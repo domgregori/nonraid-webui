@@ -1,20 +1,17 @@
-export type ContainerRuntimeStatus = 'running' | 'stopped';
-
-export interface Container {
+export interface ContainerViewModel {
+  id: string;
   name: string;
   image: string;
-  status: ContainerRuntimeStatus;
-  cpu: string;
-  mem: string;
   ports: string;
-}
-
-export interface ContainerViewModel extends Container {
   statusLabel: string;
   statusColor: string;
+  cpuLabel: string;
+  memLabel: string;
   toggleLabel: string;
   toggleBorder: string;
   toggleBg: string;
   toggleFg: string;
+  isPending: boolean;
   onToggle: () => void;
+  onRestart: () => void;
 }

@@ -1,17 +1,31 @@
 import { COLORS, tint } from '../styles/colors';
-import type { Container, ContainerRuntimeStatus, ContainerViewModel } from '../types';
+import type { ContainerViewModel } from '../types';
+import type { DockerContainerSummary } from '../types/dockerApi';
+import { formatBytesAsMB } from '../utils/format';
 
-export function deriveContainerViewModel(container: Container, status: ContainerRuntimeStatus, onToggle: () => void): ContainerViewModel {
-  const running = status === 'running';
+export interface ContainerActions {
+  isPending: boolean;
+  onToggle: () => void;
+  onRestart: () => void;
+}
+
+export function deriveContainerViewModel(container: DockerContainerSummary, actions: ContainerActions): ContainerViewModel {
+  const running = container.state === 'running';
   return {
-    ...container,
-    status,
+    id: container.id,
+    name: container.name,
+    image: container.image,
+    ports: container.ports,
     statusLabel: running ? 'Running' : 'Stopped',
     statusColor: running ? COLORS.green : COLORS.textDim,
+    cpuLabel: container.cpuPercent === null ? '—' : `${Math.round(container.cpuPercent)}%`,
+    memLabel: container.memUsedBytes === null ? '—' : formatBytesAsMB(container.memUsedBytes),
     toggleLabel: running ? 'Stop' : 'Start',
     toggleBorder: running ? COLORS.red : COLORS.green,
     toggleBg: running ? 'transparent' : tint(COLORS.green, 15),
     toggleFg: running ? COLORS.red : COLORS.green,
-    onToggle,
+    isPending: actions.isPending,
+    onToggle: actions.onToggle,
+    onRestart: actions.onRestart,
   };
 }

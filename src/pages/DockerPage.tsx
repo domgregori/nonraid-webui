@@ -1,11 +1,15 @@
-import { CONTAINERS } from '../mock/containers';
 import { deriveContainerViewModel } from '../selectors/containers';
-import { useAppStore } from '../state/useAppStore';
+import { useDockerContainers } from '../hooks/useDockerContainers';
 
 export function DockerPage() {
-  const { state, dispatch } = useAppStore();
-  const containers = CONTAINERS.map((c) =>
-    deriveContainerViewModel(c, state.containers[c.name], () => dispatch({ type: 'TOGGLE_CONTAINER', name: c.name })),
+  const { containers, status, error, pendingIds, start, stop, restart } = useDockerContainers();
+
+  const views = containers.map((c) =>
+    deriveContainerViewModel(c, {
+      isPending: pendingIds.has(c.id),
+      onToggle: () => (c.state === 'running' ? stop(c.id) : start(c.id)),
+      onRestart: () => restart(c.id),
+    }),
   );
 
   return (
@@ -17,9 +21,12 @@ export function DockerPage() {
         </button>
       </div>
 
+      {status === 'loading' && <div className="status-note">Loading containers…</div>}
+      {error && <div className="status-note status-note--error">{error}</div>}
+
       <div className="docker-grid">
-        {containers.map((c) => (
-          <div className="docker-card" key={c.name}>
+        {views.map((c) => (
+          <div className="docker-card" key={c.id}>
             <div className="docker-card__head">
               <div className="docker-card__name">{c.name}</div>
               <span className="docker-card__status" style={{ color: c.statusColor }}>
@@ -29,20 +36,21 @@ export function DockerPage() {
             </div>
             <div className="docker-card__image">{c.image}</div>
             <div className="docker-card__stats">
-              <span>CPU {c.cpu}</span>
-              <span>Mem {c.mem}</span>
+              <span>CPU {c.cpuLabel}</span>
+              <span>Mem {c.memLabel}</span>
               <span>{c.ports}</span>
             </div>
             <div className="docker-card__actions">
               <button
                 type="button"
                 className="btn"
+                disabled={c.isPending}
                 style={{ borderColor: c.toggleBorder, background: c.toggleBg, color: c.toggleFg }}
                 onClick={c.onToggle}
               >
                 {c.toggleLabel}
               </button>
-              <button type="button" className="btn">
+              <button type="button" className="btn" disabled={c.isPending} onClick={c.onRestart}>
                 Restart
               </button>
             </div>
