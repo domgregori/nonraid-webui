@@ -12,6 +12,18 @@ export function formatBytesHuman(bytes: number): string {
   return `${gb >= 10 ? Math.round(gb) : gb.toFixed(1)} GB`;
 }
 
+/** Byte-scale size for file listings — unlike formatBytesHuman this covers B/KB/MB too. */
+export function formatFileSize(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+}
+
 export function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);

@@ -1,9 +1,11 @@
 import cors from 'cors';
 import express from 'express';
+import { BrowseService } from './browse/service.js';
 import { config } from './config.js';
 import { createDockerClient } from './docker/index.js';
 import { createNmdClient } from './nmd/index.js';
 import { arrayRouter } from './routes/array.js';
+import { browseRouter } from './routes/browse.js';
 import { disksRouter } from './routes/disks.js';
 import { dockerRouter } from './routes/docker.js';
 import { parityRouter } from './routes/parity.js';
@@ -20,7 +22,9 @@ function main() {
   const docker = createDockerClient();
   const smart = new SmartService(createSmartClient());
   const shareApplier = createShareApplier();
-  const shares = new ShareService(new ShareStore(), shareApplier, nmd);
+  const shareStore = new ShareStore();
+  const shares = new ShareService(shareStore, shareApplier, nmd);
+  const browse = new BrowseService(shareStore);
   const system = new SystemStatsService();
 
   const app = express();
@@ -38,6 +42,7 @@ function main() {
   app.use('/api', dockerRouter(docker));
   app.use('/api', smartRouter(nmd, smart));
   app.use('/api', sharesRouter(shares));
+  app.use('/api', browseRouter(browse));
   app.use('/api', systemRouter(system));
 
   app.listen(config.port, () => {
