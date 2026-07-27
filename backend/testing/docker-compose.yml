@@ -1,0 +1,38 @@
+services:
+  shares-test:
+    build: ./docker
+    container_name: nonraid-webui-shares-test
+    privileged: true # needed for loop devices + FUSE (mergerfs)
+    devices:
+      - /dev/fuse
+    volumes:
+      - ../..:/app # whole nonraid-webui repo, live-mounted for iterative dev
+      - backend_node_modules:/app/backend/node_modules # keep container's own native deps (tsx/esbuild)
+      - disk_images:/data/disk-images # loopback disk image files persist across restarts
+    working_dir: /app/backend
+    # Host networking instead of published ports: this host's Docker hit an
+    # iptables/nf_tables DNAT error on port publishing (pre-existing host issue,
+    # unrelated to this container). Host networking sidesteps it entirely, and is
+    # fine here since this container is single-purpose local dev/test only.
+    # Backend ends up reachable at http://localhost:3001 same as before.
+    network_mode: host
+    environment:
+      # All modes set by hand, on purpose — the backend no longer picks mock data by
+      # itself. Real nmdctl/Docker/smartctl can't work here (no kernel module, no real
+      # SMART hardware), so those three are explicit mock. mergerfs is real and
+      # installed, so SHARES_MODE stays real.
+      NMD_MODE: mock
+      DOCKER_MODE: mock
+      SMART_MODE: mock
+      SHARES_MODE: real
+      # 10 — matches MockNmdClient's 10 mock data-disk slots (backend/src/nmd/mockData.ts).
+      # Keep these in sync: if the mock array ever changes disk count, this should too,
+      # otherwise Sharing-page disk selections for the mismatched slots would silently
+      # write to the container's root filesystem instead of a real disk-backed mount.
+      DISK_COUNT: '10'
+      DISK_SIZE_MB: '512'
+    command: bash -c "npm install && npm run dev"
+
+volumes:
+  backend_node_modules:
+  disk_images:
