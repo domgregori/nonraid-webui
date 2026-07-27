@@ -1,30 +1,28 @@
 import { deriveToggleButton } from '../../selectors/status';
-import { useAppStore } from '../../state/useAppStore';
+import { useArrayStatus } from '../../state/useArrayStatus';
 import { ArrayStatusPill } from './ArrayStatusPill';
-import { ScenarioSwitcher } from './ScenarioSwitcher';
+import { HeaderSystemInfo } from './HeaderSystemInfo';
 
 export function Header() {
-  const { state, dispatch } = useAppStore();
-  const toggleBtn = deriveToggleButton(state.arrayStarted);
+  const { status, arrayPending, toggleArray } = useArrayStatus();
+  const toggleBtn = deriveToggleButton(status);
 
   return (
     <div className="header">
       <div className="header__brand">
         <div className="header__logo">N</div>
-        <div>
-          <div className="header__title">nonraid</div>
-          <div className="header__subtitle">nmdctl dashboard</div>
-        </div>
+        <div className="header__title">nonraid</div>
       </div>
 
-      <ScenarioSwitcher />
+      <HeaderSystemInfo />
 
       <div className="header__status">
         <ArrayStatusPill />
         <button
           type="button"
           className="toggle-array-btn"
-          onClick={() => dispatch({ type: 'TOGGLE_ARRAY' })}
+          disabled={!status || arrayPending}
+          onClick={toggleArray}
           style={{ borderColor: toggleBtn.border, background: toggleBtn.bg, color: toggleBtn.fg }}
         >
           {toggleBtn.label}

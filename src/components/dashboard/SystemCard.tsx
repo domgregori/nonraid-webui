@@ -1,12 +1,15 @@
 import { COLORS } from '../../styles/colors';
+import { useSystemStats } from '../../hooks/useSystemStats';
+import { formatMemLabel } from '../../utils/format';
 import { Card } from '../shared/Card';
 import { ProgressBar } from '../shared/ProgressBar';
 
-const CPU_PCT = 14;
-const RAM_PCT = 30;
-const RAM_LABEL = '9.6 / 32 GB';
-
 export function SystemCard() {
+  const stats = useSystemStats();
+  if (!stats) return null;
+
+  const memPct = Math.round((stats.memUsedBytes / stats.memTotalBytes) * 100);
+
   return (
     <Card className="bars-card">
       <div className="eyebrow" style={{ marginBottom: 12 }}>
@@ -15,16 +18,16 @@ export function SystemCard() {
       <div>
         <div className="bar-row__head">
           <span>CPU</span>
-          <span className="bar-row__value">{CPU_PCT}%</span>
+          <span className="bar-row__value">{Math.round(stats.cpuPercent)}%</span>
         </div>
-        <ProgressBar pct={CPU_PCT} color={COLORS.blue} />
+        <ProgressBar pct={stats.cpuPercent} color={COLORS.blue} />
       </div>
       <div>
         <div className="bar-row__head">
           <span>Memory</span>
-          <span className="bar-row__value">{RAM_LABEL}</span>
+          <span className="bar-row__value">{formatMemLabel(stats.memUsedBytes, stats.memTotalBytes)}</span>
         </div>
-        <ProgressBar pct={RAM_PCT} color={COLORS.blue} />
+        <ProgressBar pct={memPct} color={COLORS.blue} />
       </div>
     </Card>
   );
