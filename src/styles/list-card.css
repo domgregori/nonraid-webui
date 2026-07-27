@@ -1,0 +1,87 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.list-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.list-card__title {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.list-card__subtitle {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.list-card__col {
+  flex: 1 1 160px;
+  min-width: 140px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.list-card__col--name {
+  flex: 1 1 140px;
+  min-width: 140px;
+}
+
+.list-card__col--wide {
+  flex: 2 1 200px;
+  min-width: 180px;
+}
+
+.list-card__progress {
+  flex: 1 1 160px;
+  min-width: 160px;
+}
+
+.list-card__progress .progress-track {
+  height: 6px;
+}
+
+.list-card__progress-label {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+}
+
+.list-card__actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+.badge {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+}

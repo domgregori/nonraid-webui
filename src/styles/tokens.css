@@ -1,0 +1,47 @@
+:root {
+  --color-bg: oklch(0.16 0.02 260);
+  --color-surface: oklch(0.21 0.02 260);
+  --color-surface-elevated: oklch(0.25 0.02 260);
+  --color-border: oklch(0.32 0.02 260);
+  --color-border-lit: oklch(0.4 0.03 260);
+
+  --color-text: oklch(0.93 0.01 260);
+  --color-text-secondary: oklch(0.68 0.02 260);
+  --color-text-dim: oklch(0.52 0.02 260);
+
+  --color-blue: oklch(0.68 0.14 240);
+  --color-green: oklch(0.72 0.15 145);
+  --color-amber: oklch(0.78 0.15 80);
+  --color-red: oklch(0.64 0.19 25);
+
+  --color-blue-tint: color-mix(in oklch, var(--color-blue) 15%, transparent);
+  --color-blue-tint-strong: color-mix(in oklch, var(--color-blue) 18%, transparent);
+  --color-blue-tint-soft: color-mix(in oklch, var(--color-blue) 12%, transparent);
+  --color-green-tint: color-mix(in oklch, var(--color-green) 15%, transparent);
+  --color-red-tint: color-mix(in oklch, var(--color-red) 8%, var(--color-surface));
+
+  --font-ui: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --radius-card: 12px;
+  --radius-chip: 7px;
+  --radius-btn: 8px;
+  --radius-pill: 999px;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}

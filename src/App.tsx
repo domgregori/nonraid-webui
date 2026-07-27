@@ -1,0 +1,27 @@
+import { Route, Routes } from 'react-router-dom';
+import { AppShell } from './components/layout/AppShell';
+import { DashboardPage } from './pages/DashboardPage';
+import { DockerPage } from './pages/DockerPage';
+import { HistoryPage } from './pages/HistoryPage';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { SettingsPage } from './pages/SettingsPage';
+import { SharesPage } from './pages/SharesPage';
+import { UsersPage } from './pages/UsersPage';
+
+function App() {
+  return (
+    <AppShell>
+      <Routes>
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/shares" element={<SharesPage />} />
+        <Route path="/users" element={<UsersPage />} />
+        <Route path="/docker" element={<DockerPage />} />
+        <Route path="/history" element={<HistoryPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </AppShell>
+  );
+}
+
+export default App;

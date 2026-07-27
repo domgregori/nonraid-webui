@@ -1,0 +1,10 @@
+@import './styles/tokens.css';
+@import './styles/global.css';
+@import './styles/layout.css';
+@import './styles/dashboard.css';
+@import './styles/list-card.css';
+@import './styles/docker.css';
+@import './styles/settings.css';
+@import './styles/history.css';
+@import './styles/disk-detail.css';
+@import './styles/dialog.css';

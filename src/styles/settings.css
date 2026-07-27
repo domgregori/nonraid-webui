@@ -1,0 +1,45 @@
+.settings-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-xl);
+}
+
+.settings-card__title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.settings-card .toggle-row,
+.settings-card .toggle-row--bordered {
+  padding: 10px 0;
+}
+
+.danger-card {
+  background: var(--color-red-tint);
+  border: 1px solid var(--color-red);
+  border-radius: var(--radius-card);
+  padding: var(--space-xl);
+}
+
+.danger-card__title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--color-red);
+}
+
+.danger-card__text {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.danger-card .btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: var(--radius-btn);
+}
