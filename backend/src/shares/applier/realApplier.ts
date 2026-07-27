@@ -18,10 +18,13 @@ function mergerfsPolicy(method: AllocationMethod): string {
     case 'fill-up':
       return 'ff'; // first branch (in order) with room — fills one disk before moving on
     case 'high-water':
-      // No exact mergerfs equivalent to Unraid's High-Water. `msp` (most shared path,
-      // preferring the branch with the most free space among those already containing
-      // the path) is the closest approximation, not a faithful reproduction.
-      return 'msp';
+      // No exact mergerfs equivalent to Unraid's High-Water. `mspmfs` (most shared path,
+      // tie-broken by most free space among branches that already contain the path) is
+      // the closest approximation, not a faithful reproduction. Bare `msp` is NOT a valid
+      // policy name on its own — it's always paired with a tiebreak suffix (mspmfs/msplfs/
+      // msppfrd/msplus). mergerfs 2.33.5 silently accepted the invalid bare `msp` and only
+      // segfaulted later on an actual write; 2.42.0 correctly rejects it up front.
+      return 'mspmfs';
     case 'single-disk':
       return 'ff'; // irrelevant — single-disk shares are bind-mounted, not pooled
   }
@@ -113,7 +116,11 @@ export class RealShareApplier implements ShareApplier {
       await run('mount', ['--bind', branches[0]!, mountPoint]);
     } else {
       const policy = mergerfsPolicy(share.allocationMethod);
-      await run('mergerfs', ['-o', `category.create=${policy},use_ino`, branches.join(':'), mountPoint]);
+      // mergerfs excludes any branch below `minfreespace` (default 4G) from create-policy
+      // consideration — with real multi-TB disks that's a sane safety margin, but it silently
+      // makes every branch ineligible (ENOSPC on every write) on small disks, which is exactly
+      // what this repo's test disks are. Lower it so writes still work on small/near-full disks.
+      await run('mergerfs', ['-o', `category.create=${policy},use_ino,minfreespace=100M`, branches.join(':'), mountPoint]);
     }
 
     return { ok: true, message: `Share "${share.name}" mounted at ${mountPoint} (${branches.length} disk${branches.length === 1 ? '' : 's'})` };
