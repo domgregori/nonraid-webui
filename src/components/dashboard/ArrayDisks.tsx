@@ -1,11 +1,12 @@
 import { deriveDisks } from '../../selectors/disks';
-import { useAppStore } from '../../state/useAppStore';
+import { useArrayStatus } from '../../state/useArrayStatus';
 import { DataDiskCard, ParityDiskCard } from './DiskCard';
 
 export function ArrayDisks() {
-  const { state, dispatch } = useAppStore();
-  const { parity, data } = deriveDisks(state);
-  const select = (id: string) => dispatch({ type: 'SELECT_DISK', id });
+  const { status, temps, selectDisk } = useArrayStatus();
+  if (!status) return null;
+
+  const { parity, data } = deriveDisks(status, temps);
 
   return (
     <div>
@@ -13,13 +14,13 @@ export function ArrayDisks() {
 
       <div className="disk-row">
         {parity.map((disk) => (
-          <ParityDiskCard key={disk.id} disk={disk} onClick={() => select(disk.id)} />
+          <ParityDiskCard key={disk.id} disk={disk} onClick={() => selectDisk(disk.id)} />
         ))}
       </div>
 
       <div className="disk-grid">
         {data.map((disk) => (
-          <DataDiskCard key={disk.id} disk={disk} onClick={() => select(disk.id)} />
+          <DataDiskCard key={disk.id} disk={disk} onClick={() => selectDisk(disk.id)} />
         ))}
       </div>
     </div>

@@ -1,11 +1,13 @@
 import { deriveParityViewModel } from '../../selectors/parity';
-import { useAppStore } from '../../state/useAppStore';
+import { useArrayStatus } from '../../state/useArrayStatus';
 import { Card } from '../shared/Card';
 import { ProgressBar } from '../shared/ProgressBar';
 
 export function ParityCheckCard() {
-  const { state, dispatch } = useAppStore();
-  const parity = deriveParityViewModel(state.parity, state.arrayStarted, state.scenario, dispatch);
+  const { status, parityPending, parityAction } = useArrayStatus();
+  if (!status) return null;
+
+  const parity = deriveParityViewModel(status, parityPending, parityAction);
 
   return (
     <Card>
@@ -14,16 +16,16 @@ export function ParityCheckCard() {
         <div className="parity-card__actions">
           {parity.isRunning && (
             <>
-              <button type="button" className="btn" onClick={parity.pauseHandler}>
+              <button type="button" className="btn" disabled={parityPending} onClick={parity.pauseHandler}>
                 {parity.pauseLabel}
               </button>
-              <button type="button" className="btn btn--danger" onClick={parity.cancelHandler}>
+              <button type="button" className="btn btn--danger" disabled={parityPending} onClick={parity.cancelHandler}>
                 Cancel
               </button>
             </>
           )}
           {parity.canStart && (
-            <button type="button" className="btn--primary-sm" onClick={parity.startHandler}>
+            <button type="button" className="btn--primary-sm" disabled={parityPending} onClick={parity.startHandler}>
               Start Parity Check
             </button>
           )}

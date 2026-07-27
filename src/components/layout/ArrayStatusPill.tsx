@@ -1,9 +1,9 @@
 import { deriveArrayStatus } from '../../selectors/status';
-import { useAppStore } from '../../state/useAppStore';
+import { useArrayStatus } from '../../state/useArrayStatus';
 
 export function ArrayStatusPill() {
-  const { state } = useAppStore();
-  const { text, color, pillBg } = deriveArrayStatus(state.arrayStarted, state.scenario, state.parity);
+  const { status } = useArrayStatus();
+  const { text, color, pillBg } = deriveArrayStatus(status);
 
   return (
     <div className="status-pill" style={{ borderColor: color, background: pillBg }}>

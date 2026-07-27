@@ -1,9 +1,37 @@
 import { COLORS } from '../styles/colors';
-import { DATA_DISKS, DEGRADED_MISSING_SLOT, PARITY_DISKS } from '../mock/disks';
-import type { AppState } from '../state/appReducer';
-import type { DiskBase, DiskViewModel } from '../types';
+import type { DiskViewModel } from '../types';
+import type { NmdDisk, NmdStatusResponse } from '../types/nmdApi';
 
-export function deriveDisk(base: DiskBase, arrayStarted: boolean, missing: boolean): DiskViewModel {
+const STATUS_LABELS: Record<string, string> = {
+  DISK_NP_MISSING: 'Missing · Emulated',
+  DISK_WRONG: 'Wrong Disk',
+  DISK_INVALID: 'Invalid',
+  DISK_DSBL: 'Disabled',
+  DISK_NP_DSBL: 'Disabled',
+  DISK_NEW: 'New',
+  DISK_DSBL_NEW: 'New (Disabled)',
+};
+
+function formatSize(sizeGb: number): string {
+  const tb = sizeGb / 1024;
+  if (tb >= 1) return `${Number.isInteger(tb) ? tb : tb.toFixed(1)} TB`;
+  if (sizeGb >= 10) return `${Math.round(sizeGb)} GB`;
+  return `${sizeGb.toFixed(1)} GB`; // small test disks (e.g. 0.5 GB) need the decimal
+}
+
+function parseUsagePct(usage: string | undefined): number {
+  const match = usage?.match(/(\d+)%/);
+  return match ? Number(match[1]) : 0;
+}
+
+function normalize(value: string | undefined): string {
+  return value && value !== '-' ? value : '—';
+}
+
+export function deriveDisk(disk: NmdDisk, arrayStarted: boolean, tempC: number | null | undefined): DiskViewModel {
+  const role: 'parity' | 'data' = disk.type === 'P' || disk.type === 'Q' ? 'parity' : 'data';
+  const label = disk.type === 'P' ? 'Parity 1' : disk.type === 'Q' ? 'Parity 2' : `Disk ${disk.slot}`;
+
   let status: DiskViewModel['status'];
   let statusLabel: string;
   let statusColor: string;
@@ -11,74 +39,71 @@ export function deriveDisk(base: DiskBase, arrayStarted: boolean, missing: boole
     status = 'standby';
     statusLabel = 'Standby';
     statusColor = COLORS.textDim;
-  } else if (missing) {
-    status = 'missing';
-    statusLabel = 'Missing · Emulated';
-    statusColor = COLORS.red;
-  } else {
+  } else if (disk.status === 'DISK_OK') {
     status = 'active';
     statusLabel = 'Active';
     statusColor = COLORS.green;
+  } else {
+    status = 'missing';
+    statusLabel = STATUS_LABELS[disk.status] ?? disk.status;
+    statusColor = COLORS.red;
   }
 
-  const usedPct = base.usedPct ?? 0;
-  const fsType = base.role === 'parity' ? '—' : 'XFS';
-  const mountpoint = !arrayStarted || base.role === 'parity' ? '—' : '/mnt/disk' + base.slot;
-  const tempLabel = !arrayStarted || missing || base.role === 'parity' ? '—' : base.temp + '°C';
-  const tempColor = base.temp >= 40 ? COLORS.amber : COLORS.textSecondary;
-  const barWidth = (base.role === 'parity' ? 100 : usedPct) + '%';
-  const barColor = usedPct >= 90 ? COLORS.red : usedPct >= 75 ? COLORS.amber : COLORS.blue;
-  const borderColor = status === 'missing' ? COLORS.red : status === 'standby' ? COLORS.border : COLORS.borderLit;
+  const usedPct = role === 'data' ? parseUsagePct(disk.filesystem?.usage) : 0;
+  const sizeTB = disk.size_gb / 1024;
+  const tempColor = typeof tempC === 'number' && tempC >= 40 ? COLORS.amber : COLORS.textSecondary;
 
   return {
-    ...base,
+    id: String(disk.slot),
+    slot: disk.slot,
+    label,
+    role,
+    size: sizeTB,
+    device: disk.device,
+    usedPct,
+    temp: tempC ?? 0,
     status,
     statusLabel,
     statusColor,
-    sizeLabel: base.size + ' TB',
-    usedLabel: base.role === 'parity' ? '—' : usedPct + '%',
-    fsType,
-    mountpoint,
-    tempLabel,
+    sizeLabel: formatSize(disk.size_gb),
+    usedLabel: role === 'parity' ? '—' : `${usedPct}%`,
+    fsType: role === 'parity' ? '—' : (disk.filesystem?.type ?? '—').toUpperCase(),
+    mountpoint: role === 'parity' ? '—' : normalize(disk.filesystem?.mountpoint),
+    tempLabel: typeof tempC === 'number' ? `${Math.round(tempC)}°C` : '—',
     tempColor,
-    barWidth,
-    barColor,
-    borderColor,
+    barWidth: `${usedPct}%`,
+    barColor: usedPct >= 90 ? COLORS.red : usedPct >= 75 ? COLORS.amber : COLORS.blue,
+    borderColor: status === 'missing' ? COLORS.red : status === 'standby' ? COLORS.border : COLORS.borderLit,
   };
 }
 
-export function deriveDisks(state: AppState): { parity: DiskViewModel[]; data: DiskViewModel[]; all: DiskViewModel[] } {
-  const { arrayStarted, scenario } = state;
-  const degraded = scenario === 'degraded';
-
-  const parity = PARITY_DISKS.map((d) =>
-    deriveDisk({ id: d.id, slot: d.slot, label: d.label, role: 'parity', size: d.size, device: d.device, usedPct: 0, temp: 0 }, arrayStarted, false),
-  );
-
-  const data = DATA_DISKS.map((d) => {
-    const missing = degraded && d.slot === DEGRADED_MISSING_SLOT;
-    const base: DiskBase = {
-      id: 'd' + d.slot,
-      slot: d.slot,
-      label: 'Disk ' + d.slot,
-      role: 'data',
-      size: d.size,
-      device: arrayStarted ? '/dev/nmd' + d.slot + 'p1' : '/dev/sd' + String.fromCharCode(100 + d.slot),
-      usedPct: d.used,
-      temp: d.temp,
-    };
-    return deriveDisk(base, arrayStarted, missing);
-  });
-
-  return { parity, data, all: [...parity, ...data] };
+export function deriveDisks(
+  status: NmdStatusResponse,
+  temps: Record<string, number | null>,
+): { parity: DiskViewModel[]; data: DiskViewModel[]; all: DiskViewModel[] } {
+  const arrayStarted = status.array.state === 'STARTED';
+  const sorted = [...status.disks].sort((a, b) => a.slot - b.slot);
+  const all = sorted.map((d) => deriveDisk(d, arrayStarted, temps[d.device]));
+  return {
+    parity: all.filter((d) => d.role === 'parity'),
+    data: all.filter((d) => d.role === 'data'),
+    all,
+  };
 }
 
 export function deriveCapacity(dataDisks: DiskViewModel[], arrayStarted: boolean) {
   const totalTB = dataDisks.reduce((s, d) => s + d.size, 0);
-  const usedTB = Math.round(dataDisks.reduce((s, d) => s + d.size * (d.usedPct / 100), 0));
+  const usedTB = dataDisks.reduce((s, d) => s + d.size * (d.usedPct / 100), 0);
   const freeTB = totalTB - usedTB;
-  const pct = arrayStarted ? Math.round((usedTB / totalTB) * 100) : 0;
-  return { usedTB, totalTB, freeTB, pct };
+  const pct = arrayStarted && totalTB > 0 ? Math.round((usedTB / totalTB) * 100) : 0;
+  // formatSize picks GB vs TB itself — small test disks (e.g. 5 GB total) would
+  // otherwise round to "0 / 0 TB" if this stayed hardcoded to TB.
+  return {
+    usedLabel: formatSize(usedTB * 1024),
+    totalLabel: formatSize(totalTB * 1024),
+    freeLabel: formatSize(freeTB * 1024),
+    pct,
+  };
 }
 
 export function deriveDisksOnline(disks: DiskViewModel[]): number {

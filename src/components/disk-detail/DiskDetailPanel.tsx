@@ -1,24 +1,21 @@
 import { deriveDisks } from '../../selectors/disks';
-import { useAppStore } from '../../state/useAppStore';
+import { useArrayStatus } from '../../state/useArrayStatus';
 
 export function DiskDetailPanel() {
-  const { state, dispatch } = useAppStore();
-  const { selectedDiskId, actionNote } = state;
-  if (!selectedDiskId) return null;
+  const { status, temps, selectedDiskId, actionNote, unassignPending, closeDetail, unassignDisk, replaceDisk } = useArrayStatus();
+  if (!selectedDiskId || !status) return null;
 
-  const { all } = deriveDisks(state);
+  const { all } = deriveDisks(status, temps);
   const disk = all.find((d) => d.id === selectedDiskId);
   if (!disk) return null;
 
-  const close = () => dispatch({ type: 'CLOSE_DETAIL' });
-
   return (
     <>
-      <div className="detail-overlay" onClick={close} />
+      <div className="detail-overlay" onClick={closeDetail} />
       <div className="detail-panel">
         <div className="detail-panel__head">
           <div className="detail-panel__title">{disk.label}</div>
-          <button type="button" className="detail-panel__close" onClick={close} aria-label="Close">
+          <button type="button" className="detail-panel__close" onClick={closeDetail} aria-label="Close">
             &#10005;
           </button>
         </div>
@@ -64,19 +61,16 @@ export function DiskDetailPanel() {
         </div>
 
         <div className="detail-actions">
-          <button
-            type="button"
-            className="btn btn--block"
-            onClick={() => dispatch({ type: 'REPLACE_DISK', slot: disk.slot })}
-          >
+          <button type="button" className="btn btn--block" onClick={() => replaceDisk(disk.slot)}>
             Replace Disk
           </button>
           <button
             type="button"
             className="btn btn--block btn--danger"
-            onClick={() => dispatch({ type: 'UNASSIGN_DISK', slot: disk.slot })}
+            disabled={unassignPending}
+            onClick={() => unassignDisk(disk.slot)}
           >
-            Unassign Disk
+            {unassignPending ? 'Unassigning…' : 'Unassign Disk'}
           </button>
         </div>
 
