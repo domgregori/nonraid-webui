@@ -4,9 +4,10 @@ interface ToggleSwitchProps {
   on: boolean;
   onToggle: () => void;
   label: string;
+  disabled?: boolean;
 }
 
-export function ToggleSwitch({ on, onToggle, label }: ToggleSwitchProps) {
+export function ToggleSwitch({ on, onToggle, label, disabled }: ToggleSwitchProps) {
   return (
     <button
       type="button"
@@ -14,7 +15,8 @@ export function ToggleSwitch({ on, onToggle, label }: ToggleSwitchProps) {
       aria-pressed={on}
       aria-label={label}
       onClick={onToggle}
-      style={{ background: on ? COLORS.blue : COLORS.border }}
+      disabled={disabled}
+      style={{ background: on ? COLORS.blue : COLORS.border, opacity: disabled ? 0.5 : 1, cursor: disabled ? 'default' : 'pointer' }}
     >
       <div className="toggle-switch__thumb" style={{ marginLeft: on ? 18 : 0 }} />
     </button>

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import type { AllocationMethod, Share, ShareInput } from '../../types/sharesApi';
+import { ToggleSwitch } from '../shared/ToggleSwitch';
 
 interface ShareFormModalProps {
   initial: Share | null; // null = create mode
@@ -20,9 +21,27 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
   const { status } = useArrayStatus();
   const dataDisks = (status?.disks ?? []).filter((d) => d.type === 'data').sort((a, b) => a.slot - b.slot);
 
+  const allDiskSlots = dataDisks.map((d) => d.slot);
+
   const [name, setName] = useState(initial?.name ?? '');
-  const [disks, setDisks] = useState<number[]>(initial?.disks ?? []);
+  const [disks, setDisks] = useState<number[]>(initial?.disks ?? allDiskSlots);
   const [allocationMethod, setAllocationMethod] = useState<AllocationMethod>(initial?.allocationMethod ?? 'most-free');
+  // Default to "all drives" on create, or on edit if the share already uses every data disk.
+  const [useAllDisks, setUseAllDisks] = useState<boolean>(() => {
+    if (initial?.allocationMethod === 'single-disk') return false;
+    const disksAtLoad = initial?.disks ?? allDiskSlots;
+    return (
+      disksAtLoad.length === allDiskSlots.length &&
+      allDiskSlots.every((slot) => disksAtLoad.includes(slot))
+    );
+  });
+
+  // Keep the disk list in sync with the array while "all drives" is on, so a disk added
+  // after the modal opens (or removed) is reflected without the user re-toggling anything.
+  const allDiskSlotsKey = allDiskSlots.join(',');
+  useEffect(() => {
+    if (useAllDisks) setDisks(allDiskSlots);
+  }, [useAllDisks, allDiskSlotsKey]);
   const [smbEnabled, setSmbEnabled] = useState(initial?.protocols.includes('smb') ?? true);
   const [smbPublic, setSmbPublic] = useState(initial?.smb?.public ?? true);
   const [nfsEnabled, setNfsEnabled] = useState(initial?.protocols.includes('nfs') ?? false);
@@ -42,7 +61,11 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
 
   const handleAllocationChange = (value: AllocationMethod) => {
     setAllocationMethod(value);
-    if (value === 'single-disk' && disks.length > 1) setDisks(disks.slice(0, 1));
+    if (value === 'single-disk') {
+      // "All drives" doesn't apply to a single-disk share — fall back to manual selection.
+      setUseAllDisks(false);
+      if (disks.length > 1) setDisks(disks.slice(0, 1));
+    }
   };
 
   const validate = (): string | null => {
@@ -98,20 +121,36 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
           </label>
 
           <div className="form-field">
-            <span className="form-field__label">Disks</span>
-            <div className="disk-checkbox-grid">
-              {dataDisks.map((d) => (
-                <label key={d.slot} className="disk-checkbox">
-                  <input
-                    type={allocationMethod === 'single-disk' ? 'radio' : 'checkbox'}
-                    checked={disks.includes(d.slot)}
-                    onChange={() => toggleDisk(d.slot)}
-                  />
-                  Disk {d.slot}
-                </label>
-              ))}
-              {dataDisks.length === 0 && <span className="status-note">No data disks reported by the array right now.</span>}
+            <div className="toggle-row" style={{ padding: 0 }}>
+              <div>
+                <div className="toggle-row__title">Use all drives</div>
+                <div className="toggle-row__desc">
+                  {useAllDisks ? `Using all ${allDiskSlots.length} data disk(s)` : 'Choose specific disks below'}
+                </div>
+              </div>
+              <ToggleSwitch
+                on={useAllDisks}
+                onToggle={() => setUseAllDisks((prev) => !prev)}
+                label="Use all drives"
+                disabled={allocationMethod === 'single-disk'}
+              />
             </div>
+
+            {!useAllDisks && (
+              <div className="disk-checkbox-grid" style={{ marginTop: 8 }}>
+                {dataDisks.map((d) => (
+                  <label key={d.slot} className="disk-checkbox">
+                    <input
+                      type={allocationMethod === 'single-disk' ? 'radio' : 'checkbox'}
+                      checked={disks.includes(d.slot)}
+                      onChange={() => toggleDisk(d.slot)}
+                    />
+                    Disk {d.slot}
+                  </label>
+                ))}
+                {dataDisks.length === 0 && <span className="status-note">No data disks reported by the array right now.</span>}
+              </div>
+            )}
           </div>
 
           <label className="form-field">
