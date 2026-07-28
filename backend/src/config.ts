@@ -48,9 +48,13 @@ export const config = {
   systemStatsIntervalMs: Number(process.env.SYSTEM_STATS_INTERVAL_MS ?? 2_000),
   usersMode: (process.env.USERS_MODE as UsersMode | undefined) ?? 'real',
   usersUseSudo: envBool('USERS_USE_SUDO', false),
-  // Managed users/groups live at uid/gid >= this, so they're clearly distinguishable
-  // from real host system accounts (never touches anything below this range).
+  // Managed users/groups live in [start, end], so they're clearly distinguishable
+  // from real host system accounts (never touches anything outside this range).
+  // The upper bound matters as much as the lower one: 65534/65535 are the
+  // classic reserved "nobody"/"nogroup"/overflow uid-gid values on Linux, and
+  // an open-ended ">= start" check would wrongly treat those as app-managed.
   usersUidRangeStart: Number(process.env.USERS_UID_RANGE_START ?? 20_000),
+  usersUidRangeEnd: Number(process.env.USERS_UID_RANGE_END ?? 59_999),
   usersTimeoutMs: Number(process.env.USERS_TIMEOUT_MS ?? 15_000),
   usersShellPath: process.env.USERS_SHELL_PATH ?? '/usr/sbin/nologin',
 };

@@ -41,7 +41,7 @@ export class UsersService {
    * request could otherwise name a real pre-existing system group (docker, sudo, disk, ...)
    * and get a managed user added to it via usermod, which is effectively privilege escalation
    * (docker-group membership is root-equivalent). Only groups this app itself created
-   * (gid >= config.usersUidRangeStart) are ever valid targets.
+   * (gid in [config.usersUidRangeStart, config.usersUidRangeEnd]) are ever valid targets.
    */
   private async assertManagedGroups(groups: string[]): Promise<void> {
     const managed = new Set((await this.client.listGroups()).map((g) => g.name));

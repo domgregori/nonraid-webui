@@ -54,7 +54,11 @@ async function setSambaPassword(username: string, password: string): Promise<voi
   await runWithStdin('smbpasswd', ['-a', '-s', username], `${password}\n${password}\n`);
 }
 
-function parseGetentPasswd(stdout: string, uidRangeStart: number): { username: string; uid: number }[] {
+function parseGetentPasswd(
+  stdout: string,
+  uidRangeStart: number,
+  uidRangeEnd: number,
+): { username: string; uid: number }[] {
   return stdout
     .trim()
     .split('\n')
@@ -63,7 +67,7 @@ function parseGetentPasswd(stdout: string, uidRangeStart: number): { username: s
       const [username, , uidStr] = line.split(':');
       return { username: username!, uid: Number(uidStr) };
     })
-    .filter((u) => Number.isInteger(u.uid) && u.uid >= uidRangeStart);
+    .filter((u) => Number.isInteger(u.uid) && u.uid >= uidRangeStart && u.uid <= uidRangeEnd);
 }
 
 function parseGetentGroup(stdout: string): { name: string; gid: number; members: string[] }[] {
@@ -85,9 +89,12 @@ function parseGetentGroup(stdout: string): { name: string; gid: number; members:
  * Shells out to real useradd/usermod/userdel/groupadd/groupdel/chpasswd/smbpasswd.
  * The host's /etc/passwd + /etc/group (via getent, which also covers NSS sources
  * like LDAP if configured) are the source of truth for who exists — no separate
- * JSON cache to drift out of sync with. Only accounts with uid/gid >=
- * config.usersUidRangeStart are considered "managed" (listed, editable, deletable)
- * so this can never touch real host system accounts.
+ * JSON cache to drift out of sync with. Only accounts with uid/gid in
+ * [config.usersUidRangeStart, config.usersUidRangeEnd] are considered "managed"
+ * (listed, editable, deletable) so this can never touch real host system
+ * accounts. The upper bound matters: without it, reserved accounts like
+ * `nobody`/`nogroup` (uid/gid 65534 on Linux) satisfy a plain ">= start" check
+ * and get misidentified as app-managed — confirmed live on a real host.
  */
 export class RealUsersClient implements UsersClient {
   readonly mode = 'real' as const;
@@ -98,7 +105,9 @@ export class RealUsersClient implements UsersClient {
   }
 
   private async managedGroups() {
-    return (await this.allGroups()).filter((g) => g.gid >= config.usersUidRangeStart);
+    return (await this.allGroups()).filter(
+      (g) => g.gid >= config.usersUidRangeStart && g.gid <= config.usersUidRangeEnd,
+    );
   }
 
   private async nextUid(): Promise<number> {
@@ -115,7 +124,7 @@ export class RealUsersClient implements UsersClient {
 
   async listUsers(): Promise<User[]> {
     const [{ stdout }, groups] = await Promise.all([run('getent', ['passwd']), this.managedGroups()]);
-    const users = parseGetentPasswd(stdout, config.usersUidRangeStart);
+    const users = parseGetentPasswd(stdout, config.usersUidRangeStart, config.usersUidRangeEnd);
     return users.map((u) => ({
       username: u.username,
       uid: u.uid,
@@ -129,7 +138,11 @@ export class RealUsersClient implements UsersClient {
     }
 
     const uid = await this.nextUid();
-    await run('useradd', ['-u', String(uid), '-M', '-s', config.usersShellPath, input.username]);
+    // -N: don't auto-create a same-name private group. Without this, useradd creates
+    // one with a gid that often lands inside our managed range (confirmed live — it
+    // frequently matches the new uid), making it indistinguishable from a real
+    // app-created group and cluttering the group list with one-off noise per user.
+    await run('useradd', ['-u', String(uid), '-N', '-M', '-s', config.usersShellPath, input.username]);
     await setUnixPassword(input.username, input.password);
     await setSambaPassword(input.username, input.password);
     if (input.groups.length > 0) {
