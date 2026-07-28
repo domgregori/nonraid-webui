@@ -1,44 +1,106 @@
-import { tint } from '../styles/colors';
-import { USERS } from '../mock/users';
+import { useState } from 'react';
+import { AddUserModal } from '../components/users/AddUserModal';
+import { GroupsModal } from '../components/users/GroupsModal';
+import { UserDetailPanel } from '../components/users/UserDetailPanel';
+import { useGroups } from '../hooks/useGroups';
+import { useUsers } from '../hooks/useUsers';
 import { deriveUserViewModel } from '../selectors/users';
 
 export function UsersPage() {
-  const users = USERS.map(deriveUserViewModel);
+  const { users, status, error, actionError, pendingUsernames, create, update, remove } = useUsers();
+  const groups = useGroups();
+  const [creating, setCreating] = useState(false);
+  const [managingGroups, setManagingGroups] = useState(false);
+  const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+
+  const views = users.map(deriveUserViewModel);
+  const existingUsernames = users.map((u) => u.username);
+  const selectedUser = users.find((u) => u.username === selectedUsername) ?? null;
+
+  const handleDeleteClick = (username: string) => {
+    if (confirmingDelete === username) {
+      remove(username);
+      setConfirmingDelete(null);
+    } else {
+      setConfirmingDelete(username);
+    }
+  };
 
   return (
     <div className="page">
       <div className="page-header">
         <div className="page-title">Users</div>
-        <button type="button" className="btn--primary">
-          Add User
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn" onClick={() => setManagingGroups(true)}>
+            Groups
+          </button>
+          <button type="button" className="btn--primary" onClick={() => setCreating(true)}>
+            Add User
+          </button>
+        </div>
       </div>
 
+      {status === 'loading' && <div className="status-note">Loading users…</div>}
+      {error && <div className="status-note status-note--error">{error}</div>}
+      {actionError && <div className="status-note status-note--error">{actionError}</div>}
+
       <div className="list">
-        {users.map((u) => (
-          <div className="list-card" key={u.name}>
+        {views.map((u) => (
+          <div className="list-card" key={u.username}>
             <div className="avatar">{u.initial}</div>
             <div className="list-card__col--name">
-              <div className="list-card__title">{u.name}</div>
-              <div className="list-card__subtitle">Last login: {u.lastLogin}</div>
+              <div className="list-card__title">{u.username}</div>
+              <div className="list-card__subtitle">uid {u.uid}</div>
             </div>
-            <div className="list-card__col" style={{ flexBasis: 150 }}>
-              <span className="badge" style={{ background: tint(u.roleColor, 15), color: u.roleColor }}>
-                {u.role}
-              </span>
-            </div>
-            <div className="list-card__col--wide">Access: {u.access}</div>
+            <div className="list-card__col--wide">{u.groupsLabel}</div>
             <div className="list-card__actions">
-              <button type="button" className="btn">
-                Edit
+              <button type="button" className="btn" disabled={pendingUsernames.has(u.username)} onClick={() => setSelectedUsername(u.username)}>
+                Manage
               </button>
-              <button type="button" className="btn btn--danger">
-                Remove
+              <button
+                type="button"
+                className="btn btn--danger"
+                disabled={pendingUsernames.has(u.username)}
+                onClick={() => handleDeleteClick(u.username)}
+              >
+                {confirmingDelete === u.username ? 'Confirm?' : 'Remove'}
               </button>
             </div>
           </div>
         ))}
+        {status === 'ready' && views.length === 0 && <div className="status-note">No users yet.</div>}
       </div>
+
+      {creating && (
+        <AddUserModal
+          existingUsernames={existingUsernames}
+          onCancel={() => setCreating(false)}
+          onSubmit={async (input) => {
+            const ok = await create(input);
+            if (ok) setCreating(false);
+            return ok;
+          }}
+        />
+      )}
+
+      {managingGroups && <GroupsModal groups={groups} onClose={() => setManagingGroups(false)} />}
+
+      {selectedUser && (
+        <UserDetailPanel
+          user={selectedUser}
+          groups={groups.groups}
+          pending={pendingUsernames.has(selectedUser.username)}
+          onClose={() => setSelectedUsername(null)}
+          onUpdateGroups={(nextGroups) => update(selectedUser.username, { groups: nextGroups })}
+          onResetPassword={(password) => update(selectedUser.username, { password })}
+          onDelete={async () => {
+            const ok = await remove(selectedUser.username);
+            if (ok) setSelectedUsername(null);
+            return ok;
+          }}
+        />
+      )}
     </div>
   );
 }

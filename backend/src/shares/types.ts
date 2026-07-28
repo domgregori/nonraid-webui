@@ -1,6 +1,16 @@
 export type AllocationMethod = 'most-free' | 'fill-up' | 'high-water' | 'single-disk';
 export type ShareProtocol = 'smb' | 'nfs';
 
+// Per-user/per-group SMB access level for a share. NFS exports stay host-based
+// (see realApplier.ts) — vanilla NFS has no per-user auth to hang this off of.
+export type SharePermission = 'read-write' | 'read-only' | 'none' | 'hidden';
+
+// One share's full access list, by principal name. Groups are Samba's "@groupname" syntax.
+export interface ShareAccess {
+  users: Record<string, SharePermission>;
+  groups: Record<string, SharePermission>;
+}
+
 export interface ShareInput {
   name: string;
   disks: number[]; // data disk slots

@@ -6,10 +6,14 @@ containers, historical metrics (via Grafana), and array settings.
 
 Two-part repo: a React frontend (this directory) and an Express backend (`backend/`) that wraps
 `nmdctl`, the Docker Engine API, `smartctl`, mergerfs/Samba/NFS (shares), and host CPU/memory.
-**Dashboard, Docker, and Sharing pages are wired to the real backend** (polling, with mock fallbacks
-when nonraid/Docker/smartmontools/mergerfs aren't available — see `backend/README.md`). Users/History/
-Settings and the Dashboard sidebar's Activity feed are still mock-only — there's no backend concept
-for any of those yet.
+**Dashboard, Docker, Sharing, and Users pages are wired to the real backend** (polling, with mock
+fallbacks when nonraid/Docker/smartmontools/mergerfs/useradd aren't available — see
+`backend/README.md`). History/Settings and the Dashboard sidebar's Activity feed are still mock-only —
+there's no backend concept for any of those yet.
+
+Users means SMB/NFS share accounts (real Linux/Samba users, uid/gid ≥ 20000), **not** a webui login
+system — the API itself still has no auth layer at all (see `backend/README.md`'s Privileges section);
+those are two separate, still-separate concerns.
 
 ## Stack
 
@@ -33,9 +37,10 @@ npm install
 npm run dev   # http://localhost:3001, real mode by default (see backend/README.md to set mock)
 ```
 
-Run both, then open the frontend — Dashboard, Docker, and Sharing will show live data. Real mode is
-the default everywhere; the backend only uses mock data for a part when you set that part's mode to
-`mock` by hand.
+Run both, then open the frontend — Dashboard, Docker, Sharing, and Users will show live data. Real mode
+is the default everywhere; the backend only uses mock data for a part when you set that part's mode to
+`mock` by hand. Users' real mode needs root (`useradd`/`smbpasswd` family) — see
+`backend/README.md`'s Privileges section, or run `backend/testing/`'s Docker environment instead.
 
 See `backend/README.md` for the API and configuration.
 
@@ -43,31 +48,38 @@ See `backend/README.md` for the API and configuration.
 
 ```
 src/
-  types/       domain types (Disk, Parity, Container, User, Settings, ...) +
-               nmdApi.ts/dockerApi.ts/sharesApi.ts/systemApi.ts (mirror the backend's wire types)
-  api/         fetch wrappers for the backend (nmdApi, dockerApi, smartApi, sharesApi, systemApi)
-  mock/        hardcoded mock data for still-unwired pages (users, activity log)
+  types/       domain types (Disk, Parity, Container, Settings, ...) +
+               nmdApi.ts/dockerApi.ts/sharesApi.ts/usersApi.ts/systemApi.ts (mirror the backend's
+               wire types)
+  api/         fetch wrappers for the backend (nmdApi, dockerApi, smartApi, sharesApi, usersApi,
+               systemApi)
+  mock/        hardcoded mock data for still-unwired pages (activity log)
   state/       AppStoreProvider (settings + Grafana URL, local-only) and
                ArrayStatusProvider (polls the backend for array/parity/disk/temp state,
                owns disk-detail selection — this is the real one)
-  hooks/       useDockerContainers, useShares, useSystemStats — polling hooks with
-               create/update/remove actions where relevant
+  hooks/       useDockerContainers, useShares, useUsers, useGroups, useSystemStats — polling hooks
+               with create/update/remove actions where relevant
   selectors/   pure derivation functions (backend response -> view models)
-  components/  layout, dashboard, disk-detail, shares (create/edit form), shared UI primitives
+  components/  layout, dashboard, disk-detail, shares (create/edit form), users (add-user modal,
+               groups modal, per-user detail panel with share-access grid), shared UI primitives
   pages/       one component per route
   styles/      CSS token file + per-area stylesheets
 
-backend/                 Express API wrapping nmdctl, Docker, smartctl, shares, and system stats
+backend/                 Express API wrapping nmdctl, Docker, smartctl, shares, users, and system stats
   src/nmd/     NmdClient interface + RealNmdClient (shells out to nmdctl) + MockNmdClient
   src/docker/  DockerClient interface + RealDockerClient (dockerode) + MockDockerClient
   src/smart/   SmartClient interface + RealSmartClient (smartctl) + MockSmartClient + caching service
-  src/shares/  ShareStore (owns shares.json) + ShareApplier interface (mergerfs/Samba/NFS,
-               real or mock) + ShareService (orchestrates both)
+  src/shares/  ShareStore (owns shares.json) + ShareAccessStore (owns share-access.json, per-user/
+               group SMB permissions) + ShareApplier interface (mergerfs/Samba/NFS, real or mock) +
+               ShareService (orchestrates all three)
+  src/users/   UsersClient interface + RealUsersClient (shells out to useradd/smbpasswd/etc., host
+               /etc/passwd+/etc/group as source of truth) + MockUsersClient + UsersService
   src/system/  SystemStatsService (host CPU/memory via Node's os module — no mock variant, see
                backend/README.md for why)
   src/routes/  /api/status, /api/array/*, /api/parity/*, /api/docker/*, /api/smart/*,
-               /api/shares/*, /api/system
-  testing/     Docker-based environment with real mergerfs/Samba to test Shares against
+               /api/shares/*, /api/users/*, /api/groups/*, /api/system
+  testing/     Docker-based environment with real mergerfs/Samba/useradd to test Shares and Users
+               against
 ```
 
 ## Notes
@@ -84,6 +96,10 @@ backend/                 Express API wrapping nmdctl, Docker, smartctl, shares, 
 - Shares backend and frontend (create/edit/delete via a form modal, real mergerfs/Samba/NFS) are done
   and tested against `backend/testing/`'s real environment — see `backend/README.md`'s Shares section
   for what was actually verified.
+- Users backend and frontend (real Linux/Samba accounts at uid/gid ≥ 20000, groups, per-share
+  read-write/read-only/none/hidden access) are done — see `backend/README.md`'s Users section for the
+  `hidden` approximation caveat and what's deliberately out of scope for this first version (rename,
+  quotas, API tokens, 2FA).
 - System card (CPU/Memory) and the header's hostname/uptime/CPU/mem are wired to `/api/system` — real
   host stats via Node's `os` module, confirmed live (values change between polls, not a static
   snapshot). Note this reports the **host's** stats, not container-scoped ones, if the backend runs

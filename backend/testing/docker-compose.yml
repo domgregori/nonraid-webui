@@ -20,11 +20,15 @@ services:
       # All modes set by hand, on purpose — the backend no longer picks mock data by
       # itself. Real nmdctl/Docker/smartctl can't work here (no kernel module, no real
       # SMART hardware), so those three are explicit mock. mergerfs is real and
-      # installed, so SHARES_MODE stays real.
+      # installed, so SHARES_MODE stays real. Same reasoning for USERS_MODE: the
+      # container already runs privileged as root with real smbd, so real
+      # useradd/groupadd/smbpasswd are exactly as safe here as real mount/mergerfs is —
+      # contained, disposable, never touches the host's actual /etc/passwd.
       NMD_MODE: mock
       DOCKER_MODE: mock
       SMART_MODE: mock
       SHARES_MODE: real
+      USERS_MODE: real
       # 10 — matches MockNmdClient's 10 mock data-disk slots (backend/src/nmd/mockData.ts).
       # Keep these in sync: if the mock array ever changes disk count, this should too,
       # otherwise Sharing-page disk selections for the mismatched slots would silently

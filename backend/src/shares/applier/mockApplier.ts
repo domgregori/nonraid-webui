@@ -1,5 +1,5 @@
 import { HttpError } from '../../httpError.js';
-import type { Share, ShareCommandResult, ShareStats } from '../types.js';
+import type { Share, ShareAccess, ShareCommandResult, ShareStats } from '../types.js';
 import type { ApplyContext, ShareApplier } from './client.js';
 
 // Deterministic per-share fake usage fraction, so repeated calls are stable
@@ -28,7 +28,7 @@ export class MockShareApplier implements ShareApplier {
     return { ok: true, message: `Share "${name}" unmounted (mock)` };
   }
 
-  async syncExports(): Promise<ShareCommandResult> {
+  async syncExports(_allShares: Share[], _accessByShare: Record<string, ShareAccess>): Promise<ShareCommandResult> {
     return { ok: true, message: 'Samba/NFS config synced (mock)' };
   }
 

@@ -64,6 +64,10 @@ smbclient -L localhost -N       # list SMB shares (once the backend creates some
   daemon) — it needs the host kernel to support it, which isn't guaranteed in Docker
   regardless of `--privileged`. The entrypoint tries and logs a clear warning if it
   doesn't come up; mergerfs and Samba testing are unaffected either way.
+- `USERS_MODE: real` — same reasoning as Shares: real `useradd`/`groupadd`/`smbpasswd`
+  need root, which the container already runs as, and they only ever touch this
+  disposable container's own `/etc/passwd`/`/etc/group`/samba passdb, never the host's.
+  Managed users/groups live at uid/gid 20000+ (`USERS_UID_RANGE_START`).
 
 ### Networking
 
@@ -83,6 +87,15 @@ mergerfs commands) — see `backend/README.md`'s Shares section for the details:
 rename (old pool unmounted, new one mounted, config regenerated with only the new name),
 delete (unmounted, un-exported, underlying files left intact), and the offline-disks
 error path (clean 409 instead of a cryptic mount failure).
+
+### Poking at Users manually
+
+```bash
+docker exec nonraid-webui-shares-test bash -c '
+  getent passwd | awk -F: "\$3 >= 20000"   # managed users the backend has created
+  getent group | awk -F: "\$3 >= 20000"    # managed groups
+'
+```
 
 Earlier manual mergerfs-only check, kept here as a quick sanity command if you want to
 poke at the environment before/without the backend running:

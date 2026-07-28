@@ -12,6 +12,7 @@ export type NmdMode = 'real' | 'mock';
 export type DockerMode = 'real' | 'mock';
 export type SmartMode = 'real' | 'mock';
 export type SharesMode = 'real' | 'mock';
+export type UsersMode = 'real' | 'mock';
 
 function envBool(name: string, fallback: boolean): boolean {
   const v = process.env[name];
@@ -43,5 +44,13 @@ export const config = {
   smbConfPath: process.env.SMB_CONF_PATH ?? '/etc/samba/smb.conf',
   exportsPath: process.env.EXPORTS_PATH ?? '/etc/exports',
   sharesUseSudo: envBool('SHARES_USE_SUDO', false),
+  shareAccessConfigPath: process.env.SHARE_ACCESS_CONFIG_PATH ?? path.join(process.cwd(), 'data', 'share-access.json'),
   systemStatsIntervalMs: Number(process.env.SYSTEM_STATS_INTERVAL_MS ?? 2_000),
+  usersMode: (process.env.USERS_MODE as UsersMode | undefined) ?? 'real',
+  usersUseSudo: envBool('USERS_USE_SUDO', false),
+  // Managed users/groups live at uid/gid >= this, so they're clearly distinguishable
+  // from real host system accounts (never touches anything below this range).
+  usersUidRangeStart: Number(process.env.USERS_UID_RANGE_START ?? 20_000),
+  usersTimeoutMs: Number(process.env.USERS_TIMEOUT_MS ?? 15_000),
+  usersShellPath: process.env.USERS_SHELL_PATH ?? '/usr/sbin/nologin',
 };

@@ -121,6 +121,56 @@ Known gap found during testing, not yet fixed: SMB guest access hits `NT_STATUS_
 actually listing files inside a share (the share itself is correctly created/listed/exported) — a
 Samba guest-account/permissions detail to sort out, not a failure of the create/mount/config pipeline.
 
+## Users (`src/users/`)
+
+SMB/NFS share users — real Linux/Samba accounts, not a webui login system (there still isn't one; see
+"Privileges" below). Unlike Shares, there's no JSON store for *which users/groups exist* — the host's
+`/etc/passwd`/`/etc/group` (read via `getent`, which also picks up NSS sources like LDAP if
+configured) are the source of truth, same reasoning as why `nmd`/`docker`/`smart` query the live
+system instead of caching. Only accounts with uid/gid ≥ `USERS_UID_RANGE_START` (default `20000`) are
+considered "managed" — listed, editable, deletable — so this can never see or touch real host system
+accounts.
+
+- **Create** — `useradd -u <uid> -M -s <USERS_SHELL_PATH>` (no home dir, login shell disabled — these
+  are share-access accounts, not shell accounts), then sets both the Unix password (`chpasswd`) and the
+  Samba password (`smbpasswd -a -s`) so the two stay in sync. Passwords are only ever sent over stdin
+  to these commands, never as argv (argv is visible to any other process on the host via `ps`).
+- **Groups** — real `groupadd`/`usermod -aG`/`usermod -G`, same uid/gid-range managed-only rule.
+  Updating a user's group list only ever replaces membership in *managed* groups — any other secondary
+  group the account happens to have (unlikely, but possible via NSS) is preserved.
+- **Delete** — `smbpasswd -x` (best-effort — fine if the account predates Samba being set up) then
+  `userdel`, then purges every reference to that user from the share-access list below and resyncs
+  `smb.conf`.
+- **Per-share access** (`src/shares/aclStore.ts`, `data/share-access.json`) — the one piece that *is* a
+  JSON store, for the same reason `shares.json` is: no external system holds "which permission level
+  does user X have on share Y" as data — `smb.conf` is generated *from* it, not the other way around.
+  Four levels: `read-write`, `read-only`, `none`, `hidden` — `none` is stored explicitly (never just
+  "no entry"), since on a public share an absent entry means the share's normal guest-open default,
+  which is not the same thing as an explicit deny. Realized in `smb.conf` as `read list` (read-only
+  exceptions to an otherwise-writable share, so guest/public shares keep working exactly as before this
+  feature existed), `valid users` (only added for non-public shares, so it can't fight with `guest ok`),
+  and `invalid users` (explicit denial, works regardless of guest ok — also used to deny *everyone* via
+  the `*` wildcard on a private share that has zero explicit grants yet, since Samba's own default
+  there — any account that can authenticate at all — is not an acceptable default). SMB only — plain
+  NFS exports are host-based, not user-based, so per-user NFS permissions are out of scope.
+- **`hidden` is an approximation, not a faithful per-user hide.** Samba's `access based share enum`
+  (ABE) is share-wide, not per-user — there's no native way to make a share invisible to one specific
+  denied user while staying visible to another. `hidden` is realized as: turn on ABE for the share
+  whenever *anyone* has `hidden` set. Side effect: this also hides the share from any `none` principals
+  on that same share, which isn't a faithful "denied but still browseable" vs. "denied and invisible"
+  distinction — flagged here rather than silently shipped as if it were exact, same spirit as the
+  `high-water`→`mspmfs` approximation in Shares above.
+- Group membership changes don't need a `smb.conf` resync — Samba resolves `@groupname` membership live
+  from the OS at connection time, so only actual access-list changes (`ShareService.resyncExports()`)
+  trigger a rewrite.
+
+`RealUsersClient`/`MockUsersClient` behind the same `UsersClient` interface, same real/mock pattern via
+`USERS_MODE`.
+
+`testing/`'s Docker environment now runs `USERS_MODE: real` too (the container already runs privileged
+as root with real `smbd`, so this is exactly as safe as Shares' real mount/mergerfs testing) — see
+`testing/README.md` for how to exercise it.
+
 ## System stats (`src/system/`)
 
 Host CPU% and memory for the Dashboard's System card + header. **No real/mock split** here, unlike
@@ -153,7 +203,7 @@ cp .env.example .env   # optional, defaults work out of the box in mock mode
 
 | Method | Path                | Body/Params                                          | Notes |
 |--------|---------------------|-------------------------------------------------------|-------|
-| GET    | `/api/health`        | —                                                       | `{ ok, nmdMode, dockerMode, smartMode, sharesMode }` — check which clients are active |
+| GET    | `/api/health`        | —                                                       | `{ ok, nmdMode, dockerMode, smartMode, sharesMode, usersMode }` — check which clients are active |
 | GET    | `/api/status`         | —                                                       | Full `nmdctl status -o json` passthrough |
 | POST   | `/api/array/start`     | —                                                       | `nmdctl start` |
 | POST   | `/api/array/stop`       | —                                                       | `nmdctl stop`. Mock client rejects with 502 if a parity check is active, matching real driver behavior. |
@@ -168,11 +218,22 @@ cp .env.example .env   # optional, defaults work out of the box in mock mode
 | PUT    | `/api/shares/:name`          | same body as POST                                                    | Renaming (body `name` ≠ `:name`) unmounts the old pool and mounts a new one |
 | DELETE | `/api/shares/:name`            | —                                                                       | Unmounts + un-exports only — never deletes files |
 | GET    | `/api/system`             | —                                                               | `{ hostname, uptimeSeconds, cpuPercent, memUsedBytes, memTotalBytes }` |
+| GET    | `/api/users`               | —                                                               | `User[]` — managed accounts (uid ≥ `USERS_UID_RANGE_START`) |
+| POST   | `/api/users`                | `{ username, password, groups }`                                     | 201 on success, 409 if the username exists |
+| PUT    | `/api/users/:username`        | `{ password?, groups? }`                                            | Either field optional — omit to leave unchanged |
+| DELETE | `/api/users/:username`          | —                                                                       | Also purges the user from every share's access list and resyncs `smb.conf` |
+| GET    | `/api/users/:username/access`    | —                                                                       | `{ shareName, permission }[]` — one entry per existing share, `'none'` where unset |
+| PUT    | `/api/users/:username/access/:shareName` | `{ permission }` — one of `read-write` \| `read-only` \| `none` \| `hidden` | Resyncs `smb.conf` |
+| GET    | `/api/groups`               | —                                                               | `Group[]` — managed groups (gid ≥ `USERS_UID_RANGE_START`) |
+| POST   | `/api/groups`                | `{ name }`                                                            | 201 on success, 409 if the group exists |
+| DELETE | `/api/groups/:name`            | —                                                                       | Also purges the group from every share's access list and resyncs `smb.conf` |
+| GET    | `/api/groups/:name/access`       | —                                                                       | Same shape as the per-user access endpoint |
+| PUT    | `/api/groups/:name/access/:shareName`  | `{ permission }`                                                | Same as the per-user version, applied via Samba's `@groupname` syntax |
 
 Errors are `{ error: string }` with status 400 (bad request — e.g. invalid parity action, or a share
-name/disks/allocation method that fails validation), 404 (share not found), 409 (share name already
-exists, or none of a share's disks are currently mounted), or 502 (the underlying command itself
-failed — nmdctl/Docker/smartctl/mergerfs/Samba).
+name/disks/allocation method that fails validation), 404 (share/user/group not found), 409 (name
+already exists, or none of a share's disks are currently mounted), or 502 (the underlying command
+itself failed — nmdctl/Docker/smartctl/mergerfs/Samba/useradd family).
 
 ## Config (env vars, see `.env.example`)
 
@@ -198,7 +259,14 @@ failed — nmdctl/Docker/smartctl/mergerfs/Samba).
 - `SMB_CONF_PATH` / `EXPORTS_PATH` — config files to write the managed block into (defaults
   `/etc/samba/smb.conf` / `/etc/exports`)
 - `SHARES_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to mount/mergerfs/umount
+- `SHARE_ACCESS_CONFIG_PATH` — where `share-access.json` lives (default `backend/data/share-access.json`)
 - `SYSTEM_STATS_INTERVAL_MS` — background CPU-sampling interval (default `2000`)
+- `USERS_MODE` — `real` (default) | `mock`
+- `USERS_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to the useradd/smbpasswd
+  family
+- `USERS_UID_RANGE_START` — uid/gid floor for managed accounts/groups (default `20000`)
+- `USERS_SHELL_PATH` — login shell assigned to created accounts (default `/usr/sbin/nologin`)
+- `USERS_TIMEOUT_MS` — kill useradd/smbpasswd/etc. subprocess after this long (default `15000`)
 
 ## Privileges
 
@@ -223,10 +291,18 @@ running privileged commands, it's rewriting system service config and mounting/u
 filesystems. The managed-block + backup approach limits blast radius on the config-file side; the
 mount side has no equivalent safety net beyond the offline-disk check.
 
+Users needs root for `useradd`/`usermod`/`userdel`/`groupadd`/`groupdel`/`chpasswd`/`smbpasswd` — same
+sudoers pattern via `USERS_USE_SUDO`. This is consequential in the same way Shares is: it's creating
+and deleting real host accounts, not just config. The uid/gid-range restriction (`USERS_UID_RANGE_START`)
+is the safety net here — every operation refuses to touch anything below it, so it can't be pointed at
+real system/service accounts even by a buggy caller.
+
 **There is no auth layer on this API yet** — anyone who can reach it can start/stop the array, run
-parity checks, start/stop/restart any container, read disk identifiers/serials, and create/rename/
-delete shares (which mounts/unmounts filesystems and exports them over the network). Fine for a
-trusted LAN during development; needs an auth layer before this is ever exposed beyond that.
+parity checks, start/stop/restart any container, read disk identifiers/serials, create/rename/delete
+shares (which mounts/unmounts filesystems and exports them over the network), and now also create,
+delete, and set passwords for real system accounts. Fine for a trusted LAN during development; needs an
+auth layer before this is ever exposed beyond that — this feature makes that gap more urgent, not less,
+since it now manages credentials, not just infrastructure.
 
 ## Not yet done
 
@@ -237,7 +313,9 @@ trusted LAN during development; needs an auth layer before this is ever exposed 
 - Docker: image pull/list, "Add Container" (currently a design-only button), container logs
 - SMART: only temperature is read today; SMART pass/fail health, reallocated sectors, etc. aren't
   surfaced
-- Shares: per-user SMB ACLs (waiting on a real Users system — see root README), the guest-access
-  permission issue noted above, no validation that a share name doesn't collide with an existing
-  directory some other way
+- Shares: the guest-access permission issue noted above, no validation that a share name doesn't
+  collide with an existing directory some other way
+- Users: no rename (delete + recreate only — `useradd`/`usermod` renaming is more disruptive to
+  double-check than it's worth for a first version), no quotas, no API tokens, no 2FA — none of these
+  were in scope for the first version (see root README for what was deliberately deferred and why)
 - Auth

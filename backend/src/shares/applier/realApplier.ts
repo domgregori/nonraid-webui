@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { config } from '../../config.js';
 import { HttpError } from '../../httpError.js';
-import type { AllocationMethod, Share, ShareCommandResult, ShareStats } from '../types.js';
+import type { AllocationMethod, Share, ShareAccess, ShareCommandResult, ShareStats } from '../types.js';
 import type { ApplyContext, ShareApplier } from './client.js';
 
 const execFileAsync = promisify(execFile);
@@ -148,21 +148,57 @@ export class RealShareApplier implements ShareApplier {
     }
   }
 
-  async syncExports(allShares: Share[]): Promise<ShareCommandResult> {
-    await this.writeSmbBlock(allShares);
+  async syncExports(allShares: Share[], accessByShare: Record<string, ShareAccess>): Promise<ShareCommandResult> {
+    await this.writeSmbBlock(allShares, accessByShare);
     await this.writeExportsBlock(allShares);
     return { ok: true, message: 'Samba/NFS config synced' };
   }
 
-  private async writeSmbBlock(shares: Share[]): Promise<void> {
+  private async writeSmbBlock(shares: Share[], accessByShare: Record<string, ShareAccess>): Promise<void> {
     const lines: string[] = [];
     for (const s of shares) {
       if (!s.protocols.includes('smb')) continue;
+      const access = accessByShare[s.name] ?? { users: {}, groups: {} };
+
+      // Samba principal syntax: users bare, groups prefixed with '@'.
+      const named = (perm: 'read-write' | 'read-only' | 'none' | 'hidden') => [
+        ...Object.entries(access.users).filter(([, p]) => p === perm).map(([name]) => name),
+        ...Object.entries(access.groups).filter(([, p]) => p === perm).map(([name]) => `@${name}`),
+      ];
+      const writeUsers = named('read-write');
+      const readOnlyUsers = named('read-only');
+      const deniedUsers = named('none');
+      const hiddenUsers = named('hidden');
+      const isPublic = s.smb?.public !== false;
+
       lines.push(`[${s.name}]`);
       lines.push(`   path = ${userMountPath(s.name)}`);
       lines.push(`   browseable = yes`);
+      // Share stays writable by default, same as before per-user ACLs existed — this
+      // must not silently lock guest/public shares to read-only. `read list` (below)
+      // carves out per-user read-only *exceptions* to that default instead.
       lines.push(`   writable = yes`);
-      lines.push(`   guest ok = ${s.smb?.public !== false ? 'yes' : 'no'}`);
+      lines.push(`   guest ok = ${isPublic ? 'yes' : 'no'}`);
+
+      const validUsers = [...writeUsers, ...readOnlyUsers];
+      // Non-public shares require real accounts, so only they get `valid users` — for
+      // public shares that would fight with `guest ok` and defeat the point of "public".
+      if (!isPublic && validUsers.length > 0) lines.push(`   valid users = ${validUsers.join(', ')}`);
+      if (readOnlyUsers.length > 0) lines.push(`   read list = ${readOnlyUsers.join(', ')}`);
+
+      // `invalid users` denies a named account/group regardless of guest ok, so this still
+      // works to carve exceptions out of an otherwise-public share. On a private share with
+      // no explicit grants yet, deny everyone via the `*` wildcard instead of falling back
+      // to Samba's actual default (any account that can authenticate at all) — a private
+      // share with zero grants must mean "nobody has access", not "wide open".
+      const invalidUsers = !isPublic && validUsers.length === 0 ? ['*'] : [...deniedUsers, ...hiddenUsers];
+      if (invalidUsers.length > 0) lines.push(`   invalid users = ${invalidUsers.join(', ')}`);
+      // Samba has no native "denied but still browseable" vs "denied and invisible"
+      // distinction *per user* — access based share enum is share-wide only. So
+      // 'hidden' is approximated as: turn on ABE for the whole share whenever anyone
+      // has 'hidden' set, which also hides it from any 'none' principals as a side
+      // effect (an acceptable approximation, not a faithful per-user hide).
+      if (hiddenUsers.length > 0) lines.push(`   access based share enum = yes`);
     }
     await replaceManagedBlock(config.smbConfPath, lines);
 
