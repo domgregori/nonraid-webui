@@ -223,7 +223,7 @@ export class RealShareApplier implements ShareApplier {
       }
     }
     await replaceManagedBlock(config.exportsPath, lines);
-    // best-effort — NFS kernel server may not be available in every environment (see backend/testing/README.md)
+    // best-effort — NFS kernel server may not be available in every environment
     await run('exportfs', ['-ra']).catch(() => {});
   }
 }

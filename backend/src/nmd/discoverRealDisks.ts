@@ -34,11 +34,10 @@ function readProcMounts(): RealMount[] {
 /**
  * Finds real mounted filesystems at <MOUNT_PREFIX><slot>) for slot 1..28 (nmdctl's
  * data-disk slot range) and reports their actual size/usage/fstype — used so
- * MockNmdClient can report genuinely real numbers when run inside
- * backend/testing/'s Docker environment (which provisions real loopback-mounted
- * disks at exactly these paths), instead of disconnected fictional TB-scale ones.
- * Returns [] when nothing's mounted there (e.g. a plain dev machine), so callers
- * can fall back to fully fictional mock data.
+ * MockNmdClient can report genuinely real numbers when run on a dev VM with a
+ * real NonRAID array mounted at exactly these paths, instead of disconnected
+ * fictional TB-scale ones. Returns [] when nothing's mounted there (e.g. a
+ * plain dev machine), so callers can fall back to fully fictional mock data.
  */
 export function discoverRealDataDisks(): DiscoveredDataDisk[] {
   const mounts = readProcMounts();

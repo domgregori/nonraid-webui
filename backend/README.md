@@ -19,10 +19,10 @@ Two `NmdClient` implementations (`src/nmd/client.ts`):
   nonraid kernel module loaded (like this one). Ticks parity-check progress on a 1s interval, same
   shape as the real thing. Its data disks come from `discoverRealDataDisks()`
   (`src/nmd/discoverRealDisks.ts`), which reads `/proc/mounts` + `statfs` for real mounts at
-  `/mnt/disk1..28` — inside `backend/testing/`'s container, this makes the mock array report the
-  *actual* loopback disks (real size, real filesystem, real usage), not disconnected fictional
-  numbers. Falls back to fictional TB-scale disks only when nothing's really mounted there (e.g. a
-  plain dev machine with no test container running).
+  `/mnt/disk1..28` — on a dev VM with a real array mounted, this makes the mock array report the
+  *actual* disks (real size, real filesystem, real usage), not disconnected fictional numbers.
+  Falls back to fictional TB-scale disks only when nothing's really mounted there (e.g. a plain dev
+  machine with no test array).
 
 `createNmdClient()` (`src/nmd/index.ts`) picks one based on `NMD_MODE`: `real` (default) always uses
 `RealNmdClient`; `mock` must be set by hand to use `MockNmdClient`.
@@ -97,8 +97,8 @@ the source of truth and reconciles it onto three real subsystems:
   `# === nonraid-webui:managed-shares:begin/end ===` markers — never the rest of the file — and keeps
   a `.bak` before every rewrite.
 - **NFS** — same managed-block approach for `/etc/exports` (`EXPORTS_PATH`), then `exportfs -ra`
-  (best-effort — see `testing/README.md` on why NFS-in-Docker is unreliable; this is not a limitation
-  of the approach itself, just of testing it in a container).
+  (best-effort — the NFS kernel server may not be available in every environment; this is not a
+  limitation of the approach itself).
 - **Stats** — `df -k --output=used,size` on the pooled mountpoint once it exists, rather than summing
   member disks ourselves (handles overlapping disks across shares correctly for free).
 
@@ -108,7 +108,7 @@ via `SHARES_MODE`. `ShareService` ties the store + applier
 remount, idempotently) before persisting to `shares.json`, and deleting a share only unmounts +
 un-exports it, never touches the underlying files.
 
-**Verified for real** (not just unit-level) against `testing/`'s Docker environment: created a
+**Verified for real** (not just unit-level) against a VM with a real NonRAID array: created a
 3-disk share, confirmed the actual `mergerfs` mount, wrote files to two different underlying disks and
 confirmed they appear merged in one directory listing, confirmed `df` on the pool reports correctly
 aggregated size, confirmed the share is listed by a real `smbclient -L`, renamed it (old mount
@@ -189,12 +189,12 @@ consecutive samples — a single snapshot is just cumulative counters since boot
 usage, same idea as Docker's CPU% calculation. Memory doesn't need that (`os.totalmem()`/`freemem()`
 are already instantaneous).
 
-**Caveat**: `os.cpus()`/`totalmem()`/`freemem()` are container-oblivious — inside a container (like
-`testing/`'s) they report the **host's** stats, not the container's own cgroup limits. Correct for the
-real deployment target (running directly on the NAS host); confusing if you go looking for
-container-scoped numbers while testing. Verified live: hostname/uptime/CPU/memory all confirmed
-reflecting the actual dev machine, and CPU% confirmed changing between successive polls (28% → 17% a
-few seconds apart), proving the background sampler is real, not a static value.
+**Caveat**: `os.cpus()`/`totalmem()`/`freemem()` are container-oblivious — inside a Docker container
+they'd report the **host's** stats, not the container's own cgroup limits. Not an issue for this
+project's actual deployment target (running directly on the NAS host or in the dev VM, both of which
+have their own real kernel). Verified live: hostname/uptime/CPU/memory all confirmed reflecting the
+actual dev machine, and CPU% confirmed changing between successive polls (28% → 17% a few seconds
+apart), proving the background sampler is real, not a static value.
 
 ## Running
 

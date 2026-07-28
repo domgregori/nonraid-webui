@@ -33,8 +33,8 @@ function idleResync(totalGb: number): NmdResyncStatus {
  * without the real nonraid kernel module loaded. Ticks parity-check progress
  * on an interval, same as real hardware would, so the API behaves like the
  * real thing from the frontend's perspective. Disk data comes from
- * getMockDiskSeeds() — real disks when backend/testing/'s container has some
- * mounted, fictional ones otherwise (see mockData.ts).
+ * getMockDiskSeeds() — real disks when a dev VM has a real array mounted,
+ * fictional ones otherwise (see mockData.ts).
  */
 export class MockNmdClient implements NmdClient {
   readonly mode = 'mock' as const;

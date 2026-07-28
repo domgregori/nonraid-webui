@@ -40,7 +40,9 @@ npm run dev   # http://localhost:3001, real mode by default (see backend/README.
 Run both, then open the frontend — Dashboard, Docker, Sharing, and Users will show live data. Real mode
 is the default everywhere; the backend only uses mock data for a part when you set that part's mode to
 `mock` by hand. Users' real mode needs root (`useradd`/`smbpasswd` family) — see
-`backend/README.md`'s Privileges section, or run `backend/testing/`'s Docker environment instead.
+`backend/README.md`'s Privileges section. For a real end-to-end test environment (real kernel driver,
+real array, real Samba/NFS), use a VM — see the main `nonraid` repo's development docs. There is no
+Docker-based test environment for this project; don't reintroduce one.
 
 See `backend/README.md` for the API and configuration.
 
@@ -78,9 +80,11 @@ backend/                 Express API wrapping nmdctl, Docker, smartctl, shares, 
                backend/README.md for why)
   src/routes/  /api/status, /api/array/*, /api/parity/*, /api/docker/*, /api/smart/*,
                /api/shares/*, /api/users/*, /api/groups/*, /api/system
-  testing/     Docker-based environment with real mergerfs/Samba/useradd to test Shares and Users
-               against
 ```
+
+There is no Docker-based test environment for this project. Real-mode testing (Shares, Users,
+mergerfs, Samba) happens on a VM with the real NonRAID kernel driver — see the main `nonraid`
+repo's development docs. Don't reintroduce a Docker test environment.
 
 ## Notes
 
@@ -94,13 +98,12 @@ backend/                 Express API wrapping nmdctl, Docker, smartctl, shares, 
 - Docker Engine API integration (containers page) is done. Grafana URL storage (history page) needs
   no backend beyond storing the URL, and isn't started.
 - Shares backend and frontend (create/edit/delete via a form modal, real mergerfs/Samba/NFS) are done
-  and tested against `backend/testing/`'s real environment — see `backend/README.md`'s Shares section
-  for what was actually verified.
+  and tested against a real VM environment — see `backend/README.md`'s Shares section for what was
+  actually verified.
 - Users backend and frontend (real Linux/Samba accounts at uid/gid ≥ 20000, groups, per-share
   read-write/read-only/none/hidden access) are done — see `backend/README.md`'s Users section for the
   `hidden` approximation caveat and what's deliberately out of scope for this first version (rename,
   quotas, API tokens, 2FA).
 - System card (CPU/Memory) and the header's hostname/uptime/CPU/mem are wired to `/api/system` — real
   host stats via Node's `os` module, confirmed live (values change between polls, not a static
-  snapshot). Note this reports the **host's** stats, not container-scoped ones, if the backend runs
-  inside a container (like `backend/testing/`'s).
+  snapshot).

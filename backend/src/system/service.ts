@@ -26,10 +26,10 @@ function cpuSnapshot(): CpuSnapshot {
  * "don't add latency to every request" reasoning as SmartService's caching.
  *
  * Caveat: os.cpus()/totalmem()/freemem() are container-oblivious — inside a
- * container (like backend/testing/'s) they report the HOST's stats, not the
- * container's own cgroup limits. Correct for the real deployment target
- * (running directly on the NAS host), misleading if you go looking for
- * per-container numbers in the test environment.
+ * Docker container they'd report the HOST's stats, not the container's own
+ * cgroup limits. Not an issue for this project's actual deployment target
+ * (running directly on the NAS host or in the dev VM, both of which have
+ * their own real kernel), only relevant if this ever runs inside a container.
  */
 export class SystemStatsService {
   private last: CpuSnapshot = cpuSnapshot();

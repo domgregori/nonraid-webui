@@ -12,8 +12,8 @@ export interface MockDiskSeed {
 }
 
 // Used only when no real disks are found at /mnt/disk1.. (e.g. a plain dev
-// machine with no backend/testing/ container running). Sizes match the
-// frontend's original design mock.
+// machine with no test VM array mounted). Sizes match the frontend's
+// original design mock.
 const FICTIONAL_DATA_DISKS = [
   { slot: 1, sizeGb: 4096, usedPct: 62 },
   { slot: 2, sizeGb: 4096, usedPct: 58 },
