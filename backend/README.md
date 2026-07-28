@@ -136,8 +136,13 @@ accounts.
   Samba password (`smbpasswd -a -s`) so the two stay in sync. Passwords are only ever sent over stdin
   to these commands, never as argv (argv is visible to any other process on the host via `ps`).
 - **Groups** — real `groupadd`/`usermod -aG`/`usermod -G`, same uid/gid-range managed-only rule.
-  Updating a user's group list only ever replaces membership in *managed* groups — any other secondary
-  group the account happens to have (unlikely, but possible via NSS) is preserved.
+  `UsersService` rejects any group in a create/update request that isn't already a managed
+  (app-created) group before it ever reaches `usermod` — group names pass shape validation alone,
+  which isn't a privilege check, so without this a request could name a real pre-existing system group
+  (`docker`, `sudo`, ...) and get a managed user added to it, which is privilege escalation (`docker`
+  group membership is root-equivalent). Updating a user's group list only ever replaces membership in
+  *managed* groups — any other secondary group the account happens to have (unlikely, but possible via
+  NSS) is preserved.
 - **Delete** — `smbpasswd -x` (best-effort — fine if the account predates Samba being set up) then
   `userdel`, then purges every reference to that user from the share-access list below and resyncs
   `smb.conf`.
@@ -167,9 +172,12 @@ accounts.
 `RealUsersClient`/`MockUsersClient` behind the same `UsersClient` interface, same real/mock pattern via
 `USERS_MODE`.
 
-`testing/`'s Docker environment now runs `USERS_MODE: real` too (the container already runs privileged
-as root with real `smbd`, so this is exactly as safe as Shares' real mount/mergerfs testing) — see
-`testing/README.md` for how to exercise it.
+**Not yet verified against a real environment** — `RealUsersClient`'s `useradd`/`usermod`/`smbpasswd`
+calls have been reviewed carefully, including a security pass that caught and fixed two real issues
+(see the Groups bullet's privilege-escalation note and the Per-share access bullet's deny-by-default
+note above), but not exercised live: the Docker container this would have run in wasn't available in
+the sandbox this was built in, and has since been removed project-wide in favor of VM-based testing
+(see root README). Verify with `USERS_MODE=real` on a VM, same as Shares, before relying on it.
 
 ## System stats (`src/system/`)
 
