@@ -1,6 +1,11 @@
 import Docker from 'dockerode';
 import type { DockerClient } from './client.js';
-import type { ContainerRuntimeState, DockerCommandResult, DockerContainerSummary } from './types.js';
+import type {
+  ContainerRuntimeState,
+  CreateContainerOptions,
+  DockerCommandResult,
+  DockerContainerSummary,
+} from './types.js';
 
 interface CpuStatsLike {
   cpu_usage: { total_usage: number; percpu_usage?: number[] };
@@ -73,6 +78,7 @@ export class RealDockerClient implements DockerClient {
           memUsedBytes,
           memLimitBytes,
           ports: formatPorts(c.Ports),
+          labels: c.Labels ?? {},
         };
       }),
     );
@@ -91,5 +97,36 @@ export class RealDockerClient implements DockerClient {
   async restartContainer(id: string): Promise<DockerCommandResult> {
     await this.docker.getContainer(id).restart();
     return { ok: true, message: 'Container restarted' };
+  }
+
+  async createContainer(options: CreateContainerOptions): Promise<DockerCommandResult> {
+    const exposedPorts: Record<string, object> = {};
+    const portBindings: Record<string, { HostPort: string }[]> = {};
+    for (const p of options.ports) {
+      const key = `${p.containerPort}/${p.protocol}`;
+      exposedPorts[key] = {};
+      portBindings[key] = [{ HostPort: String(p.hostPort) }];
+    }
+
+    const container = await this.docker.createContainer({
+      name: options.name,
+      Image: options.image,
+      Env: options.env,
+      Labels: options.labels,
+      ExposedPorts: exposedPorts,
+      HostConfig: {
+        PortBindings: portBindings,
+        Binds: options.binds,
+        Devices: options.devices.map((d) => ({
+          PathOnHost: d.hostPath,
+          PathInContainer: d.containerPath,
+          CgroupPermissions: 'rwm',
+        })),
+        NetworkMode: options.network,
+        Privileged: options.privileged,
+      },
+    });
+    await container.start();
+    return { ok: true, message: `Container "${options.name}" created and started` };
   }
 }

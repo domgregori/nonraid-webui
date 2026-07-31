@@ -16,9 +16,33 @@ export interface DockerContainerSummary {
   memUsedBytes: number | null;
   memLimitBytes: number | null;
   ports: string; // e.g. "8096:8096" or "8096:8096, 8920:8920" or "—"
+  labels: Record<string, string>;
 }
 
 export interface DockerCommandResult {
   ok: boolean;
   message: string;
+}
+
+export interface CreateContainerPortBinding {
+  containerPort: number;
+  protocol: 'tcp' | 'udp';
+  hostPort: number;
+}
+
+export interface CreateContainerDevice {
+  hostPath: string;
+  containerPath: string;
+}
+
+export interface CreateContainerOptions {
+  name: string;
+  image: string;
+  network: string; // 'bridge' | 'host' | 'none' | a custom network name
+  privileged: boolean;
+  env: string[]; // "KEY=VALUE"
+  ports: CreateContainerPortBinding[];
+  binds: string[]; // "hostPath:containerPath" or "hostPath:containerPath:ro"
+  devices: CreateContainerDevice[];
+  labels: Record<string, string>;
 }
