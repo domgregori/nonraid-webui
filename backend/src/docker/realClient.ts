@@ -99,7 +99,29 @@ export class RealDockerClient implements DockerClient {
     return { ok: true, message: 'Container restarted' };
   }
 
+  /** dockerode's createContainer, unlike the `docker` CLI, does not pull a missing
+   * image on its own — it fails outright with a 404 if the image isn't already
+   * cached locally, which is the common case for a template being installed for
+   * the first time. */
+  private async ensureImagePulled(image: string): Promise<void> {
+    try {
+      await this.docker.getImage(image).inspect();
+      return;
+    } catch {
+      // not present locally — pull it below
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      this.docker.pull(image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+        if (err) return reject(err);
+        this.docker.modem.followProgress(stream, (err2: Error | null) => (err2 ? reject(err2) : resolve()));
+      });
+    });
+  }
+
   async createContainer(options: CreateContainerOptions): Promise<DockerCommandResult> {
+    await this.ensureImagePulled(options.image);
+
     const exposedPorts: Record<string, object> = {};
     const portBindings: Record<string, { HostPort: string }[]> = {};
     for (const p of options.ports) {
