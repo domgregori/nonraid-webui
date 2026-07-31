@@ -147,7 +147,13 @@ export class RealDockerClient implements DockerClient {
                 total: event.progressDetail.total,
               });
             }
-            onProgress?.({ phase: 'pulling', message: event.status ?? `Pulling ${image}`, percent: aggregatePercent() });
+            onProgress?.({
+              phase: 'pulling',
+              message: event.status ?? `Pulling ${image}`,
+              percent: aggregatePercent(),
+              layerId: event.id,
+              layerStatus: event.status,
+            });
           },
         );
       });

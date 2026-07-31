@@ -522,6 +522,35 @@
   }
 }
 
+.apps-install-progress__log {
+  max-height: 140px;
+  overflow-y: auto;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.apps-install-progress__log-line {
+  display: flex;
+  gap: var(--space-sm);
+  padding: 1px 0;
+  white-space: nowrap;
+}
+
+.apps-install-progress__log-id {
+  color: var(--color-text-dim);
+  flex-shrink: 0;
+}
+
+.apps-install-progress__log-status {
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* App detail panel */
 
 .apps-detail-panel {

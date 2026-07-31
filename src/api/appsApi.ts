@@ -42,12 +42,14 @@ async function installStream(name: string, body: InstallRequest, onProgress: (p:
       if (!line) continue;
 
       const event = JSON.parse(line) as
-        | { type: 'progress'; phase: CreateContainerProgress['phase']; message: string; percent: number | null }
+        | ({ type: 'progress' } & CreateContainerProgress)
         | { type: 'done'; result: DockerCommandResult }
         | { type: 'error'; message: string };
 
-      if (event.type === 'progress') onProgress({ phase: event.phase, message: event.message, percent: event.percent });
-      else if (event.type === 'done') return event.result;
+      if (event.type === 'progress') {
+        const { type: _type, ...progress } = event;
+        onProgress(progress);
+      } else if (event.type === 'done') return event.result;
       else throw new Error(event.message);
     }
   }

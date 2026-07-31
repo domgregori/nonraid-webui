@@ -51,6 +51,14 @@ export interface CreateContainerProgress {
   phase: 'pulling' | 'creating' | 'starting';
   message: string;
   percent: number | null; // 0-100, or null when not (yet) knowable — e.g. image already cached, or a phase with no byte-level progress
+  // A pull downloads/extracts each image layer independently and in parallel —
+  // `layerId` ties this specific tick to one layer (Docker's own short layer
+  // digest) so the client can render one persistent line per layer, the way
+  // `docker pull` itself does, rather than a firehose of hundreds of ticks.
+  // Absent outside the pulling phase, or for whole-pull events with no single
+  // layer (e.g. the final "Digest: sha256:...").
+  layerId?: string;
+  layerStatus?: string;
 }
 
 export type CreateContainerProgressCallback = (progress: CreateContainerProgress) => void;

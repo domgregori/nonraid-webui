@@ -87,8 +87,21 @@ export class MockDockerClient implements DockerClient {
   async createContainer(options: CreateContainerOptions, onProgress?: CreateContainerProgressCallback): Promise<DockerCommandResult> {
     // Simulated pacing so the progress UI has something real to exercise
     // without a real Docker daemon — not meant to model actual pull speed.
-    for (const percent of [0, 35, 70, 100]) {
-      onProgress?.({ phase: 'pulling', message: `Pulling ${options.image} (mock)`, percent });
+    const mockLayers = ['a1b2c3d4e5f6', 'b2c3d4e5f6a7', 'c3d4e5f6a7b8'];
+    for (const id of mockLayers) {
+      onProgress?.({ phase: 'pulling', message: `Pulling ${options.image} (mock)`, percent: 0, layerId: id, layerStatus: 'Pulling fs layer' });
+    }
+    await sleep(150);
+    for (const percent of [25, 55, 85, 100]) {
+      for (const id of mockLayers) {
+        onProgress?.({
+          phase: 'pulling',
+          message: `Pulling ${options.image} (mock)`,
+          percent,
+          layerId: id,
+          layerStatus: percent < 100 ? 'Downloading' : 'Pull complete',
+        });
+      }
       await sleep(200);
     }
     onProgress?.({ phase: 'creating', message: 'Creating container (mock)', percent: null });

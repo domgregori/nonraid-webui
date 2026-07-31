@@ -147,4 +147,6 @@ export interface CreateContainerProgress {
   phase: 'pulling' | 'creating' | 'starting';
   message: string;
   percent: number | null;
+  layerId?: string;
+  layerStatus?: string;
 }

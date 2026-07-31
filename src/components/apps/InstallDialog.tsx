@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { appsApi } from '../../api/appsApi';
 import type { CaApp, CaConfigEntry, CreateContainerProgress, InstallOverrides, InstallPlan } from '../../types/appsApi';
 
@@ -54,6 +54,12 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
   const [installError, setInstallError] = useState<string | null>(null);
   const [installMessage, setInstallMessage] = useState<string | null>(null);
   const [installProgress, setInstallProgress] = useState<CreateContainerProgress | null>(null);
+  // One persistent line per image layer, updated in place as its status
+  // changes — mirrors how `docker pull` itself renders multi-layer progress,
+  // rather than a scrolling firehose of every single tick (a real pull can
+  // emit well over a hundred of those for one small image).
+  const [pullLog, setPullLog] = useState<{ id: string; status: string }[]>([]);
+  const pullLogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -102,9 +108,22 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
   const handleInstall = async () => {
     setInstallError(null);
     setInstallProgress(null);
+    setPullLog([]);
     setStage('installing');
     try {
-      const result = await appsApi.install(appName, { repository, containerName, overrides, privilegedAck }, setInstallProgress);
+      const result = await appsApi.install(appName, { repository, containerName, overrides, privilegedAck }, (p) => {
+        setInstallProgress(p);
+        if (!p.layerId) return;
+        const status = p.layerStatus ?? p.message;
+        setPullLog((prev) => {
+          const idx = prev.findIndex((line) => line.id === p.layerId);
+          if (idx === -1) return [...prev, { id: p.layerId!, status }];
+          if (prev[idx].status === status) return prev;
+          const next = [...prev];
+          next[idx] = { id: p.layerId!, status };
+          return next;
+        });
+      });
       setInstallMessage(result.message);
       setStage('done');
     } catch (err) {
@@ -112,6 +131,10 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
       setStage('reviewed');
     }
   };
+
+  useEffect(() => {
+    pullLogRef.current?.scrollTo({ top: pullLogRef.current.scrollHeight });
+  }, [pullLog]);
 
   const configEntries = (app?.Config ?? []).filter((e) => !isHidden(e['@attributes'].Display) && e['@attributes'].Type !== 'Label');
   const primaryEntries = configEntries.filter((e) => !isAdvanced(e['@attributes'].Display));
@@ -299,6 +322,16 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
                     style={installProgress?.percent != null ? { width: `${installProgress.percent}%` } : undefined}
                   />
                 </div>
+                {pullLog.length > 0 && (
+                  <div className="apps-install-progress__log" ref={pullLogRef}>
+                    {pullLog.map((line) => (
+                      <div className="apps-install-progress__log-line" key={line.id}>
+                        <span className="apps-install-progress__log-id">{line.id.slice(0, 12)}</span>
+                        <span className="apps-install-progress__log-status">{line.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
