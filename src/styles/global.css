@@ -110,6 +110,12 @@ button {
   padding: 6px 14px;
 }
 
+.btn--primary:disabled,
+.btn--primary-sm:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .btn--block {
   width: 100%;
   padding: 10px;

@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
+import { AppsPage } from './pages/AppsPage';
 import { BrowsePage } from './pages/BrowsePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DockerPage } from './pages/DockerPage';
@@ -18,6 +19,7 @@ function App() {
         <Route path="/browse" element={<BrowsePage />} />
         <Route path="/users" element={<UsersPage />} />
         <Route path="/docker" element={<DockerPage />} />
+        <Route path="/apps" element={<AppsPage />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
