@@ -1,6 +1,7 @@
 import Docker from 'dockerode';
 import type { DockerClient } from './client.js';
 import type {
+  ContainerDetail,
   ContainerRuntimeState,
   CreateContainerOptions,
   CreateContainerProgressCallback,
@@ -37,6 +38,41 @@ function computeCpuPercent(cpuStats: CpuStatsLike, precpuStats: CpuStatsLike): n
 function computeMemUsed(memStats: MemStatsLike): number {
   const cache = memStats.stats?.cache ?? memStats.stats?.inactive_file ?? 0;
   return Math.max(0, memStats.usage - cache);
+}
+
+interface DockerPortBindings {
+  [portAndProtocol: string]: { HostPort?: string }[] | null;
+}
+
+interface DockerDevice {
+  PathOnHost: string;
+  PathInContainer: string;
+}
+
+/** Parses "host:container" or "host:container:ro" — the exact format Binds
+ * is written in by createContainer, so this is a lossless round-trip. */
+function parseBind(bind: string): { hostPath: string; containerPath: string; readOnly: boolean } {
+  const parts = bind.split(':');
+  const readOnly = parts.at(-1) === 'ro';
+  if (readOnly) parts.pop();
+  const [hostPath, containerPath] = parts;
+  return { hostPath: hostPath ?? '', containerPath: containerPath ?? '', readOnly };
+}
+
+function parsePortBindings(bindings: DockerPortBindings | undefined): { containerPort: number; hostPort: number; protocol: 'tcp' | 'udp' }[] {
+  if (!bindings) return [];
+  const result: { containerPort: number; hostPort: number; protocol: 'tcp' | 'udp' }[] = [];
+  for (const [key, hostEntries] of Object.entries(bindings)) {
+    const [portStr, protocol] = key.split('/');
+    const containerPort = Number(portStr);
+    for (const entry of hostEntries ?? []) {
+      const hostPort = Number(entry.HostPort);
+      if (Number.isInteger(containerPort) && Number.isInteger(hostPort)) {
+        result.push({ containerPort, hostPort, protocol: protocol === 'udp' ? 'udp' : 'tcp' });
+      }
+    }
+  }
+  return result;
 }
 
 function formatPorts(ports: Docker.Port[]): string {
@@ -91,6 +127,32 @@ export class RealDockerClient implements DockerClient {
     );
   }
 
+  async inspectContainer(id: string): Promise<ContainerDetail> {
+    const info = await this.docker.getContainer(id).inspect();
+    const env = (info.Config.Env ?? []).map((entry) => {
+      const eq = entry.indexOf('=');
+      return eq === -1 ? { name: entry, value: '' } : { name: entry.slice(0, eq), value: entry.slice(eq + 1) };
+    });
+    const binds = (info.HostConfig.Binds ?? []).map(parseBind);
+    const devices = ((info.HostConfig.Devices as DockerDevice[] | undefined) ?? []).map((d) => ({
+      hostPath: d.PathOnHost,
+      containerPath: d.PathInContainer,
+    }));
+
+    return {
+      id: info.Id,
+      name: info.Name.replace(/^\//, ''),
+      image: info.Config.Image, // the reference actually used to create it (e.g. "repo:tag") — Id/top-level Image is a resolved sha256 digest, not editable
+      network: info.HostConfig.NetworkMode ?? 'bridge',
+      privileged: info.HostConfig.Privileged ?? false,
+      env,
+      ports: parsePortBindings(info.HostConfig.PortBindings as DockerPortBindings | undefined),
+      binds,
+      devices,
+      labels: info.Config.Labels ?? {},
+    };
+  }
+
   async startContainer(id: string): Promise<DockerCommandResult> {
     await this.docker.getContainer(id).start();
     return { ok: true, message: 'Container started' };
@@ -104,6 +166,11 @@ export class RealDockerClient implements DockerClient {
   async restartContainer(id: string): Promise<DockerCommandResult> {
     await this.docker.getContainer(id).restart();
     return { ok: true, message: 'Container restarted' };
+  }
+
+  async removeContainer(id: string, options?: { force?: boolean }): Promise<DockerCommandResult> {
+    await this.docker.getContainer(id).remove({ force: options?.force ?? false });
+    return { ok: true, message: 'Container removed' };
   }
 
   /** dockerode's createContainer, unlike the `docker` CLI, does not pull a missing

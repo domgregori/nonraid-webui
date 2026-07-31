@@ -1,7 +1,6 @@
-import path from 'node:path';
-import { realpath } from 'node:fs/promises';
 import { config } from '../config.js';
 import type { CreateContainerProgressCallback, DockerClient, DockerCommandResult, DockerContainerSummary } from '../docker/index.js';
+import { computeElevatedAccessReasons, isAllowedBindPath, isAllowedDevicePath, sanitizeContainerName } from '../docker/planning.js';
 import { HttpError } from '../httpError.js';
 import type { CaFeedStore } from './feedStore.js';
 import type {
@@ -71,50 +70,6 @@ function sortApps(apps: CaApp[], sort: AppSort): void {
   } else if (sort === 'new') {
     apps.sort((a, b) => (Date.parse(b.Date ?? '') || 0) - (Date.parse(a.Date ?? '') || 0));
   }
-}
-
-/**
- * Resolves an absolute host path against the allowed root directories.
- * Uses path.resolve('/', ...) so `..` segments can't climb out of a root —
- * template-supplied paths are treated as untrusted input, not just UX hints.
- *
- * A string-only check isn't enough: a symlink sitting under an allowed root
- * (e.g. `/mnt/user/someshare/escape -> /etc`) can look compliant while its
- * real mount target is outside every root, and Docker's bind mounts follow
- * host-side symlinks at mount time. So once the string check passes, walk up
- * to the nearest existing ancestor (the target may not exist yet — Docker
- * creates missing bind sources), resolve it through `realpath`, and re-check
- * containment on the real path. Mirrors `browse/paths.ts`'s `resolveExisting`,
- * which does the same thing for file-browser paths.
- */
-async function isAllowedPath(hostPath: string, roots: string[]): Promise<boolean> {
-  if (!hostPath) return false;
-
-  const normalizedRoots = roots.map((root) => path.resolve('/', root));
-  const withinRoots = (candidate: string) =>
-    normalizedRoots.some((root) => candidate === root || candidate.startsWith(`${root}/`));
-
-  const resolved = path.resolve('/', hostPath);
-  if (!withinRoots(resolved)) return false;
-
-  let probe = resolved;
-  for (;;) {
-    try {
-      const real = await realpath(probe);
-      const tail = path.relative(probe, resolved);
-      const effective = tail ? path.resolve(real, tail) : real;
-      return withinRoots(real) && withinRoots(effective);
-    } catch {
-      const parent = path.dirname(probe);
-      if (parent === probe) return false; // walked all the way to '/' without finding anything real
-      probe = parent;
-    }
-  }
-}
-
-function sanitizeContainerName(raw: string): string {
-  const cleaned = raw.trim().replace(/[^a-zA-Z0-9_.-]/g, '-');
-  return /^[a-zA-Z0-9]/.test(cleaned) ? cleaned : `app-${cleaned}`;
 }
 
 function resolveWebUiTemplate(template: string | undefined, ports: PlanPortBinding[]): string | null {
@@ -292,7 +247,7 @@ export class AppsService {
           });
           break;
         case 'Path': {
-          const allowed = !resolved || (await isAllowedPath(resolved, this.bindRoots));
+          const allowed = !resolved || (await isAllowedBindPath(resolved, this.bindRoots));
           if (!allowed) {
             errors.push(
               `Path "${attrs.Name}" (${resolved}) is outside the allowed host directories (${this.bindRoots.join(', ')})`,
@@ -313,7 +268,7 @@ export class AppsService {
           break;
         }
         case 'Device': {
-          const allowed = !resolved || resolved.startsWith('/dev/');
+          const allowed = !resolved || isAllowedDevicePath(resolved);
           if (!allowed) errors.push(`Device "${attrs.Name}" (${resolved}) must be a /dev/ path`);
           if (resolved) {
             devices.push({
@@ -335,19 +290,12 @@ export class AppsService {
 
     const privileged = app.Privileged === 'true';
     const network = app.Network || 'bridge';
-    const containerName = sanitizeContainerName(request.containerName?.trim() || app.Name);
+    const containerName = sanitizeContainerName(request.containerName?.trim() || app.Name, app.Name);
 
-    // A device path like /dev/sda (a whole disk) gives a container full raw
-    // read/write access to host storage even without Privileged — and host
-    // networking removes network-namespace isolation entirely — so both need
-    // the same explicit human confirmation as a privileged container, not
-    // just the /dev/ prefix or allowed-roots checks above.
-    const elevatedAccessReasons: string[] = [];
-    if (privileged) elevatedAccessReasons.push('This template runs a privileged container (full host access).');
-    for (const d of devices) {
-      if (d.allowed) elevatedAccessReasons.push(`This template passes through host device "${d.hostPath}" directly.`);
-    }
-    if (network === 'host') elevatedAccessReasons.push('This template uses host networking (no network isolation from the host).');
+    const elevatedAccessReasons = computeElevatedAccessReasons(
+      { privileged, network, allowedDeviceHostPaths: devices.filter((d) => d.allowed).map((d) => d.hostPath) },
+      'This template',
+    );
 
     return {
       appName: app.Name,

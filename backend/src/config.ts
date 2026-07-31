@@ -65,10 +65,13 @@ export const config = {
     process.env.APPS_FEED_BACKUP_URL ?? 'https://raw.githubusercontent.com/Squidly271/AppFeed/master/applicationFeed.json',
   appsFeedCachePath: process.env.APPS_FEED_CACHE_PATH ?? path.join(process.cwd(), 'data', 'ca-feed.json'),
   appsFeedRefreshIntervalMs: Number(process.env.APPS_FEED_REFRESH_INTERVAL_MS ?? 24 * 60 * 60 * 1000),
-  // Host paths a template's volume ("Path" type Config entries) may bind-mount.
-  // Anything outside these roots is rejected when building an install plan —
-  // there's no auth layer in front of this API yet, so template-chosen host
-  // binds need a hard boundary, not just a UI warning.
+  // Host paths a container's volumes may bind-mount — shared by both Apps
+  // (a CA template's "Path" Config entries) and the Docker tab's manual
+  // Add/Edit Container dialog, since both end up calling the same
+  // createContainer with caller-influenced host paths. Anything outside
+  // these roots is rejected when building a plan — there's no auth layer in
+  // front of this API yet, so it needs to be a hard boundary, not just a UI
+  // warning.
   appsBindRoots: (process.env.APPS_BIND_ROOTS ?? process.env.SHARE_MOUNT_ROOT ?? '/mnt/user')
     .split(',')
     .map((p) => p.trim())

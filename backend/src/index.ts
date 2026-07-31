@@ -56,7 +56,7 @@ async function main() {
   app.use('/api', arrayRouter(nmd));
   app.use('/api', parityRouter(nmd));
   app.use('/api', disksRouter(nmd));
-  app.use('/api', dockerRouter(docker));
+  app.use('/api', dockerRouter(docker, config.appsBindRoots));
   app.use('/api', smartRouter(nmd, smart));
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));

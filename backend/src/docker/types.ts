@@ -48,7 +48,7 @@ export interface CreateContainerOptions {
 }
 
 export interface CreateContainerProgress {
-  phase: 'pulling' | 'creating' | 'starting';
+  phase: 'pulling' | 'removing' | 'creating' | 'starting';
   message: string;
   percent: number | null; // 0-100, or null when not (yet) knowable — e.g. image already cached, or a phase with no byte-level progress
   // A pull downloads/extracts each image layer independently and in parallel —
@@ -62,3 +62,77 @@ export interface CreateContainerProgress {
 }
 
 export type CreateContainerProgressCallback = (progress: CreateContainerProgress) => void;
+
+// Full detail for one container — used to populate an edit form from what's
+// actually running, rather than DockerContainerSummary's list-view-only shape.
+export interface ContainerEnvVar {
+  name: string;
+  value: string;
+}
+
+export interface ContainerPortMapping {
+  containerPort: number;
+  hostPort: number;
+  protocol: 'tcp' | 'udp';
+}
+
+export interface ContainerVolumeMount {
+  hostPath: string;
+  containerPath: string;
+  readOnly: boolean;
+}
+
+export interface ContainerDeviceMapping {
+  hostPath: string;
+  containerPath: string;
+}
+
+export interface ContainerDetail {
+  id: string;
+  name: string;
+  image: string;
+  network: string;
+  privileged: boolean;
+  env: ContainerEnvVar[];
+  ports: ContainerPortMapping[];
+  binds: ContainerVolumeMount[];
+  devices: ContainerDeviceMapping[];
+  labels: Record<string, string>;
+}
+
+// A manually-configured container (via the Docker tab's Add/Edit dialog) has
+// no CA template behind it, so its request/plan shapes are the raw Docker
+// fields directly rather than a Config-schema resolution like Apps' InstallPlan.
+export interface ManualContainerRequest {
+  containerName: string;
+  image: string;
+  network: string;
+  privileged: boolean;
+  env: ContainerEnvVar[];
+  ports: ContainerPortMapping[];
+  binds: ContainerVolumeMount[];
+  devices: ContainerDeviceMapping[];
+  privilegedAck?: boolean;
+}
+
+export interface ManualPlanBind extends ContainerVolumeMount {
+  allowed: boolean;
+}
+
+export interface ManualPlanDevice extends ContainerDeviceMapping {
+  allowed: boolean;
+}
+
+export interface ManualContainerPlan {
+  containerName: string;
+  image: string;
+  network: string;
+  privileged: boolean;
+  env: ContainerEnvVar[];
+  ports: ContainerPortMapping[];
+  binds: ManualPlanBind[];
+  devices: ManualPlanDevice[];
+  errors: string[];
+  requiresPrivilegedAck: boolean;
+  elevatedAccessReasons: string[];
+}
