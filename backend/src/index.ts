@@ -1,9 +1,11 @@
 import cors from 'cors';
 import express from 'express';
+import { AppsService, CaFeedStore } from './apps/index.js';
 import { BrowseService } from './browse/service.js';
 import { config } from './config.js';
 import { createDockerClient } from './docker/index.js';
 import { createNmdClient } from './nmd/index.js';
+import { appsRouter } from './routes/apps.js';
 import { arrayRouter } from './routes/array.js';
 import { browseRouter } from './routes/browse.js';
 import { disksRouter } from './routes/disks.js';
@@ -19,7 +21,7 @@ import { createSmartClient, SmartService } from './smart/index.js';
 import { SystemStatsService } from './system/service.js';
 import { createUsersClient, UsersService } from './users/index.js';
 
-function main() {
+async function main() {
   const nmd = createNmdClient();
   const docker = createDockerClient();
   const smart = new SmartService(createSmartClient());
@@ -31,6 +33,9 @@ function main() {
   const system = new SystemStatsService();
   const usersClient = createUsersClient();
   const users = new UsersService(usersClient, shareAccessStore, shareStore, shares);
+  const caFeedStore = new CaFeedStore();
+  await caFeedStore.start();
+  const apps = new AppsService(caFeedStore, docker);
 
   const app = express();
   app.use(cors({ origin: config.corsOrigin }));
@@ -57,6 +62,7 @@ function main() {
   app.use('/api', browseRouter(browse));
   app.use('/api', systemRouter(system));
   app.use('/api', usersRouter(users));
+  app.use('/api', appsRouter(apps));
 
   app.listen(config.port, () => {
     console.log(
@@ -66,4 +72,7 @@ function main() {
   });
 }
 
-main();
+main().catch((err) => {
+  console.error('Fatal startup error:', err);
+  process.exit(1);
+});

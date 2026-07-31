@@ -57,4 +57,20 @@ export const config = {
   usersUidRangeEnd: Number(process.env.USERS_UID_RANGE_END ?? 59_999),
   usersTimeoutMs: Number(process.env.USERS_TIMEOUT_MS ?? 15_000),
   usersShellPath: process.env.USERS_SHELL_PATH ?? '/usr/sbin/nologin',
+  // Community Applications template feed — see backend/src/apps/. Primary is
+  // Unraid's own CDN; backup is the GitHub-hosted mirror the CA plugin itself
+  // falls back to.
+  appsFeedPrimaryUrl: process.env.APPS_FEED_PRIMARY_URL ?? 'https://assets.ca.unraid.net/feed/applicationFeed.json',
+  appsFeedBackupUrl:
+    process.env.APPS_FEED_BACKUP_URL ?? 'https://raw.githubusercontent.com/Squidly271/AppFeed/master/applicationFeed.json',
+  appsFeedCachePath: process.env.APPS_FEED_CACHE_PATH ?? path.join(process.cwd(), 'data', 'ca-feed.json'),
+  appsFeedRefreshIntervalMs: Number(process.env.APPS_FEED_REFRESH_INTERVAL_MS ?? 24 * 60 * 60 * 1000),
+  // Host paths a template's volume ("Path" type Config entries) may bind-mount.
+  // Anything outside these roots is rejected when building an install plan —
+  // there's no auth layer in front of this API yet, so template-chosen host
+  // binds need a hard boundary, not just a UI warning.
+  appsBindRoots: (process.env.APPS_BIND_ROOTS ?? process.env.SHARE_MOUNT_ROOT ?? '/mnt/user')
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean),
 };
