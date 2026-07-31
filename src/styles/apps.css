@@ -478,6 +478,50 @@
   align-items: flex-start;
 }
 
+.apps-install-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.apps-install-progress__status {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.apps-install-progress__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.apps-install-progress__bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-blue);
+  transition: width 0.2s ease;
+}
+
+/* Unknown percentage (e.g. "creating"/"starting" phases have no byte count) —
+   an animated sweep instead of a stalled, static bar. */
+.apps-install-progress__bar-fill--indeterminate {
+  width: 40%;
+  animation: apps-install-progress-sweep 1.2s ease-in-out infinite;
+}
+
+@keyframes apps-install-progress-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
 /* App detail panel */
 
 .apps-detail-panel {

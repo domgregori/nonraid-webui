@@ -1,4 +1,9 @@
-import type { CreateContainerOptions, DockerCommandResult, DockerContainerSummary } from './types.js';
+import type {
+  CreateContainerOptions,
+  CreateContainerProgressCallback,
+  DockerCommandResult,
+  DockerContainerSummary,
+} from './types.js';
 
 export interface DockerClient {
   readonly mode: 'real' | 'mock';
@@ -6,5 +11,5 @@ export interface DockerClient {
   startContainer(id: string): Promise<DockerCommandResult>;
   stopContainer(id: string): Promise<DockerCommandResult>;
   restartContainer(id: string): Promise<DockerCommandResult>;
-  createContainer(options: CreateContainerOptions): Promise<DockerCommandResult>;
+  createContainer(options: CreateContainerOptions, onProgress?: CreateContainerProgressCallback): Promise<DockerCommandResult>;
 }

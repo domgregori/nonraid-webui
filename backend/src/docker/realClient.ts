@@ -3,9 +3,16 @@ import type { DockerClient } from './client.js';
 import type {
   ContainerRuntimeState,
   CreateContainerOptions,
+  CreateContainerProgressCallback,
   DockerCommandResult,
   DockerContainerSummary,
 } from './types.js';
+
+interface PullProgressEvent {
+  status?: string;
+  id?: string;
+  progressDetail?: { current?: number; total?: number };
+}
 
 interface CpuStatsLike {
   cpu_usage: { total_usage: number; percpu_usage?: number[] };
@@ -103,7 +110,7 @@ export class RealDockerClient implements DockerClient {
    * image on its own — it fails outright with a 404 if the image isn't already
    * cached locally, which is the common case for a template being installed for
    * the first time. */
-  private async ensureImagePulled(image: string): Promise<void> {
+  private async ensureImagePulled(image: string, onProgress?: CreateContainerProgressCallback): Promise<void> {
     try {
       await this.docker.getImage(image).inspect();
       return;
@@ -111,16 +118,45 @@ export class RealDockerClient implements DockerClient {
       // not present locally — pull it below
     }
 
+    onProgress?.({ phase: 'pulling', message: `Pulling ${image}`, percent: 0 });
+
+    // Each image layer ("id") reports its own current/total bytes independently
+    // and in parallel — sum across all layers seen so far for one overall
+    // percentage rather than showing a per-layer breakdown.
+    const layerBytes = new Map<string, { current: number; total: number }>();
+    const aggregatePercent = (): number | null => {
+      let current = 0;
+      let total = 0;
+      for (const layer of layerBytes.values()) {
+        current += layer.current;
+        total += layer.total;
+      }
+      return total > 0 ? Math.min(100, Math.round((current / total) * 100)) : null;
+    };
+
     await new Promise<void>((resolve, reject) => {
       this.docker.pull(image, (err: Error | null, stream: NodeJS.ReadableStream) => {
         if (err) return reject(err);
-        this.docker.modem.followProgress(stream, (err2: Error | null) => (err2 ? reject(err2) : resolve()));
+        this.docker.modem.followProgress(
+          stream,
+          (err2: Error | null) => (err2 ? reject(err2) : resolve()),
+          (event: PullProgressEvent) => {
+            if (event.id && event.progressDetail?.total) {
+              layerBytes.set(event.id, {
+                current: event.progressDetail.current ?? 0,
+                total: event.progressDetail.total,
+              });
+            }
+            onProgress?.({ phase: 'pulling', message: event.status ?? `Pulling ${image}`, percent: aggregatePercent() });
+          },
+        );
       });
     });
   }
 
-  async createContainer(options: CreateContainerOptions): Promise<DockerCommandResult> {
-    await this.ensureImagePulled(options.image);
+  async createContainer(options: CreateContainerOptions, onProgress?: CreateContainerProgressCallback): Promise<DockerCommandResult> {
+    await this.ensureImagePulled(options.image, onProgress);
+    onProgress?.({ phase: 'creating', message: 'Creating container', percent: null });
 
     const exposedPorts: Record<string, object> = {};
     const portBindings: Record<string, { HostPort: string }[]> = {};
@@ -148,6 +184,7 @@ export class RealDockerClient implements DockerClient {
         Privileged: options.privileged,
       },
     });
+    onProgress?.({ phase: 'starting', message: 'Starting container', percent: null });
     await container.start();
     return { ok: true, message: `Container "${options.name}" created and started` };
   }

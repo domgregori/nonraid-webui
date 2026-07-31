@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { appsApi } from '../../api/appsApi';
-import type { CaApp, CaConfigEntry, InstallOverrides, InstallPlan } from '../../types/appsApi';
+import type { CaApp, CaConfigEntry, CreateContainerProgress, InstallOverrides, InstallPlan } from '../../types/appsApi';
 
 interface InstallDialogProps {
   appName: string;
@@ -53,6 +53,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [installError, setInstallError] = useState<string | null>(null);
   const [installMessage, setInstallMessage] = useState<string | null>(null);
+  const [installProgress, setInstallProgress] = useState<CreateContainerProgress | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -100,9 +101,10 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
 
   const handleInstall = async () => {
     setInstallError(null);
+    setInstallProgress(null);
     setStage('installing');
     try {
-      const result = await appsApi.install(appName, { repository, containerName, overrides, privilegedAck });
+      const result = await appsApi.install(appName, { repository, containerName, overrides, privilegedAck }, setInstallProgress);
       setInstallMessage(result.message);
       setStage('done');
     } catch (err) {
@@ -116,6 +118,9 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
   const advancedEntries = configEntries.filter((e) => isAdvanced(e['@attributes'].Display));
   const elevatedReasons = plan?.elevatedAccessReasons ?? (app ? preReviewElevatedReasons(app) : []);
   const needsElevatedAck = elevatedReasons.length > 0;
+  // Nothing is editable once install has actually started — show the values
+  // that are actually being installed as plain info instead of live inputs.
+  const locked = stage === 'installing' || stage === 'done';
 
   return (
     <>
@@ -137,16 +142,20 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
 
             <label className="form-field">
               <span className="form-field__label">Container name</span>
-              <input
-                className="history-input"
-                style={{ width: '100%' }}
-                value={containerName}
-                onChange={(e) => {
-                  setContainerName(e.target.value);
-                  setPlan(null);
-                  setStage('editing');
-                }}
-              />
+              {locked ? (
+                <div className="form-field__value">{containerName}</div>
+              ) : (
+                <input
+                  className="history-input"
+                  style={{ width: '100%' }}
+                  value={containerName}
+                  onChange={(e) => {
+                    setContainerName(e.target.value);
+                    setPlan(null);
+                    setStage('editing');
+                  }}
+                />
+              )}
             </label>
 
             {needsElevatedAck && (
@@ -174,7 +183,14 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
             )}
 
             {primaryEntries.map((entry) => (
-              <ConfigField key={entry['@attributes'].Target} entry={entry} value={overrides[entry['@attributes'].Target] ?? ''} onChange={setField} plan={plan} />
+              <ConfigField
+                key={entry['@attributes'].Target}
+                entry={entry}
+                value={overrides[entry['@attributes'].Target] ?? ''}
+                onChange={setField}
+                plan={plan}
+                locked={locked}
+              />
             ))}
 
             {advancedEntries.length > 0 && (
@@ -190,6 +206,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
                       value={overrides[entry['@attributes'].Target] ?? ''}
                       onChange={setField}
                       plan={plan}
+                      locked={locked}
                     />
                   ))}
               </div>
@@ -273,6 +290,18 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
               </div>
             )}
 
+            {stage === 'installing' && (
+              <div className="apps-install-progress">
+                <div className="apps-install-progress__status">{installProgress?.message ?? 'Starting…'}</div>
+                <div className="apps-install-progress__bar">
+                  <div
+                    className={`apps-install-progress__bar-fill${installProgress?.percent == null ? ' apps-install-progress__bar-fill--indeterminate' : ''}`}
+                    style={installProgress?.percent != null ? { width: `${installProgress.percent}%` } : undefined}
+                  />
+                </div>
+              </div>
+            )}
+
             {installError && <div className="status-note status-note--error">{installError}</div>}
 
             {stage === 'done' && installMessage && (
@@ -290,7 +319,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
               <button type="button" className="btn" onClick={onClose}>
                 {stage === 'done' ? 'Close' : 'Cancel'}
               </button>
-              {stage !== 'done' && stage !== 'reviewed' && (
+              {stage !== 'done' && stage !== 'reviewed' && stage !== 'installing' && (
                 <button type="button" className="btn--primary" disabled={stage === 'loading'} onClick={handleReview}>
                   {stage === 'loading' ? 'Reviewing…' : 'Review'}
                 </button>
@@ -312,7 +341,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
               )}
               {stage === 'installing' && (
                 <button type="button" className="btn--primary" disabled>
-                  Installing…
+                  {installProgress?.percent != null ? `Installing… ${installProgress.percent}%` : 'Installing…'}
                 </button>
               )}
             </div>
@@ -328,9 +357,10 @@ interface ConfigFieldProps {
   value: string;
   onChange: (target: string, value: string) => void;
   plan: InstallPlan | null;
+  locked: boolean;
 }
 
-function ConfigField({ entry, value, onChange, plan }: ConfigFieldProps) {
+function ConfigField({ entry, value, onChange, plan, locked }: ConfigFieldProps) {
   const attrs = entry['@attributes'];
   const masked = attrs.Mask === 'true';
   const required = attrs.Required === 'true';
@@ -351,13 +381,17 @@ function ConfigField({ entry, value, onChange, plan }: ConfigFieldProps) {
         {label}
         {required && <span className="apps-required-mark"> *</span>}
       </span>
-      <input
-        className={`history-input${fieldError ? ' apps-field--error' : ''}`}
-        style={{ width: '100%' }}
-        type={masked ? 'password' : attrs.Type === 'Port' ? 'number' : 'text'}
-        value={value}
-        onChange={(e) => onChange(attrs.Target, e.target.value)}
-      />
+      {locked ? (
+        <div className="form-field__value">{masked ? '••••••••' : value || '—'}</div>
+      ) : (
+        <input
+          className={`history-input${fieldError ? ' apps-field--error' : ''}`}
+          style={{ width: '100%' }}
+          type={masked ? 'password' : attrs.Type === 'Port' ? 'number' : 'text'}
+          value={value}
+          onChange={(e) => onChange(attrs.Target, e.target.value)}
+        />
+      )}
       {attrs.Description && <span className="apps-field__hint">{attrs.Description}</span>}
       {fieldError && <span className="apps-field__hint apps-field__hint--error">{fieldError}</span>}
     </label>

@@ -77,18 +77,33 @@ export function appsRouter(apps: AppsService): Router {
     }
   });
 
+  // Streams newline-delimited JSON events instead of a single response, so the
+  // client can show real pull/create/start progress — a plain install can take
+  // long enough (pulling a multi-hundred-MB image) that a silent blocking POST
+  // reads as hung. Errors are reported as a `{type:"error"}` event rather than
+  // an HTTP error status, since the response has already started streaming by
+  // the time most failures happen (the two synchronous validation checks in
+  // AppsService.install are the only ones that could still use a real status).
   router.post('/apps/:name/install', async (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' });
+    const send = (event: object) => res.write(`${JSON.stringify(event)}\n`);
     try {
-      const { result } = await apps.install({
-        name: req.params.name,
-        repository: req.body?.repository,
-        containerName: req.body?.containerName,
-        overrides: req.body?.overrides,
-        privilegedAck: req.body?.privilegedAck,
-      });
-      res.json(result);
+      const { result } = await apps.install(
+        {
+          name: req.params.name,
+          repository: req.body?.repository,
+          containerName: req.body?.containerName,
+          overrides: req.body?.overrides,
+          privilegedAck: req.body?.privilegedAck,
+        },
+        (progress) => send({ type: 'progress', ...progress }),
+      );
+      send({ type: 'done', result });
     } catch (err) {
-      handleError(err, res);
+      const message = err instanceof HttpError ? err.message : (err as Error).message;
+      send({ type: 'error', message });
+    } finally {
+      res.end();
     }
   });
 

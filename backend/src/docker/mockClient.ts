@@ -2,9 +2,14 @@ import type { DockerClient } from './client.js';
 import type {
   ContainerRuntimeState,
   CreateContainerOptions,
+  CreateContainerProgressCallback,
   DockerCommandResult,
   DockerContainerSummary,
 } from './types.js';
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 interface MockContainerSeed {
   id: string;
@@ -79,7 +84,18 @@ export class MockDockerClient implements DockerClient {
     return { ok: true, message: 'Container restarted' };
   }
 
-  async createContainer(options: CreateContainerOptions): Promise<DockerCommandResult> {
+  async createContainer(options: CreateContainerOptions, onProgress?: CreateContainerProgressCallback): Promise<DockerCommandResult> {
+    // Simulated pacing so the progress UI has something real to exercise
+    // without a real Docker daemon — not meant to model actual pull speed.
+    for (const percent of [0, 35, 70, 100]) {
+      onProgress?.({ phase: 'pulling', message: `Pulling ${options.image} (mock)`, percent });
+      await sleep(200);
+    }
+    onProgress?.({ phase: 'creating', message: 'Creating container (mock)', percent: null });
+    await sleep(150);
+    onProgress?.({ phase: 'starting', message: 'Starting container (mock)', percent: null });
+    await sleep(150);
+
     const id = `mock-installed-${options.name}`;
     this.installed.push({
       id,

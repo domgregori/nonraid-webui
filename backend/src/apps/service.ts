@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { realpath } from 'node:fs/promises';
 import { config } from '../config.js';
-import type { DockerClient, DockerCommandResult, DockerContainerSummary } from '../docker/index.js';
+import type { CreateContainerProgressCallback, DockerClient, DockerCommandResult, DockerContainerSummary } from '../docker/index.js';
 import { HttpError } from '../httpError.js';
 import type { CaFeedStore } from './feedStore.js';
 import type {
@@ -202,7 +202,10 @@ export class AppsService {
    * server-side validation just checked — a client can't review one plan and
    * submit a tampered one.
    */
-  async install(request: InstallRequest): Promise<{ result: DockerCommandResult; plan: InstallPlan }> {
+  async install(
+    request: InstallRequest,
+    onProgress?: CreateContainerProgressCallback,
+  ): Promise<{ result: DockerCommandResult; plan: InstallPlan }> {
     const app = await this.getApp(request.name, request.repository);
     const plan = await this.resolvePlan(app, request);
 
@@ -216,17 +219,20 @@ export class AppsService {
       );
     }
 
-    const result = await this.docker.createContainer({
-      name: plan.containerName,
-      image: plan.image,
-      network: plan.network,
-      privileged: plan.privileged,
-      env: plan.env.map((e) => `${e.name}=${e.value}`),
-      ports: plan.ports.map((p) => ({ containerPort: p.containerPort, protocol: p.protocol, hostPort: p.hostPort })),
-      binds: plan.binds.map((b) => `${b.hostPath}:${b.containerPath}${b.readOnly ? ':ro' : ''}`),
-      devices: plan.devices.map((d) => ({ hostPath: d.hostPath, containerPath: d.containerPath })),
-      labels: { [APP_NAME_LABEL]: app.Name, [APP_REPOSITORY_LABEL]: app.Repository },
-    });
+    const result = await this.docker.createContainer(
+      {
+        name: plan.containerName,
+        image: plan.image,
+        network: plan.network,
+        privileged: plan.privileged,
+        env: plan.env.map((e) => `${e.name}=${e.value}`),
+        ports: plan.ports.map((p) => ({ containerPort: p.containerPort, protocol: p.protocol, hostPort: p.hostPort })),
+        binds: plan.binds.map((b) => `${b.hostPath}:${b.containerPath}${b.readOnly ? ':ro' : ''}`),
+        devices: plan.devices.map((d) => ({ hostPath: d.hostPath, containerPath: d.containerPath })),
+        labels: { [APP_NAME_LABEL]: app.Name, [APP_REPOSITORY_LABEL]: app.Repository },
+      },
+      onProgress,
+    );
     return { result, plan };
   }
 

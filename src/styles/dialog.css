@@ -52,6 +52,20 @@
   color: var(--color-text-secondary);
 }
 
+/* Read-only stand-in for a form-field's <input> once its value is locked in
+   (e.g. mid-install) — same box metrics as .history-input so the layout
+   doesn't jump, but visually inert. */
+.form-field__value {
+  padding: 8px 12px;
+  border-radius: var(--radius-btn);
+  border: 1px solid transparent;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
 .disk-checkbox-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));

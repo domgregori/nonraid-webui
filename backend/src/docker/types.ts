@@ -46,3 +46,11 @@ export interface CreateContainerOptions {
   devices: CreateContainerDevice[];
   labels: Record<string, string>;
 }
+
+export interface CreateContainerProgress {
+  phase: 'pulling' | 'creating' | 'starting';
+  message: string;
+  percent: number | null; // 0-100, or null when not (yet) knowable — e.g. image already cached, or a phase with no byte-level progress
+}
+
+export type CreateContainerProgressCallback = (progress: CreateContainerProgress) => void;
