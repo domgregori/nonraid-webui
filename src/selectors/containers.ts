@@ -1,12 +1,13 @@
 import { COLORS, tint } from '../styles/colors';
 import type { ContainerViewModel } from '../types';
-import type { DockerContainerSummary } from '../types/dockerApi';
+import { CA_APP_NAME_LABEL, type DockerContainerSummary } from '../types/dockerApi';
 import { formatBytesAsMB } from '../utils/format';
 
 export interface ContainerActions {
   isPending: boolean;
   onToggle: () => void;
   onRestart: () => void;
+  onEdit: () => void;
 }
 
 export function deriveContainerViewModel(container: DockerContainerSummary, actions: ContainerActions): ContainerViewModel {
@@ -25,7 +26,9 @@ export function deriveContainerViewModel(container: DockerContainerSummary, acti
     toggleBg: running ? 'transparent' : tint(COLORS.green, 15),
     toggleFg: running ? COLORS.red : COLORS.green,
     isPending: actions.isPending,
+    caAppName: container.labels[CA_APP_NAME_LABEL] ?? null,
     onToggle: actions.onToggle,
     onRestart: actions.onRestart,
+    onEdit: actions.onEdit,
   };
 }

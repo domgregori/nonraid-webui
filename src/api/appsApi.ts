@@ -1,60 +1,14 @@
-import { API_BASE_URL } from './config';
+import { streamNdjson } from './progressStream';
 import { request } from './request';
-import type {
-  AppSort,
-  AppSummary,
-  CaApp,
-  CreateContainerProgress,
-  DockerCommandResult,
-  FeedMeta,
-  InstallPlan,
-  InstallRequest,
-} from '../types/appsApi';
+import type { AppSort, AppSummary, CaApp, DockerCommandResult, FeedMeta, InstallPlan, InstallRequest } from '../types/appsApi';
+import type { CreateContainerProgress } from '../types/dockerApi';
 
-/**
- * The install endpoint streams newline-delimited JSON events (progress ticks,
- * then a final done/error event) instead of a single response — pulling a
- * multi-hundred-MB image can take long enough that a silent blocking request
- * reads as hung. `request()` assumes one JSON body, so this reads the stream
- * directly instead of going through it.
- */
-async function installStream(name: string, body: InstallRequest, onProgress: (p: CreateContainerProgress) => void): Promise<DockerCommandResult> {
-  const res = await fetch(`${API_BASE_URL}/api/apps/${encodeURIComponent(name)}/install`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.body) throw new Error(`Install failed: ${res.status}`);
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    let newlineIndex: number;
-    while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, newlineIndex).trim();
-      buffer = buffer.slice(newlineIndex + 1);
-      if (!line) continue;
-
-      const event = JSON.parse(line) as
-        | ({ type: 'progress' } & CreateContainerProgress)
-        | { type: 'done'; result: DockerCommandResult }
-        | { type: 'error'; message: string };
-
-      if (event.type === 'progress') {
-        const { type: _type, ...progress } = event;
-        onProgress(progress);
-      } else if (event.type === 'done') return event.result;
-      else throw new Error(event.message);
-    }
-  }
-
-  throw new Error('Install stream ended without a result');
+function install(name: string, body: InstallRequest, onProgress: (p: CreateContainerProgress) => void): Promise<DockerCommandResult> {
+  return streamNdjson(
+    `/api/apps/${encodeURIComponent(name)}/install`,
+    { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
+    onProgress,
+  );
 }
 
 export const appsApi = {
@@ -79,5 +33,5 @@ export const appsApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     }),
-  install: installStream,
+  install,
 };

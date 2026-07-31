@@ -43,6 +43,29 @@
   font-family: var(--font-mono);
 }
 
+.docker-card__badges {
+  margin-top: 6px;
+}
+
+.docker-card__badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-chip);
+  padding: 3px 7px;
+}
+
+.docker-card__badge--ca {
+  color: var(--color-green);
+  background: color-mix(in oklch, var(--color-green) 15%, transparent);
+}
+
+.docker-card__badge--custom {
+  color: var(--color-text-dim);
+  background: var(--color-surface-elevated);
+}
+
 .docker-card__stats {
   margin-top: var(--space-md);
   display: flex;
