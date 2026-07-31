@@ -9,7 +9,7 @@ export interface CaConfigAttributes {
   Name: string;
   Target: string;
   Default: string;
-  Mode: string;
+  Mode?: string; // absent on ~10% of real Path/Port entries — never assume present
   Description: string;
   Type: CaConfigType;
   Display: string; // 'always' | 'advanced' | 'always-hide' | ...

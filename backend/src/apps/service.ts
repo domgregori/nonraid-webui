@@ -300,7 +300,7 @@ export class AppsService {
               required,
               containerPath: attrs.Target,
               hostPath: resolved,
-              readOnly: attrs.Mode.toLowerCase() === 'ro',
+              readOnly: (attrs.Mode ?? '').toLowerCase() === 'ro',
               allowed,
             });
           }
