@@ -22,6 +22,15 @@ export function dockerRouter(docker: DockerClient, bindRoots: string[]): Router 
     }
   });
 
+  router.get('/docker/containers/:id/logs', async (req, res) => {
+    try {
+      const tail = Number(req.query.tail);
+      res.json({ logs: await docker.getContainerLogs(req.params.id, Number.isInteger(tail) && tail > 0 ? tail : undefined) });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   router.post('/docker/containers/:id/start', async (req, res) => {
     try {
       res.json(await docker.startContainer(req.params.id));

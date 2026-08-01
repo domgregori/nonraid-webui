@@ -15,4 +15,5 @@ export interface DockerClient {
   restartContainer(id: string): Promise<DockerCommandResult>;
   removeContainer(id: string, options?: { force?: boolean }): Promise<DockerCommandResult>;
   createContainer(options: CreateContainerOptions, onProgress?: CreateContainerProgressCallback): Promise<DockerCommandResult>;
+  getContainerLogs(id: string, tail?: number): Promise<string>;
 }

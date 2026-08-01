@@ -33,4 +33,6 @@ export const dockerApi = {
       { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
       onProgress,
     ),
+  getContainerLogs: (id: string, tail?: number) =>
+    request<{ logs: string }>(`/api/docker/containers/${id}/logs${tail ? `?tail=${tail}` : ''}`),
 };

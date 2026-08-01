@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { ContainerFormDialog } from '../components/docker/ContainerFormDialog';
+import { LogsDialog } from '../components/docker/LogsDialog';
 import { useDockerContainers } from '../hooks/useDockerContainers';
 import { deriveContainerViewModel } from '../selectors/containers';
 
-type DialogState = { mode: 'add' } | { mode: 'edit'; containerId: string } | null;
+type DialogState =
+  | { mode: 'add' }
+  | { mode: 'edit'; containerId: string }
+  | { mode: 'logs'; containerId: string; containerName: string }
+  | null;
 
 export function DockerPage() {
   const { containers, status, error, pendingIds, start, stop, restart, refresh } = useDockerContainers();
@@ -15,6 +20,7 @@ export function DockerPage() {
       onToggle: () => (c.state === 'running' ? stop(c.id) : start(c.id)),
       onRestart: () => restart(c.id),
       onEdit: () => setDialog({ mode: 'edit', containerId: c.id }),
+      onViewLogs: () => setDialog({ mode: 'logs', containerId: c.id, containerName: c.name }),
     }),
   );
 
@@ -47,6 +53,11 @@ export function DockerPage() {
               ) : (
                 <span className="docker-card__badge docker-card__badge--custom">Custom</span>
               )}
+              {c.webUiUrl && (
+                <a className="docker-card__weburl" href={c.webUiUrl} target="_blank" rel="noreferrer">
+                  Web UI &#8599;
+                </a>
+              )}
             </div>
             <div className="docker-card__stats">
               <span>CPU {c.cpuLabel}</span>
@@ -66,6 +77,11 @@ export function DockerPage() {
               <button type="button" className="btn" disabled={c.isPending} onClick={c.onRestart}>
                 Restart
               </button>
+            </div>
+            <div className="docker-card__actions">
+              <button type="button" className="btn" disabled={c.isPending} onClick={c.onViewLogs}>
+                Logs
+              </button>
               <button type="button" className="btn" disabled={c.isPending} onClick={c.onEdit}>
                 Edit
               </button>
@@ -74,13 +90,17 @@ export function DockerPage() {
         ))}
       </div>
 
-      {dialog && (
+      {(dialog?.mode === 'add' || dialog?.mode === 'edit') && (
         <ContainerFormDialog
           mode={dialog.mode}
           containerId={dialog.mode === 'edit' ? dialog.containerId : undefined}
           onClose={() => setDialog(null)}
           onDone={refresh}
         />
+      )}
+
+      {dialog?.mode === 'logs' && (
+        <LogsDialog containerId={dialog.containerId} containerName={dialog.containerName} onClose={() => setDialog(null)} />
       )}
     </div>
   );

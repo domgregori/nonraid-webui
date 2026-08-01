@@ -125,6 +125,17 @@ export class MockDockerClient implements DockerClient {
     return { ok: true, message: 'Container removed (mock)' };
   }
 
+  async getContainerLogs(id: string, tail = 500): Promise<string> {
+    const container = this.find(id);
+    const running = (this.state[id] ?? 'stopped') === 'running';
+    const lines = Array.from({ length: Math.min(tail, 20) }, (_, i) => {
+      const ts = new Date(Date.now() - (20 - i) * 1000).toISOString();
+      return `${ts} [mock] ${container.name} log line ${i + 1}`;
+    });
+    if (!running) lines.push(`${new Date().toISOString()} [mock] container is stopped`);
+    return lines.join('\n');
+  }
+
   async createContainer(options: CreateContainerOptions, onProgress?: CreateContainerProgressCallback): Promise<DockerCommandResult> {
     // Simulated pacing so the progress UI has something real to exercise
     // without a real Docker daemon — not meant to model actual pull speed.

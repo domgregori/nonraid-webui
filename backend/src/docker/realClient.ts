@@ -75,6 +75,28 @@ function parsePortBindings(bindings: DockerPortBindings | undefined): { containe
   return result;
 }
 
+/**
+ * A container without a TTY (the default, and what our own createContainer
+ * always produces) has its stdout/stderr multiplexed into one stream: each
+ * frame is an 8-byte header — [stream type, 0, 0, 0, size as big-endian
+ * uint32] — followed by that many bytes of payload. A TTY container's logs
+ * are raw text with no framing at all. `container.logs()` doesn't tell you
+ * which you got, so the caller has to check `Tty` from inspect first.
+ */
+function demuxLogBuffer(buffer: Buffer): string {
+  const chunks: string[] = [];
+  let offset = 0;
+  while (offset + 8 <= buffer.length) {
+    const size = buffer.readUInt32BE(offset + 4);
+    const start = offset + 8;
+    const end = start + size;
+    if (end > buffer.length) break;
+    chunks.push(buffer.subarray(start, end).toString('utf8'));
+    offset = end;
+  }
+  return chunks.join('');
+}
+
 function formatPorts(ports: Docker.Port[]): string {
   if (!ports || ports.length === 0) return '—';
   const seen = new Set<string>();
@@ -171,6 +193,13 @@ export class RealDockerClient implements DockerClient {
   async removeContainer(id: string, options?: { force?: boolean }): Promise<DockerCommandResult> {
     await this.docker.getContainer(id).remove({ force: options?.force ?? false });
     return { ok: true, message: 'Container removed' };
+  }
+
+  async getContainerLogs(id: string, tail = 500): Promise<string> {
+    const container = this.docker.getContainer(id);
+    const info = await container.inspect();
+    const buffer = (await container.logs({ stdout: true, stderr: true, tail, timestamps: true, follow: false })) as unknown as Buffer;
+    return info.Config.Tty ? buffer.toString('utf8') : demuxLogBuffer(buffer);
   }
 
   /** dockerode's createContainer, unlike the `docker` CLI, does not pull a missing
