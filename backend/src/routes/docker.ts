@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { APP_NAME_LABEL, APP_REPOSITORY_LABEL, type AppsService } from '../apps/index.js';
 import { resolveWebUiTemplate } from '../apps/webUi.js';
+import type { ActivityStore } from '../activity/index.js';
 import type { DockerClient, DockerContainerSummary } from '../docker/index.js';
 import { buildManualPlan } from '../docker/manualPlan.js';
 import { HttpError } from '../httpError.js';
 
-export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: AppsService): Router {
+export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: AppsService, activity: ActivityStore): Router {
   const router = Router();
 
   // The Docker layer itself has no notion of CA templates (kept as a clean
@@ -26,6 +27,16 @@ export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: Ap
     } catch {
       return container;
     }
+  }
+
+  // start/stop/restart only get an id from the client, not a name — fetch it
+  // first purely so the activity entry reads like "jellyfin stopped" instead
+  // of a container id. Best-effort: falls back to the id if inspect fails.
+  async function containerName(id: string): Promise<string> {
+    return docker
+      .inspectContainer(id)
+      .then((c) => c.name)
+      .catch(() => id);
   }
 
   router.get('/docker/containers', async (_req, res) => {
@@ -55,7 +66,10 @@ export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: Ap
 
   router.post('/docker/containers/:id/start', async (req, res) => {
     try {
-      res.json(await docker.startContainer(req.params.id));
+      const name = await containerName(req.params.id);
+      const result = await docker.startContainer(req.params.id);
+      activity.log(`Container "${name}" started`, 'blue').catch(() => {});
+      res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }
@@ -63,7 +77,10 @@ export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: Ap
 
   router.post('/docker/containers/:id/stop', async (req, res) => {
     try {
-      res.json(await docker.stopContainer(req.params.id));
+      const name = await containerName(req.params.id);
+      const result = await docker.stopContainer(req.params.id);
+      activity.log(`Container "${name}" stopped`, 'blue').catch(() => {});
+      res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }
@@ -71,7 +88,10 @@ export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: Ap
 
   router.post('/docker/containers/:id/restart', async (req, res) => {
     try {
-      res.json(await docker.restartContainer(req.params.id));
+      const name = await containerName(req.params.id);
+      const result = await docker.restartContainer(req.params.id);
+      activity.log(`Container "${name}" restarted`, 'blue').catch(() => {});
+      res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }
@@ -111,6 +131,7 @@ export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: Ap
         },
         (progress) => send({ type: 'progress', ...progress }),
       );
+      activity.log(`Container "${plan.containerName}" created`, 'green').catch(() => {});
       send({ type: 'done', result });
     } catch (err) {
       const message = err instanceof HttpError ? err.message : (err as Error).message;
@@ -154,6 +175,7 @@ export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: Ap
         },
         (progress) => send({ type: 'progress', ...progress }),
       );
+      activity.log(`Container "${plan.containerName}" updated`, 'blue').catch(() => {});
       send({ type: 'done', result });
     } catch (err) {
       const message = err instanceof HttpError ? err.message : (err as Error).message;

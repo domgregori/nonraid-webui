@@ -1,10 +1,11 @@
+import type { ActivityStore } from '../activity/index.js';
 import type { ShareAccessStore } from '../shares/aclStore.js';
 import type { ShareService } from '../shares/service.js';
 import type { ShareStore } from '../shares/store.js';
 import type { SharePermission } from '../shares/types.js';
 import { HttpError } from '../httpError.js';
 import type { UsersClient } from './client.js';
-import type { Group, GroupInput, User, UserCommandResult, UserInput, UserUpdateInput } from './types.js';
+import type { Group, User, UserCommandResult } from './types.js';
 import { validateGroupInput, validatePermission, validateUserInput, validateUserUpdateInput } from './validate.js';
 
 export interface ShareAccessEntry {
@@ -18,6 +19,7 @@ export class UsersService {
     private aclStore: ShareAccessStore,
     private shareStore: ShareStore,
     private shares: ShareService,
+    private activity: ActivityStore,
   ) {}
 
   listUsers(): Promise<User[]> {
@@ -27,7 +29,9 @@ export class UsersService {
   async createUser(input: unknown): Promise<User> {
     const userInput = validateUserInput(input);
     await this.assertManagedGroups(userInput.groups);
-    return this.client.createUser(userInput);
+    const user = await this.client.createUser(userInput);
+    this.activity.log(`User "${user.username}" created`, 'green').catch(() => {});
+    return user;
   }
 
   async updateUser(username: string, input: unknown): Promise<User> {
@@ -55,6 +59,7 @@ export class UsersService {
     const result = await this.client.deleteUser(username);
     await this.aclStore.removePrincipal('users', username);
     await this.shares.resyncExports();
+    this.activity.log(`User "${username}" deleted`, 'red').catch(() => {});
     return result;
   }
 
@@ -62,14 +67,17 @@ export class UsersService {
     return this.client.listGroups();
   }
 
-  createGroup(input: unknown): Promise<Group> {
-    return this.client.createGroup(validateGroupInput(input));
+  async createGroup(input: unknown): Promise<Group> {
+    const group = await this.client.createGroup(validateGroupInput(input));
+    this.activity.log(`Group "${group.name}" created`, 'green').catch(() => {});
+    return group;
   }
 
   async deleteGroup(name: string): Promise<UserCommandResult> {
     const result = await this.client.deleteGroup(name);
     await this.aclStore.removePrincipal('groups', name);
     await this.shares.resyncExports();
+    this.activity.log(`Group "${name}" deleted`, 'red').catch(() => {});
     return result;
   }
 

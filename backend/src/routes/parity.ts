@@ -1,10 +1,19 @@
 import { Router } from 'express';
+import type { ActivityStore } from '../activity/index.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { ParityCheckAction } from '../nmd/types.js';
 
 const VALID_ACTIONS: ParityCheckAction[] = ['CORRECT', 'NOCORRECT', 'PAUSE', 'RESUME', 'CANCEL'];
 
-export function parityRouter(nmd: NmdClient): Router {
+const ACTIVITY_MESSAGE: Record<ParityCheckAction, { text: string; color: 'blue' | 'amber' }> = {
+  CORRECT: { text: 'Parity check started', color: 'blue' },
+  NOCORRECT: { text: 'Parity check started (non-correcting)', color: 'blue' },
+  PAUSE: { text: 'Parity check paused', color: 'amber' },
+  RESUME: { text: 'Parity check resumed', color: 'blue' },
+  CANCEL: { text: 'Parity check cancelled', color: 'amber' },
+};
+
+export function parityRouter(nmd: NmdClient, activity: ActivityStore): Router {
   const router = Router();
 
   router.post('/parity/:action', async (req, res) => {
@@ -14,7 +23,10 @@ export function parityRouter(nmd: NmdClient): Router {
       return;
     }
     try {
-      res.json(await nmd.parityCheck(action));
+      const result = await nmd.parityCheck(action);
+      const { text, color } = ACTIVITY_MESSAGE[action];
+      activity.log(text, color).catch(() => {});
+      res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

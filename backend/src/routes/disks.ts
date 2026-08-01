@@ -1,7 +1,8 @@
 import { Router } from 'express';
+import type { ActivityStore } from '../activity/index.js';
 import type { NmdClient } from '../nmd/index.js';
 
-export function disksRouter(nmd: NmdClient): Router {
+export function disksRouter(nmd: NmdClient, activity: ActivityStore): Router {
   const router = Router();
 
   router.post('/disks/:slot/unassign', async (req, res) => {
@@ -11,7 +12,9 @@ export function disksRouter(nmd: NmdClient): Router {
       return;
     }
     try {
-      res.json(await nmd.unassignDisk(slot));
+      const result = await nmd.unassignDisk(slot);
+      activity.log(`Disk unassigned from slot ${slot}`, 'amber').catch(() => {});
+      res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

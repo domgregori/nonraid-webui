@@ -1,3 +1,4 @@
+import type { ActivityStore } from '../activity/index.js';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { ShareAccessStore } from './aclStore.js';
@@ -12,6 +13,7 @@ export class ShareService {
     private applier: ShareApplier,
     private nmd: NmdClient,
     private aclStore: ShareAccessStore,
+    private activity: ActivityStore,
   ) {}
 
   private async buildContext(): Promise<ApplyContext> {
@@ -44,6 +46,7 @@ export class ShareService {
     await this.applier.mountShare(share, ctx);
     await this.store.upsert(share);
     await this.resyncExports();
+    this.activity.log(`Share "${share.name}" created`, 'green').catch(() => {});
     return share;
   }
 
@@ -53,8 +56,9 @@ export class ShareService {
     }
     const share = validateShareInput(input);
     const ctx = await this.buildContext();
+    const renamed = share.name !== name;
 
-    if (share.name !== name) {
+    if (renamed) {
       if (await this.store.get(share.name)) {
         throw new HttpError(409, `Share "${share.name}" already exists.`);
       }
@@ -66,6 +70,7 @@ export class ShareService {
     await this.applier.mountShare(share, ctx);
     await this.store.upsert(share);
     await this.resyncExports();
+    this.activity.log(renamed ? `Share "${name}" renamed to "${share.name}"` : `Share "${share.name}" updated`, 'blue').catch(() => {});
     return share;
   }
 
@@ -77,6 +82,7 @@ export class ShareService {
     await this.store.remove(name);
     await this.aclStore.removeShare(name);
     await this.resyncExports();
+    this.activity.log(`Share "${name}" deleted`, 'red').catch(() => {});
   }
 
   /** Re-derives smb.conf/exports from the current share list + access lists. Also

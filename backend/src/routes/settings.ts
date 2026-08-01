@@ -1,8 +1,9 @@
 import { Router } from 'express';
+import type { ActivityStore } from '../activity/index.js';
 import type { NmdClient } from '../nmd/index.js';
 import { sendAppriseNotification, type SettingsStore } from '../settings/index.js';
 
-export function settingsRouter(store: SettingsStore, nmd: NmdClient): Router {
+export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: ActivityStore): Router {
   const router = Router();
 
   router.get('/settings', async (_req, res) => {
@@ -22,6 +23,7 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient): Router {
       const patch = req.body ?? {};
       if (typeof patch.turboWrite === 'boolean') {
         await nmd.setWriteMethod(patch.turboWrite);
+        activity.log(patch.turboWrite ? 'Turbo write enabled' : 'Turbo write disabled', 'blue').catch(() => {});
       }
       res.json(await store.update(patch));
     } catch (err) {

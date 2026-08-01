@@ -1,3 +1,4 @@
+import type { ActivityStore } from '../activity/index.js';
 import { config } from '../config.js';
 import type { CreateContainerProgressCallback, DockerClient, DockerCommandResult, DockerContainerSummary } from '../docker/index.js';
 import { computeElevatedAccessReasons, isAllowedBindPath, isAllowedDevicePath, sanitizeContainerName } from '../docker/planning.js';
@@ -80,6 +81,7 @@ export class AppsService {
   constructor(
     private feedStore: CaFeedStore,
     private docker: DockerClient,
+    private activity: ActivityStore,
     private bindRoots: string[] = config.appsBindRoots,
   ) {}
 
@@ -192,6 +194,7 @@ export class AppsService {
       },
       onProgress,
     );
+    this.activity.log(`Installed "${app.Name}" from Community Applications`, 'green').catch(() => {});
     return { result, plan };
   }
 

@@ -1,10 +1,12 @@
 import cors from 'cors';
 import express from 'express';
+import { ActivityStore } from './activity/index.js';
 import { AppsService, CaFeedStore } from './apps/index.js';
 import { BrowseService } from './browse/service.js';
 import { config } from './config.js';
 import { createDockerClient } from './docker/index.js';
 import { createNmdClient } from './nmd/index.js';
+import { activityRouter } from './routes/activity.js';
 import { appsRouter } from './routes/apps.js';
 import { arrayRouter } from './routes/array.js';
 import { browseRouter } from './routes/browse.js';
@@ -27,17 +29,18 @@ async function main() {
   const nmd = createNmdClient();
   const docker = createDockerClient();
   const smart = new SmartService(createSmartClient());
+  const activity = new ActivityStore();
   const shareApplier = createShareApplier();
   const shareStore = new ShareStore();
   const shareAccessStore = new ShareAccessStore();
-  const shares = new ShareService(shareStore, shareApplier, nmd, shareAccessStore);
+  const shares = new ShareService(shareStore, shareApplier, nmd, shareAccessStore, activity);
   const browse = new BrowseService(shareStore);
   const system = new SystemStatsService();
   const usersClient = createUsersClient();
-  const users = new UsersService(usersClient, shareAccessStore, shareStore, shares);
+  const users = new UsersService(usersClient, shareAccessStore, shareStore, shares, activity);
   const caFeedStore = new CaFeedStore();
   await caFeedStore.start();
-  const apps = new AppsService(caFeedStore, docker);
+  const apps = new AppsService(caFeedStore, docker, activity);
   const settingsStore = new SettingsStore();
 
   // The driver has no readback for write method (see nmd/client.ts), so on a
@@ -66,17 +69,18 @@ async function main() {
   });
 
   app.use('/api', statusRouter(nmd));
-  app.use('/api', arrayRouter(nmd, settingsStore));
-  app.use('/api', parityRouter(nmd));
-  app.use('/api', settingsRouter(settingsStore, nmd));
-  app.use('/api', disksRouter(nmd));
-  app.use('/api', dockerRouter(docker, config.appsBindRoots, apps));
+  app.use('/api', arrayRouter(nmd, settingsStore, activity));
+  app.use('/api', parityRouter(nmd, activity));
+  app.use('/api', settingsRouter(settingsStore, nmd, activity));
+  app.use('/api', disksRouter(nmd, activity));
+  app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity));
   app.use('/api', smartRouter(nmd, smart));
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
   app.use('/api', systemRouter(system));
   app.use('/api', usersRouter(users));
   app.use('/api', appsRouter(apps));
+  app.use('/api', activityRouter(activity));
 
   app.listen(config.port, () => {
     console.log(

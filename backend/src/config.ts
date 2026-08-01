@@ -80,4 +80,6 @@ export const config = {
   // notification config, the History page's Grafana URL) — see backend/src/settings/.
   settingsConfigPath: process.env.SETTINGS_CONFIG_PATH ?? path.join(process.cwd(), 'data', 'settings.json'),
   appriseBin: process.env.APPRISE_BIN ?? 'apprise',
+  // Dashboard activity feed — see backend/src/activity/.
+  activityConfigPath: process.env.ACTIVITY_CONFIG_PATH ?? path.join(process.cwd(), 'data', 'activity.json'),
 };
