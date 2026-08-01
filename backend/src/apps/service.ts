@@ -17,6 +17,7 @@ import type {
   PlanEnvVar,
   PlanPortBinding,
 } from './types.js';
+import { resolveWebUiTemplate } from './webUi.js';
 
 const OVERVIEW_SUMMARY_LENGTH = 220;
 
@@ -24,9 +25,11 @@ const OVERVIEW_SUMMARY_LENGTH = 220;
 // load can recognize "this container came from installing that template" —
 // matching by image string alone would be ambiguous (shared base images,
 // registry-prefix differences) and wouldn't survive the user renaming the
-// container.
-const APP_NAME_LABEL = 'com.nonraid.apps.name';
-const APP_REPOSITORY_LABEL = 'com.nonraid.apps.repository';
+// container. Exported so routes/docker.ts can recognize the same containers
+// (e.g. to resolve their WebUI link from the CA template rather than a
+// generic "first published port" guess).
+export const APP_NAME_LABEL = 'com.nonraid.apps.name';
+export const APP_REPOSITORY_LABEL = 'com.nonraid.apps.repository';
 
 function toSummary(app: CaApp, installedContainer: DockerContainerSummary | undefined): AppSummary {
   const overview = (app.Overview ?? '').replace(/\s+/g, ' ').trim();
@@ -72,16 +75,6 @@ function sortApps(apps: CaApp[], sort: AppSort): void {
   }
 }
 
-function resolveWebUiTemplate(template: string | undefined, ports: PlanPortBinding[]): string | null {
-  if (!template) return null;
-  // [IP] is deliberately left for the frontend to fill in with the host it's
-  // actually talking to (window.location.hostname) — this backend has no
-  // reliable way to know which address the user reaches it on.
-  return template.replace(/\[PORT:(\d+)\]/g, (_match, containerPort: string) => {
-    const bound = ports.find((p) => String(p.containerPort) === containerPort);
-    return bound ? String(bound.hostPort) : containerPort;
-  });
-}
 
 export class AppsService {
   constructor(
@@ -90,12 +83,24 @@ export class AppsService {
     private bindRoots: string[] = config.appsBindRoots,
   ) {}
 
-  async listSummaries(query: AppListQuery = {}): Promise<AppSummary[]> {
+  /**
+   * The feed mixes real Docker apps with actual Unraid *plugins* (.plg/.txz
+   * packages installed outside Docker entirely — their `Repository` is a
+   * .plg URL, not an image). There's no framework in this project for
+   * installing plugins, so they're excluded here, once, rather than filtered
+   * ad hoc in each caller — every other method reads the feed through this.
+   */
+  private async applications(): Promise<CaApp[]> {
     const feed = await this.feedStore.getFeed();
+    return feed.applist.filter((app) => app.Plugin !== true);
+  }
+
+  async listSummaries(query: AppListQuery = {}): Promise<AppSummary[]> {
+    const applications = await this.applications();
     const search = query.search?.trim().toLowerCase();
     const category = query.category?.trim();
 
-    const matched = feed.applist.filter((app) => {
+    const matched = applications.filter((app) => {
       if (category && !(Array.isArray(app.CategoryList) && app.CategoryList.includes(category))) return false;
       if (search) {
         const haystack = `${app.Name} ${app.Repository} ${app.Overview ?? ''}`.toLowerCase();
@@ -111,9 +116,9 @@ export class AppsService {
   }
 
   async listCategories(): Promise<string[]> {
-    const feed = await this.feedStore.getFeed();
+    const applications = await this.applications();
     const categories = new Set<string>();
-    for (const app of feed.applist) {
+    for (const app of applications) {
       if (Array.isArray(app.CategoryList)) for (const c of app.CategoryList) categories.add(c);
     }
     return [...categories].sort();
@@ -126,8 +131,7 @@ export class AppsService {
    * silently resolve to the wrong template.
    */
   async getApp(name: string, repository?: string): Promise<CaApp> {
-    const feed = await this.feedStore.getFeed();
-    const matches = feed.applist.filter((a) => a.Name === name);
+    const matches = (await this.applications()).filter((a) => a.Name === name);
     const first = matches[0];
     if (!first) throw new HttpError(404, `App "${name}" not found in the catalog`);
     if (repository) {
@@ -138,8 +142,8 @@ export class AppsService {
   }
 
   async getFeedMeta(): Promise<{ appCount: number; lastUpdated: string; fetchedAt: number }> {
-    const feed = await this.feedStore.getFeed();
-    return { appCount: feed.applist.length, lastUpdated: feed.last_updated, fetchedAt: this.feedStore.lastFetchedAt };
+    const [feed, applications] = await Promise.all([this.feedStore.getFeed(), this.applications()]);
+    return { appCount: applications.length, lastUpdated: feed.last_updated, fetchedAt: this.feedStore.lastFetchedAt };
   }
 
   refreshFeed() {

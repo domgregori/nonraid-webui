@@ -2,6 +2,7 @@ import Docker from 'dockerode';
 import type { DockerClient } from './client.js';
 import type {
   ContainerDetail,
+  ContainerPortMapping,
   ContainerRuntimeState,
   CreateContainerOptions,
   CreateContainerProgressCallback,
@@ -106,6 +107,13 @@ function formatPorts(ports: Docker.Port[]): string {
   return [...seen].join(', ');
 }
 
+function toPortMappings(ports: Docker.Port[]): ContainerPortMapping[] {
+  if (!ports) return [];
+  return ports
+    .filter((p) => p.PublicPort)
+    .map((p) => ({ containerPort: p.PrivatePort, hostPort: p.PublicPort, protocol: p.Type === 'udp' ? 'udp' : 'tcp' }) as ContainerPortMapping);
+}
+
 export class RealDockerClient implements DockerClient {
   readonly mode = 'real' as const;
   private docker = new Docker();
@@ -143,7 +151,9 @@ export class RealDockerClient implements DockerClient {
           memUsedBytes,
           memLimitBytes,
           ports: formatPorts(c.Ports),
+          portMappings: toPortMappings(c.Ports),
           labels: c.Labels ?? {},
+          webUiUrl: null,
         };
       }),
     );

@@ -1,14 +1,36 @@
 import { Router } from 'express';
-import type { DockerClient } from '../docker/index.js';
+import { APP_NAME_LABEL, APP_REPOSITORY_LABEL, type AppsService } from '../apps/index.js';
+import { resolveWebUiTemplate } from '../apps/webUi.js';
+import type { DockerClient, DockerContainerSummary } from '../docker/index.js';
 import { buildManualPlan } from '../docker/manualPlan.js';
 import { HttpError } from '../httpError.js';
 
-export function dockerRouter(docker: DockerClient, bindRoots: string[]): Router {
+export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: AppsService): Router {
   const router = Router();
+
+  // The Docker layer itself has no notion of CA templates (kept as a clean
+  // dependency direction — Apps depends on Docker, not the reverse), so a
+  // container's real WebUI link, when it has a resolvable one, is filled in
+  // here at the route boundary instead: look up the CA app the labels point
+  // to, and resolve its WebUI field against this container's *actual*
+  // current port mappings (not whatever the template's install-time default
+  // was — ports may have changed since via an edit). Containers without CA
+  // labels, or whose CA app can no longer be found in the feed (e.g.
+  // delisted), just keep the client-side "first published port" fallback.
+  async function withWebUiUrl(container: DockerContainerSummary): Promise<DockerContainerSummary> {
+    const appName = container.labels[APP_NAME_LABEL];
+    if (!appName) return container;
+    try {
+      const app = await apps.getApp(appName, container.labels[APP_REPOSITORY_LABEL]);
+      return { ...container, webUiUrl: resolveWebUiTemplate(app.WebUI, container.portMappings) };
+    } catch {
+      return container;
+    }
+  }
 
   router.get('/docker/containers', async (_req, res) => {
     try {
-      res.json(await docker.listContainers());
+      res.json(await Promise.all((await docker.listContainers()).map(withWebUiUrl)));
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

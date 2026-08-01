@@ -24,7 +24,14 @@ export interface CaConfigEntry {
 
 export interface CaApp {
   Name: string;
-  Repository: string;
+  Repository: string; // for a real Docker app, an image reference — but see `Plugin` below
+  // A real Unraid *plugin* (a .plg/.txz package installed outside Docker
+  // entirely, not a container) — appears in the same feed as Docker apps,
+  // but its `Repository` is a .plg URL, not an image. There's no framework
+  // in this project for installing plugins, so these must be filtered out
+  // wherever the catalog is read, not just hidden in the UI — treating one
+  // as a normal app would try to `docker pull` a .plg URL as an image.
+  Plugin?: boolean;
   Registry?: string;
   Network?: string;
   Privileged?: string; // 'true' | 'false'

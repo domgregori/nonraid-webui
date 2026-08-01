@@ -16,7 +16,13 @@ export interface DockerContainerSummary {
   memUsedBytes: number | null;
   memLimitBytes: number | null;
   ports: string; // e.g. "8096:8096" or "8096:8096, 8920:8920" or "—"
+  portMappings: ContainerPortMapping[]; // structured form of the above, published ports only
   labels: Record<string, string>;
+  // Resolved by routes/docker.ts (not DockerClient itself — the Docker layer
+  // has no knowledge of CA templates), using the container's actual current
+  // portMappings against its CA app's WebUI field, when it has one. Always
+  // null coming out of a DockerClient implementation directly.
+  webUiUrl: string | null;
 }
 
 export interface DockerCommandResult {

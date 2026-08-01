@@ -77,7 +77,9 @@ export class MockDockerClient implements DockerClient {
         memUsedBytes: running ? container.memUsedBytes : null,
         memLimitBytes: running ? container.memLimitBytes : null,
         ports: running ? container.ports : '—',
+        portMappings: running ? (container.detail?.ports ?? []) : [],
         labels: container.labels,
+        webUiUrl: null,
       };
     });
   }

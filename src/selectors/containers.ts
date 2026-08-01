@@ -26,9 +26,21 @@ function firstPublishedHostPort(ports: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
+/**
+ * `webUiUrl`, when present, is the backend's real resolution of the CA
+ * template's WebUI field against this container's actual ports — prefer it.
+ * `[IP]` is left unresolved by the backend (it has no reliable way to know
+ * which address the browser reaches it on), so fill it in here the same way
+ * the Apps install dialog does.
+ */
+function resolveContainerWebUi(container: DockerContainerSummary): string | null {
+  if (container.webUiUrl) return container.webUiUrl.replace('[IP]', window.location.hostname);
+  const hostPort = firstPublishedHostPort(container.ports);
+  return hostPort ? `http://${window.location.hostname}:${hostPort}` : null;
+}
+
 export function deriveContainerViewModel(container: DockerContainerSummary, actions: ContainerActions): ContainerViewModel {
   const running = container.state === 'running';
-  const hostPort = running ? firstPublishedHostPort(container.ports) : null;
   return {
     id: container.id,
     name: container.name,
@@ -44,7 +56,7 @@ export function deriveContainerViewModel(container: DockerContainerSummary, acti
     toggleFg: running ? COLORS.red : COLORS.green,
     isPending: actions.isPending,
     caAppName: container.labels[CA_APP_NAME_LABEL] ?? null,
-    webUiUrl: hostPort ? `http://${window.location.hostname}:${hostPort}` : null,
+    webUiUrl: running ? resolveContainerWebUi(container) : null,
     onToggle: actions.onToggle,
     onRestart: actions.onRestart,
     onEdit: actions.onEdit,

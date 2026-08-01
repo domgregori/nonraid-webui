@@ -11,7 +11,13 @@ export interface DockerContainerSummary {
   memUsedBytes: number | null;
   memLimitBytes: number | null;
   ports: string;
+  portMappings: ContainerPortMapping[];
   labels: Record<string, string>;
+  // Resolved server-side from the CA app's WebUI field against this
+  // container's actual ports, when it's a CA-installed container with one.
+  // [IP] is left unresolved for us to fill in — see resolveContainerWebUi.
+  // Null for custom containers, or CA ones with no WebUI/unresolvable app.
+  webUiUrl: string | null;
 }
 
 export interface DockerCommandResult {
