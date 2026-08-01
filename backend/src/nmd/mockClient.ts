@@ -128,14 +128,18 @@ export class MockNmdClient implements NmdClient {
           disabled: disabledCount,
           replaced: 0,
           new: 0,
-          sync_errors: 0,
+          sync_errors: 0, // this mock never injects sync errors
           disk_errors: 0,
         },
         last_sync: {
           timestamp: this.state.lastSyncTimestamp,
           age_seconds: Math.floor(Date.now() / 1000) - this.state.lastSyncTimestamp,
           elapsed_seconds: this.state.lastSyncElapsed,
-          status: 'OK',
+          // Mirrors real nmdctl's last_sync_status values (see format_json_output()
+          // in tools/nmdctl): 'never' before any sync has completed, 'in_progress'
+          // while one's running, else 'completed' otherwise (this mock never
+          // injects sync errors, so 'errors' never applies here).
+          status: this.state.lastSyncTimestamp === 0 ? 'never' : resync.active ? 'in_progress' : 'completed',
         },
       },
       resync,

@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
-import type { SmartClient } from './types.js';
+import type { SmartClient, SmartHealth } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -14,6 +14,7 @@ interface SmartctlJson {
   temperature?: { current?: number };
   nvme_smart_health_information_log?: { temperature?: number };
   ata_smart_attributes?: { table?: SmartctlAtaAttribute[] };
+  smart_status?: { passed?: boolean };
 }
 
 /**
@@ -63,6 +64,16 @@ export class RealSmartClient implements SmartClient {
     try {
       const data = await this.run(device);
       return extractTemperatureC(data);
+    } catch {
+      return null;
+    }
+  }
+
+  async getHealth(device: string): Promise<SmartHealth | null> {
+    try {
+      const data = await this.run(device);
+      if (typeof data.smart_status?.passed !== 'boolean') return null;
+      return data.smart_status.passed ? 'passed' : 'failed';
     } catch {
       return null;
     }

@@ -1,6 +1,6 @@
 import cors from 'cors';
 import express from 'express';
-import { ActivityStore } from './activity/index.js';
+import { ActivityStore, ActivityWatcher } from './activity/index.js';
 import { AppsService, CaFeedStore } from './apps/index.js';
 import { BrowseService } from './browse/service.js';
 import { config } from './config.js';
@@ -30,6 +30,7 @@ async function main() {
   const docker = createDockerClient();
   const smart = new SmartService(createSmartClient());
   const activity = new ActivityStore();
+  new ActivityWatcher(nmd, smart, activity);
   const shareApplier = createShareApplier();
   const shareStore = new ShareStore();
   const shareAccessStore = new ShareAccessStore();

@@ -82,4 +82,8 @@ export const config = {
   appriseBin: process.env.APPRISE_BIN ?? 'apprise',
   // Dashboard activity feed — see backend/src/activity/.
   activityConfigPath: process.env.ACTIVITY_CONFIG_PATH ?? path.join(process.cwd(), 'data', 'activity.json'),
+  // How often the background watcher (backend/src/activity/watcher.ts) polls
+  // for passive state changes (parity check completing on its own, a disk
+  // erroring out, a SMART health check failing) worth logging on its own.
+  activityWatcherIntervalMs: Number(process.env.ACTIVITY_WATCHER_INTERVAL_MS ?? 30_000),
 };
