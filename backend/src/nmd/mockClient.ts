@@ -4,6 +4,7 @@ import type { NmdCommandResult, NmdResyncStatus, NmdStatusResponse, ParityCheckA
 
 interface MockState {
   arrayStarted: boolean;
+  label: string;
   resync: NmdResyncStatus;
   lastSyncTimestamp: number;
   lastSyncElapsed: number;
@@ -46,6 +47,7 @@ export class MockNmdClient implements NmdClient {
     const totalGb = this.totalDataGb();
     this.state = {
       arrayStarted: true,
+      label: 'nonraid-mock',
       resync: idleResync(totalGb),
       lastSyncTimestamp: Math.floor(Date.now() / 1000) - 3 * 86400,
       lastSyncElapsed: 5400,
@@ -103,7 +105,7 @@ export class MockNmdClient implements NmdClient {
 
     return {
       array: {
-        label: 'nonraid-mock',
+        label: this.state.label,
         state: arrayStarted ? 'STARTED' : 'STOPPED',
         superblock: '/nonraid.dat',
         disks_present: seeds.length,
@@ -191,6 +193,20 @@ export class MockNmdClient implements NmdClient {
       default:
         throw new Error(`Unknown parity check action: ${action satisfies never}`);
     }
+  }
+
+  async setWriteMethod(turbo: boolean): Promise<NmdCommandResult> {
+    // Mirrors the real driver's own lack of readback — accepted and applied
+    // (nothing to actually simulate), but not reflected anywhere in getStatus().
+    return { ok: true, message: turbo ? 'Turbo write enabled (mock)' : 'Standard write mode (mock)' };
+  }
+
+  async setLabel(label: string): Promise<NmdCommandResult> {
+    if (this.state.arrayStarted) {
+      throw new Error('Label can only be set when the array is stopped.');
+    }
+    this.state.label = label;
+    return { ok: true, message: `Array label set to "${label}"` };
   }
 
   async unassignDisk(slot: number): Promise<NmdCommandResult> {

@@ -76,6 +76,16 @@ export class RealNmdClient implements NmdClient {
     return { ok: true, message: stdout.trim() };
   }
 
+  async setWriteMethod(turbo: boolean): Promise<NmdCommandResult> {
+    const { stdout } = await this.run(['set', 'md_write_method', turbo ? '1' : '0']);
+    return { ok: true, message: stdout.trim() };
+  }
+
+  async setLabel(label: string): Promise<NmdCommandResult> {
+    const { stdout } = await this.run(['set', 'label', label]);
+    return { ok: true, message: stdout.trim() };
+  }
+
   async unassignDisk(slot: number): Promise<NmdCommandResult> {
     // Same safety checks nmdctl's own (interactive-only) unassign_disk() does,
     // read fresh right before acting.

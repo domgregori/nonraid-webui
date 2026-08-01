@@ -1,6 +1,21 @@
+import { execSync } from 'node:child_process';
 import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { config } from '../config.js';
 import type { SystemStats } from './types.js';
+
+const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+function readBuildVersion(): string | null {
+  try {
+    return execSync('git rev-parse --short HEAD', { cwd: THIS_DIR, stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+  } catch {
+    return null; // not a git checkout (e.g. a packaged deployment with no .git) — fine, just omit it
+  }
+}
 
 interface CpuSnapshot {
   idle: number;
@@ -35,6 +50,7 @@ export class SystemStatsService {
   private last: CpuSnapshot = cpuSnapshot();
   private cpuPercent = 0;
   private timer: NodeJS.Timeout;
+  private readonly buildVersion = readBuildVersion();
 
   constructor(intervalMs: number = config.systemStatsIntervalMs) {
     this.timer = setInterval(() => this.tick(), intervalMs);
@@ -58,6 +74,7 @@ export class SystemStatsService {
       cpuPercent: Math.round(this.cpuPercent * 10) / 10,
       memUsedBytes: memTotalBytes - memFreeBytes,
       memTotalBytes,
+      buildVersion: this.buildVersion,
     };
   }
 }

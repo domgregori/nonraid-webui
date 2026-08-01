@@ -11,11 +11,13 @@ import { browseRouter } from './routes/browse.js';
 import { disksRouter } from './routes/disks.js';
 import { dockerRouter } from './routes/docker.js';
 import { parityRouter } from './routes/parity.js';
+import { settingsRouter } from './routes/settings.js';
 import { sharesRouter } from './routes/shares.js';
 import { smartRouter } from './routes/smart.js';
 import { statusRouter } from './routes/status.js';
 import { systemRouter } from './routes/system.js';
 import { usersRouter } from './routes/users.js';
+import { SettingsStore } from './settings/index.js';
 import { createShareApplier, ShareAccessStore, ShareService, ShareStore } from './shares/index.js';
 import { createSmartClient, SmartService } from './smart/index.js';
 import { SystemStatsService } from './system/service.js';
@@ -36,6 +38,17 @@ async function main() {
   const caFeedStore = new CaFeedStore();
   await caFeedStore.start();
   const apps = new AppsService(caFeedStore, docker);
+  const settingsStore = new SettingsStore();
+
+  // The driver has no readback for write method (see nmd/client.ts), so on a
+  // fresh backend start (independent of whether the array/driver itself was
+  // just started), reapply whatever was last persisted — best-effort, since
+  // the array might not be started yet, in which case there's nothing to
+  // apply until /array/start does it.
+  const persistedSettings = await settingsStore.get();
+  if (persistedSettings.turboWrite) {
+    await nmd.setWriteMethod(true).catch(() => {});
+  }
 
   const app = express();
   app.use(cors({ origin: config.corsOrigin }));
@@ -53,8 +66,9 @@ async function main() {
   });
 
   app.use('/api', statusRouter(nmd));
-  app.use('/api', arrayRouter(nmd));
+  app.use('/api', arrayRouter(nmd, settingsStore));
   app.use('/api', parityRouter(nmd));
+  app.use('/api', settingsRouter(settingsStore, nmd));
   app.use('/api', disksRouter(nmd));
   app.use('/api', dockerRouter(docker, config.appsBindRoots, apps));
   app.use('/api', smartRouter(nmd, smart));
