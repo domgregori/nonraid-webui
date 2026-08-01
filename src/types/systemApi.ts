@@ -5,4 +5,5 @@ export interface SystemStats {
   cpuPercent: number;
   memUsedBytes: number;
   memTotalBytes: number;
+  buildVersion: string | null;
 }

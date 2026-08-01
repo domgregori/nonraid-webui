@@ -1,9 +1,9 @@
-import { useAppStore } from '../../state/useAppStore';
+import { useSettings } from '../../hooks/useSettings';
 import { Card } from '../shared/Card';
 import { ToggleSwitch } from '../shared/ToggleSwitch';
 
 export function SettingsQuickCard() {
-  const { state, dispatch } = useAppStore();
+  const { settings, saving, update } = useSettings();
 
   return (
     <Card>
@@ -16,15 +16,25 @@ export function SettingsQuickCard() {
           <div className="toggle-row__title">Turbo write</div>
           <div className="toggle-row__desc">Reconstruct write mode</div>
         </div>
-        <ToggleSwitch on={state.settings.turboWrite} onToggle={() => dispatch({ type: 'TOGGLE_TURBO' })} label="Turbo write" />
+        <ToggleSwitch
+          on={settings?.turboWrite ?? false}
+          onToggle={() => settings && update({ turboWrite: !settings.turboWrite })}
+          label="Turbo write"
+          disabled={!settings || saving}
+        />
       </div>
 
       <div className="toggle-row toggle-row--bordered">
         <div>
           <div className="toggle-row__title">Event notifications</div>
-          <div className="toggle-row__desc">Array health alerts</div>
+          <div className="toggle-row__desc">Dispatch via apprise</div>
         </div>
-        <ToggleSwitch on={state.settings.notifyEnabled} onToggle={() => dispatch({ type: 'TOGGLE_NOTIFY' })} label="Event notifications" />
+        <ToggleSwitch
+          on={settings?.notifications.enabled ?? false}
+          onToggle={() => settings && update({ notifications: { enabled: !settings.notifications.enabled } })}
+          label="Event notifications"
+          disabled={!settings || saving}
+        />
       </div>
     </Card>
   );

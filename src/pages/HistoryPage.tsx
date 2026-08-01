@@ -1,9 +1,23 @@
+import { useEffect, useRef, useState } from 'react';
+import { useSettings } from '../hooks/useSettings';
 import { HISTORY_PANELS } from '../mock/history';
-import { useAppStore } from '../state/useAppStore';
 
 export function HistoryPage() {
-  const { state, dispatch } = useAppStore();
-  const { grafanaUrl, grafanaDraft } = state;
+  const { settings, saving, update } = useSettings();
+  const [draft, setDraft] = useState('');
+
+  // Seed the draft only once, the first time settings load — re-syncing on
+  // every later fetch would clobber an in-progress edit (same race as
+  // SettingsPage's array-label draft).
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (settings && !initialized.current) {
+      setDraft(settings.grafanaUrl);
+      initialized.current = true;
+    }
+  }, [settings]);
+
+  const grafanaUrl = settings?.grafanaUrl ?? '';
 
   return (
     <div className="page">
@@ -17,15 +31,16 @@ export function HistoryPage() {
         <div className="history-header__controls">
           <input
             className="history-input"
-            value={grafanaDraft}
-            onChange={(e) => dispatch({ type: 'SET_GRAFANA_DRAFT', value: e.target.value })}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
             placeholder="https://grafana.example.com/d/nonraid/embed?kiosk"
           />
           <button
             type="button"
             className="btn--primary"
             style={{ padding: '8px 14px' }}
-            onClick={() => dispatch({ type: 'CONNECT_GRAFANA' })}
+            disabled={saving}
+            onClick={() => update({ grafanaUrl: grafanaUrl ? '' : draft.trim() })}
           >
             {grafanaUrl ? 'Disconnect' : 'Connect'}
           </button>

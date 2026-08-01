@@ -1,36 +1,154 @@
-import { useAppStore } from '../state/useAppStore';
+import { useEffect, useRef, useState } from 'react';
+import { nmdApi } from '../api/nmdApi';
+import { settingsApi } from '../api/settingsApi';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
+import { useSettings } from '../hooks/useSettings';
+import { useSystemStats } from '../hooks/useSystemStats';
+import { useArrayStatus } from '../state/useArrayStatus';
+import { formatMemLabel, formatUptime } from '../utils/format';
 
 export function SettingsPage() {
-  const { state, dispatch } = useAppStore();
+  const { settings, loadState, error, saving, saveError, update } = useSettings();
+  const stats = useSystemStats();
+  const { status } = useArrayStatus();
+
+  const [labelDraft, setLabelDraft] = useState('');
+  const [labelResult, setLabelResult] = useState<string | null>(null);
+  const [labelError, setLabelError] = useState<string | null>(null);
+  const [labelSaving, setLabelSaving] = useState(false);
+
+  const [appriseDraft, setAppriseDraft] = useState('');
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [testSending, setTestSending] = useState(false);
+
+  // Only seed the drafts the first time data arrives — re-syncing on every
+  // later status/settings poll would clobber whatever the user is mid-typing
+  // (hit this live: typing right after navigating, before the first status
+  // fetch resolved, silently reverted the field).
+  const labelInitialized = useRef(false);
+  const appriseInitialized = useRef(false);
+
+  useEffect(() => {
+    if (status && !labelInitialized.current) {
+      setLabelDraft(status.array.label);
+      labelInitialized.current = true;
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (settings && !appriseInitialized.current) {
+      setAppriseDraft(settings.notifications.appriseUrls);
+      appriseInitialized.current = true;
+    }
+  }, [settings]);
+
+  const arrayStarted = status?.array.state === 'STARTED';
+
+  const saveLabel = async () => {
+    setLabelSaving(true);
+    setLabelError(null);
+    setLabelResult(null);
+    try {
+      const result = await nmdApi.setLabel(labelDraft.trim());
+      setLabelResult(result.message);
+    } catch (err) {
+      setLabelError((err as Error).message);
+    } finally {
+      setLabelSaving(false);
+    }
+  };
+
+  const saveNotifications = () => update({ notifications: { appriseUrls: appriseDraft } });
+
+  const sendTest = async () => {
+    setTestSending(true);
+    setTestError(null);
+    setTestResult(null);
+    try {
+      const result = await settingsApi.testNotification();
+      setTestResult(result.message);
+    } catch (err) {
+      setTestError((err as Error).message);
+    } finally {
+      setTestSending(false);
+    }
+  };
 
   return (
     <div className="page page--narrow">
       <div className="page-title">Settings</div>
+
+      {loadState === 'error' && <div className="status-note status-note--error">{error}</div>}
+
+      <div className="settings-card">
+        <div className="settings-card__title">About</div>
+        <div className="settings-info-grid">
+          <InfoRow label="Hostname" value={stats?.hostname ?? '—'} />
+          <InfoRow label="Uptime" value={stats ? formatUptime(stats.uptimeSeconds) : '—'} />
+          <InfoRow label="CPU" value={stats ? `${Math.round(stats.cpuPercent)}%` : '—'} />
+          <InfoRow label="Memory" value={stats ? formatMemLabel(stats.memUsedBytes, stats.memTotalBytes) : '—'} />
+          <InfoRow label="Array label" value={status?.array.label || '(unset)'} />
+          <InfoRow label="Array health" value={status?.array.health.status ?? '—'} />
+          <InfoRow
+            label="Array size"
+            value={
+              status
+                ? `${status.array.size.data_disk_count} data disk${status.array.size.data_disk_count === 1 ? '' : 's'}, ${status.array.size.data_gb} GB`
+                : '—'
+            }
+          />
+          <InfoRow label="Superblock" value={status?.array.superblock ?? '—'} mono />
+          <InfoRow label="Build" value={stats?.buildVersion ?? 'unknown'} mono />
+        </div>
+      </div>
 
       <div className="settings-card">
         <div className="settings-card__title">Array</div>
         <div className="toggle-row">
           <div>
             <div className="toggle-row__title">Turbo write</div>
-            <div className="toggle-row__desc">Reconstruct write mode — faster writes, keeps all disks spinning</div>
+            <div className="toggle-row__desc">
+              Reconstruct write mode — faster writes, but needs every disk spinning. The driver can't report its
+              current setting back, so this switch reflects what was last saved here, not necessarily live kernel
+              state after an out-of-band change.
+            </div>
           </div>
           <ToggleSwitch
-            on={state.settings.turboWrite}
-            onToggle={() => dispatch({ type: 'TOGGLE_TURBO' })}
+            on={settings?.turboWrite ?? false}
+            onToggle={() => settings && update({ turboWrite: !settings.turboWrite })}
             label="Turbo write"
+            disabled={!settings || saving}
           />
         </div>
+        {saveError && <div className="status-note status-note--error">{saveError}</div>}
+
+        <div className="settings-field toggle-row--bordered">
+          <div className="toggle-row__title">Array label</div>
+          <div className="settings-field__row">
+            <input
+              className="history-input"
+              style={{ width: '100%' }}
+              value={labelDraft}
+              onChange={(e) => setLabelDraft(e.target.value)}
+              placeholder="(unset)"
+              disabled={!status}
+            />
+            <button type="button" className="btn" disabled={labelSaving || !status} onClick={saveLabel}>
+              {labelSaving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+          {arrayStarted && (
+            <div className="toggle-row__desc">Stop the array first — nmdctl only allows changing the label while stopped.</div>
+          )}
+          {labelResult && <div className="status-note">{labelResult}</div>}
+          {labelError && <div className="status-note status-note--error">{labelError}</div>}
+        </div>
+
         <div className="toggle-row toggle-row--bordered">
           <div>
             <div className="toggle-row__title">Superblock path</div>
-            <div className="toggle-row__desc toggle-row__desc--mono">/nonraid.dat</div>
-          </div>
-        </div>
-        <div className="toggle-row toggle-row--bordered">
-          <div>
-            <div className="toggle-row__title">Parity check schedule</div>
-            <div className="toggle-row__desc">Quarterly, check-only mode</div>
+            <div className="toggle-row__desc toggle-row__desc--mono">{status?.array.superblock ?? '—'}</div>
           </div>
         </div>
       </div>
@@ -40,32 +158,53 @@ export function SettingsPage() {
         <div className="toggle-row">
           <div>
             <div className="toggle-row__title">Event notifications</div>
-            <div className="toggle-row__desc">Alert on array health changes</div>
+            <div className="toggle-row__desc">Enable dispatching notifications via apprise</div>
           </div>
           <ToggleSwitch
-            on={state.settings.notifyEnabled}
-            onToggle={() => dispatch({ type: 'TOGGLE_NOTIFY' })}
+            on={settings?.notifications.enabled ?? false}
+            onToggle={() => settings && update({ notifications: { enabled: !settings.notifications.enabled } })}
             label="Event notifications"
+            disabled={!settings || saving}
           />
         </div>
-        <div className="toggle-row toggle-row--bordered">
-          <div>
-            <div className="toggle-row__title">Notify command</div>
-            <div className="toggle-row__desc toggle-row__desc--mono">apprise -t "NonRAID" -b</div>
-          </div>
-        </div>
-      </div>
 
-      <div className="danger-card">
-        <div className="danger-card__title">Danger Zone</div>
-        <div className="danger-card__text">
-          New Config resets the array topology, letting you add or remove disks without a full rebuild. Existing disk
-          data is preserved but parity will need to be rebuilt.
+        <div className="settings-field toggle-row--bordered">
+          <div className="toggle-row__title">Apprise target URLs</div>
+          <div className="toggle-row__desc">
+            One or more{' '}
+            <a href="https://github.com/caronc/apprise#popular-notification-services" target="_blank" rel="noreferrer">
+              apprise service URLs
+            </a>
+            , space or newline separated (e.g. mailto://, discord://, pushover://).
+          </div>
+          <textarea
+            className="history-input settings-textarea"
+            value={appriseDraft}
+            onChange={(e) => setAppriseDraft(e.target.value)}
+            placeholder="mailto://user:pass@gmail.com"
+            rows={3}
+          />
+          <div className="settings-field__row">
+            <button type="button" className="btn" disabled={saving} onClick={saveNotifications}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button type="button" className="btn" disabled={testSending} onClick={sendTest}>
+              {testSending ? 'Sending…' : 'Send test notification'}
+            </button>
+          </div>
+          {testResult && <div className="status-note">{testResult}</div>}
+          {testError && <div className="status-note status-note--error">{testError}</div>}
         </div>
-        <button type="button" className="btn btn--danger">
-          Start New Config
-        </button>
       </div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="settings-info-row">
+      <span className="settings-info-row__label">{label}</span>
+      <span className={`settings-info-row__value${mono ? ' settings-info-row__value--mono' : ''}`}>{value}</span>
     </div>
   );
 }

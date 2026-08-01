@@ -3,17 +3,14 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
-import { AppStoreProvider } from './state/AppStoreProvider'
 import { ArrayStatusProvider } from './state/ArrayStatusProvider'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <AppStoreProvider>
-        <ArrayStatusProvider>
-          <App />
-        </ArrayStatusProvider>
-      </AppStoreProvider>
+      <ArrayStatusProvider>
+        <App />
+      </ArrayStatusProvider>
     </BrowserRouter>
   </StrictMode>,
 )

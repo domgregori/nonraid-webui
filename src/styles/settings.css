@@ -16,30 +16,49 @@
   padding: 10px 0;
 }
 
-.danger-card {
-  background: var(--color-red-tint);
-  border: 1px solid var(--color-red);
-  border-radius: var(--radius-card);
-  padding: var(--space-xl);
+.settings-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-md) var(--space-xl);
 }
 
-.danger-card__title {
-  font-size: 13px;
-  font-weight: 700;
-  margin-bottom: 6px;
-  color: var(--color-red);
-}
-
-.danger-card__text {
+.settings-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
   font-size: 12px;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-  margin-bottom: 14px;
 }
 
-.danger-card .btn {
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 700;
-  border-radius: var(--radius-btn);
+.settings-info-row__label {
+  color: var(--color-text-secondary);
+}
+
+.settings-info-row__value {
+  color: var(--color-text);
+  text-align: right;
+}
+
+.settings-info-row__value--mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.settings-field {
+  padding: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-field__row {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.settings-textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--font-mono);
+  line-height: 1.5;
+  box-sizing: border-box;
 }
