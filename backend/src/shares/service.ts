@@ -4,6 +4,7 @@ import type { ActivityStore } from '../activity/index.js';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
+import type { SettingsStore } from '../settings/index.js';
 import type { ShareAccessStore } from './aclStore.js';
 import type { ApplyContext, ShareApplier } from './applier/client.js';
 import type { ShareStore } from './store.js';
@@ -17,10 +18,11 @@ export class ShareService {
     private nmd: NmdClient,
     private aclStore: ShareAccessStore,
     private activity: ActivityStore,
+    private settingsStore: SettingsStore,
   ) {}
 
   private async buildContext(): Promise<ApplyContext> {
-    const status = await this.nmd.getStatus();
+    const [status, settings] = await Promise.all([this.nmd.getStatus(), this.settingsStore.get()]);
     const diskMountpoints: Record<number, string> = {};
     const diskSizesGb: Record<number, number> = {};
 
@@ -31,7 +33,7 @@ export class ShareService {
       if (mp && mp !== '-') diskMountpoints[d.slot] = mp;
     }
 
-    return { diskMountpoints, diskSizesGb };
+    return { diskMountpoints, diskSizesGb, minFreeSpaceMb: settings.minFreeSpaceMb };
   }
 
   /**

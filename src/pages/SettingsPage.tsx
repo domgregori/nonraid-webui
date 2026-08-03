@@ -22,12 +22,17 @@ export function SettingsPage() {
   const [testError, setTestError] = useState<string | null>(null);
   const [testSending, setTestSending] = useState(false);
 
+  const [minFreeSpaceDraft, setMinFreeSpaceDraft] = useState('');
+  const [minFreeSpaceSaving, setMinFreeSpaceSaving] = useState(false);
+  const [minFreeSpaceError, setMinFreeSpaceError] = useState<string | null>(null);
+
   // Only seed the drafts the first time data arrives — re-syncing on every
   // later status/settings poll would clobber whatever the user is mid-typing
   // (hit this live: typing right after navigating, before the first status
   // fetch resolved, silently reverted the field).
   const labelInitialized = useRef(false);
   const appriseInitialized = useRef(false);
+  const minFreeSpaceInitialized = useRef(false);
 
   useEffect(() => {
     if (status && !labelInitialized.current) {
@@ -40,6 +45,13 @@ export function SettingsPage() {
     if (settings && !appriseInitialized.current) {
       setAppriseDraft(settings.notifications.appriseUrls);
       appriseInitialized.current = true;
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    if (settings && !minFreeSpaceInitialized.current) {
+      setMinFreeSpaceDraft(String(settings.minFreeSpaceMb));
+      minFreeSpaceInitialized.current = true;
     }
   }, [settings]);
 
@@ -60,6 +72,18 @@ export function SettingsPage() {
   };
 
   const saveNotifications = () => update({ notifications: { appriseUrls: appriseDraft } });
+
+  const saveMinFreeSpace = async () => {
+    const value = Number(minFreeSpaceDraft);
+    if (!Number.isInteger(value) || value < 0) {
+      setMinFreeSpaceError('Enter a non-negative whole number of MB.');
+      return;
+    }
+    setMinFreeSpaceSaving(true);
+    setMinFreeSpaceError(null);
+    await update({ minFreeSpaceMb: value });
+    setMinFreeSpaceSaving(false);
+  };
 
   const sendTest = async () => {
     setTestSending(true);
@@ -150,6 +174,33 @@ export function SettingsPage() {
             <div className="toggle-row__title">Superblock path</div>
             <div className="toggle-row__desc toggle-row__desc--mono">{status?.array.superblock ?? '—'}</div>
           </div>
+        </div>
+      </div>
+
+      <div className="settings-card">
+        <div className="settings-card__title">Shares</div>
+        <div className="settings-field">
+          <div className="toggle-row__title">Minimum free space (MB)</div>
+          <div className="toggle-row__desc">
+            When a share spans multiple disks, mergerfs won't pick a disk with less free space than this for a new
+            file. Its own default is 4096 MB (4 GB) — a sane margin on large disks, but on small disks that can make
+            every disk ineligible and every write fail. Applies immediately to every currently-mounted share.
+          </div>
+          <div className="settings-field__row">
+            <input
+              className="history-input"
+              type="number"
+              min={0}
+              step={1}
+              value={minFreeSpaceDraft}
+              onChange={(e) => setMinFreeSpaceDraft(e.target.value)}
+              disabled={!settings}
+            />
+            <button type="button" className="btn" disabled={minFreeSpaceSaving || !settings} onClick={saveMinFreeSpace}>
+              {minFreeSpaceSaving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+          {minFreeSpaceError && <div className="status-note status-note--error">{minFreeSpaceError}</div>}
         </div>
       </div>
 

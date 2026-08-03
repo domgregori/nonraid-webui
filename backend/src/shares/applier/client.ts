@@ -3,6 +3,7 @@ import type { Share, ShareAccess, ShareCommandResult, ShareStats } from '../type
 export interface ApplyContext {
   diskMountpoints: Record<number, string>; // data disk slot -> real mountpoint, e.g. { 1: '/mnt/disk1' }
   diskSizesGb: Record<number, number>; // data disk slot -> size, for mock stats estimation
+  minFreeSpaceMb: number; // mergerfs's minfreespace, from settings — see settings/types.ts
 }
 
 export interface ShareApplier {

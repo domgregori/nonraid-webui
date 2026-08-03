@@ -16,10 +16,17 @@ export interface AppSettings {
   // History page's Grafana embed URL — persisted here instead of session-only
   // frontend state so it survives a reload / works from another device.
   grafanaUrl: string;
+  // mergerfs's `minfreespace`, in MB, applied to every pooled share mount
+  // (see shares/applier/realApplier.ts). mergerfs excludes any branch below
+  // this threshold from create-policy consideration — its own default is
+  // 4096 (4G), a sane margin on real multi-TB disks but one that silently
+  // makes every branch ineligible (ENOSPC on every write) on small disks.
+  minFreeSpaceMb: number;
 }
 
 export type AppSettingsUpdate = Partial<{
   turboWrite: boolean;
   notifications: Partial<NotificationSettings>;
   grafanaUrl: string;
+  minFreeSpaceMb: number;
 }>;

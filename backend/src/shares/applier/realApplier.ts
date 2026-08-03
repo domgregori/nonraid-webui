@@ -116,11 +116,12 @@ export class RealShareApplier implements ShareApplier {
       await run('mount', ['--bind', branches[0]!, mountPoint]);
     } else {
       const policy = mergerfsPolicy(share.allocationMethod);
-      // mergerfs excludes any branch below `minfreespace` (default 4G) from create-policy
-      // consideration — with real multi-TB disks that's a sane safety margin, but it silently
-      // makes every branch ineligible (ENOSPC on every write) on small disks, which is exactly
-      // what this repo's test disks are. Lower it so writes still work on small/near-full disks.
-      await run('mergerfs', ['-o', `category.create=${policy},use_ino,minfreespace=100M`, branches.join(':'), mountPoint]);
+      // mergerfs excludes any branch below `minfreespace` from create-policy consideration —
+      // its own default (4G) is a sane safety margin on real multi-TB disks, but it silently
+      // makes every branch ineligible (ENOSPC on every write) on small disks. ctx.minFreeSpaceMb
+      // comes from Settings (default 100M, matching this repo's small test disks) rather than
+      // being hardcoded, so real deployments can raise it back toward mergerfs's own default.
+      await run('mergerfs', ['-o', `category.create=${policy},use_ino,minfreespace=${ctx.minFreeSpaceMb}M`, branches.join(':'), mountPoint]);
     }
 
     return { ok: true, message: `Share "${share.name}" mounted at ${mountPoint} (${branches.length} disk${branches.length === 1 ? '' : 's'})` };

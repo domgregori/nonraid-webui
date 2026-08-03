@@ -7,6 +7,7 @@ const DEFAULTS: AppSettings = {
   turboWrite: false,
   notifications: { enabled: false, appriseUrls: '' },
   grafanaUrl: '',
+  minFreeSpaceMb: 100,
 };
 
 /**

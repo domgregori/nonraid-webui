@@ -34,10 +34,11 @@ async function main() {
   const smart = new SmartService(createSmartClient());
   const activity = new ActivityStore();
   new ActivityWatcher(nmd, smart, activity);
+  const settingsStore = new SettingsStore();
   const shareApplier = createShareApplier();
   const shareStore = new ShareStore();
   const shareAccessStore = new ShareAccessStore();
-  const shares = new ShareService(shareStore, shareApplier, nmd, shareAccessStore, activity);
+  const shares = new ShareService(shareStore, shareApplier, nmd, shareAccessStore, activity, settingsStore);
   const browse = new BrowseService(shares);
   const system = new SystemStatsService();
   const usersClient = createUsersClient();
@@ -45,7 +46,6 @@ async function main() {
   const caFeedStore = new CaFeedStore();
   await caFeedStore.start();
   const apps = new AppsService(caFeedStore, docker, activity);
-  const settingsStore = new SettingsStore();
 
   // The driver has no readback for write method (see nmd/client.ts), so on a
   // fresh backend start (independent of whether the array/driver itself was
@@ -83,7 +83,7 @@ async function main() {
   app.use('/api', statusRouter(nmd));
   app.use('/api', arrayRouter(nmd, settingsStore, activity));
   app.use('/api', parityRouter(nmd, activity));
-  app.use('/api', settingsRouter(settingsStore, nmd, activity));
+  app.use('/api', settingsRouter(settingsStore, nmd, activity, shares));
   app.use('/api', disksRouter(nmd, activity));
   app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity));
   app.use('/api', lxcRouter(lxc, activity));
