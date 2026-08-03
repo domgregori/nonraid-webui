@@ -9,7 +9,7 @@ export interface BrowseEntry {
 }
 
 export interface BrowseListing {
-  share: string;
+  root: string;
   path: string;
   entries: BrowseEntry[];
 }

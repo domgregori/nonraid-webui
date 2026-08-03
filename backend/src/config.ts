@@ -42,6 +42,12 @@ export const config = {
   sharesMode: (process.env.SHARES_MODE as SharesMode | undefined) ?? 'real',
   sharesConfigPath: process.env.SHARES_CONFIG_PATH ?? path.join(process.cwd(), 'data', 'shares.json'),
   shareMountRoot: process.env.SHARE_MOUNT_ROOT ?? '/mnt/user',
+  // The file Browse page's own ceiling/starting point — independent of
+  // shareMountRoot above (that one's for the Shares subsystem's own share
+  // paths). Browse spans the whole /mnt tree (shares, individual array
+  // disks, cache, etc.), not just one share, so it needs a wider root.
+  browseRoot: process.env.BROWSE_ROOT ?? '/mnt',
+  browseDefaultPath: process.env.BROWSE_DEFAULT_PATH ?? '/mnt/user',
   smbConfPath: process.env.SMB_CONF_PATH ?? '/etc/samba/smb.conf',
   exportsPath: process.env.EXPORTS_PATH ?? '/etc/exports',
   sharesUseSudo: envBool('SHARES_USE_SUDO', false),

@@ -2,8 +2,8 @@ import { API_BASE_URL } from './config';
 import { request } from './request';
 import type { BrowseCommandResult, BrowseListing } from '../types/browseApi';
 
-function withPath(base: string, relPath: string): string {
-  const qs = relPath ? `?path=${encodeURIComponent(relPath)}` : '';
+function withPath(base: string, path: string): string {
+  const qs = path ? `?path=${encodeURIComponent(path)}` : '';
   return `${base}${qs}`;
 }
 
@@ -14,26 +14,22 @@ const jsonInit = (body: unknown): RequestInit => ({
 });
 
 export const browseApi = {
-  list: (share: string, path: string) => request<BrowseListing>(withPath(`/api/browse/${encodeURIComponent(share)}`, path)),
+  list: (path: string) => request<BrowseListing>(withPath('/api/browse', path)),
 
-  downloadUrl: (share: string, path: string) => `${API_BASE_URL}${withPath(`/api/browse/${encodeURIComponent(share)}/download`, path)}`,
+  downloadUrl: (path: string) => `${API_BASE_URL}${withPath('/api/browse/download', path)}`,
 
-  mkdir: (share: string, path: string, name: string) =>
-    request<BrowseCommandResult>(`/api/browse/${encodeURIComponent(share)}/mkdir`, jsonInit({ path, name })),
+  mkdir: (path: string, name: string) => request<BrowseCommandResult>('/api/browse/mkdir', jsonInit({ path, name })),
 
-  rename: (share: string, path: string, newName: string) =>
-    request<BrowseCommandResult>(`/api/browse/${encodeURIComponent(share)}/rename`, jsonInit({ path, newName })),
+  rename: (path: string, newName: string) => request<BrowseCommandResult>('/api/browse/rename', jsonInit({ path, newName })),
 
-  move: (share: string, path: string, destPath: string) =>
-    request<BrowseCommandResult>(`/api/browse/${encodeURIComponent(share)}/move`, jsonInit({ path, destPath })),
+  move: (path: string, destPath: string) => request<BrowseCommandResult>('/api/browse/move', jsonInit({ path, destPath })),
 
-  remove: (share: string, path: string) =>
-    request<BrowseCommandResult>(withPath(`/api/browse/${encodeURIComponent(share)}`, path), { method: 'DELETE' }),
+  remove: (path: string) => request<BrowseCommandResult>(withPath('/api/browse', path), { method: 'DELETE' }),
 
-  upload: async (share: string, path: string, files: FileList | File[]): Promise<{ ok: boolean; results: BrowseCommandResult[] }> => {
+  upload: async (path: string, files: FileList | File[]): Promise<{ ok: boolean; results: BrowseCommandResult[] }> => {
     const form = new FormData();
     form.append('path', path);
     for (const file of Array.from(files)) form.append('files', file);
-    return request(`/api/browse/${encodeURIComponent(share)}/upload`, { method: 'POST', body: form });
+    return request('/api/browse/upload', { method: 'POST', body: form });
   },
 };

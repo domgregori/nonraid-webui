@@ -3,13 +3,13 @@ import type { BrowseEntry } from '../../types/browseApi';
 
 interface MoveModalProps {
   entry: BrowseEntry;
-  shareLabel: string;
+  currentPath: string;
   onCancel: () => void;
   onSubmit: (destPath: string) => Promise<boolean>;
 }
 
-export function MoveModal({ entry, shareLabel, onCancel, onSubmit }: MoveModalProps) {
-  const [destPath, setDestPath] = useState('');
+export function MoveModal({ entry, currentPath, onCancel, onSubmit }: MoveModalProps) {
+  const [destPath, setDestPath] = useState(currentPath);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -17,7 +17,7 @@ export function MoveModal({ entry, shareLabel, onCancel, onSubmit }: MoveModalPr
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const ok = await onSubmit(destPath.replace(/^\/+/, '').replace(/\/+$/, ''));
+    const ok = await onSubmit(destPath.trim().replace(/\/+$/, ''));
     setSubmitting(false);
     if (!ok) setError('Move failed — see the page error banner for details.');
   };
@@ -35,13 +35,13 @@ export function MoveModal({ entry, shareLabel, onCancel, onSubmit }: MoveModalPr
 
         <form onSubmit={handleSubmit} className="dialog__body">
           <label className="form-field">
-            <span className="form-field__label">Destination folder in {shareLabel}</span>
+            <span className="form-field__label">Destination folder (absolute path under /mnt)</span>
             <input
               className="history-input"
               style={{ width: '100%' }}
               value={destPath}
               onChange={(e) => setDestPath(e.target.value)}
-              placeholder="e.g. photos/2024 — leave blank for the share root"
+              placeholder="e.g. /mnt/user/photos/2024"
               autoFocus
             />
           </label>

@@ -8,7 +8,9 @@ export interface BrowseEntry {
 }
 
 export interface BrowseListing {
-  share: string;
+  /** The browse ceiling ("/mnt" by default) — clients compare `path` against
+   * this to know when they've reached the top and should hide/disable "up". */
+  root: string;
   path: string;
   entries: BrowseEntry[];
 }

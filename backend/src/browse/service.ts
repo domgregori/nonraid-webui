@@ -1,22 +1,14 @@
 import { copyFile, mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { HttpError } from '../httpError.js';
-import type { ShareStore } from '../shares/store.js';
-import { relativeTo, resolveExisting, resolveForCreate } from './paths.js';
+import { resolveExisting, resolveForCreate } from './paths.js';
 import type { BrowseCommandResult, BrowseEntry, BrowseListing } from './types.js';
 
+/** Browses the whole /mnt tree (config.browseRoot), not a single share — see
+ * paths.ts for the traversal-ceiling enforcement every method here relies on. */
 export class BrowseService {
-  constructor(private shareStore: ShareStore) {}
-
-  private async assertShareExists(shareName: string): Promise<void> {
-    if (!(await this.shareStore.get(shareName))) {
-      throw new HttpError(404, `Share "${shareName}" not found.`);
-    }
-  }
-
-  async list(shareName: string, relPath: string): Promise<BrowseListing> {
-    await this.assertShareExists(shareName);
-    const { root, absPath } = await resolveExisting(shareName, relPath);
+  async list(requestPath: string): Promise<BrowseListing> {
+    const { root, absPath } = await resolveExisting(requestPath);
     const st = await stat(absPath);
     if (!st.isDirectory()) throw new HttpError(400, 'Not a directory.');
 
@@ -37,20 +29,18 @@ export class BrowseService {
       return a.name.localeCompare(b.name);
     });
 
-    return { share: shareName, path: relativeTo(root, absPath), entries };
+    return { root, path: absPath, entries };
   }
 
-  async resolveDownload(shareName: string, relPath: string): Promise<{ absPath: string; name: string }> {
-    await this.assertShareExists(shareName);
-    const { absPath } = await resolveExisting(shareName, relPath);
+  async resolveDownload(requestPath: string): Promise<{ absPath: string; name: string }> {
+    const { absPath } = await resolveExisting(requestPath);
     const st = await stat(absPath);
     if (!st.isFile()) throw new HttpError(400, 'Only files can be downloaded.');
     return { absPath, name: path.basename(absPath) };
   }
 
-  async mkdir(shareName: string, parentRelPath: string, name: string): Promise<BrowseCommandResult> {
-    await this.assertShareExists(shareName);
-    const { absPath } = await resolveForCreate(shareName, parentRelPath, name);
+  async mkdir(parentPath: string, name: string): Promise<BrowseCommandResult> {
+    const { absPath } = await resolveForCreate(parentPath, name);
 
     const exists = await stat(absPath).then(() => true).catch(() => false);
     if (exists) throw new HttpError(409, `"${name}" already exists.`);
@@ -59,13 +49,12 @@ export class BrowseService {
     return { ok: true, message: `Created folder "${name}"` };
   }
 
-  async rename(shareName: string, relPath: string, newName: string): Promise<BrowseCommandResult> {
-    await this.assertShareExists(shareName);
-    const { root, absPath } = await resolveExisting(shareName, relPath);
-    if (absPath === root) throw new HttpError(400, 'Cannot rename a share root.');
+  async rename(requestPath: string, newName: string): Promise<BrowseCommandResult> {
+    const { root, absPath } = await resolveExisting(requestPath);
+    if (absPath === root) throw new HttpError(400, 'Cannot rename the browse root.');
 
-    const parentRel = relativeTo(root, path.dirname(absPath));
-    const { absPath: destAbs } = await resolveForCreate(shareName, parentRel, newName);
+    const parentPath = path.dirname(absPath);
+    const { absPath: destAbs } = await resolveForCreate(parentPath, newName);
     if (destAbs === absPath) return { ok: true, message: `Renamed to "${newName}"` };
 
     const destExists = await stat(destAbs).then(() => true).catch(() => false);
@@ -75,13 +64,12 @@ export class BrowseService {
     return { ok: true, message: `Renamed to "${newName}"` };
   }
 
-  async move(shareName: string, relPath: string, destParentRelPath: string): Promise<BrowseCommandResult> {
-    await this.assertShareExists(shareName);
-    const { root, absPath } = await resolveExisting(shareName, relPath);
-    if (absPath === root) throw new HttpError(400, 'Cannot move a share root.');
+  async move(requestPath: string, destParentPath: string): Promise<BrowseCommandResult> {
+    const { root, absPath } = await resolveExisting(requestPath);
+    if (absPath === root) throw new HttpError(400, 'Cannot move the browse root.');
 
     const name = path.basename(absPath);
-    const { absPath: destAbs } = await resolveForCreate(shareName, destParentRelPath, name);
+    const { absPath: destAbs } = await resolveForCreate(destParentPath, name);
     const destParentStat = await stat(path.dirname(destAbs));
     if (!destParentStat.isDirectory()) throw new HttpError(400, 'Destination is not a directory.');
     if (destAbs === absPath) return { ok: true, message: `Moved "${name}"` };
@@ -93,21 +81,19 @@ export class BrowseService {
     return { ok: true, message: `Moved "${name}"` };
   }
 
-  async remove(shareName: string, relPath: string): Promise<BrowseCommandResult> {
-    await this.assertShareExists(shareName);
-    const { root, absPath } = await resolveExisting(shareName, relPath);
-    if (absPath === root) throw new HttpError(400, 'Cannot delete a share root.');
+  async remove(requestPath: string): Promise<BrowseCommandResult> {
+    const { root, absPath } = await resolveExisting(requestPath);
+    if (absPath === root) throw new HttpError(400, 'Cannot delete the browse root.');
     await rm(absPath, { recursive: true });
     return { ok: true, message: `Deleted "${path.basename(absPath)}"` };
   }
 
   /** `tempPath` is a file multer already wrote to scratch disk; this validates the
    * destination and moves it into place, cleaning up the temp file either way. */
-  async saveUpload(shareName: string, destParentRelPath: string, originalName: string, tempPath: string): Promise<BrowseCommandResult> {
+  async saveUpload(destParentPath: string, originalName: string, tempPath: string): Promise<BrowseCommandResult> {
     try {
-      await this.assertShareExists(shareName);
       const safeName = path.basename(originalName);
-      const { absPath } = await resolveForCreate(shareName, destParentRelPath, safeName);
+      const { absPath } = await resolveForCreate(destParentPath, safeName);
 
       const exists = await stat(absPath).then(() => true).catch(() => false);
       if (exists) throw new HttpError(409, `"${safeName}" already exists.`);

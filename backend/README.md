@@ -331,6 +331,9 @@ itself failed — nmdctl/Docker/smartctl/mergerfs/Samba/useradd family).
   `/etc/samba/smb.conf` / `/etc/exports`)
 - `SHARES_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to mount/mergerfs/umount
 - `SHARE_ACCESS_CONFIG_PATH` — where `share-access.json` lives (default `backend/data/share-access.json`)
+- `BROWSE_ROOT` — the file browser's traversal ceiling; nothing above this path is reachable (default
+  `/mnt`)
+- `BROWSE_DEFAULT_PATH` — where the Browse page starts (default `/mnt/user`)
 - `SYSTEM_STATS_INTERVAL_MS` — background CPU-sampling interval (default `2000`)
 - `USERS_MODE` — `real` (default) | `mock`
 - `USERS_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to the useradd/smbpasswd
