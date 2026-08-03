@@ -18,7 +18,42 @@ export interface SelfTestHistoryEntry {
   lifetimeHours: number | null;
 }
 
-/** Curated smartmontools detail — not the raw ATA attribute table, see the Disks tab handoff's design decision. */
+/** One row of the raw ATA SMART attribute table (smartctl's `-a` output), e.g. Unraid's "Attributes" tab. */
+export interface SmartRawAttribute {
+  id: number;
+  name: string;
+  /** e.g. "0x0032" — hex of the attribute's flags word. */
+  flagHex: string | null;
+  value: number | null;
+  worst: number | null;
+  threshold: number | null;
+  type: 'Pre-fail' | 'Old age' | null;
+  updated: 'Always' | 'Offline' | null;
+  /** "Never", or the raw when_failed text (e.g. "FAILING_NOW"). */
+  whenFailed: string;
+  rawValue: number | null;
+  rawString: string | null;
+}
+
+/** Drive/controller capability + self-test polling info, e.g. Unraid's "Capabilities" tab. */
+export interface SmartCapabilitiesInfo {
+  offlineDataCollectionStatus: string | null;
+  offlineDataCollectionSeconds: number | null;
+  selfTestExecutionStatus: string | null;
+  shortSelfTestPollingMinutes: number | null;
+  extendedSelfTestPollingMinutes: number | null;
+  execOfflineImmediateSupported: boolean | null;
+  offlineSurfaceScanSupported: boolean | null;
+  selfTestSupported: boolean | null;
+  conveyanceSelfTestSupported: boolean | null;
+  selectiveSelfTestSupported: boolean | null;
+  attributeAutosaveEnabled: boolean | null;
+  errorLoggingSupported: boolean | null;
+  generalPurposeLoggingSupported: boolean | null;
+  sctStatusSupported: boolean | null;
+}
+
+/** Curated smartmontools detail, plus the raw attribute table and capabilities for the Disks tab's Attributes/Capabilities sub-views. */
 export interface SmartAttributes {
   device: string;
   model: string | null;
@@ -34,6 +69,8 @@ export interface SmartAttributes {
   selfTest: SelfTestStatus;
   selfTestHistory: SelfTestHistoryEntry[];
   capabilities: { short: boolean; long: boolean; conveyance: boolean };
+  rawAttributes: SmartRawAttribute[];
+  capabilitiesInfo: SmartCapabilitiesInfo;
 }
 
 export interface SmartClient {

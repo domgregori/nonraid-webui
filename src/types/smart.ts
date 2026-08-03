@@ -17,6 +17,37 @@ export interface SelfTestHistoryEntry {
   lifetimeHours: number | null;
 }
 
+export interface SmartRawAttribute {
+  id: number;
+  name: string;
+  flagHex: string | null;
+  value: number | null;
+  worst: number | null;
+  threshold: number | null;
+  type: 'Pre-fail' | 'Old age' | null;
+  updated: 'Always' | 'Offline' | null;
+  whenFailed: string;
+  rawValue: number | null;
+  rawString: string | null;
+}
+
+export interface SmartCapabilitiesInfo {
+  offlineDataCollectionStatus: string | null;
+  offlineDataCollectionSeconds: number | null;
+  selfTestExecutionStatus: string | null;
+  shortSelfTestPollingMinutes: number | null;
+  extendedSelfTestPollingMinutes: number | null;
+  execOfflineImmediateSupported: boolean | null;
+  offlineSurfaceScanSupported: boolean | null;
+  selfTestSupported: boolean | null;
+  conveyanceSelfTestSupported: boolean | null;
+  selectiveSelfTestSupported: boolean | null;
+  attributeAutosaveEnabled: boolean | null;
+  errorLoggingSupported: boolean | null;
+  generalPurposeLoggingSupported: boolean | null;
+  sctStatusSupported: boolean | null;
+}
+
 export interface SmartAttributes {
   device: string;
   model: string | null;
@@ -32,4 +63,6 @@ export interface SmartAttributes {
   selfTest: SelfTestStatus;
   selfTestHistory: SelfTestHistoryEntry[];
   capabilities: { short: boolean; long: boolean; conveyance: boolean };
+  rawAttributes: SmartRawAttribute[];
+  capabilitiesInfo: SmartCapabilitiesInfo;
 }

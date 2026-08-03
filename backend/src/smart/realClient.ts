@@ -1,14 +1,34 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
-import type { SelfTestHistoryEntry, SelfTestStatus, SelfTestType, SmartAttributes, SmartClient, SmartHealth } from './types.js';
+import type {
+  SelfTestHistoryEntry,
+  SelfTestStatus,
+  SelfTestType,
+  SmartAttributes,
+  SmartCapabilitiesInfo,
+  SmartClient,
+  SmartHealth,
+  SmartRawAttribute,
+} from './types.js';
 
 const execFileAsync = promisify(execFile);
+
+interface SmartctlAtaAttributeFlags {
+  value?: number;
+  prefailure?: boolean;
+  updated_online?: boolean;
+}
 
 interface SmartctlAtaAttribute {
   id?: number;
   name?: string;
-  raw?: { value?: number };
+  value?: number;
+  worst?: number;
+  thresh?: number;
+  when_failed?: string;
+  flags?: SmartctlAtaAttributeFlags;
+  raw?: { value?: number; string?: string };
 }
 
 interface SmartctlSelfTestLogEntry {
@@ -27,14 +47,23 @@ interface SmartctlJson {
   power_cycle_count?: number;
   ata_smart_attributes?: { table?: SmartctlAtaAttribute[] };
   ata_smart_data?: {
+    offline_data_collection?: { status?: { string?: string }; completion_seconds?: number };
     capabilities?: {
       exec_offline_immediate_supported?: boolean;
+      offline_surface_scan_supported?: boolean;
+      self_tests_supported?: boolean;
       conveyance_self_test_supported?: boolean;
+      selective_self_test_supported?: boolean;
+      attribute_autosave_enabled?: boolean;
+      error_logging_supported?: boolean;
+      gp_logging_supported?: boolean;
     };
     self_test?: {
       status?: { passed?: boolean; string?: string };
+      polling_minutes?: { short?: number; extended?: number };
     };
   };
+  ata_sct_capabilities?: { value?: number };
   ata_smart_self_test_log?: { standard?: { table?: SmartctlSelfTestLogEntry[] } };
   nvme_self_test_log?: {
     current_self_test_operation?: { string?: string };
@@ -56,11 +85,11 @@ function findAttr(data: SmartctlJson, id: number): number | null {
 }
 
 /**
- * Best-effort — smartmontools' JSON field names here are from general
- * knowledge, not confirmed against real `smartctl --json -a` output (see the
- * Disks tab handoff: no SMART-capable disk exists in this project's dev
- * environment). Every field falls back to null/unknown rather than throwing,
- * so an unexpected shape degrades to "—" in the UI instead of breaking it.
+ * Field names verified against real `smartctl --json -a` output from a PNY
+ * SATA SSD (smartmontools 7.5) — see the Disks tab handoff for how this was
+ * originally written speculatively, then confirmed. NVMe/other-vendor shapes
+ * are still unverified, so every field falls back to null/unknown rather than
+ * throwing — an unexpected shape degrades to "—" in the UI instead of breaking it.
  */
 function extractSelfTest(data: SmartctlJson): SelfTestStatus {
   const ataStatus = data.ata_smart_data?.self_test?.status;
@@ -112,6 +141,48 @@ function extractSelfTestHistory(data: SmartctlJson): SelfTestHistoryEntry[] {
   }
 
   return [];
+}
+
+function extractRawAttributes(data: SmartctlJson): SmartRawAttribute[] {
+  const table = data.ata_smart_attributes?.table;
+  if (!table) return [];
+  return table.map((a) => ({
+    id: a.id ?? 0,
+    name: a.name ?? 'Unknown_Attribute',
+    flagHex: typeof a.flags?.value === 'number' ? `0x${a.flags.value.toString(16).padStart(4, '0')}` : null,
+    value: typeof a.value === 'number' ? a.value : null,
+    worst: typeof a.worst === 'number' ? a.worst : null,
+    threshold: typeof a.thresh === 'number' ? a.thresh : null,
+    type: typeof a.flags?.prefailure === 'boolean' ? (a.flags.prefailure ? 'Pre-fail' : 'Old age') : null,
+    updated: typeof a.flags?.updated_online === 'boolean' ? (a.flags.updated_online ? 'Always' : 'Offline') : null,
+    whenFailed: a.when_failed && a.when_failed.length > 0 ? a.when_failed : 'Never',
+    rawValue: typeof a.raw?.value === 'number' ? a.raw.value : null,
+    rawString: a.raw?.string ?? null,
+  }));
+}
+
+/** SCT "Status supported" is bit 0 of the capabilities word — the named sub-flags cover other SCT features. */
+function extractCapabilitiesInfo(data: SmartctlJson): SmartCapabilitiesInfo {
+  const caps = data.ata_smart_data?.capabilities;
+  const offline = data.ata_smart_data?.offline_data_collection;
+  const selfTest = data.ata_smart_data?.self_test;
+  const sct = data.ata_sct_capabilities;
+  return {
+    offlineDataCollectionStatus: offline?.status?.string ?? null,
+    offlineDataCollectionSeconds: typeof offline?.completion_seconds === 'number' ? offline.completion_seconds : null,
+    selfTestExecutionStatus: selfTest?.status?.string ?? null,
+    shortSelfTestPollingMinutes: typeof selfTest?.polling_minutes?.short === 'number' ? selfTest.polling_minutes.short : null,
+    extendedSelfTestPollingMinutes: typeof selfTest?.polling_minutes?.extended === 'number' ? selfTest.polling_minutes.extended : null,
+    execOfflineImmediateSupported: caps?.exec_offline_immediate_supported ?? null,
+    offlineSurfaceScanSupported: caps?.offline_surface_scan_supported ?? null,
+    selfTestSupported: caps?.self_tests_supported ?? null,
+    conveyanceSelfTestSupported: caps?.conveyance_self_test_supported ?? null,
+    selectiveSelfTestSupported: caps?.selective_self_test_supported ?? null,
+    attributeAutosaveEnabled: caps?.attribute_autosave_enabled ?? null,
+    errorLoggingSupported: caps?.error_logging_supported ?? null,
+    generalPurposeLoggingSupported: caps?.gp_logging_supported ?? null,
+    sctStatusSupported: typeof sct?.value === 'number' ? (sct.value & 1) === 1 : null,
+  };
 }
 
 /**
@@ -208,6 +279,8 @@ export class RealSmartClient implements SmartClient {
         long: true,
         conveyance: caps?.conveyance_self_test_supported === true,
       },
+      rawAttributes: extractRawAttributes(data),
+      capabilitiesInfo: extractCapabilitiesInfo(data),
     };
   }
 

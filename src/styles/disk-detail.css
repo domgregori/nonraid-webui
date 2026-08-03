@@ -141,3 +141,50 @@
   color: var(--color-text-secondary);
   font-family: var(--font-mono);
 }
+
+.smart-tabs {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.smart-tabs__btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.smart-tabs__btn--active {
+  border-color: var(--color-blue);
+  color: var(--color-blue);
+}
+
+.smart-attr-table__scroll {
+  overflow-x: auto;
+}
+
+.smart-attr-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.smart-attr-table th {
+  text-align: left;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.smart-attr-table td {
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid var(--color-border);
+}
