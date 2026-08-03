@@ -44,6 +44,12 @@ export function parseVariable(content: string, key: string): string | null {
 /** Set (or, when value is null, remove) one `key = value` line, returning the
  * updated content. */
 export function applyVariable(content: string, key: string, value: string | null): string {
+  // A value containing \r/\n would otherwise split into extra physical
+  // lines once written, letting one field's value inject arbitrary
+  // additional lxc.* directives into the config file.
+  if (value !== null && /[\r\n]/.test(value)) {
+    throw new Error(`Value for "${key}" must not contain line breaks`);
+  }
   const hadTrailingNewline = content.endsWith('\n');
   const lines = content.length > 0 ? content.split('\n') : [];
   const idx = findLineIndex(lines, key);

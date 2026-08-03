@@ -18,6 +18,17 @@ function requireValidName(name: string): string {
   return name;
 }
 
+// These end up as lines in the container's real LXC config file (see
+// backend/src/lxc/configFile.ts) — a line break here would let one field's
+// value inject arbitrary extra lxc.* directives, so reject it up front
+// rather than relying solely on configFile.ts's own check.
+function requireNoLineBreaks(field: string, value: string): string {
+  if (/[\r\n]/.test(value)) {
+    throw new HttpError(400, `${field} must not contain line breaks`);
+  }
+  return value;
+}
+
 export function lxcRouter(lxc: LxcClient, activity: ActivityStore): Router {
   const router = Router();
 
@@ -146,10 +157,14 @@ export function lxcRouter(lxc: LxcClient, activity: ActivityStore): Router {
         arch: String(body.arch || DEFAULT_ARCH),
         bridge: String(body.bridge || ''),
         autostart: body.autostart === true,
-        description: String(body.description ?? ''),
-        webUiUrl: String(body.webUiUrl ?? ''),
+        description: requireNoLineBreaks('description', String(body.description ?? '')),
+        webUiUrl: requireNoLineBreaks('webUiUrl', String(body.webUiUrl ?? '')),
       };
       if (!options.bridge) throw new HttpError(400, 'bridge is required');
+      const validBridges = await lxc.listBridges();
+      if (!validBridges.includes(options.bridge)) {
+        throw new HttpError(400, `Invalid bridge "${options.bridge}" — must be one of: ${validBridges.join(', ')}`);
+      }
 
       const result = await lxc.createContainer(options, (progress) => send({ type: 'progress', ...progress }));
       activity.log(`LXC container "${name}" created`, 'green').catch(() => {});
