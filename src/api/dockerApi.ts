@@ -22,13 +22,13 @@ export const dockerApi = {
       body: JSON.stringify(body),
     }),
   createContainer: (body: ManualContainerRequest, onProgress: (p: CreateContainerProgress) => void) =>
-    streamNdjson(
+    streamNdjson<CreateContainerProgress, DockerCommandResult>(
       '/api/docker/containers',
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
       onProgress,
     ),
   recreateContainer: (id: string, body: ManualContainerRequest, onProgress: (p: CreateContainerProgress) => void) =>
-    streamNdjson(
+    streamNdjson<CreateContainerProgress, DockerCommandResult>(
       `/api/docker/containers/${id}`,
       { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
       onProgress,

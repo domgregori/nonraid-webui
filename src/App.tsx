@@ -5,6 +5,7 @@ import { BrowsePage } from './pages/BrowsePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DockerPage } from './pages/DockerPage';
 import { HistoryPage } from './pages/HistoryPage';
+import { LxcPage } from './pages/LxcPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SharesPage } from './pages/SharesPage';
@@ -19,6 +20,7 @@ function App() {
         <Route path="/browse" element={<BrowsePage />} />
         <Route path="/users" element={<UsersPage />} />
         <Route path="/docker" element={<DockerPage />} />
+        <Route path="/lxc" element={<LxcPage />} />
         <Route path="/apps" element={<AppsPage />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/settings" element={<SettingsPage />} />

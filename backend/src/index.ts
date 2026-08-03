@@ -5,6 +5,7 @@ import { AppsService, CaFeedStore } from './apps/index.js';
 import { BrowseService } from './browse/service.js';
 import { config } from './config.js';
 import { createDockerClient } from './docker/index.js';
+import { createLxcClient } from './lxc/index.js';
 import { createNmdClient } from './nmd/index.js';
 import { activityRouter } from './routes/activity.js';
 import { appsRouter } from './routes/apps.js';
@@ -12,6 +13,7 @@ import { arrayRouter } from './routes/array.js';
 import { browseRouter } from './routes/browse.js';
 import { disksRouter } from './routes/disks.js';
 import { dockerRouter } from './routes/docker.js';
+import { lxcRouter } from './routes/lxc.js';
 import { parityRouter } from './routes/parity.js';
 import { settingsRouter } from './routes/settings.js';
 import { sharesRouter } from './routes/shares.js';
@@ -28,6 +30,7 @@ import { createUsersClient, UsersService } from './users/index.js';
 async function main() {
   const nmd = createNmdClient();
   const docker = createDockerClient();
+  const lxc = createLxcClient();
   const smart = new SmartService(createSmartClient());
   const activity = new ActivityStore();
   new ActivityWatcher(nmd, smart, activity);
@@ -63,6 +66,7 @@ async function main() {
       ok: true,
       nmdMode: nmd.mode,
       dockerMode: docker.mode,
+      lxcMode: lxc.mode,
       smartMode: smart.mode,
       sharesMode: shareApplier.mode,
       usersMode: usersClient.mode,
@@ -75,6 +79,7 @@ async function main() {
   app.use('/api', settingsRouter(settingsStore, nmd, activity));
   app.use('/api', disksRouter(nmd, activity));
   app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity));
+  app.use('/api', lxcRouter(lxc, activity));
   app.use('/api', smartRouter(nmd, smart));
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
@@ -86,7 +91,7 @@ async function main() {
   app.listen(config.port, () => {
     console.log(
       `nonraid-webui backend listening on http://localhost:${config.port} ` +
-        `(nmd mode: ${nmd.mode}, docker mode: ${docker.mode}, smart mode: ${smart.mode}, shares mode: ${shareApplier.mode}, users mode: ${usersClient.mode})`,
+        `(nmd mode: ${nmd.mode}, docker mode: ${docker.mode}, lxc mode: ${lxc.mode}, smart mode: ${smart.mode}, shares mode: ${shareApplier.mode}, users mode: ${usersClient.mode})`,
     );
   });
 }

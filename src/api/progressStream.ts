@@ -1,19 +1,21 @@
 import { API_BASE_URL } from './config';
-import type { CreateContainerProgress, DockerCommandResult } from '../types/dockerApi';
 
 /**
  * Reads a newline-delimited JSON progress stream — the protocol shared by
- * the Apps install endpoint and the Docker tab's create/recreate endpoints
- * (see backend/src/routes/apps.ts and backend/src/routes/docker.ts). A
- * plain image pull can take long enough that a single blocking response
- * reads as hung, so these stream `{type:'progress',...}` ticks and finish
- * with `{type:'done', result}` or `{type:'error', message}`.
+ * the Apps install endpoint, the Docker tab's create/recreate endpoints, and
+ * the LXC tab's create endpoint (see backend/src/routes/apps.ts,
+ * backend/src/routes/docker.ts, backend/src/routes/lxc.ts). A pull/download
+ * can take long enough that a single blocking response reads as hung, so
+ * these stream `{type:'progress',...}` ticks and finish with
+ * `{type:'done', result}` or `{type:'error', message}`. Generic over the
+ * progress tick shape and final result shape since Docker and LXC's create
+ * flows report different fields.
  */
-export async function streamNdjson(
+export async function streamNdjson<TProgress, TResult>(
   url: string,
   init: RequestInit,
-  onProgress: (p: CreateContainerProgress) => void,
-): Promise<DockerCommandResult> {
+  onProgress: (p: TProgress) => void,
+): Promise<TResult> {
   const res = await fetch(`${API_BASE_URL}${url}`, init);
   if (!res.body) throw new Error(`Request failed: ${res.status}`);
 
@@ -33,13 +35,13 @@ export async function streamNdjson(
       if (!line) continue;
 
       const event = JSON.parse(line) as
-        | ({ type: 'progress' } & CreateContainerProgress)
-        | { type: 'done'; result: DockerCommandResult }
+        | ({ type: 'progress' } & TProgress)
+        | { type: 'done'; result: TResult }
         | { type: 'error'; message: string };
 
       if (event.type === 'progress') {
         const { type: _type, ...progress } = event;
-        onProgress(progress);
+        onProgress(progress as TProgress);
       } else if (event.type === 'done') return event.result;
       else throw new Error(event.message);
     }

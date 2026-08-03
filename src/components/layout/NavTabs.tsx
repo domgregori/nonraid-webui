@@ -6,6 +6,7 @@ const TABS = [
   { to: '/browse', label: 'Browse' },
   { to: '/users', label: 'Users' },
   { to: '/docker', label: 'Docker' },
+  { to: '/lxc', label: 'LXC' },
   { to: '/apps', label: 'Apps' },
   { to: '/history', label: 'History' },
   { to: '/settings', label: 'Settings' },

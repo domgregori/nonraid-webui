@@ -13,6 +13,7 @@ export type DockerMode = 'real' | 'mock';
 export type SmartMode = 'real' | 'mock';
 export type SharesMode = 'real' | 'mock';
 export type UsersMode = 'real' | 'mock';
+export type LxcMode = 'real' | 'mock';
 
 function envBool(name: string, fallback: boolean): boolean {
   const v = process.env[name];
@@ -86,4 +87,25 @@ export const config = {
   // for passive state changes (parity check completing on its own, a disk
   // erroring out, a SMART health check failing) worth logging on its own.
   activityWatcherIntervalMs: Number(process.env.ACTIVITY_WATCHER_INTERVAL_MS ?? 30_000),
+  // LXC containers — see backend/src/lxc/. Shells out to the classic liblxc
+  // `lxc-*` command-line tools (lxc-ls/lxc-info/lxc-create/...), the same
+  // toolset ich777's unraid-lxc-plugin wraps in PHP. `lxcDefaultPath` is
+  // passed as `-P` to every lxc-* call, matching that plugin's configurable
+  // storage root (analogous to appsBindRoots above).
+  lxcMode: (process.env.LXC_MODE as LxcMode | undefined) ?? 'real',
+  lxcDefaultPath: process.env.LXC_DEFAULT_PATH ?? '/var/lib/lxc',
+  lxcUseSudo: envBool('LXC_USE_SUDO', false),
+  lxcTimeoutMs: Number(process.env.LXC_TIMEOUT_MS ?? 15_000),
+  // lxc-create --template download fetches a rootfs tarball from
+  // images.linuxcontainers.org — needs much longer than other lxc-* calls.
+  lxcCreateTimeoutMs: Number(process.env.LXC_CREATE_TIMEOUT_MS ?? 10 * 60 * 1000),
+  lxcStopTimeoutSec: Number(process.env.LXC_STOP_TIMEOUT_SEC ?? 30),
+  // `lxc-create --template download -- --list` fetches the live image index
+  // from the image server on a cold cache — the download template caches
+  // it on disk afterward (~30ms on a warm cache, observed), but the first
+  // call on a fresh host needs real network time.
+  lxcDistroListTimeoutMs: Number(process.env.LXC_DISTRO_LIST_TIMEOUT_MS ?? 30_000),
+  // Poll-and-cache interval for the CPU/memory/IP stats worker — see
+  // lxc/statsPoller.ts, same shape as SystemStatsService.
+  lxcStatsIntervalMs: Number(process.env.LXC_STATS_INTERVAL_MS ?? 3_000),
 };

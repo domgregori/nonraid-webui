@@ -47,6 +47,47 @@ Unlike `nmd/types.ts`, `docker/types.ts` is **not** a passthrough of the raw Doc
 payload is large and stats need the CPU% derivation above) — both clients normalize to
 `DockerContainerSummary`.
 
+## LXC (`src/lxc/`)
+
+Same real/mock pattern via `LXC_MODE` and `createLxcClient()` (`src/lxc/index.ts`), covering
+lifecycle + create-from-download-template only (Phase 1 — snapshots, backups, ZFS/BTRFS conversion,
+and a community-template catalog are explicitly deferred, see "Not yet done" below).
+
+- **`RealLxcClient`** — shells out to the classic liblxc `lxc-*` tools (`lxc-ls`, `lxc-info`,
+  `lxc-start`, `lxc-stop`, `lxc-destroy`, `lxc-create`) via `execFile`/`spawn` with argv arrays only
+  — never string-interpolated shell commands. A container's app-level metadata (description, WebUI
+  link, autostart) lives as plain lines in its own real LXC `config` file under `LXC_DEFAULT_PATH`
+  — real directives (`lxc.start.auto`) and app-invented comment-prefixed pseudo-keys
+  (`#container_description`, `#container_webui`) both use `key = value` lines, read/written by
+  `src/lxc/configFile.ts`. No separate metadata store — the container stays fully self-describing.
+  CPU%/memory/IPs are **not** read live from `lxc-info` (it has no such stats) — a background poller
+  (`src/lxc/statsPoller.ts`, same poll-and-cache shape as `SystemStatsService`) derives them from
+  `/proc/<pid>/stat` and `/proc/<pid>/status` for each running container's init process, which
+  undercounts CPU for workloads that fork child processes with their own host PIDs — an accepted
+  approximation, not a cgroup-accurate reading.
+- **`MockLxcClient`** — two fake containers, full lifecycle transitions, and a synthesized editable
+  config text so the "Edit config" dialog has something real to load/save in mock mode too.
+
+The distribution list (`GET /api/lxc/distros`) is fetched **live** from the image server via
+`lxc-create -n <throwaway> -t download -- --list`, run against an isolated scratch `-P` path rather
+than `LXC_DEFAULT_PATH` — `lxc-create` requires `-n` even to list (omitting it silently creates a
+stray container named after a literal arg), and even with a real name the download template's early
+exit leaves a container briefly visible to `lxc-ls`/`lxc-info` while the process runs, which a
+concurrent `listContainers()` poll can catch. Redirecting `-P` to scratch avoids that race entirely
+rather than filtering it after the fact. Falls back to a small static list (`src/lxc/distros.ts`) if
+the live fetch fails; the create form's distribution field is a dropdown with a free-text override
+either way, since `lxc-create --template download` accepts anything the image server actually has.
+
+Host bridge discovery (`GET /api/lxc/bridges`) enumerates `/sys/class/net/*/bridge` directly rather
+than `os.networkInterfaces()` — the latter silently omits interfaces with no active carrier (a
+freshly created, unattached bridge like `lxcbr0` or `docker0` never appeared in its output, even
+though it had a real assigned IP and `ip addr show` saw it fine).
+
+Editing a container (the LXC page's "Edit" button) writes its real on-disk `config` file directly
+(`GET`/`PUT /api/lxc/containers/:name/config`) rather than a curated subset of fields — unlike
+Docker, an LXC container isn't immutable, so its config can just be changed in place (most changes
+need a restart to take effect; LXC only reads this file at start).
+
 ## SMART / disk temperature (`src/smart/`)
 
 nmdctl's status JSON has **no temperature field at all** — that's SMART data, not something the array
@@ -211,7 +252,7 @@ cp .env.example .env   # optional, defaults work out of the box in mock mode
 
 | Method | Path                | Body/Params                                          | Notes |
 |--------|---------------------|-------------------------------------------------------|-------|
-| GET    | `/api/health`        | —                                                       | `{ ok, nmdMode, dockerMode, smartMode, sharesMode, usersMode }` — check which clients are active |
+| GET    | `/api/health`        | —                                                       | `{ ok, nmdMode, dockerMode, lxcMode, smartMode, sharesMode, usersMode }` — check which clients are active |
 | GET    | `/api/status`         | —                                                       | Full `nmdctl status -o json` passthrough |
 | POST   | `/api/array/start`     | —                                                       | `nmdctl start` |
 | POST   | `/api/array/stop`       | —                                                       | `nmdctl stop`. Mock client rejects with 502 if a parity check is active, matching real driver behavior. |
@@ -220,6 +261,17 @@ cp .env.example .env   # optional, defaults work out of the box in mock mode
 | POST   | `/api/docker/containers/:id/start`  | —                                                   | |
 | POST   | `/api/docker/containers/:id/stop`    | —                                                   | |
 | POST   | `/api/docker/containers/:id/restart`  | —                                                   | |
+| GET    | `/api/lxc/containers`          | —                                                       | `LxcContainerSummary[]` — name, state, autostart, description, webUiUrl, cpu/mem/ips |
+| GET    | `/api/lxc/containers/:name`      | —                                                       | Full detail — pid, rootfs path, bridge, MAC, cgroup limits |
+| GET    | `/api/lxc/containers/:name/config` | —                                                     | `{ content }` — the container's raw on-disk config file text |
+| PUT    | `/api/lxc/containers/:name/config` | `{ content }`                                         | Overwrites the config file verbatim |
+| POST   | `/api/lxc/containers/:name/start`  | —                                                       | |
+| POST   | `/api/lxc/containers/:name/stop`   | `{ force? }`                                            | `force: true` → `lxc-stop --kill` instead of a graceful timeout |
+| POST   | `/api/lxc/containers/:name/restart` | —                                                       | |
+| DELETE | `/api/lxc/containers/:name`      | —                                                       | `lxc-destroy` |
+| POST   | `/api/lxc/containers`         | `{ name, distribution, release, arch, bridge, autostart, description?, webUiUrl? }` | NDJSON progress stream, same protocol as Docker create |
+| GET    | `/api/lxc/distros`           | —                                                       | `{ distros, defaultArch }` — live image index, falls back to a static list |
+| GET    | `/api/lxc/bridges`           | —                                                       | Host bridge names a new container's veth can attach to |
 | GET    | `/api/smart/temperatures`        | —                                                       | `{ [device]: number \| null }` for every disk currently in the array |
 | GET    | `/api/shares`             | —                                                               | `ShareWithStats[]` — config + live used/total bytes |
 | POST   | `/api/shares`              | `{ name, disks, allocationMethod, protocols, smb?, nfs? }`         | 201 on success, 409 if the name exists |
@@ -255,6 +307,17 @@ itself failed — nmdctl/Docker/smartctl/mergerfs/Samba/useradd family).
 - `NMD_TIMEOUT_MS` — kill nmdctl subprocess after this long (default `15000`)
 - `DOCKER_MODE` — `real` (default) | `mock` (dockerode reads the standard `DOCKER_HOST`/socket env
   vars itself if you need a non-default connection)
+- `LXC_MODE` — `real` (default) | `mock`
+- `LXC_DEFAULT_PATH` — container storage root, passed as `-P` to every `lxc-*` call (default
+  `/var/lib/lxc`)
+- `LXC_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to the `lxc-*` family
+- `LXC_TIMEOUT_MS` — kill most `lxc-*` subprocesses after this long (default `15000`)
+- `LXC_CREATE_TIMEOUT_MS` — longer timeout for `lxc-create --template download`, which fetches a
+  rootfs tarball (default `600000`, 10 minutes)
+- `LXC_STOP_TIMEOUT_SEC` — graceful-shutdown wait passed to `lxc-stop --timeout` (default `30`)
+- `LXC_DISTRO_LIST_TIMEOUT_MS` — timeout for the live image-index fetch, which can hit the network on
+  a cold cache (default `30000`)
+- `LXC_STATS_INTERVAL_MS` — background poll interval for the CPU/mem/IP stats worker (default `3000`)
 - `SMART_MODE` — `real` (default) | `mock`
 - `SMARTCTL_BIN` — path/name of the smartctl binary (default `smartctl`)
 - `SMART_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to smartctl
@@ -291,6 +354,9 @@ Docker access needs the process to run as root, or as a user in the `docker` gro
 membership is effectively root-equivalent (container mounts make privilege escalation trivial) — same
 severity as the nmdctl sudoers rule above.
 
+LXC needs root (or a sudoers rule via `LXC_USE_SUDO`) for the `lxc-*` toolset — same severity as
+Docker/nmdctl, since it can create/start/destroy full system containers on the host.
+
 `smartctl` also needs root (or a sudoers rule, same pattern as nmdctl's `NMD_USE_SUDO`).
 
 Shares needs root for `mount`/`mergerfs`/`umount` and to write `smb.conf`/`/etc/exports` — same
@@ -319,6 +385,12 @@ since it now manages credentials, not just infrastructure.
 - `nmdctl set` (turbo write, etc.)
 - WebSocket/SSE push for status instead of frontend polling
 - Docker: image pull/list, "Add Container" (currently a design-only button), container logs
+- LXC: Phase 1 only (lifecycle + create-from-download-template + config-file editing). Snapshots,
+  `lxc-autobackup`-style backups, ZFS/BTRFS backing-device conversion, and a GitHub-release-based
+  community template catalog (the CA-equivalent for LXC) are explicitly deferred — see the handoff
+  doc this was built from for how the reference plugin (ich777/unraid-lxc-plugin) implements those.
+  Stats-poller CPU% is a `/proc/<pid>`-based approximation, not real cgroup accounting (see the LXC
+  section above).
 - SMART: only temperature is read today; SMART pass/fail health, reallocated sectors, etc. aren't
   surfaced
 - Shares: the guest-access permission issue noted above, no validation that a share name doesn't

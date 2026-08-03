@@ -2,14 +2,14 @@
 
 A web dashboard for [nonraid](https://github.com/qvr/nonraid) / `nmdctl` — an unRAID-style storage
 array driver + CLI. Surfaces array status, parity protection, per-disk detail, shares, users, Docker
-containers, historical metrics (via Grafana), and array settings.
+containers, LXC containers, historical metrics (via Grafana), and array settings.
 
 Two-part repo: a React frontend (this directory) and an Express backend (`backend/`) that wraps
-`nmdctl`, the Docker Engine API, `smartctl`, mergerfs/Samba/NFS (shares), and host CPU/memory.
-**Dashboard, Docker, Sharing, and Users pages are wired to the real backend** (polling, with mock
-fallbacks when nonraid/Docker/smartmontools/mergerfs/useradd aren't available — see
-`backend/README.md`). History/Settings and the Dashboard sidebar's Activity feed are still mock-only —
-there's no backend concept for any of those yet.
+`nmdctl`, the Docker Engine API, the `lxc-*` command-line tools, `smartctl`, mergerfs/Samba/NFS
+(shares), and host CPU/memory. **Dashboard, Docker, LXC, Sharing, and Users pages are wired to the
+real backend** (polling, with mock fallbacks when nonraid/Docker/liblxc/smartmontools/mergerfs/useradd
+aren't available — see `backend/README.md`). History/Settings and the Dashboard sidebar's Activity
+feed are still mock-only — there's no backend concept for any of those yet.
 
 Users means SMB/NFS share accounts (real Linux/Samba users, uid/gid ≥ 20000), **not** a webui login
 system — the API itself still has no auth layer at all (see `backend/README.md`'s Privileges section);
@@ -17,9 +17,9 @@ those are two separate, still-separate concerns.
 
 ## Stack
 
-- Frontend: React 19 + TypeScript, Vite, react-router-dom (routes: `/`, `/shares`, `/users`,
-  `/docker`, `/history`, `/settings`). Plain CSS with a token file (`src/styles/tokens.css`) — no
-  CSS-in-JS, no component library.
+- Frontend: React 19 + TypeScript, Vite, react-router-dom (routes: `/`, `/shares`, `/browse`,
+  `/users`, `/docker`, `/lxc`, `/apps`, `/history`, `/settings`). Plain CSS with a token file
+  (`src/styles/tokens.css`) — no CSS-in-JS, no component library.
 - Backend: Node + TypeScript, Express. See `backend/README.md`.
 
 ## Getting started (frontend)
@@ -59,17 +59,21 @@ src/
   state/       AppStoreProvider (settings + Grafana URL, local-only) and
                ArrayStatusProvider (polls the backend for array/parity/disk/temp state,
                owns disk-detail selection — this is the real one)
-  hooks/       useDockerContainers, useShares, useUsers, useGroups, useSystemStats — polling hooks
-               with create/update/remove actions where relevant
+  hooks/       useDockerContainers, useLxcContainers, useShares, useUsers, useGroups,
+               useSystemStats — polling hooks with create/update/remove actions where relevant
   selectors/   pure derivation functions (backend response -> view models)
   components/  layout, dashboard, disk-detail, shares (create/edit form), users (add-user modal,
                groups modal, per-user detail panel with share-access grid), shared UI primitives
   pages/       one component per route
   styles/      CSS token file + per-area stylesheets
 
-backend/                 Express API wrapping nmdctl, Docker, smartctl, shares, users, and system stats
+backend/                 Express API wrapping nmdctl, Docker, lxc-*, smartctl, shares, users, and
+                         system stats
   src/nmd/     NmdClient interface + RealNmdClient (shells out to nmdctl) + MockNmdClient
   src/docker/  DockerClient interface + RealDockerClient (dockerode) + MockDockerClient
+  src/lxc/     LxcClient interface + RealLxcClient (shells out to lxc-ls/lxc-info/lxc-create/...) +
+               MockLxcClient + configFile.ts (line-based get/set against a container's real config
+               file — its only metadata store) + statsPoller.ts (poll-and-cache CPU/mem/IPs)
   src/smart/   SmartClient interface + RealSmartClient (smartctl) + MockSmartClient + caching service
   src/shares/  ShareStore (owns shares.json) + ShareAccessStore (owns share-access.json, per-user/
                group SMB permissions) + ShareApplier interface (mergerfs/Samba/NFS, real or mock) +
@@ -78,7 +82,7 @@ backend/                 Express API wrapping nmdctl, Docker, smartctl, shares, 
                /etc/passwd+/etc/group as source of truth) + MockUsersClient + UsersService
   src/system/  SystemStatsService (host CPU/memory via Node's os module — no mock variant, see
                backend/README.md for why)
-  src/routes/  /api/status, /api/array/*, /api/parity/*, /api/docker/*, /api/smart/*,
+  src/routes/  /api/status, /api/array/*, /api/parity/*, /api/docker/*, /api/lxc/*, /api/smart/*,
                /api/shares/*, /api/users/*, /api/groups/*, /api/system
 ```
 
@@ -97,6 +101,11 @@ repo's development docs. Don't reintroduce a Docker test environment.
   log source exists.
 - Docker Engine API integration (containers page) is done. Grafana URL storage (history page) needs
   no backend beyond storing the URL, and isn't started.
+- LXC containers page/backend is done for Phase 1 — lifecycle, create-from-download-template (live
+  distro index + host bridge picker), and direct config-file editing. Verified end-to-end against a
+  real VM with liblxc installed (real `lxc-create`, real DHCP IP via `lxcbr0`). Snapshots, backups,
+  ZFS/BTRFS conversion, and a community-template catalog are deferred — see `backend/README.md`'s
+  LXC section.
 - Shares backend and frontend (create/edit/delete via a form modal, real mergerfs/Samba/NFS) are done
   and tested against a real VM environment — see `backend/README.md`'s Shares section for what was
   actually verified.

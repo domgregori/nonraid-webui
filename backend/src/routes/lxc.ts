@@ -1,0 +1,166 @@
+import { Router } from 'express';
+import type { ActivityStore } from '../activity/index.js';
+import { HttpError } from '../httpError.js';
+import { DEFAULT_ARCH } from '../lxc/distros.js';
+import type { CreateLxcContainerOptions, LxcClient } from '../lxc/index.js';
+
+// Container names become directory names under lxcDefaultPath
+// (`<lxcDefaultPath>/<name>/`) and are interpolated into config-file paths
+// on disk — reject anything that isn't a safe, plain identifier before it
+// ever reaches path.join, so a name like "../../etc" can't escape the
+// container storage root.
+const NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
+
+function requireValidName(name: string): string {
+  if (!NAME_RE.test(name)) {
+    throw new HttpError(400, `Invalid container name "${name}" — use letters, numbers, "_", "-", "." only`);
+  }
+  return name;
+}
+
+export function lxcRouter(lxc: LxcClient, activity: ActivityStore): Router {
+  const router = Router();
+
+  router.get('/lxc/containers', async (_req, res) => {
+    try {
+      res.json(await lxc.listContainers());
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.get('/lxc/distros', async (_req, res) => {
+    try {
+      res.json(await lxc.listDistros());
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.get('/lxc/bridges', async (_req, res) => {
+    try {
+      res.json(await lxc.listBridges());
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.get('/lxc/containers/:name', async (req, res) => {
+    try {
+      res.json(await lxc.inspectContainer(requireValidName(req.params.name)));
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/lxc/containers/:name/start', async (req, res) => {
+    try {
+      const name = requireValidName(req.params.name);
+      const result = await lxc.startContainer(name);
+      activity.log(`LXC container "${name}" started`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/lxc/containers/:name/stop', async (req, res) => {
+    try {
+      const name = requireValidName(req.params.name);
+      const force = req.body?.force === true;
+      const result = await lxc.stopContainer(name, { force });
+      activity.log(`LXC container "${name}" stopped`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/lxc/containers/:name/restart', async (req, res) => {
+    try {
+      const name = requireValidName(req.params.name);
+      const result = await lxc.restartContainer(name);
+      activity.log(`LXC container "${name}" restarted`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
+  router.delete('/lxc/containers/:name', async (req, res) => {
+    try {
+      const name = requireValidName(req.params.name);
+      const result = await lxc.destroyContainer(name);
+      activity.log(`LXC container "${name}" destroyed`, 'red').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
+  router.get('/lxc/containers/:name/config', async (req, res) => {
+    try {
+      const name = requireValidName(req.params.name);
+      res.json({ content: await lxc.getConfigText(name) });
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
+  router.put('/lxc/containers/:name/config', async (req, res) => {
+    try {
+      const name = requireValidName(req.params.name);
+      if (typeof req.body?.content !== 'string') throw new HttpError(400, 'content is required');
+      const result = await lxc.setConfigText(name, req.body.content);
+      activity.log(`LXC container "${name}" config updated`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
+  // Streams newline-delimited JSON progress events — same protocol as the
+  // Docker/Apps create endpoints (see backend/src/routes/docker.ts), since
+  // a rootfs download can take long enough for a silent blocking response
+  // to read as hung.
+  router.post('/lxc/containers', async (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' });
+    const send = (event: object) => res.write(`${JSON.stringify(event)}\n`);
+    try {
+      const body = req.body ?? {};
+      const name = requireValidName(String(body.name ?? ''));
+      if (!body.distribution || !body.release) {
+        throw new HttpError(400, 'distribution and release are required');
+      }
+      const options: CreateLxcContainerOptions = {
+        name,
+        distribution: String(body.distribution),
+        release: String(body.release),
+        arch: String(body.arch || DEFAULT_ARCH),
+        bridge: String(body.bridge || ''),
+        autostart: body.autostart === true,
+        description: String(body.description ?? ''),
+        webUiUrl: String(body.webUiUrl ?? ''),
+      };
+      if (!options.bridge) throw new HttpError(400, 'bridge is required');
+
+      const result = await lxc.createContainer(options, (progress) => send({ type: 'progress', ...progress }));
+      activity.log(`LXC container "${name}" created`, 'green').catch(() => {});
+      send({ type: 'done', result });
+    } catch (err) {
+      const message = err instanceof HttpError ? err.message : (err as Error).message;
+      send({ type: 'error', message });
+    } finally {
+      res.end();
+    }
+  });
+
+  return router;
+}
