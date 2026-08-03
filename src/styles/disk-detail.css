@@ -95,3 +95,49 @@
   font-size: 12px;
   line-height: 1.4;
 }
+
+.smart-section {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+.smart-section .detail-rows {
+  margin-top: var(--space-md);
+}
+
+.smart-selftest {
+  margin-top: var(--space-lg);
+}
+
+.smart-selftest__head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: var(--space-sm);
+}
+
+.smart-selftest .progress-track {
+  margin-bottom: var(--space-sm);
+}
+
+.smart-selftest__actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.smart-history {
+  margin-top: var(--space-lg);
+  font-size: 11px;
+}
+
+.smart-history__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: 6px 0;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+}

@@ -39,6 +39,10 @@ export const config = {
   smartUseSudo: envBool('SMART_USE_SUDO', false),
   smartTimeoutMs: Number(process.env.SMART_TIMEOUT_MS ?? 10_000),
   smartCacheTtlMs: Number(process.env.SMART_CACHE_TTL_MS ?? 60_000),
+  // Attribute/self-test reads are on-demand (a disk's detail panel open), not
+  // polled continuously like temperature — short TTL so self-test progress
+  // (see smart/service.ts) shows up promptly without hammering smartctl.
+  smartAttributesCacheTtlMs: Number(process.env.SMART_ATTRIBUTES_CACHE_TTL_MS ?? 4_000),
   sharesMode: (process.env.SHARES_MODE as SharesMode | undefined) ?? 'real',
   sharesConfigPath: process.env.SHARES_CONFIG_PATH ?? path.join(process.cwd(), 'data', 'shares.json'),
   shareMountRoot: process.env.SHARE_MOUNT_ROOT ?? '/mnt/user',

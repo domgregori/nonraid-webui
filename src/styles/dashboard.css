@@ -114,8 +114,26 @@
   font-family: var(--font-mono);
 }
 
-.disk-section-label {
+.disks-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.disk-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   margin-bottom: 10px;
+}
+
+.disk-section-label {
+  margin-bottom: 0;
+}
+
+.disk-section-link {
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .disk-row {

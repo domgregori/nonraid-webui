@@ -1,5 +1,5 @@
 import { config } from '../config.js';
-import type { SmartClient, SmartHealth } from './types.js';
+import type { SelfTestType, SmartAttributes, SmartClient, SmartHealth } from './types.js';
 
 interface CacheEntry<T> {
   value: T;
@@ -19,10 +19,16 @@ export class SmartService {
   private tempInFlight = new Map<string, Promise<void>>();
   private healthCache = new Map<string, CacheEntry<SmartHealth | null>>();
   private healthInFlight = new Map<string, Promise<void>>();
+  private attrCache = new Map<string, CacheEntry<SmartAttributes | null>>();
+  private attrInFlight = new Map<string, Promise<void>>();
 
   constructor(
     private client: SmartClient,
     private ttlMs: number = config.smartCacheTtlMs,
+    // Shorter than ttlMs: attributes are fetched only while a disk's detail
+    // panel is open (unlike temperature, not polled for every disk on every
+    // /api/status tick), and need to reflect self-test progress promptly.
+    private attrTtlMs: number = config.smartAttributesCacheTtlMs,
   ) {}
 
   get mode() {
@@ -30,27 +36,38 @@ export class SmartService {
   }
 
   async getTemperatures(devices: string[]): Promise<Record<string, number | null>> {
-    return this.getCached(devices, this.tempCache, this.tempInFlight, (d) => this.client.getTemperature(d));
+    return this.getCached(devices, this.tempCache, this.tempInFlight, (d) => this.client.getTemperature(d), null, this.ttlMs);
   }
 
   async getHealthStatuses(devices: string[]): Promise<Record<string, SmartHealth | null>> {
-    return this.getCached(devices, this.healthCache, this.healthInFlight, (d) => this.client.getHealth(d));
+    return this.getCached(devices, this.healthCache, this.healthInFlight, (d) => this.client.getHealth(d), null, this.ttlMs);
   }
 
-  /** Stale-while-revalidate fetch, shared by temperature and health reads — see SmartService's doc comment. */
+  async getAttributes(devices: string[]): Promise<Record<string, SmartAttributes | null>> {
+    return this.getCached(devices, this.attrCache, this.attrInFlight, (d) => this.client.getAttributes(d), null, this.attrTtlMs);
+  }
+
+  async startSelfTest(device: string, type: SelfTestType): Promise<void> {
+    await this.client.startSelfTest(device, type);
+    // Drop the cached attributes so the next poll picks up 'running' immediately, instead of a stale 'idle' for up to attrTtlMs.
+    this.attrCache.delete(device);
+  }
+
+  /** Stale-while-revalidate fetch, shared by temperature/health/attribute reads — see SmartService's doc comment. */
   private async getCached<T>(
     devices: string[],
     cache: Map<string, CacheEntry<T>>,
     inFlight: Map<string, Promise<void>>,
     fetch: (device: string) => Promise<T>,
-    fallback: T = null as T,
+    fallback: T,
+    ttlMs: number,
   ): Promise<Record<string, T>> {
     const now = Date.now();
     const toAwait: Promise<void>[] = [];
 
     for (const device of devices) {
       const entry = cache.get(device);
-      const stale = !entry || now - entry.updatedAt > this.ttlMs;
+      const stale = !entry || now - entry.updatedAt > ttlMs;
       if (!stale) continue;
 
       const pending = inFlight.get(device);

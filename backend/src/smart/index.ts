@@ -9,4 +9,4 @@ export function createSmartClient(): SmartClient {
 }
 
 export { SmartService } from './service.js';
-export type { SmartClient, SmartHealth } from './types.js';
+export type { SelfTestType, SmartAttributes, SmartClient, SmartHealth } from './types.js';

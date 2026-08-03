@@ -19,7 +19,7 @@ export function DashboardPage() {
           <>
             <StatCards />
             <ParityCheckCard />
-            <ArrayDisks />
+            <ArrayDisks showManageLink />
           </>
         )}
       </div>

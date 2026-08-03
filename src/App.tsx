@@ -3,6 +3,7 @@ import { AppShell } from './components/layout/AppShell';
 import { AppsPage } from './pages/AppsPage';
 import { BrowsePage } from './pages/BrowsePage';
 import { DashboardPage } from './pages/DashboardPage';
+import { DisksPage } from './pages/DisksPage';
 import { DockerPage } from './pages/DockerPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { LxcPage } from './pages/LxcPage';
@@ -16,6 +17,7 @@ function App() {
     <AppShell>
       <Routes>
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/disks" element={<DisksPage />} />
         <Route path="/shares" element={<SharesPage />} />
         <Route path="/browse" element={<BrowsePage />} />
         <Route path="/users" element={<UsersPage />} />
