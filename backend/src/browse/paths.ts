@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { realpath } from 'node:fs/promises';
+import { realpath, stat } from 'node:fs/promises';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 
@@ -41,6 +41,19 @@ async function browseRoot(): Promise<string> {
 export interface ResolvedPath {
   root: string;
   absPath: string;
+}
+
+/**
+ * A directory whose device id differs from its parent's is a mount point —
+ * a share's own root (bind-mounted or mergerfs-pooled, see
+ * shares/applier/realApplier.ts) or an array disk's own filesystem
+ * (/mnt/disk1, etc). The OS refuses to rmdir/rename over an active mount
+ * (EBUSY), so operations that would do that should say so clearly up front
+ * instead of surfacing that raw error.
+ */
+export async function isMountPoint(absPath: string): Promise<boolean> {
+  const [here, parent] = await Promise.all([stat(absPath), stat(path.dirname(absPath))]);
+  return here.dev !== parent.dev;
 }
 
 /**

@@ -1,12 +1,15 @@
 import { copyFile, mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { HttpError } from '../httpError.js';
-import { resolveExisting, resolveForCreate } from './paths.js';
+import type { ShareService } from '../shares/index.js';
+import { isMountPoint, resolveExisting, resolveForCreate } from './paths.js';
 import type { BrowseCommandResult, BrowseEntry, BrowseListing } from './types.js';
 
 /** Browses the whole /mnt tree (config.browseRoot), not a single share — see
  * paths.ts for the traversal-ceiling enforcement every method here relies on. */
 export class BrowseService {
+  constructor(private shares: ShareService) {}
+
   async list(requestPath: string): Promise<BrowseListing> {
     const { root, absPath } = await resolveExisting(requestPath);
     const st = await stat(absPath);
@@ -52,6 +55,9 @@ export class BrowseService {
   async rename(requestPath: string, newName: string): Promise<BrowseCommandResult> {
     const { root, absPath } = await resolveExisting(requestPath);
     if (absPath === root) throw new HttpError(400, 'Cannot rename the browse root.');
+    if (await isMountPoint(absPath)) {
+      throw new HttpError(400, `"${path.basename(absPath)}" is a mount point (a share, or an array disk) — rename it from the Sharing page instead.`);
+    }
 
     const parentPath = path.dirname(absPath);
     const { absPath: destAbs } = await resolveForCreate(parentPath, newName);
@@ -67,6 +73,9 @@ export class BrowseService {
   async move(requestPath: string, destParentPath: string): Promise<BrowseCommandResult> {
     const { root, absPath } = await resolveExisting(requestPath);
     if (absPath === root) throw new HttpError(400, 'Cannot move the browse root.');
+    if (await isMountPoint(absPath)) {
+      throw new HttpError(400, `"${path.basename(absPath)}" is a mount point (a share, or an array disk) — it can't be moved.`);
+    }
 
     const name = path.basename(absPath);
     const { absPath: destAbs } = await resolveForCreate(destParentPath, name);
@@ -84,6 +93,18 @@ export class BrowseService {
   async remove(requestPath: string): Promise<BrowseCommandResult> {
     const { root, absPath } = await resolveExisting(requestPath);
     if (absPath === root) throw new HttpError(400, 'Cannot delete the browse root.');
+
+    // A share's own mount point can't be rmdir'd directly (EBUSY — it's
+    // active). If that's what this is, delete the share properly instead:
+    // unmount it and wipe its real data from every backing disk.
+    const removedShare = await this.shares.removeMountPointWithData(absPath);
+    if (removedShare) {
+      return { ok: true, message: `Deleted share "${removedShare}" and its data` };
+    }
+
+    if (await isMountPoint(absPath)) {
+      throw new HttpError(400, `"${path.basename(absPath)}" is a mount point (e.g. an array disk) — it can't be deleted from here.`);
+    }
     await rm(absPath, { recursive: true });
     return { ok: true, message: `Deleted "${path.basename(absPath)}"` };
   }

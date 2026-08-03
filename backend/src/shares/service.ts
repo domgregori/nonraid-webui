@@ -1,4 +1,7 @@
+import { rm } from 'node:fs/promises';
+import path from 'node:path';
 import type { ActivityStore } from '../activity/index.js';
+import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { ShareAccessStore } from './aclStore.js';
@@ -49,6 +52,47 @@ export class ShareService {
         console.error(`Failed to remount share "${share.name}" at startup:`, (err as Error).message);
       }
     }
+  }
+
+  /**
+   * If `mountPath` is exactly a configured share's own mount point
+   * (config.shareMountRoot + "/" + name), permanently deletes that share:
+   * unmounts it, removes the real underlying data from every disk backing
+   * it (not just the merged view — the OS refuses to rmdir a mount point
+   * while it's active, EBUSY, so Browse can't just delete it like a normal
+   * directory), and drops it from the share list so a later remountAll()
+   * doesn't bring the empty mount point back. Returns the removed share's
+   * name, or null if `mountPath` isn't a share's mount point (nothing to
+   * do here — the caller should fall back to a normal filesystem delete).
+   *
+   * This is irreversible — unlike `remove()` (used by the Shares page),
+   * which only forgets the share config and leaves real files intact, this
+   * also wipes the data itself. Used by Browse's delete, where "delete this
+   * folder" means exactly that, mount point or not.
+   */
+  async removeMountPointWithData(mountPath: string): Promise<string | null> {
+    if (path.dirname(mountPath) !== config.shareMountRoot) return null;
+    const name = path.basename(mountPath);
+    const share = await this.store.get(name);
+    if (!share) return null;
+
+    const ctx = await this.buildContext();
+    await this.applier.unmountShare(name);
+    for (const slot of share.disks) {
+      const mp = ctx.diskMountpoints[slot];
+      if (!mp) continue; // disk offline — nothing reachable to delete on it
+      await rm(`${mp}/${name}`, { recursive: true, force: true });
+    }
+    // Now just a plain empty directory (unmounted), so this won't hit the
+    // EBUSY that stopped a direct delete in the first place. Best-effort:
+    // the share is already fully gone by this point either way.
+    await rm(mountPath, { recursive: true, force: true }).catch(() => {});
+
+    await this.store.remove(name);
+    await this.aclStore.removeShare(name);
+    await this.resyncExports();
+    this.activity.log(`Share "${name}" deleted, including its data`, 'red').catch(() => {});
+    return name;
   }
 
   async list(): Promise<ShareWithStats[]> {

@@ -38,7 +38,7 @@ async function main() {
   const shareStore = new ShareStore();
   const shareAccessStore = new ShareAccessStore();
   const shares = new ShareService(shareStore, shareApplier, nmd, shareAccessStore, activity);
-  const browse = new BrowseService();
+  const browse = new BrowseService(shares);
   const system = new SystemStatsService();
   const usersClient = createUsersClient();
   const users = new UsersService(usersClient, shareAccessStore, shareStore, shares, activity);
