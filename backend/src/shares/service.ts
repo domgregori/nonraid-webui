@@ -31,6 +31,26 @@ export class ShareService {
     return { diskMountpoints, diskSizesGb };
   }
 
+  /**
+   * Re-mounts every configured share. Mount state lives in the OS (mount
+   * table), not in shares.json, so it doesn't survive a backend restart or
+   * host reboot on its own — call this once at startup so /mnt/user/<name>
+   * reflects real disk data again instead of staying an empty leftover
+   * directory from before the restart. Best-effort per share: one share
+   * with an offline disk shouldn't block the others (or startup) from
+   * mounting.
+   */
+  async remountAll(): Promise<void> {
+    const [shares, ctx] = await Promise.all([this.store.list(), this.buildContext()]);
+    for (const share of shares) {
+      try {
+        await this.applier.mountShare(share, ctx);
+      } catch (err) {
+        console.error(`Failed to remount share "${share.name}" at startup:`, (err as Error).message);
+      }
+    }
+  }
+
   async list(): Promise<ShareWithStats[]> {
     const [shares, ctx] = await Promise.all([this.store.list(), this.buildContext()]);
     return Promise.all(shares.map(async (s) => ({ ...s, stats: await this.applier.getStats(s, ctx) })));

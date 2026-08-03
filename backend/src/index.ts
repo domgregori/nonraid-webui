@@ -57,6 +57,13 @@ async function main() {
     await nmd.setWriteMethod(true).catch(() => {});
   }
 
+  // Share mounts live in the OS mount table, not shares.json, so they don't
+  // survive a backend restart/reboot on their own — reapply them now so
+  // /mnt/user/<name> reflects real disk data again instead of staying an
+  // empty leftover directory. Best-effort (see ShareService.remountAll):
+  // never block startup on one share's mount failing.
+  await shares.remountAll();
+
   const app = express();
   app.use(cors({ origin: config.corsOrigin }));
   app.use(express.json());
