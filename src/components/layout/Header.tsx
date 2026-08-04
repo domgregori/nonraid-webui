@@ -10,7 +10,7 @@ export function Header() {
   return (
     <div className="header">
       <div className="header__brand">
-        <div className="header__logo">N</div>
+        <img src="/logo.png" alt="" className="header__logo" />
         <div className="header__title">nonraid</div>
       </div>
 
