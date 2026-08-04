@@ -88,7 +88,7 @@ export const config = {
     .map((p) => p.trim())
     .filter(Boolean),
   // App-level settings with no home elsewhere (turbo write's *desired* state,
-  // notification config, the History page's Grafana URL) — see backend/src/settings/.
+  // notification config) — see backend/src/settings/.
   settingsConfigPath: process.env.SETTINGS_CONFIG_PATH ?? path.join(process.cwd(), 'data', 'settings.json'),
   appriseBin: process.env.APPRISE_BIN ?? 'apprise',
   // Dashboard activity feed — see backend/src/activity/.
@@ -118,4 +118,10 @@ export const config = {
   // Poll-and-cache interval for the CPU/memory/IP stats worker — see
   // lxc/statsPoller.ts, same shape as SystemStatsService.
   lxcStatsIntervalMs: Number(process.env.LXC_STATS_INTERVAL_MS ?? 3_000),
+  // First-party history (History page) — see backend/src/metrics/. Independent
+  // of the live-UI poll intervals above: those are for "what's happening right
+  // now", this is "what happened over time", sampled far less often on purpose.
+  metricsDbPath: process.env.METRICS_DB_PATH ?? path.join(process.cwd(), 'data', 'metrics.db'),
+  metricsSampleIntervalMs: Number(process.env.METRICS_SAMPLE_INTERVAL_MS ?? 60_000),
+  metricsRetentionDays: Number(process.env.METRICS_RETENTION_DAYS ?? 30),
 };

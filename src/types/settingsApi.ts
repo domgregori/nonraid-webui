@@ -8,14 +8,12 @@ export interface NotificationSettings {
 export interface AppSettings {
   turboWrite: boolean;
   notifications: NotificationSettings;
-  grafanaUrl: string;
   minFreeSpaceMb: number;
 }
 
 export type AppSettingsUpdate = Partial<{
   turboWrite: boolean;
   notifications: Partial<NotificationSettings>;
-  grafanaUrl: string;
   minFreeSpaceMb: number;
 }>;
 

@@ -6,7 +6,6 @@ import type { AppSettings, AppSettingsUpdate } from './types.js';
 const DEFAULTS: AppSettings = {
   turboWrite: false,
   notifications: { enabled: false, appriseUrls: '' },
-  grafanaUrl: '',
   minFreeSpaceMb: 100,
 };
 

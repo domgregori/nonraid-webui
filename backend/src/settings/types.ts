@@ -13,9 +13,6 @@ export interface AppSettings {
   // this has to be persisted here rather than read back from the driver.
   turboWrite: boolean;
   notifications: NotificationSettings;
-  // History page's Grafana embed URL — persisted here instead of session-only
-  // frontend state so it survives a reload / works from another device.
-  grafanaUrl: string;
   // mergerfs's `minfreespace`, in MB, applied to every pooled share mount
   // (see shares/applier/realApplier.ts). mergerfs excludes any branch below
   // this threshold from create-policy consideration — its own default is
@@ -27,6 +24,5 @@ export interface AppSettings {
 export type AppSettingsUpdate = Partial<{
   turboWrite: boolean;
   notifications: Partial<NotificationSettings>;
-  grafanaUrl: string;
   minFreeSpaceMb: number;
 }>;

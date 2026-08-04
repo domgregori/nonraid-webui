@@ -19,6 +19,7 @@
   align-items: center;
 }
 
+/* Shared styled text input — also used outside the History page (ContainerFormDialog, Docker logs toolbar). */
 .history-input {
   width: 280px;
   max-width: 60vw;
@@ -31,65 +32,112 @@
   font-family: var(--font-mono);
 }
 
-.history-iframe-wrap {
-  background: var(--color-surface);
+.history-range-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-btn);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  overflow: hidden;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-.history-iframe-wrap iframe {
-  width: 100%;
-  height: 70vh;
-  border: none;
-  display: block;
-  background: var(--color-bg);
+.history-range-btn--active {
+  border-color: var(--color-blue);
+  color: var(--color-blue);
 }
 
-.history-grid {
+.metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: var(--space-lg);
 }
 
-.history-panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  overflow: hidden;
+.metric-card--wide {
+  grid-column: 1 / -1;
 }
 
-.history-panel__preview {
-  height: 150px;
-  background-image: repeating-linear-gradient(
-    135deg,
-    var(--color-surface-elevated),
-    var(--color-surface-elevated) 10px,
-    var(--color-surface) 10px,
-    var(--color-surface) 20px
-  );
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.ts-chart {
+  position: relative;
+  margin-top: var(--space-sm);
 }
 
-.history-panel__badge {
+.ts-chart__svg {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.ts-chart__gridline {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+.ts-chart__axis-label {
+  fill: var(--color-text-dim);
   font-size: 11px;
   font-family: var(--font-mono);
-  color: var(--color-text-secondary);
-  background: color-mix(in oklch, var(--color-bg) 60%, transparent);
-  padding: 4px 10px;
-  border-radius: 6px;
 }
 
-.history-panel__desc {
-  padding: var(--space-md) 14px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
+.ts-chart__crosshair {
+  stroke: var(--color-border-lit);
+  stroke-width: 1;
+  pointer-events: none;
 }
 
-.history-hint {
-  margin-top: var(--space-lg);
+.ts-chart__tooltip {
+  position: absolute;
+  top: 4px;
+  transform: translateX(-50%);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 6px 10px;
   font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ts-chart__tooltip-time {
   color: var(--color-text-dim);
+  font-family: var(--font-mono);
+  margin-bottom: 4px;
+}
+
+.ts-chart__tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+}
+
+.ts-chart__tooltip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.ts-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+}
+
+.ts-chart__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.ts-chart__legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
 }

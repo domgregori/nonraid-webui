@@ -14,10 +14,9 @@ export interface UseSettings {
 }
 
 /**
- * Single source of truth for persisted app settings — used by SettingsPage,
- * the dashboard's SettingsQuickCard, and HistoryPage (for the Grafana URL),
- * so all three stay in sync with the backend rather than each keeping their
- * own local copy.
+ * Single source of truth for persisted app settings — used by SettingsPage
+ * and the dashboard's SettingsQuickCard, so both stay in sync with the
+ * backend rather than each keeping their own local copy.
  */
 export function useSettings(): UseSettings {
   const [settings, setSettings] = useState<AppSettings | null>(null);

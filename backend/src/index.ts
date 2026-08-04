@@ -6,6 +6,7 @@ import { BrowseService } from './browse/service.js';
 import { config } from './config.js';
 import { createDockerClient } from './docker/index.js';
 import { createLxcClient } from './lxc/index.js';
+import { MetricsSampler, MetricsService, openMetricsDb } from './metrics/index.js';
 import { createNmdClient } from './nmd/index.js';
 import { activityRouter } from './routes/activity.js';
 import { appsRouter } from './routes/apps.js';
@@ -14,6 +15,7 @@ import { browseRouter } from './routes/browse.js';
 import { disksRouter } from './routes/disks.js';
 import { dockerRouter } from './routes/docker.js';
 import { lxcRouter } from './routes/lxc.js';
+import { metricsRouter } from './routes/metrics.js';
 import { parityRouter } from './routes/parity.js';
 import { settingsRouter } from './routes/settings.js';
 import { sharesRouter } from './routes/shares.js';
@@ -46,6 +48,9 @@ async function main() {
   const caFeedStore = new CaFeedStore();
   await caFeedStore.start();
   const apps = new AppsService(caFeedStore, docker, activity);
+
+  const metrics = new MetricsService(openMetricsDb());
+  new MetricsSampler(metrics, system, nmd, smart).start();
 
   // The driver has no readback for write method (see nmd/client.ts), so on a
   // fresh backend start (independent of whether the array/driver itself was
@@ -81,12 +86,13 @@ async function main() {
   });
 
   app.use('/api', statusRouter(nmd));
-  app.use('/api', arrayRouter(nmd, settingsStore, activity));
+  app.use('/api', arrayRouter(nmd, settingsStore, activity, shares));
   app.use('/api', parityRouter(nmd, activity));
   app.use('/api', settingsRouter(settingsStore, nmd, activity, shares));
   app.use('/api', disksRouter(nmd, smart, activity));
   app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity));
   app.use('/api', lxcRouter(lxc, activity));
+  app.use('/api', metricsRouter(metrics));
   app.use('/api', smartRouter(nmd, smart));
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
