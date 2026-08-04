@@ -154,6 +154,7 @@ export class RealDockerClient implements DockerClient {
           portMappings: toPortMappings(c.Ports),
           labels: c.Labels ?? {},
           webUiUrl: null,
+          icon: c.Labels?.['net.unraid.docker.icon'] ?? null,
         };
       }),
     );

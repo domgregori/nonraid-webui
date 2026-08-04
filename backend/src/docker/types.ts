@@ -23,6 +23,11 @@ export interface DockerContainerSummary {
   // portMappings against its CA app's WebUI field, when it has one. Always
   // null coming out of a DockerClient implementation directly.
   webUiUrl: string | null;
+  // Read straight off the container's `net.unraid.docker.icon` label — the
+  // de facto convention CA templates (and many upstream images) use, so this
+  // works for any container carrying it, not just ones installed through
+  // this app's own Apps feature.
+  icon: string | null;
 }
 
 export interface DockerCommandResult {

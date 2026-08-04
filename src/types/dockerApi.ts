@@ -18,6 +18,7 @@ export interface DockerContainerSummary {
   // [IP] is left unresolved for us to fill in — see resolveContainerWebUi.
   // Null for custom containers, or CA ones with no WebUI/unresolvable app.
   webUiUrl: string | null;
+  icon: string | null;
 }
 
 export interface DockerCommandResult {

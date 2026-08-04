@@ -190,7 +190,14 @@ export class AppsService {
         ports: plan.ports.map((p) => ({ containerPort: p.containerPort, protocol: p.protocol, hostPort: p.hostPort })),
         binds: plan.binds.map((b) => `${b.hostPath}:${b.containerPath}${b.readOnly ? ':ro' : ''}`),
         devices: plan.devices.map((d) => ({ hostPath: d.hostPath, containerPath: d.containerPath })),
-        labels: { [APP_NAME_LABEL]: app.Name, [APP_REPOSITORY_LABEL]: app.Repository },
+        labels: {
+          [APP_NAME_LABEL]: app.Name,
+          [APP_REPOSITORY_LABEL]: app.Repository,
+          // Same label convention real Unraid's dashboard reads directly off any
+          // container — stamping it here means our own catalog installs show a
+          // real icon on the dashboard without needing a runtime catalog lookup.
+          ...(app.Icon ? { 'net.unraid.docker.icon': app.Icon } : {}),
+        },
       },
       onProgress,
     );

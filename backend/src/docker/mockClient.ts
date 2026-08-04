@@ -80,6 +80,7 @@ export class MockDockerClient implements DockerClient {
         portMappings: running ? (container.detail?.ports ?? []) : [],
         labels: container.labels,
         webUiUrl: null,
+        icon: container.labels['net.unraid.docker.icon'] ?? null,
       };
     });
   }
