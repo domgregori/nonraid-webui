@@ -122,3 +122,30 @@ export interface NmdCommandResult {
   ok: boolean;
   message: string;
 }
+
+/**
+ * A slot `nmdctl import` (always run with -u, see realClient.ts) skipped
+ * because the physical partition's size doesn't match the superblock's
+ * recorded size for that slot — see the nonraid project's own migration
+ * docs: "do not continue the import" when this happens. In unattended mode
+ * the driver never guesses which size is right; it just leaves the slot
+ * unimported, which nmdctl's own start_array() then refuses to start with
+ * (missing-disk check) — so this is surfaced for diagnosis, not as a gate
+ * this app has to enforce itself.
+ */
+export interface ImportSizeMismatch {
+  slot: number;
+  partitionSizeKb: number | null;
+  expectedSizeKb: number | null;
+}
+
+export interface ImportResult {
+  importedCount: number;
+  sizeMismatches: ImportSizeMismatch[];
+  // Any other "Error: ..." line from the command's output (e.g. a disk with
+  // no matching physical device found) — surfaced verbatim, not re-worded.
+  errors: string[];
+  // Full raw command output (--no-color) — always shown alongside the parsed
+  // summary above so nothing is hidden behind this app's interpretation of it.
+  output: string;
+}

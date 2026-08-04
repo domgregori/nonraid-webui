@@ -107,3 +107,16 @@ export interface NmdCommandResult {
   ok: boolean;
   message: string;
 }
+
+export interface ImportSizeMismatch {
+  slot: number;
+  partitionSizeKb: number | null;
+  expectedSizeKb: number | null;
+}
+
+export interface ImportResult {
+  importedCount: number;
+  sizeMismatches: ImportSizeMismatch[];
+  errors: string[];
+  output: string;
+}

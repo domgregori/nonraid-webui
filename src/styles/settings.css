@@ -62,3 +62,54 @@
   line-height: 1.5;
   box-sizing: border-box;
 }
+
+.import-result {
+  margin-top: var(--space-md);
+}
+
+.import-warning {
+  border-radius: var(--radius-btn);
+  border: 1px solid;
+  padding: 12px 14px;
+  margin-bottom: var(--space-sm);
+  font-size: 12px;
+}
+
+.import-warning--danger {
+  border-color: var(--color-red);
+  background: color-mix(in oklch, var(--color-red) 12%, transparent);
+}
+
+.import-warning--amber {
+  border-color: var(--color-amber);
+  background: color-mix(in oklch, var(--color-amber) 12%, transparent);
+}
+
+.import-warning__title {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.import-warning__desc {
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.import-warning__row {
+  font-family: var(--font-mono);
+  padding: 2px 0;
+}
+
+.import-raw-output {
+  margin-top: var(--space-sm);
+  padding: 10px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+  max-height: 300px;
+  overflow-y: auto;
+}

@@ -1,6 +1,6 @@
 import type { NmdClient } from './client.js';
 import { buildMockDisk, getMockDiskSeeds } from './mockData.js';
-import type { NmdCommandResult, NmdResyncStatus, NmdStatusResponse, ParityCheckAction } from './types.js';
+import type { ImportResult, NmdCommandResult, NmdResyncStatus, NmdStatusResponse, ParityCheckAction } from './types.js';
 
 interface MockState {
   arrayStarted: boolean;
@@ -160,6 +160,14 @@ export class MockNmdClient implements NmdClient {
     return { ok: true, message: 'Array stopped' };
   }
 
+  async unmountDisks(): Promise<NmdCommandResult> {
+    return { ok: true, message: 'Disks unmounted (mock)' };
+  }
+
+  async mountDisks(): Promise<NmdCommandResult> {
+    return { ok: true, message: 'Disks mounted (mock)' };
+  }
+
   async parityCheck(action: ParityCheckAction): Promise<NmdCommandResult> {
     if (!this.state.arrayStarted) {
       throw new Error('Array must be started before running a parity check.');
@@ -211,6 +219,19 @@ export class MockNmdClient implements NmdClient {
     }
     this.state.label = label;
     return { ok: true, message: `Array label set to "${label}"` };
+  }
+
+  async importDisks(): Promise<ImportResult> {
+    if (this.state.arrayStarted) {
+      throw new Error('Array must be stopped before importing.');
+    }
+    const count = getMockDiskSeeds().all.length;
+    return {
+      importedCount: count,
+      sizeMismatches: [],
+      errors: [],
+      output: `Scanning array configuration...\n\nImporting ${count} disks...\n\nSuccessfully imported ${count} disk(s) (mock)\n`,
+    };
   }
 
   async unassignDisk(slot: number): Promise<NmdCommandResult> {

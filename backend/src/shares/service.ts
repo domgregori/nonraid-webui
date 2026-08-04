@@ -57,6 +57,31 @@ export class ShareService {
   }
 
   /**
+   * Unmounts every configured share. Needed before the array can stop:
+   * nmdctl (always run with -u here) refuses outright to stop with any disk
+   * filesystem still mounted, and a share's mergerfs/bind mount holds a live
+   * reference into those disk mounts even after nmdctl tries to unmount them
+   * itself — nmdctl has no idea this app's share layer exists. Unlike
+   * remountAll(), NOT best-effort: if a share is genuinely busy (a file
+   * still open), the caller needs to know rather than silently proceeding
+   * into a stop that would just fail anyway with a less useful error.
+   */
+  async unmountAll(): Promise<void> {
+    const shares = await this.store.list();
+    const failures: string[] = [];
+    for (const share of shares) {
+      try {
+        await this.applier.unmountShare(share.name);
+      } catch (err) {
+        failures.push(`${share.name}: ${(err as Error).message}`);
+      }
+    }
+    if (failures.length > 0) {
+      throw new Error(`Failed to unmount share(s): ${failures.join('; ')}`);
+    }
+  }
+
+  /**
    * If `mountPath` is exactly a configured share's own mount point
    * (config.shareMountRoot + "/" + name), permanently deletes that share:
    * unmounts it, removes the real underlying data from every disk backing
