@@ -71,7 +71,17 @@ export class RealLxcClient implements LxcClient {
   private async run(bin: string, args: string[], timeoutMs = config.lxcTimeoutMs): Promise<{ stdout: string; stderr: string }> {
     const cmd = config.lxcUseSudo ? 'sudo' : bin;
     const fullArgs = config.lxcUseSudo ? [bin, ...args] : args;
-    return execFileAsync(cmd, fullArgs, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 });
+    try {
+      return await execFileAsync(cmd, fullArgs, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 });
+    } catch (err) {
+      // Node's raw spawn failure (e.g. "spawn lxc-ls ENOENT") is accurate but
+      // not exactly self-explanatory on a dashboard — the actual missing
+      // piece is the lxc-utils package, not literally the word "spawn".
+      if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        throw new Error(`'${bin}' not found — lxc-utils isn't installed on this host.`);
+      }
+      throw err;
+    }
   }
 
   /** Unlike `lxc-info`, this build's `lxc-ls` has no `-H`/`--no-humanize` — its

@@ -114,11 +114,34 @@ function toPortMappings(ports: Docker.Port[]): ContainerPortMapping[] {
     .map((p) => ({ containerPort: p.PrivatePort, hostPort: p.PublicPort, protocol: p.Type === 'udp' ? 'udp' : 'tcp' }) as ContainerPortMapping);
 }
 
+/** dockerode's own error for a missing/unreachable daemon is just the raw Node
+ *  socket-connect failure (e.g. "connect ENOENT /var/run/docker.sock") — accurate
+ *  but not exactly self-explanatory to someone reading it on a dashboard. */
+function isDockerUnreachable(err: unknown): boolean {
+  const code = (err as NodeJS.ErrnoException | undefined)?.code;
+  return code === 'ENOENT' || code === 'ECONNREFUSED' || code === 'EACCES';
+}
+
 export class RealDockerClient implements DockerClient {
   readonly mode = 'real' as const;
   private docker = new Docker();
 
+  private async guard<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (err) {
+      if (isDockerUnreachable(err)) {
+        throw new Error('Could not reach the Docker daemon (checked /var/run/docker.sock) — is Docker installed and running on this host?');
+      }
+      throw err;
+    }
+  }
+
   async listContainers(): Promise<DockerContainerSummary[]> {
+    return this.guard(() => this.listContainersInner());
+  }
+
+  private async listContainersInner(): Promise<DockerContainerSummary[]> {
     const containers = await this.docker.listContainers({ all: true });
 
     return Promise.all(
@@ -161,6 +184,10 @@ export class RealDockerClient implements DockerClient {
   }
 
   async inspectContainer(id: string): Promise<ContainerDetail> {
+    return this.guard(() => this.inspectContainerInner(id));
+  }
+
+  private async inspectContainerInner(id: string): Promise<ContainerDetail> {
     const info = await this.docker.getContainer(id).inspect();
     const env = (info.Config.Env ?? []).map((entry) => {
       const eq = entry.indexOf('=');
@@ -187,30 +214,40 @@ export class RealDockerClient implements DockerClient {
   }
 
   async startContainer(id: string): Promise<DockerCommandResult> {
-    await this.docker.getContainer(id).start();
-    return { ok: true, message: 'Container started' };
+    return this.guard(async () => {
+      await this.docker.getContainer(id).start();
+      return { ok: true, message: 'Container started' };
+    });
   }
 
   async stopContainer(id: string): Promise<DockerCommandResult> {
-    await this.docker.getContainer(id).stop();
-    return { ok: true, message: 'Container stopped' };
+    return this.guard(async () => {
+      await this.docker.getContainer(id).stop();
+      return { ok: true, message: 'Container stopped' };
+    });
   }
 
   async restartContainer(id: string): Promise<DockerCommandResult> {
-    await this.docker.getContainer(id).restart();
-    return { ok: true, message: 'Container restarted' };
+    return this.guard(async () => {
+      await this.docker.getContainer(id).restart();
+      return { ok: true, message: 'Container restarted' };
+    });
   }
 
   async removeContainer(id: string, options?: { force?: boolean }): Promise<DockerCommandResult> {
-    await this.docker.getContainer(id).remove({ force: options?.force ?? false });
-    return { ok: true, message: 'Container removed' };
+    return this.guard(async () => {
+      await this.docker.getContainer(id).remove({ force: options?.force ?? false });
+      return { ok: true, message: 'Container removed' };
+    });
   }
 
   async getContainerLogs(id: string, tail = 500): Promise<string> {
-    const container = this.docker.getContainer(id);
-    const info = await container.inspect();
-    const buffer = (await container.logs({ stdout: true, stderr: true, tail, timestamps: true, follow: false })) as unknown as Buffer;
-    return info.Config.Tty ? buffer.toString('utf8') : demuxLogBuffer(buffer);
+    return this.guard(async () => {
+      const container = this.docker.getContainer(id);
+      const info = await container.inspect();
+      const buffer = (await container.logs({ stdout: true, stderr: true, tail, timestamps: true, follow: false })) as unknown as Buffer;
+      return info.Config.Tty ? buffer.toString('utf8') : demuxLogBuffer(buffer);
+    });
   }
 
   /** dockerode's createContainer, unlike the `docker` CLI, does not pull a missing
@@ -268,6 +305,10 @@ export class RealDockerClient implements DockerClient {
   }
 
   async createContainer(options: CreateContainerOptions, onProgress?: CreateContainerProgressCallback): Promise<DockerCommandResult> {
+    return this.guard(() => this.createContainerInner(options, onProgress));
+  }
+
+  private async createContainerInner(options: CreateContainerOptions, onProgress?: CreateContainerProgressCallback): Promise<DockerCommandResult> {
     await this.ensureImagePulled(options.image, onProgress);
     onProgress?.({ phase: 'creating', message: 'Creating container', percent: null });
 
