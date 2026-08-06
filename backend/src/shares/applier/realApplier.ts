@@ -184,15 +184,26 @@ export class RealShareApplier implements ShareApplier {
       const validUsers = [...writeUsers, ...readOnlyUsers];
       // Non-public shares require real accounts, so only they get `valid users` — for
       // public shares that would fight with `guest ok` and defeat the point of "public".
-      if (!isPublic && validUsers.length > 0) lines.push(`   valid users = ${validUsers.join(', ')}`);
+      //
+      // A private share with zero grants yet must mean "nobody has access", not Samba's
+      // actual default of "any account that can authenticate at all" — but `invalid users`
+      // has no wildcard-all token (`*` there only ever matches a literal username "*", which
+      // no real account has, so it silently denies nobody — confirmed live: both test
+      // accounts could still connect and list a share configured with `invalid users = *`).
+      // `valid users` has no such gap: an unmatchable placeholder means the allow-list is
+      // non-empty but nothing real is ever in it, so every real account is denied. Uppercase
+      // so this app's own username rules (lowercase-only) can never let a real account
+      // collide with it.
+      if (!isPublic && validUsers.length === 0) {
+        lines.push(`   valid users = NONRAID-DENY-ALL-PLACEHOLDER`);
+      } else if (!isPublic && validUsers.length > 0) {
+        lines.push(`   valid users = ${validUsers.join(', ')}`);
+      }
       if (readOnlyUsers.length > 0) lines.push(`   read list = ${readOnlyUsers.join(', ')}`);
 
       // `invalid users` denies a named account/group regardless of guest ok, so this still
-      // works to carve exceptions out of an otherwise-public share. On a private share with
-      // no explicit grants yet, deny everyone via the `*` wildcard instead of falling back
-      // to Samba's actual default (any account that can authenticate at all) — a private
-      // share with zero grants must mean "nobody has access", not "wide open".
-      const invalidUsers = !isPublic && validUsers.length === 0 ? ['*'] : [...deniedUsers, ...hiddenUsers];
+      // works to carve exceptions out of an otherwise-public share.
+      const invalidUsers = [...deniedUsers, ...hiddenUsers];
       if (invalidUsers.length > 0) lines.push(`   invalid users = ${invalidUsers.join(', ')}`);
       // Samba has no native "denied but still browseable" vs "denied and invisible"
       // distinction *per user* — access based share enum is share-wide only. So
