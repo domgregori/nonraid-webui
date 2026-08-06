@@ -1,10 +1,14 @@
 import { useState } from 'react';
+import { nmdApi } from '../../api/nmdApi';
 import { useDiskSmart } from '../../hooks/useDiskSmart';
 import { deriveDisks } from '../../selectors/disks';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { COLORS } from '../../styles/colors';
 import { formatBytesHuman } from '../../utils/format';
 import { ProgressBar } from '../shared/ProgressBar';
+import { EmptyDiskDialog } from './EmptyDiskDialog';
+import { ReplaceDiskDialog } from './ReplaceDiskDialog';
+import { ShrinkArrayDialog } from './ShrinkArrayDialog';
 import type { SelfTestType } from '../../types/smart';
 
 const SELF_TEST_LABELS: Record<SelfTestType, string> = { short: 'Short Test', long: 'Long Test', conveyance: 'Conveyance Test' };
@@ -16,15 +20,43 @@ function boolLabel(v: boolean | null): string {
 }
 
 export function DiskDetailPanel() {
-  const { status, temps, selectedDiskId, actionNote, unassignPending, closeDetail, unassignDisk, replaceDisk } = useArrayStatus();
+  const { status, temps, selectedDiskId, actionNote, unassignPending, restorePending, closeDetail, unassignDisk, restoreDisk } =
+    useArrayStatus();
   const { all } = status ? deriveDisks(status, temps) : { all: [] };
   const disk = selectedDiskId ? all.find((d) => d.id === selectedDiskId) : undefined;
 
   const smartSlot = disk && disk.device && disk.device !== 'none' ? disk.slot : null;
   const { attributes, status: smartStatus, error: smartError, testPending, startSelfTest } = useDiskSmart(smartSlot);
   const [smartTab, setSmartTab] = useState<SmartTab>('overview');
+  const [formatPending, setFormatPending] = useState(false);
+  const [formatError, setFormatError] = useState<string | null>(null);
+  const [showReplaceDialog, setShowReplaceDialog] = useState(false);
+  const [showEmptyDialog, setShowEmptyDialog] = useState(false);
+  const [showShrinkDialog, setShowShrinkDialog] = useState(false);
 
   if (!selectedDiskId || !status || !disk) return null;
+
+  const needsFormat = disk.role === 'data' && disk.fsType === 'UNKNOWN';
+  const arrayStarted = status.array.state === 'STARTED';
+  // Unassigned but not yet committed via a start since — the disk's identity
+  // is still intact and restoreUnassignedDisk() can put it back with no
+  // clear/rebuild involved. Once a start commits it, this stops applying.
+  const isRestorable = disk.rawStatus === 'DISK_NP_MISSING' && !arrayStarted;
+  // Committed-unassigned — identity already cleared, restore no longer applies.
+  // This is the only state shrinkArray() can drop, so it's the only state that offers it.
+  const isDroppable = disk.role === 'data' && disk.rawStatus === 'DISK_NP_DSBL';
+
+  const handleFormat = async () => {
+    setFormatPending(true);
+    setFormatError(null);
+    try {
+      await nmdApi.formatDisk(disk.slot);
+    } catch (err) {
+      setFormatError((err as Error).message);
+    } finally {
+      setFormatPending(false);
+    }
+  };
 
   return (
     <>
@@ -299,14 +331,52 @@ export function DiskDetailPanel() {
           </div>
         )}
 
+        {isRestorable && (
+          <div className="status-note status-note--error">
+            This disk was unassigned but the array hasn't been started since — the change isn't committed yet and
+            this disk's identity is still intact.
+            <div className="detail-actions">
+              <button type="button" className="btn btn--block" disabled={restorePending} onClick={() => restoreDisk(disk.slot)}>
+                {restorePending ? 'Restoring…' : 'Restore This Disk'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isDroppable && (
+          <div className="status-note status-note--error">
+            This disk is permanently disabled and no longer part of the array — it still shows up here and counts
+            toward DEGRADED because this driver keeps removed slots as placeholders rather than shrinking the array
+            automatically. Reconfiguring drops it from the topology for good, at the cost of a full parity rebuild.
+            <div className="detail-actions">
+              <button type="button" className="btn btn--block btn--danger" onClick={() => setShowShrinkDialog(true)}>
+                Reconfigure Array Without This Disk
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="detail-actions">
-          <button type="button" className="btn btn--block" onClick={() => replaceDisk(disk.slot)}>
+          {needsFormat && (
+            <>
+              <button type="button" className="btn btn--block" disabled={formatPending} onClick={handleFormat}>
+                {formatPending ? 'Formatting…' : 'Format Disk (XFS)'}
+              </button>
+              {formatError && <div className="status-note status-note--error">{formatError}</div>}
+            </>
+          )}
+          {disk.role === 'data' && !needsFormat && (
+            <button type="button" className="btn btn--block" onClick={() => setShowEmptyDialog(true)}>
+              Empty Disk
+            </button>
+          )}
+          <button type="button" className="btn btn--block" onClick={() => setShowReplaceDialog(true)}>
             Replace Disk
           </button>
           <button
             type="button"
             className="btn btn--block btn--danger"
-            disabled={unassignPending}
+            disabled={unassignPending || isRestorable}
             onClick={() => unassignDisk(disk.slot)}
           >
             {unassignPending ? 'Unassigning…' : 'Unassign Disk'}
@@ -315,6 +385,24 @@ export function DiskDetailPanel() {
 
         {actionNote && <div className="detail-note">{actionNote}</div>}
       </div>
+
+      {showReplaceDialog && (
+        <ReplaceDiskDialog slot={disk.slot} label={disk.label} onClose={() => setShowReplaceDialog(false)} onDone={() => {}} />
+      )}
+      {showEmptyDialog && (
+        <EmptyDiskDialog slot={disk.slot} label={disk.label} onClose={() => setShowEmptyDialog(false)} onStarted={() => {}} />
+      )}
+      {showShrinkDialog && (
+        <ShrinkArrayDialog
+          slot={disk.slot}
+          label={disk.label}
+          onClose={() => setShowShrinkDialog(false)}
+          onDone={() => {
+            setShowShrinkDialog(false);
+            closeDetail();
+          }}
+        />
+      )}
     </>
   );
 }

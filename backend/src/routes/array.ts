@@ -74,6 +74,31 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
     }
   });
 
+  router.post('/array/shrink', async (req, res) => {
+    const dropSlots = req.body?.dropSlots;
+    if (!Array.isArray(dropSlots) || dropSlots.length === 0 || !dropSlots.every((s) => Number.isInteger(s))) {
+      res.status(400).json({ error: 'dropSlots must be a non-empty array of slot numbers.' });
+      return;
+    }
+    try {
+      // Same reasoning as /array/stop — shares/disk mounts have to come down
+      // before nmdctl (which shrinkArray stops internally) will allow it.
+      await shares.unmountAll();
+      await nmd.unmountDisks();
+      const result = await nmd.shrinkArray(dropSlots);
+      try {
+        await nmd.mountDisks();
+        await shares.remountAll();
+      } catch (err) {
+        activity.log(`Array reconfigured, but remounting disks failed: ${(err as Error).message}`, 'amber').catch(() => {});
+      }
+      activity.log(`Array reconfigured, dropping slot(s) ${dropSlots.join(', ')}`, 'amber').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   router.put('/array/label', async (req, res) => {
     try {
       const label = typeof req.body?.label === 'string' ? req.body.label : '';

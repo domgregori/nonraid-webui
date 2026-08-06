@@ -1,9 +1,11 @@
 import { execFile, spawn } from 'node:child_process';
-import { writeFile } from 'node:fs/promises';
+import { closeSync, constants, openSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
 import type { NmdClient } from './client.js';
-import type { ImportResult, NmdCommandResult, NmdStatusResponse, ParityCheckAction } from './types.js';
+import type { AddDiskResult, AvailableDevice, ImportResult, NmdCommandResult, NmdStatusResponse, ParityCheckAction } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -138,14 +140,135 @@ export class RealNmdClient implements NmdClient {
     });
   }
 
+  /** For `mv`/`modprobe` — not nmdctl itself, but same sudo convention as everything else here. */
+  private async runSystem(bin: string, args: string[], timeoutMs = 30_000): Promise<{ stdout: string; stderr: string }> {
+    const useSudo = config.nmdUseSudo;
+    try {
+      return await execFileAsync(useSudo ? 'sudo' : bin, useSudo ? [bin, ...args] : args, { timeout: timeoutMs });
+    } catch (err) {
+      const e = err as { stdout?: string; stderr?: string; message: string };
+      throw new Error(e.stderr?.trim() || e.stdout?.trim() || e.message);
+    }
+  }
+
+  /**
+   * Reconfigures the array to drop one or more permanently-disabled slots —
+   * the only way this driver supports actually shrinking the topology
+   * (confirmed against tools/nmdctl this session: `create` only ever adds
+   * slot coverage, never removes it, so an already-disabled slot stays
+   * visible/counted forever otherwise). This mirrors, command-for-command,
+   * the manual recovery sequence used (and verified safe for real disk data)
+   * multiple times this session: move the superblock aside — never delete —
+   * reload the kernel module fresh, then `create -f` naming only the disks
+   * being kept, using each one's own currently-live device+id so nothing
+   * about *their* content is touched, only the array's own metadata.
+   *
+   * The module reload is the one genuinely risky step in this whole
+   * codebase: unlike everything else here, a failure between the two
+   * modprobe calls leaves the array kernel-side down with no automatic way
+   * back — see the thrown error for the exact manual recovery command in
+   * that case, the same one used tonight.
+   */
+  async shrinkArray(dropSlots: number[]): Promise<NmdCommandResult> {
+    const status = await this.getStatus();
+    if (status.array.state !== 'STARTED') {
+      throw new Error('Array must be started (so live device paths can be read) before shrinking it.');
+    }
+    if (dropSlots.length === 0) throw new Error('No slots given to drop.');
+
+    for (const slot of dropSlots) {
+      const d = status.disks.find((x) => x.slot === slot);
+      if (d && d.status === 'DISK_OK') {
+        throw new Error(`Slot ${slot} has an active disk (${d.device}) — unassign and commit that first.`);
+      }
+    }
+
+    const keep = status.disks.filter((d) => d.status === 'DISK_OK' && !dropSlots.includes(d.slot));
+    if (keep.length === 0) throw new Error('Refusing to reconfigure to zero disks.');
+    for (const d of keep) {
+      if (!d.device || d.device === 'none' || !d.disk_id || d.disk_id === 'none') {
+        throw new Error(`Could not read a live device/id for slot ${d.slot} — refusing to proceed.`);
+      }
+    }
+
+    const superblockPath = status.array.superblock;
+    const backupPath = `${superblockPath}.bak-shrink-${Date.now()}`;
+
+    await this.run(['stop']);
+    await this.runSystem('mv', [superblockPath, backupPath]);
+
+    try {
+      await this.runSystem('modprobe', ['-r', 'nonraid']);
+    } catch (err) {
+      // Module still loaded (or in an unknown state) but the old superblock is
+      // safely backed up, not gone — restore the filename and surface the error
+      // as-is; nothing kernel-side has changed yet at this point.
+      await this.runSystem('mv', [backupPath, superblockPath]).catch(() => {});
+      throw err;
+    }
+
+    try {
+      await this.runSystem('modprobe', ['nonraid', `super=${superblockPath}`]);
+    } catch (err) {
+      // Worst case: module unloaded and the reload itself failed — the array is
+      // down with no automatic way back. This exact command is what fixed the
+      // same situation manually tonight.
+      throw new Error(
+        `Module reload failed after unloading — the array is currently down. ` +
+          `Run manually: sudo modprobe nonraid super=${superblockPath} (original superblock backed up at ${backupPath}). ` +
+          `Underlying error: ${(err as Error).message}`,
+      );
+    }
+
+    const params = keep
+      .slice()
+      .sort((a, b) => a.slot - b.slot)
+      .map((d) => `${d.slot}:/dev/${d.device}:${d.disk_id}`);
+    await this.run(['create', '-f', ...params]);
+
+    await this.startArray();
+    const afterStart = await this.getStatus();
+    const pendingAction = afterStart.resync.action?.trim().split(/\s+/)[0];
+    if (pendingAction) await this.run(['check', pendingAction]);
+
+    return { ok: true, message: `Array reconfigured to ${keep.length} disks (backup of old superblock at ${backupPath}); parity rebuild started.` };
+  }
+
   async getStatus(): Promise<NmdStatusResponse> {
     const stdout = await this.runStatusJson(['status', '-o', 'json']);
     return JSON.parse(stdout) as NmdStatusResponse;
   }
 
+  /**
+   * A plain `start` is refused in unattended mode whenever the array isn't
+   * in the ordinary STOPPED state — e.g. DISABLE_DISK after a disk was just
+   * unassigned (an intentional, expected state, not a problem: it means
+   * "start running degraded, missing disk(s) emulated from parity"). nmdctl
+   * requires that state to be named explicitly as a confirmation, so on a
+   * plain-start refusal this re-checks status and retries once, naming
+   * whatever it reported — the same pattern addDisk()/replaceDisk() already
+   * use for the disk they just touched.
+   *
+   * Deliberately does NOT do this for a state prefixed "ERROR:" (confirmed
+   * against the kernel driver source this session: TOO_MANY_MISSING_DISKS,
+   * INVALID_EXPANSION, PARITY_NOT_BIGGEST, NEW_DISK_TOO_SMALL, and
+   * NO_DATA_DISKS all bake that prefix into the state name itself at the
+   * kernel level — every other abnormal state doesn't). Those genuinely can
+   * mean something needs a human look before starting, not just a rubber
+   * stamp, so this surfaces the real error instead of auto-confirming it.
+   */
   async startArray(): Promise<NmdCommandResult> {
-    const { stdout } = await this.run(['start']);
-    return { ok: true, message: stdout.trim() };
+    try {
+      const { stdout } = await this.run(['start']);
+      return { ok: true, message: stdout.trim() };
+    } catch (err) {
+      const status = await this.getStatus();
+      if (status.array.state === 'STARTED' || status.array.state.startsWith('ERROR:')) {
+        throw err;
+      }
+      const { stdout } = await this.run(['start', status.array.state]);
+      return { ok: true, message: stdout.trim() };
+    }
   }
 
   async stopArray(): Promise<NmdCommandResult> {
@@ -181,6 +304,369 @@ export class RealNmdClient implements NmdClient {
   async importDisks(): Promise<ImportResult> {
     const { stdout } = await this.run(['import']);
     return parseImportOutput(stdout);
+  }
+
+  /** Major numbers for virtio-blk devices, read fresh — they're not fixed, unlike SCSI/SATA's. */
+  private async getVirtioMajors(): Promise<string[]> {
+    try {
+      const text = await readFile('/proc/devices', 'utf8');
+      const majors: string[] = [];
+      for (const line of text.split('\n')) {
+        const match = line.trim().match(/^(\d+)\s+virtblk$/);
+        if (match?.[1]) majors.push(match[1]);
+      }
+      return majors;
+    } catch {
+      return [];
+    }
+  }
+
+/**
+   * Extends find_partition() in tools/nmdctl (the largest unmounted
+   * partition on `dev`) with a harder rule that function doesn't have: if
+   * *any* partition on the disk is currently mounted, the whole disk is
+   * off-limits — not just that one partition. A disk actively serving
+   * another purpose (e.g. this host's own boot disk, with one mounted root
+   * partition and other small unused ones like a BIOS-boot partition) must
+   * never be offered as "available," even via a technically-unmounted
+   * sibling partition. This is the actual fix for a real incident this
+   * project hit: offering an unused partition on the test VM's own boot
+   * disk here, followed by a caller that (wrongly) used the whole-disk path
+   * instead of that partition, zeroed the VM's entire root filesystem.
+   * Returns `undefined` if the device should be excluded entirely, or the
+   * largest unmounted partition's path (null if the disk has no partitions
+   * at all — a genuinely blank disk, safe to use whole).
+   */
+  private async findAvailablePartition(dev: string): Promise<string | null | undefined> {
+    try {
+      const { stdout } = await execFileAsync('lsblk', ['--json', '-b', '-p', '-o', 'NAME,SIZE,MOUNTPOINT,TYPE', dev]);
+      const tree = JSON.parse(stdout) as {
+        blockdevices?: Array<{ children?: Array<{ name: string; size: number; mountpoint: string | null; type: string }> }>;
+      };
+      const partitions = (tree.blockdevices?.[0]?.children ?? []).filter((c) => c.type === 'part');
+      if (partitions.some((p) => p.mountpoint)) return undefined;
+      const unmounted = partitions.filter((p) => !p.mountpoint);
+      if (unmounted.length === 0) return null;
+      return unmounted.reduce((a, b) => (b.size > a.size ? b : a)).name;
+    } catch {
+      return null;
+    }
+  }
+
+  private async scanDevice(dev: string): Promise<AvailableDevice | null> {
+    const partition = await this.findAvailablePartition(dev);
+    if (partition === undefined) return null; // disk has a mounted partition elsewhere — excluded entirely, see findAvailablePartition's doc comment
+
+    let locked = false;
+    try {
+      const fd = openSync(partition ?? dev, constants.O_WRONLY | constants.O_EXCL);
+      closeSync(fd);
+    } catch {
+      locked = true;
+    }
+
+    let diskId: string | null = null;
+    let model: string | null = null;
+    try {
+      const { stdout } = await execFileAsync('udevadm', ['info', '--query=property', `--name=${dev}`]);
+      const props = new Map(
+        stdout
+          .split('\n')
+          .map((line) => {
+            const i = line.indexOf('=');
+            return i === -1 ? null : ([line.slice(0, i), line.slice(i + 1)] as [string, string]);
+          })
+          .filter((kv): kv is [string, string] => kv !== null),
+      );
+      diskId = props.get('ID_SERIAL')?.trim() || null;
+      model = props.get('ID_MODEL')?.trim().replace(/_/g, ' ') || null;
+    } catch {
+      diskId = null;
+      model = null;
+    }
+
+    let sizeKb: number | null = null;
+    let uuid: string | null = null;
+    try {
+      const { stdout } = await execFileAsync('lsblk', ['-b', '-n', '-d', '-o', 'SIZE,UUID', partition ?? dev]);
+      const [sizeStr, uuidStr] = stdout.trim().split(/\s+/);
+      const bytes = Number(sizeStr);
+      sizeKb = Number.isFinite(bytes) ? Math.round(bytes / 1024) : null;
+      uuid = uuidStr || null;
+    } catch {
+      sizeKb = null;
+      uuid = null;
+    }
+
+    return { device: dev, partition, sizeKb, diskId, model, uuid, locked };
+  }
+
+  /** Every currently-visible block device path this app is willing to consider — shared by listAvailableDevices() and findDeviceByDiskId(). */
+  private async enumerateDevicePaths(): Promise<string[]> {
+    const virtioMajors = await this.getVirtioMajors();
+    const majors = ['8', '65', '66', '67', '68', '69', '70', '71', ...virtioMajors];
+    const { stdout } = await execFileAsync('lsblk', ['-n', '-d', '-p', '-I', majors.join(','), '-o', 'path']);
+    return stdout
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+  }
+
+  async listAvailableDevices(): Promise<AvailableDevice[]> {
+    const status = await this.getStatus();
+    const claimedIds = status.disks.map((d) => d.disk_id).filter((id): id is string => !!id && id !== 'none');
+
+    const devicePaths = await this.enumerateDevicePaths();
+    const scanned = await Promise.all(devicePaths.map((dev) => this.scanDevice(dev)));
+    const devices = scanned.filter((d): d is AvailableDevice => d !== null);
+
+    // Same "already part of the array" filter add_disk() applies, matched
+    // both directions since a real disk's udevadm ID_SERIAL and the
+    // superblock's recorded disk_id aren't always byte-identical strings.
+    return devices.filter((d) => {
+      if (!d.diskId) return true;
+      return !claimedIds.some((id) => d.diskId!.includes(id) || id.includes(d.diskId!));
+    });
+  }
+
+  /**
+   * Finds the physical device matching a disk_id regardless of what array
+   * slot (if any) currently claims it — the opposite filter from
+   * listAvailableDevices(), which deliberately excludes already-claimed
+   * disks. Used by restoreUnassignedDisk() to re-locate a disk whose slot
+   * still claims its identity but has lost the live device path.
+   */
+  private async findDeviceByDiskId(targetId: string): Promise<AvailableDevice | null> {
+    const devicePaths = await this.enumerateDevicePaths();
+    for (const dev of devicePaths) {
+      const scanned = await this.scanDevice(dev);
+      if (scanned?.diskId && (scanned.diskId.includes(targetId) || targetId.includes(scanned.diskId))) {
+        return scanned;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * True if `device` — or, when it's a partition, its parent disk, or any
+   * *other* partition on that same parent disk — is mounted anywhere right
+   * now. Fails safe: if this can't be determined for any reason, treats it
+   * as mounted (blocks the caller) rather than risking a false "clear".
+   */
+  private async isDeviceOrSiblingMounted(device: string): Promise<boolean> {
+    try {
+      const { stdout: pkOut } = await execFileAsync('lsblk', ['-n', '-p', '-o', 'PKNAME', device]);
+      const parent = pkOut.trim() || device;
+      const { stdout } = await execFileAsync('lsblk', ['--json', '-b', '-p', '-o', 'NAME,MOUNTPOINT,TYPE', parent]);
+      const tree = JSON.parse(stdout) as {
+        blockdevices?: Array<{ mountpoint: string | null; children?: Array<{ mountpoint: string | null }> }>;
+      };
+      const root = tree.blockdevices?.[0];
+      if (!root) return true;
+      if (root.mountpoint) return true;
+      return (root.children ?? []).some((c) => c.mountpoint);
+    } catch {
+      return true;
+    }
+  }
+
+  /**
+   * `add -f slot:device[:id]`, then start the array (naming whatever
+   * abnormal state it reports, since unattended mode refuses to start in
+   * one otherwise), then kick off any pending clear/reconstruction. Shared
+   * tail for both addDisk() (empty slot) and replaceDisk() (occupied slot,
+   * after it's cleared the old identity) — the sequence is identical once
+   * the slot is actually empty, only how it got that way differs.
+   */
+  private async commitNewDisk(slot: number, device: string, diskId: string | undefined, lines: string[]): Promise<void> {
+    const idSuffix = diskId ? `:${diskId}` : '';
+    try {
+      const { stdout } = await this.run(['add', '-f', `${slot}:${device}${idSuffix}`]);
+      lines.push(stdout.trim());
+    } catch (err) {
+      const message = (err as Error).message;
+      if (!diskId && /Could not determine disk ID/i.test(message)) {
+        // No stable /dev/disk/by-id entry for this device (common for a
+        // freshly-attached test VM disk with no `serial=` set) — fall back
+        // to a synthetic ID rather than failing outright.
+        const fallbackId = `manual-${device.replace(/[^a-zA-Z0-9]+/g, '-')}`;
+        const { stdout } = await this.run(['add', '-f', `${slot}:${device}:${fallbackId}`]);
+        lines.push(stdout.trim());
+      } else {
+        throw err;
+      }
+    }
+
+    const afterAdd = await this.getStatus();
+    if (afterAdd.array.state !== 'STARTED') {
+      try {
+        const { stdout } = await this.run(['start']);
+        lines.push(stdout.trim());
+      } catch (err) {
+        lines.push((err as Error).message);
+        // Plain start refused (an "abnormal" state needs explicit naming in
+        // unattended mode) — retry naming whatever state was just reported.
+        const { stdout } = await this.run(['start', afterAdd.array.state]);
+        lines.push(stdout.trim());
+      }
+    }
+
+    const afterStart = await this.getStatus();
+    const pendingAction = afterStart.resync.action?.trim().split(/\s+/)[0];
+    if (pendingAction) {
+      const { stdout } = await this.run(['check', pendingAction]);
+      lines.push(stdout.trim());
+    }
+  }
+
+  /**
+   * Assigns `device` to an *empty* slot — not for replacing an occupied one
+   * (nmdctl's own `add` treats any slot with a recorded disk identity, even
+   * one currently showing DISK_NP_MISSING, as a "replace", which for parity
+   * specifically demands a spare data slot; that's replaceDisk()'s job, not
+   * this one). Requires the array already stopped and the slot genuinely
+   * empty; both checked fresh here.
+   */
+  async addDisk(slot: number, device: string, diskId?: string): Promise<AddDiskResult> {
+    const status = await this.getStatus();
+    if (status.array.state === 'STARTED') {
+      throw new Error('Stop the array before adding a disk.');
+    }
+    const existing = status.disks.find((d) => d.slot === slot);
+    if (existing && existing.disk_id && existing.disk_id !== 'none') {
+      throw new Error(`Slot ${slot} already has a disk assigned — unassign it first, or use Replace Disk.`);
+    }
+
+    // Hard backstop independent of whatever the caller scanned: refuse to
+    // touch `device` if it, or any sibling partition on the same disk, is
+    // currently mounted. `add -f` skips nmdctl's own availability scan
+    // entirely (that's the whole point of -f), so this app owns this check
+    // — see findAvailablePartition's doc comment for the real incident
+    // (a whole-disk path reaching this method for a disk that also had a
+    // live mounted root filesystem on another partition) this guards against.
+    if (await this.isDeviceOrSiblingMounted(device)) {
+      throw new Error(`${device} (or a partition on the same disk) is currently mounted — refusing to touch it.`);
+    }
+
+    const lines: string[] = [];
+    await this.commitNewDisk(slot, device, diskId, lines);
+    return { slot, message: `Disk assignment to slot ${slot} started.`, output: lines.join('\n\n') };
+  }
+
+  /**
+   * The occupied-slot counterpart to addDisk(). nmdctl's `add` refuses any
+   * slot with a recorded disk_id, even one just showing DISK_NP_MISSING —
+   * so a genuine replacement first has to unassign the slot and *commit*
+   * that via `start`, which is the actual step that clears the old identity
+   * (verified against the kernel driver source this session: a committed
+   * DISABLE_DISK pass calls record_disk_info on every DISK_NP_MISSING slot,
+   * wiping its id). That's correct and intentional for a real replacement —
+   * from that point on, the driver stops trusting whatever's physically on
+   * the old disk and will rebuild the new one from parity instead — but
+   * it's irreversible. If the goal is actually restoring the *same* disk,
+   * use restoreUnassignedDisk() instead, before this runs.
+   */
+  async replaceDisk(slot: number, device: string, diskId?: string): Promise<AddDiskResult> {
+    const status = await this.getStatus();
+    if (status.array.state === 'STARTED') {
+      throw new Error('Stop the array before replacing a disk.');
+    }
+    const existing = status.disks.find((d) => d.slot === slot);
+    if (!existing || !existing.disk_id || existing.disk_id === 'none') {
+      throw new Error(`Slot ${slot} is empty — use Add Disk instead.`);
+    }
+    if (await this.isDeviceOrSiblingMounted(device)) {
+      throw new Error(`${device} (or a partition on the same disk) is currently mounted — refusing to touch it.`);
+    }
+
+    const lines: string[] = [];
+
+    if (existing.status !== 'DISK_NP_DSBL') {
+      // Not yet unassigned+committed for this slot — do that first. Skips
+      // cleanly if some earlier, separate action already left it committed.
+      await this.writeNmdCmd(`import ${slot} '' 0 0 0 ''`);
+      lines.push(`Slot ${slot} unassigned.`);
+
+      const afterUnassign = await this.getStatus();
+      try {
+        const { stdout } = await this.run(['start']);
+        lines.push(stdout.trim());
+      } catch {
+        const { stdout } = await this.run(['start', afterUnassign.array.state]);
+        lines.push(stdout.trim());
+      }
+      await this.run(['stop']);
+      lines.push(`Slot ${slot}'s previous disk identity cleared.`);
+    }
+
+    await this.commitNewDisk(slot, device, diskId, lines);
+    return { slot, message: `Slot ${slot} replaced, rebuild started.`, output: lines.join('\n\n') };
+  }
+
+  /**
+   * Undoes an *uncommitted* unassign (DISK_NP_MISSING with disk_id still
+   * intact — confirmed this session that a committed unassign clears it,
+   * but an uncommitted one doesn't touch it at all). Re-locates the
+   * physical device by that still-recorded id rather than trusting a path,
+   * since device enumeration order isn't stable across reboots, then
+   * re-imports it with matching identity and size — landing back on
+   * DISK_OK directly, no clear or parity rebuild involved, since nothing
+   * about the disk's own recorded state ever actually changed.
+   */
+  async restoreUnassignedDisk(slot: number): Promise<NmdCommandResult> {
+    const status = await this.getStatus();
+    if (status.array.state === 'STARTED') {
+      throw new Error('Array must be stopped to restore a disk.');
+    }
+    const disk = status.disks.find((d) => d.slot === slot);
+    if (!disk || disk.status !== 'DISK_NP_MISSING') {
+      throw new Error(`Slot ${slot} isn't a pending, uncommitted unassign — nothing to restore.`);
+    }
+    if (!disk.disk_id || disk.disk_id === 'none') {
+      throw new Error(`Slot ${slot} has no recorded identity to restore.`);
+    }
+
+    const found = await this.findDeviceByDiskId(disk.disk_id);
+    if (!found) {
+      throw new Error(`Could not find a physical device matching slot ${slot}'s recorded ID (${disk.disk_id}) — is the disk connected?`);
+    }
+    if (disk.size_kb && found.sizeKb && Math.abs(found.sizeKb - disk.size_kb) > 1024) {
+      throw new Error(
+        `Size mismatch for slot ${slot}: recorded ${disk.size_kb} KB, found device is ${found.sizeKb} KB — refusing, this may not be the same disk.`,
+      );
+    }
+
+    const target = found.partition ?? found.device;
+    await this.writeNmdCmd(`import ${slot} ${basename(target)} 0 ${disk.size_kb} 0 ${disk.disk_id}`);
+
+    return { ok: true, message: `Slot ${slot} restored to its previous disk. Start the array to confirm it's healthy again.` };
+  }
+
+  async formatDisk(slot: number): Promise<NmdCommandResult> {
+    const status = await this.getStatus();
+    const disk = status.disks.find((d) => d.slot === slot);
+    if (!disk) throw new Error(`No disk assigned to slot ${slot}.`);
+    if (status.resync.active) {
+      throw new Error(`A clear/sync operation is still running on slot ${slot} — wait for it to finish first.`);
+    }
+    if (disk.filesystem && disk.filesystem.type && disk.filesystem.type !== 'unknown') {
+      throw new Error(`Slot ${slot} already has a filesystem (${disk.filesystem.type}) — refusing to reformat over existing data.`);
+    }
+
+    const partition = `/dev/nmd${slot}p1`;
+    const bin = config.nmdUseSudo ? 'sudo' : 'mkfs.xfs';
+    const args = config.nmdUseSudo ? ['mkfs.xfs', partition] : [partition];
+    try {
+      // No -f: mkfs.xfs refuses on its own if the partition already carries a
+      // recognized filesystem/RAID signature — a real safety backstop, not
+      // just this app's own check above.
+      const { stdout } = await execFileAsync(bin, args, { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 });
+      await this.run(['mount']);
+      return { ok: true, message: stdout.trim() || `Formatted ${partition} as XFS and mounted it.` };
+    } catch (err) {
+      const e = err as { stdout?: string; stderr?: string; message: string };
+      throw new Error(e.stderr?.trim() || e.stdout?.trim() || e.message);
+    }
   }
 
   async unassignDisk(slot: number): Promise<NmdCommandResult> {

@@ -1,5 +1,7 @@
 import { ArrayDisks } from '../components/dashboard/ArrayDisks';
+import { EmptyDiskProgressCard } from '../components/dashboard/EmptyDiskProgressCard';
 import { ParityCheckCard } from '../components/dashboard/ParityCheckCard';
+import { UnassignedDevicesCard } from '../components/disk-detail/UnassignedDevicesCard';
 import { useArrayStatus } from '../state/useArrayStatus';
 
 export function DisksPage() {
@@ -18,7 +20,9 @@ export function DisksPage() {
       {status && (
         <div className="disks-page">
           <ParityCheckCard />
+          <EmptyDiskProgressCard />
           <ArrayDisks />
+          <UnassignedDevicesCard />
         </div>
       )}
     </div>

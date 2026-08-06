@@ -1,8 +1,32 @@
 import { COLORS, tint } from '../styles/colors';
 import type { NmdStatusResponse } from '../types/nmdApi';
 
-function isDegraded(status: NmdStatusResponse): boolean {
-  return status.array.health.status === 'DEGRADED' || status.array.counters.missing > 0;
+/**
+ * A single-parity array's unused second-parity (Q) slot is permanently counted
+ * as "invalid" + "disabled" by the driver's internal state (nmdctl's own status
+ * output even warns about this: "Driver internal state is inconsistent ... but
+ * all individual disks are DISK_OK status"). That makes nmdctl report DEGRADED
+ * even when every real disk and parity are fine. Recognize that specific,
+ * harmless pattern so the dashboard doesn't cry wolf.
+ */
+function isPhantomSecondParityGlitch(status: NmdStatusResponse): boolean {
+  const { counters, size } = status.array;
+  return (
+    !size.has_second_parity &&
+    counters.missing === 0 &&
+    counters.wrong === 0 &&
+    counters.replaced === 0 &&
+    counters.new === 0 &&
+    counters.invalid <= 1 &&
+    counters.disabled <= 1 &&
+    status.disks.every((d) => d.status === 'DISK_OK')
+  );
+}
+
+export function isDegraded(status: NmdStatusResponse): boolean {
+  if (status.array.counters.missing > 0) return true;
+  if (status.array.health.status !== 'DEGRADED') return false;
+  return !isPhantomSecondParityGlitch(status);
 }
 
 export function deriveArrayStatus(status: NmdStatusResponse | null) {

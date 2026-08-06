@@ -120,3 +120,19 @@ export interface ImportResult {
   errors: string[];
   output: string;
 }
+
+export interface AvailableDevice {
+  device: string; // internal use only (add/replace calls) — not meant for display
+  partition: string | null;
+  sizeKb: number | null;
+  diskId: string | null;
+  model: string | null;
+  uuid: string | null;
+  locked: boolean;
+}
+
+export interface AddDiskResult {
+  slot: number;
+  message: string;
+  output: string;
+}

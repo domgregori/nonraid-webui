@@ -124,6 +124,33 @@ export interface NmdCommandResult {
 }
 
 /**
+ * A physical block device not currently claimed by any array slot — mirrors
+ * `list_available_devices()` in tools/nmdctl (the same scan `nmdctl add`'s
+ * unforced path uses): whole disks matching SCSI/SATA/virtio major numbers,
+ * each with its largest *unmounted* partition (if any — a disk with no
+ * partition, or whose largest partition is mounted, has none) and an
+ * exclusive-open lock check (catches a disk in use by something like ZFS
+ * that holds it without a filesystem mount).
+ */
+export interface AvailableDevice {
+  device: string; // whole-disk path, e.g. /dev/sdb — kept for internal use (add/replace calls), not meant for display
+  partition: string | null; // largest unmounted partition path, e.g. /dev/sdb1 — null if none qualifies
+  sizeKb: number | null;
+  diskId: string | null; // udevadm ID_SERIAL — null if undetectable (e.g. no by-id entry)
+  model: string | null; // udevadm ID_MODEL — the drive's own reported product name
+  uuid: string | null; // filesystem UUID of the partition (or whole device, if unpartitioned) — null if unformatted
+  locked: boolean; // exclusive-open failed — device likely in use by another process
+}
+
+export interface AddDiskResult {
+  slot: number;
+  message: string;
+  // Full raw output across every step of the orchestration (unassign, add,
+  // start, check) — shown as-is, same transparency principle as ImportResult.
+  output: string;
+}
+
+/**
  * A slot `nmdctl import` (always run with -u, see realClient.ts) skipped
  * because the physical partition's size doesn't match the superblock's
  * recorded size for that slot — see the nonraid project's own migration

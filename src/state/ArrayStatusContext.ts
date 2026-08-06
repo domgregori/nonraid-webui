@@ -18,15 +18,18 @@ export interface ArrayStatusContextValue {
   arrayPending: boolean;
   parityPending: boolean;
   unassignPending: boolean;
+  restorePending: boolean;
   toggleArray: () => void;
   parityAction: (action: ParityCheckAction) => void;
   selectDisk: (id: string) => void;
   closeDetail: () => void;
   /** Real — calls the backend, which writes directly to /proc/nmdcmd (see backend/README.md). */
   unassignDisk: (slot: number) => void;
-  /** Still a UI-only stand-in note, not wired to anything real — replace needs actual
-   *  disk selection/partitioning, out of scope for the unassign fix. */
-  replaceDisk: (slot: number) => void;
+  /** Undoes an *uncommitted* unassign (DISK_NP_MISSING, identity still intact) — only
+   *  applies before the array has been started since. See ReplaceDiskDialog for the
+   *  guided "swap in a different disk" flow, which is a separate, deliberately atomic
+   *  backend call rather than a context action. */
+  restoreDisk: (slot: number) => void;
 }
 
 export const ArrayStatusContext = createContext<ArrayStatusContextValue | null>(null);

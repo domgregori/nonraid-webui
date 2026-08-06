@@ -63,6 +63,7 @@ export function deriveDisk(disk: NmdDisk, arrayStarted: boolean, tempC: number |
     usedPct,
     temp: tempC ?? 0,
     status,
+    rawStatus: disk.status,
     statusLabel,
     statusColor,
     sizeLabel: formatSize(disk.size_gb),

@@ -14,6 +14,8 @@ export interface DiskBase {
 
 export interface DiskViewModel extends DiskBase {
   status: DiskStatus;
+  /** The raw driver status string (e.g. "DISK_NP_MISSING") — the normalized `status` above collapses several distinct raw states into "missing"; some actions (like restoring an uncommitted unassign) need to tell those apart. */
+  rawStatus: string;
   statusLabel: string;
   statusColor: string;
   sizeLabel: string;

@@ -1,6 +1,23 @@
 import type { NmdClient } from './client.js';
 import { buildMockDisk, getMockDiskSeeds } from './mockData.js';
-import type { ImportResult, NmdCommandResult, NmdResyncStatus, NmdStatusResponse, ParityCheckAction } from './types.js';
+import type {
+  AddDiskResult,
+  AvailableDevice,
+  ImportResult,
+  NmdCommandResult,
+  NmdDisk,
+  NmdResyncStatus,
+  NmdStatusResponse,
+  ParityCheckAction,
+} from './types.js';
+
+interface MockAddedDisk {
+  slot: number;
+  device: string;
+  diskId: string;
+  sizeGb: number;
+  cleared: boolean;
+}
 
 interface MockState {
   arrayStarted: boolean;
@@ -8,10 +25,29 @@ interface MockState {
   resync: NmdResyncStatus;
   lastSyncTimestamp: number;
   lastSyncElapsed: number;
-  /** Slots unassigned via unassignDisk(), matching real driver semantics:
-   *  DISK_NP_DSBL while stopped, DISK_NP_MISSING (emulated from parity) once
-   *  the array is started again with the slot still empty. */
+  /** Slots unassigned via unassignDisk() but not yet committed via a
+   *  subsequent start — matches the real driver (confirmed against the
+   *  kernel source and real hardware this session): unassigning a
+   *  previously-valid disk shows DISK_NP_MISSING immediately, with its
+   *  disk_id still intact, regardless of whether the array is started or
+   *  stopped. Only a committed start (see committedUnassignedSlots) clears
+   *  the identity. */
   unassignedSlots: Set<number>;
+  /** Slots whose unassign has been committed via a `start` since — matches
+   *  DISK_NP_DSBL with disk_id cleared, the point past which restoring the
+   *  same disk is no longer possible (see restoreUnassignedDisk()). */
+  committedUnassignedSlots: Set<number>;
+  /** Slots removed from the topology entirely via shrinkArray() — unlike
+   *  committedUnassignedSlots (still shown as DISABLED), these stop
+   *  appearing in getStatus() at all, matching a real reconfigure. */
+  droppedSlots: Set<number>;
+  /** Slots assigned via addDisk() — not part of getMockDiskSeeds()'s fixed
+   *  set, so tracked separately and merged into getStatus()'s disk list. */
+  addedDisks: Map<number, MockAddedDisk>;
+  /** Which addedDisks entry the current resync (if its action is 'clear')
+   *  is clearing — resync is a single shared field, same as real hardware
+   *  only ever running one sync/clear/check operation at a time. */
+  clearingSlot: number | null;
 }
 
 function idleResync(totalGb: number): NmdResyncStatus {
@@ -52,6 +88,10 @@ export class MockNmdClient implements NmdClient {
       lastSyncTimestamp: Math.floor(Date.now() / 1000) - 3 * 86400,
       lastSyncElapsed: 5400,
       unassignedSlots: new Set(),
+      committedUnassignedSlots: new Set(),
+      droppedSlots: new Set(),
+      addedDisks: new Map(),
+      clearingSlot: null,
     };
     this.timer = setInterval(() => this.tick(), 1000);
     this.timer.unref();
@@ -78,22 +118,61 @@ export class MockNmdClient implements NmdClient {
       this.state.resync = idleResync(r.size_gb);
       this.state.lastSyncTimestamp = Math.floor(Date.now() / 1000);
       this.state.lastSyncElapsed = r.elapsed_seconds;
+
+      if (this.state.clearingSlot !== null) {
+        const disk = this.state.addedDisks.get(this.state.clearingSlot);
+        if (disk) disk.cleared = true;
+        this.state.clearingSlot = null;
+      }
     }
   }
 
-  async getStatus(): Promise<NmdStatusResponse> {
-    const { arrayStarted, resync, unassignedSlots } = this.state;
-    const { all: seeds, data: dataSeeds, parity: paritySeeds } = getMockDiskSeeds();
-    const disks = seeds.map((seed) => {
-      const disk = buildMockDisk(seed, arrayStarted);
-      if (unassignedSlots.has(seed.slot)) {
-        disk.status = arrayStarted ? 'DISK_NP_MISSING' : 'DISK_NP_DSBL';
-      }
-      return disk;
-    });
+  private buildAddedDisk(added: MockAddedDisk, arrayStarted: boolean): NmdDisk {
+    const sizeKb = added.sizeGb * 1024 * 1024;
+    return {
+      slot: added.slot,
+      type: 'data',
+      size_kb: sizeKb,
+      size_gb: added.sizeGb,
+      device: arrayStarted ? `/dev/nmd${added.slot}p1` : added.device,
+      status: added.cleared ? 'DISK_OK' : 'DISK_NEW',
+      errors: 0,
+      reads: 0,
+      writes: 0,
+      disk_id: added.diskId,
+      disk_name: `disk${added.slot}`,
+      ...(added.cleared
+        ? { filesystem: { type: 'xfs', mountpoint: arrayStarted ? `/mnt/disk${added.slot}` : '-', usage: arrayStarted ? '0%' : '-' } }
+        : {}),
+    };
+  }
 
-    const missingCount = arrayStarted ? unassignedSlots.size : 0;
-    const disabledCount = arrayStarted ? 0 : unassignedSlots.size;
+  async getStatus(): Promise<NmdStatusResponse> {
+    const { arrayStarted, resync, unassignedSlots, committedUnassignedSlots } = this.state;
+    const { all: seeds, data: dataSeeds, parity: paritySeeds } = getMockDiskSeeds();
+    const disks = seeds
+      .filter((seed) => !this.state.droppedSlots.has(seed.slot)) // shrinkArray() removed this slot from the topology entirely
+      .filter((seed) => !this.state.addedDisks.has(seed.slot)) // replaceDisk() has taken over this slot — show the addedDisks entry instead
+      .map((seed) => {
+        const disk = buildMockDisk(seed, arrayStarted);
+        if (unassignedSlots.has(seed.slot)) {
+          // Uncommitted: identity stays intact, matching the real driver.
+          disk.status = 'DISK_NP_MISSING';
+          disk.device = 'none';
+        } else if (committedUnassignedSlots.has(seed.slot)) {
+          // Committed: identity cleared — restoreUnassignedDisk() no longer applies.
+          disk.status = 'DISK_NP_DSBL';
+          disk.device = 'none';
+          disk.disk_id = 'none';
+        }
+        return disk;
+      });
+    for (const added of this.state.addedDisks.values()) {
+      disks.push(this.buildAddedDisk(added, arrayStarted));
+    }
+
+    const missingCount = unassignedSlots.size;
+    const disabledCount = committedUnassignedSlots.size;
     let health: { status: 'HEALTHY' | 'DEGRADED' | 'READY'; details: string; code: number };
     if (!arrayStarted) {
       health = { status: 'READY', details: '', code: 0 };
@@ -108,14 +187,14 @@ export class MockNmdClient implements NmdClient {
         label: this.state.label,
         state: arrayStarted ? 'STARTED' : 'STOPPED',
         superblock: '/nonraid.dat',
-        disks_present: seeds.length,
-        disks_imported: arrayStarted ? seeds.length : 0,
+        disks_present: disks.length,
+        disks_imported: arrayStarted ? disks.length : 0,
         disks_unassigned: 0,
         total_slots: 30,
         health,
         size: {
-          data_gb: dataSeeds.reduce((s, d) => s + d.sizeGb, 0),
-          data_disk_count: dataSeeds.length,
+          data_gb: dataSeeds.reduce((s, d) => s + d.sizeGb, 0) + [...this.state.addedDisks.values()].reduce((s, d) => s + d.sizeGb, 0),
+          data_disk_count: dataSeeds.length + this.state.addedDisks.size,
           has_parity: paritySeeds.length > 0,
           has_second_parity: paritySeeds.length > 1,
           parity_size_gb: paritySeeds[0]?.sizeGb ?? 0,
@@ -148,6 +227,14 @@ export class MockNmdClient implements NmdClient {
   }
 
   async startArray(): Promise<NmdCommandResult> {
+    // Commit any pending unassigns — matches the real driver: a start while
+    // a slot is still uncommitted-missing is what actually clears its
+    // identity (DISK_NP_MISSING -> DISK_NP_DSBL), the point past which
+    // restoreUnassignedDisk() no longer applies.
+    for (const slot of this.state.unassignedSlots) {
+      this.state.unassignedSlots.delete(slot);
+      this.state.committedUnassignedSlots.add(slot);
+    }
     this.state.arrayStarted = true;
     return { ok: true, message: 'Array started' };
   }
@@ -234,6 +321,144 @@ export class MockNmdClient implements NmdClient {
     };
   }
 
+  async listAvailableDevices(): Promise<AvailableDevice[]> {
+    // A couple of fixed fake candidates — enough to exercise the "Unassigned
+    // Devices" UI in mock mode without depending on real host hardware.
+    const candidates: AvailableDevice[] = [
+      {
+        device: '/dev/sdx',
+        partition: '/dev/sdx1',
+        sizeKb: 500 * 1024 * 1024,
+        diskId: 'MOCK_SPARE_1',
+        model: 'Mock 500GB SSD',
+        uuid: 'a1b2c3d4-0000-0000-0000-000000000001',
+        locked: false,
+      },
+      {
+        device: '/dev/sdy',
+        partition: null,
+        sizeKb: 1000 * 1024 * 1024,
+        diskId: 'MOCK_SPARE_2',
+        model: 'Mock 1TB HDD',
+        uuid: null,
+        locked: false,
+      },
+    ];
+    // Drop any this mock's own addDisk() already claimed.
+    const addedDevices = new Set([...this.state.addedDisks.values()].map((d) => d.device));
+    return candidates.filter((c) => !addedDevices.has(c.device));
+  }
+
+  async addDisk(slot: number, device: string, diskId?: string): Promise<AddDiskResult> {
+    if (this.state.arrayStarted) {
+      throw new Error('Stop the array before adding a disk.');
+    }
+    const seedExists = getMockDiskSeeds().all.some((s) => s.slot === slot);
+    const identityCleared = this.state.committedUnassignedSlots.has(slot);
+    const existing = (seedExists && !identityCleared) || this.state.addedDisks.has(slot);
+    if (existing) {
+      throw new Error(`Slot ${slot} already has a disk assigned — unassign it first, or use Replace Disk.`);
+    }
+
+    this.assignDiskToSlot(slot, device, diskId);
+    return { slot, message: `Disk assignment to slot ${slot} started (mock).`, output: `Adding ${device} to slot ${slot} (mock)\nClearing started (mock)` };
+  }
+
+  /** Shared tail for addDisk() and replaceDisk() — registers the new disk and starts the mock "clearing" resync, same as real hardware's parity rebuild. */
+  private assignDiskToSlot(slot: number, device: string, diskId?: string): void {
+    const sizeGb = 30; // matches the real test disk this feature was built and verified against
+    this.state.addedDisks.set(slot, { slot, device, diskId: diskId ?? `MOCK_${device.replace(/[^a-zA-Z0-9]+/g, '_')}`, sizeGb, cleared: false });
+    this.state.arrayStarted = true;
+    this.state.clearingSlot = slot;
+    this.state.resync = {
+      ...idleResync(sizeGb),
+      active: true,
+      paused: false,
+      progress_percent: 0,
+      position_gb: 0,
+      action: 'clear',
+      rate_mb_s: 45,
+    };
+  }
+
+  /**
+   * Occupied-slot counterpart to addDisk() — mirrors realClient's
+   * replaceDisk(): commits any pending unassign first (clearing the old
+   * identity, matching the real driver), then assigns the new disk the same
+   * way addDisk() does.
+   */
+  async replaceDisk(slot: number, device: string, diskId?: string): Promise<AddDiskResult> {
+    if (this.state.arrayStarted) {
+      throw new Error('Stop the array before replacing a disk.');
+    }
+    const seedExists = getMockDiskSeeds().all.some((s) => s.slot === slot);
+    if (!seedExists && !this.state.addedDisks.has(slot)) {
+      throw new Error(`Slot ${slot} is empty — use Add Disk instead.`);
+    }
+
+    const lines: string[] = [];
+    if (!this.state.committedUnassignedSlots.has(slot)) {
+      this.state.unassignedSlots.delete(slot);
+      this.state.committedUnassignedSlots.add(slot);
+      this.state.addedDisks.delete(slot);
+      lines.push(`Slot ${slot} unassigned.`, `Slot ${slot}'s previous disk identity cleared.`);
+    }
+
+    this.assignDiskToSlot(slot, device, diskId);
+    lines.push(`Adding ${device} to slot ${slot} (mock)`, 'Clearing started (mock)');
+    return { slot, message: `Slot ${slot} replaced, rebuild started (mock).`, output: lines.join('\n') };
+  }
+
+  /** Mirrors realClient's shrinkArray() at the state-model level — no real module reload to simulate, just removes the slot from the topology for good. */
+  async shrinkArray(dropSlots: number[]): Promise<NmdCommandResult> {
+    if (!this.state.arrayStarted) {
+      throw new Error('Array must be started (so live device paths can be read) before shrinking it.');
+    }
+    if (dropSlots.length === 0) throw new Error('No slots given to drop.');
+    for (const slot of dropSlots) {
+      if (!this.state.committedUnassignedSlots.has(slot)) {
+        throw new Error(`Slot ${slot} isn't a committed-disabled slot — unassign and commit it first.`);
+      }
+    }
+    for (const slot of dropSlots) {
+      this.state.committedUnassignedSlots.delete(slot);
+      this.state.droppedSlots.add(slot);
+    }
+    return { ok: true, message: `Array reconfigured to drop slot(s) ${dropSlots.join(', ')} (mock).` };
+  }
+
+  /**
+   * Undoes an uncommitted unassign — only while the slot is still in
+   * unassignedSlots (DISK_NP_MISSING, identity intact). Once startArray()
+   * has promoted it to committedUnassignedSlots the identity is gone, same
+   * as the real driver, and this no longer applies.
+   */
+  async restoreUnassignedDisk(slot: number): Promise<NmdCommandResult> {
+    if (this.state.arrayStarted) {
+      throw new Error('Array must be stopped to restore a disk.');
+    }
+    if (!this.state.unassignedSlots.has(slot)) {
+      throw new Error(`Slot ${slot} isn't a pending, uncommitted unassign — nothing to restore.`);
+    }
+    this.state.unassignedSlots.delete(slot);
+    return { ok: true, message: `Slot ${slot} restored to its previous disk. Start the array to confirm it's healthy again.` };
+  }
+
+  async formatDisk(slot: number): Promise<NmdCommandResult> {
+    if (this.state.resync.active) {
+      throw new Error(`A clear/sync operation is still running on slot ${slot} — wait for it to finish first.`);
+    }
+    const added = this.state.addedDisks.get(slot);
+    if (added) {
+      if (!added.cleared) throw new Error(`Slot ${slot} hasn't finished clearing yet.`);
+      added.cleared = true; // already formatted-equivalent in the mock's own buildAddedDisk() once cleared
+      return { ok: true, message: `Formatted slot ${slot} as XFS and mounted it (mock).` };
+    }
+    const seed = getMockDiskSeeds().all.find((s) => s.slot === slot);
+    if (!seed) throw new Error(`No disk assigned to slot ${slot}.`);
+    throw new Error(`Slot ${slot} already has a filesystem (${seed.fsType}) — refusing to reformat over existing data.`);
+  }
+
   async unassignDisk(slot: number): Promise<NmdCommandResult> {
     if (this.state.arrayStarted) {
       throw new Error('Array must be stopped before unassigning disks.');
@@ -241,7 +466,7 @@ export class MockNmdClient implements NmdClient {
 
     const { all: seeds, parity: paritySeeds } = getMockDiskSeeds();
     const seed = seeds.find((s) => s.slot === slot);
-    if (!seed || this.state.unassignedSlots.has(slot)) {
+    if (!seed || this.state.unassignedSlots.has(slot) || this.state.committedUnassignedSlots.has(slot)) {
       throw new Error(`No disk assigned to slot ${slot}, or it's already unassigned.`);
     }
 

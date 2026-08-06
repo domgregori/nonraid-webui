@@ -1,4 +1,5 @@
 import { COLORS } from '../styles/colors';
+import { isDegraded } from './status';
 import type { ParityViewModel } from '../types';
 import type { NmdStatusResponse, ParityCheckAction } from '../types/nmdApi';
 
@@ -9,6 +10,13 @@ function formatEta(seconds: number): string {
   return `${Math.floor(mins / 60)}h ${mins % 60}m remaining`;
 }
 
+/** resync is a single shared field — a new-disk clear or a parity rebuild uses the same progress data as a parity check, just a different `action` value. */
+function progressVerb(action: string): string {
+  if (action.startsWith('clear')) return 'Clearing new disk';
+  if (action.startsWith('recon')) return 'Reconstructing parity';
+  return 'Checking';
+}
+
 export function deriveParityViewModel(
   status: NmdStatusResponse,
   pending: boolean,
@@ -16,7 +24,7 @@ export function deriveParityViewModel(
 ): ParityViewModel {
   const { resync, array } = status;
   const arrayStarted = array.state === 'STARTED';
-  const degraded = array.health.status === 'DEGRADED' || array.counters.missing > 0;
+  const degraded = isDegraded(status);
   const canStart = arrayStarted && !resync.active && !pending;
   const progressPct = Math.round(resync.progress_percent);
 
@@ -26,7 +34,7 @@ export function deriveParityViewModel(
     progressPct,
     barColor: degraded ? COLORS.red : COLORS.blue,
     progressLabel: resync.active
-      ? `Checking: ${progressPct}%`
+      ? `${progressVerb(resync.action)}: ${progressPct}%`
       : array.counters.sync_errors > 0
         ? `Last check: completed, ${array.counters.sync_errors} errors`
         : 'Last check: completed, 0 errors',

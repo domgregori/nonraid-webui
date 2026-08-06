@@ -13,6 +13,111 @@ function parseSlot(param: string): number | null {
 export function disksRouter(nmd: NmdClient, smart: SmartService, activity: ActivityStore): Router {
   const router = Router();
 
+  router.get('/disks/available', async (_req, res) => {
+    try {
+      const devices = await nmd.listAvailableDevices();
+      res.json(devices);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/disks/:slot/add', async (req, res) => {
+    const slot = parseSlot(req.params.slot);
+    if (slot === null) {
+      res.status(400).json({ error: 'Slot must be a number 0-29.' });
+      return;
+    }
+    const device = req.body?.device;
+    if (typeof device !== 'string' || !device) {
+      res.status(400).json({ error: 'device is required.' });
+      return;
+    }
+    try {
+      // Validate against a fresh scan rather than trusting a raw client-supplied
+      // path — this shells out with `device`, so it must be a real, currently
+      // available device, not attacker-controlled input.
+      const available = await nmd.listAvailableDevices();
+      const match = available.find((d) => d.device === device);
+      if (!match) {
+        res.status(400).json({ error: `${device} is not a currently available device.` });
+        return;
+      }
+      // Use the specific free partition when the scan found one — never the
+      // whole parent device in that case. Only fall back to the whole
+      // device when the disk genuinely has no partitions at all (a blank
+      // disk with nothing else on it). Passing the whole device for a disk
+      // that has *other* partitions (even unmounted ones don't imply the
+      // rest of the disk is safe — see the mounted-sibling check this is
+      // paired with in NmdClient.addDisk itself) is exactly the bug that
+      // zeroed this project's own test VM's root filesystem once already.
+      const target = match.partition ?? match.device;
+      const result = await nmd.addDisk(slot, target, match.diskId ?? undefined);
+      activity.log(`Disk ${device} added to slot ${slot}`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/disks/:slot/replace', async (req, res) => {
+    const slot = parseSlot(req.params.slot);
+    if (slot === null) {
+      res.status(400).json({ error: 'Slot must be a number 0-29.' });
+      return;
+    }
+    const device = req.body?.device;
+    if (typeof device !== 'string' || !device) {
+      res.status(400).json({ error: 'device is required.' });
+      return;
+    }
+    try {
+      // Same fresh-scan validation addDisk uses — see the comment there for why.
+      const available = await nmd.listAvailableDevices();
+      const match = available.find((d) => d.device === device);
+      if (!match) {
+        res.status(400).json({ error: `${device} is not a currently available device.` });
+        return;
+      }
+      const target = match.partition ?? match.device;
+      const result = await nmd.replaceDisk(slot, target, match.diskId ?? undefined);
+      activity.log(`Disk in slot ${slot} replaced with ${device}`, 'amber').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/disks/:slot/restore', async (req, res) => {
+    const slot = parseSlot(req.params.slot);
+    if (slot === null) {
+      res.status(400).json({ error: 'Slot must be a number 0-29.' });
+      return;
+    }
+    try {
+      const result = await nmd.restoreUnassignedDisk(slot);
+      activity.log(`Disk in slot ${slot} restored after unassign`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/disks/:slot/format', async (req, res) => {
+    const slot = parseSlot(req.params.slot);
+    if (slot === null) {
+      res.status(400).json({ error: 'Slot must be a number 0-29.' });
+      return;
+    }
+    try {
+      const result = await nmd.formatDisk(slot);
+      activity.log(`Disk in slot ${slot} formatted (XFS)`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   router.post('/disks/:slot/unassign', async (req, res) => {
     const slot = parseSlot(req.params.slot);
     if (slot === null) {

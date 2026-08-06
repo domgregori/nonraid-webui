@@ -18,6 +18,7 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
   const [arrayPending, setArrayPending] = useState(false);
   const [parityPending, setParityPending] = useState(false);
   const [unassignPending, setUnassignPending] = useState(false);
+  const [restorePending, setRestorePending] = useState(false);
   const mounted = useRef(true);
   const statusRef = useRef<NmdStatusResponse | null>(null);
 
@@ -112,14 +113,22 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
     [refreshStatus],
   );
 
-  const replaceDisk = useCallback((slot: number) => {
-    const arrayStarted = statusRef.current?.array.state === 'STARTED';
-    setActionNote(
-      arrayStarted
-        ? `Stop the array before replacing slot ${slot}.`
-        : `Slot ${slot} ready for replacement — insert new disk and start the array.`,
-    );
-  }, []);
+  const restoreDisk = useCallback(
+    (slot: number) => {
+      setRestorePending(true);
+      setActionNote(null);
+      setActionError(null);
+      nmdApi
+        .restoreDisk(slot)
+        .then((result) => {
+          setActionNote(result.message);
+          return refreshStatus();
+        })
+        .catch((err) => setActionError((err as Error).message))
+        .finally(() => setRestorePending(false));
+    },
+    [refreshStatus],
+  );
 
   return (
     <ArrayStatusContext.Provider
@@ -134,12 +143,13 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
         arrayPending,
         parityPending,
         unassignPending,
+        restorePending,
         toggleArray,
         parityAction,
         selectDisk,
         closeDetail,
         unassignDisk,
-        replaceDisk,
+        restoreDisk,
       }}
     >
       {children}

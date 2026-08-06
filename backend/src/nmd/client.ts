@@ -1,4 +1,4 @@
-import type { ImportResult, NmdCommandResult, NmdStatusResponse, ParityCheckAction } from './types.js';
+import type { AddDiskResult, AvailableDevice, ImportResult, NmdCommandResult, NmdStatusResponse, ParityCheckAction } from './types.js';
 
 export interface NmdClient {
   readonly mode: 'real' | 'mock';
@@ -21,8 +21,56 @@ export interface NmdClient {
   // array"). Safe to call any time the array is stopped, including when
   // everything's already imported (it just reports 0 newly imported).
   importDisks(): Promise<ImportResult>;
+  // Physical block devices not already claimed by an array slot — for an
+  // "Unassigned Devices" list. Real/mock only, doesn't touch array state.
+  listAvailableDevices(): Promise<AvailableDevice[]>;
+  // Assigns a device to an *empty* slot only: `add -f slot:device[:id]`,
+  // then start the array (naming whatever abnormal state it reports, since
+  // unattended mode refuses to start in one otherwise), then kick off the
+  // pending clear/reconstruction (`check <action>`, matching /proc/nmdstat's
+  // live mdResyncAction) so it starts running in the background. Returns
+  // once that's kicked off — doesn't wait for it to finish; the existing
+  // getStatus().resync polling already reports its progress, since it's the
+  // same field parity checks use. Refuses if the slot already has a disk
+  // identity recorded (even one just showing DISK_NP_MISSING) — nmdctl's
+  // own `add` treats that as "already assigned" regardless of live status;
+  // see replaceDisk() for that case, or restoreUnassignedDisk() if the goal
+  // is actually putting the *same* disk back rather than a different one.
+  addDisk(slot: number, device: string, diskId?: string): Promise<AddDiskResult>;
+  // The occupied-slot counterpart to addDisk(): unassigns the slot and
+  // commits that via `start` first (this is the step that clears the old
+  // disk's recorded identity and makes the driver stop trusting its
+  // on-disk content — correct for a genuine replacement, but irreversible),
+  // then runs the same add/start/check sequence addDisk() does for the new
+  // device. If the caller actually wants the *same* disk back rather than
+  // a different one, don't call this — see restoreUnassignedDisk(), and
+  // only while the slot is still showing DISK_NP_MISSING (uncommitted).
+  replaceDisk(slot: number, device: string, diskId?: string): Promise<AddDiskResult>;
+  // Undoes an *uncommitted* unassign — a slot still showing DISK_NP_MISSING
+  // with its disk_id intact, before any `start` has run since the unassign.
+  // Re-locates the physical device by its still-recorded disk_id (paths
+  // aren't stable across reboots) and re-imports it with matching identity
+  // and size, restoring DISK_OK with no clear/rebuild involved. Once a
+  // `start` has committed the unassign, the identity is gone and this no
+  // longer applies — that's the intentional line between "changed my mind"
+  // and "this disk is really gone" (replaceDisk()'s territory instead).
+  restoreUnassignedDisk(slot: number): Promise<NmdCommandResult>;
+  // `nmdctl mount` never creates a filesystem — a freshly-cleared disk comes
+  // out with FS "unknown" and stays unmounted until this runs. Shells out to
+  // mkfs.xfs with no -f: XFS refuses on its own if the partition already has
+  // a recognized filesystem/RAID signature, the same protection wipefs's
+  // absence would otherwise have to be checked for by hand.
+  formatDisk(slot: number): Promise<NmdCommandResult>;
   parityCheck(action: ParityCheckAction): Promise<NmdCommandResult>;
   unassignDisk(slot: number): Promise<NmdCommandResult>;
+  // Reconfigures the array to drop one or more permanently-disabled slots —
+  // the only way this driver supports actually shrinking the topology; see
+  // realClient.ts's doc comment for the full sequence and its risk profile.
+  // Requires the array already STARTED (to read live device paths) — the
+  // caller (routes/array.ts) is responsible for unmounting shares/disks
+  // first and remounting them after, same composition as /array/stop and
+  // /array/start already use around stopArray()/startArray().
+  shrinkArray(dropSlots: number[]): Promise<NmdCommandResult>;
   // The driver has no readback for write method — it's a write-only kernel
   // command (confirmed: absent from both `status -o json` and /proc/nmdstat)
   // — so the caller is the source of truth for what's "currently" set, same
