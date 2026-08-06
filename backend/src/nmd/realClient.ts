@@ -10,6 +10,18 @@ import type { AddDiskResult, AvailableDevice, ImportResult, NmdCommandResult, Nm
 const execFileAsync = promisify(execFile);
 
 /**
+ * Deterministic fallback ID for a device with no real udev-visible serial
+ * (common for virtio test disks, and any real disk without `serial=` set).
+ * Shared so findDeviceByDiskId() can reverse it — a synthetic ID isn't
+ * something a fresh udevadm scan will ever reproduce, so relocating one
+ * needs to check each candidate's own path against this same formula
+ * instead of the normal diskId comparison.
+ */
+function syntheticDiskId(devicePath: string): string {
+  return `manual-${devicePath.replace(/[^a-zA-Z0-9]+/g, '-')}`;
+}
+
+/**
  * Parses `nmdctl -u --no-color import`'s stdout. The command itself always
  * exits 0 even when some disks were skipped (a size mismatch, a missing
  * physical disk, etc.) — see import_disks() in tools/nmdctl, the main
@@ -228,8 +240,12 @@ export class RealNmdClient implements NmdClient {
 
     await this.startArray();
     const afterStart = await this.getStatus();
-    const pendingAction = afterStart.resync.action?.trim().split(/\s+/)[0];
-    if (pendingAction) await this.run(['check', pendingAction]);
+    // See commitNewDisk()'s comment: resync.action holds a stale idle label
+    // even when nothing is pending — `pending` is the real signal.
+    if (afterStart.resync.pending) {
+      const pendingAction = afterStart.resync.action.trim().split(/\s+/)[0]!;
+      await this.run(['check', pendingAction]);
+    }
 
     // nmdctl's own mount command creates /mnt/diskN on demand but never
     // removes it — a dropped slot would otherwise leave an empty, orphaned
@@ -243,6 +259,75 @@ export class RealNmdClient implements NmdClient {
     }
 
     return { ok: true, message: `Array reconfigured to ${keep.length} disks (backup of old superblock at ${backupPath}); parity rebuild started.` };
+  }
+
+  /**
+   * Recovers from stale/inconsistent driver-side counters (mdNumMissing,
+   * mdNumInvalid, etc.) without changing anything about the array's actual
+   * configuration — the superblock file is never touched or replaced, only
+   * the live kernel state gets refreshed by reloading against the same
+   * persisted file and re-importing each slot's already-known identity.
+   * This is the exact manual recovery sequence used successfully multiple
+   * times this session for ERROR:TOO_MANY_MISSING_DISKS and similar states
+   * that don't reflect any real problem with the disks themselves.
+   *
+   * Deliberately does not require the array to be STARTED first — unlike
+   * shrinkArray(), this is meant to work *from* an abnormal ERROR:* state,
+   * where array.state itself isn't 'STARTED'. Each disk's identity comes
+   * from status.disks[].disk_id, which stays populated even for a slot
+   * currently showing DISABLED/MISSING because of the very counter
+   * staleness this recovers from (confirmed repeatedly this session) — but
+   * status.disks[].device reads "none" for exactly those slots, so the
+   * actual device path is re-located fresh via disk_id, the same approach
+   * restoreUnassignedDisk() uses.
+   */
+  async reloadDriver(): Promise<NmdCommandResult> {
+    const before = await this.getStatus();
+    const superblockPath = before.array.superblock;
+
+    const known = before.disks.filter((d) => d.disk_id && d.disk_id !== 'none');
+    if (known.length === 0) {
+      throw new Error('No disks with a known identity to re-import — nothing to safely recover.');
+    }
+
+    const located: { slot: number; device: string; diskId: string; sizeKb: number }[] = [];
+    for (const d of known) {
+      const found = await this.findDeviceByDiskId(d.disk_id);
+      if (!found) {
+        throw new Error(
+          `Could not find a physical device matching slot ${d.slot}'s recorded ID (${d.disk_id}) — refusing to proceed with an incomplete re-import.`,
+        );
+      }
+      located.push({ slot: d.slot, device: found.partition ?? found.device, diskId: d.disk_id, sizeKb: d.size_kb });
+    }
+
+    await this.run(['stop']);
+
+    try {
+      await this.runSystem('modprobe', ['-r', 'nonraid']);
+    } catch (err) {
+      throw new Error(`Module unload failed — nothing was touched, array state is unchanged. Underlying error: ${(err as Error).message}`);
+    }
+
+    try {
+      await this.runSystem('modprobe', ['nonraid', `super=${superblockPath}`]);
+    } catch (err) {
+      throw new Error(
+        `Module reload failed after unloading — the array is currently down. ` +
+          `Run manually: sudo modprobe nonraid super=${superblockPath}. ` +
+          `Underlying error: ${(err as Error).message}`,
+      );
+    }
+
+    for (const d of located) {
+      await this.writeNmdCmd(`import ${d.slot} ${basename(d.device)} 0 ${d.sizeKb} 0 ${d.diskId}`);
+    }
+
+    await this.startArray();
+    return {
+      ok: true,
+      message: `Driver reloaded and ${located.length} disk(s) re-imported with their existing identities — the array's configuration didn't change.`,
+    };
   }
 
   async getStatus(): Promise<NmdStatusResponse> {
@@ -427,14 +512,33 @@ export class RealNmdClient implements NmdClient {
     const status = await this.getStatus();
     const claimedIds = status.disks.map((d) => d.disk_id).filter((id): id is string => !!id && id !== 'none');
 
+    // A disk actively serving as an array member is claimed by the driver and
+    // re-exposed as its own block device (e.g. /dev/nmd5p1) — the *raw*
+    // partition underneath (e.g. /dev/vdb1) never shows a mountpoint via
+    // lsblk, since nothing mounts it directly; the array driver sits above
+    // the OS mount layer entirely. That means neither the diskId match above
+    // nor scanDevice()'s own OS-level mount check can see it: a virtio test
+    // disk (or any real disk without a udev-visible serial) with no live
+    // diskId would pass the check above AND read as "unmounted" — exactly
+    // the shape of the incident that motivated the mount check in the first
+    // place, just via a different blind spot. Cross-referencing basenames
+    // against the array's own live device list closes it independently of
+    // both existing checks.
+    const claimedDeviceNames = new Set(
+      status.disks.map((d) => d.device).filter((dev): dev is string => !!dev && dev !== 'none'),
+    );
+
     const devicePaths = await this.enumerateDevicePaths();
     const scanned = await Promise.all(devicePaths.map((dev) => this.scanDevice(dev)));
     const devices = scanned.filter((d): d is AvailableDevice => d !== null);
 
-    // Same "already part of the array" filter add_disk() applies, matched
-    // both directions since a real disk's udevadm ID_SERIAL and the
-    // superblock's recorded disk_id aren't always byte-identical strings.
     return devices.filter((d) => {
+      if (claimedDeviceNames.has(basename(d.device)) || (d.partition && claimedDeviceNames.has(basename(d.partition)))) {
+        return false;
+      }
+      // Same "already part of the array" filter add_disk() applies, matched
+      // both directions since a real disk's udevadm ID_SERIAL and the
+      // superblock's recorded disk_id aren't always byte-identical strings.
       if (!d.diskId) return true;
       return !claimedIds.some((id) => d.diskId!.includes(id) || id.includes(d.diskId!));
     });
@@ -451,7 +555,20 @@ export class RealNmdClient implements NmdClient {
     const devicePaths = await this.enumerateDevicePaths();
     for (const dev of devicePaths) {
       const scanned = await this.scanDevice(dev);
-      if (scanned?.diskId && (scanned.diskId.includes(targetId) || targetId.includes(scanned.diskId))) {
+      if (!scanned) continue;
+      if (scanned.diskId && (scanned.diskId.includes(targetId) || targetId.includes(scanned.diskId))) {
+        return scanned;
+      }
+      // No real udev serial to match on — check whether this device's own
+      // path reproduces the target as a synthetic ID (see syntheticDiskId's
+      // doc comment). Tried against both the whole device and its partition
+      // — commitNewDisk() generates the fallback from whichever one was
+      // actually passed to `add` at the time, and there's no way to tell
+      // which from the ID string alone.
+      if (
+        targetId === syntheticDiskId(scanned.device) ||
+        (scanned.partition && targetId === syntheticDiskId(scanned.partition))
+      ) {
         return scanned;
       }
     }
@@ -500,7 +617,7 @@ export class RealNmdClient implements NmdClient {
         // No stable /dev/disk/by-id entry for this device (common for a
         // freshly-attached test VM disk with no `serial=` set) — fall back
         // to a synthetic ID rather than failing outright.
-        const fallbackId = `manual-${device.replace(/[^a-zA-Z0-9]+/g, '-')}`;
+        const fallbackId = syntheticDiskId(device);
         const { stdout } = await this.run(['add', '-f', `${slot}:${device}:${fallbackId}`]);
         lines.push(stdout.trim());
       } else {
@@ -523,8 +640,13 @@ export class RealNmdClient implements NmdClient {
     }
 
     const afterStart = await this.getStatus();
-    const pendingAction = afterStart.resync.action?.trim().split(/\s+/)[0];
-    if (pendingAction) {
+    // resync.action holds a stale/idle default label (e.g. "check P") even
+    // when nothing is actually pending — checking it for mere truthiness
+    // (as this used to) fires a bogus `check <word>` on every add/replace
+    // that didn't need one, which the driver correctly rejects as an
+    // invalid option. `pending` is the real signal.
+    if (afterStart.resync.pending) {
+      const pendingAction = afterStart.resync.action.trim().split(/\s+/)[0]!;
       const { stdout } = await this.run(['check', pendingAction]);
       lines.push(stdout.trim());
     }

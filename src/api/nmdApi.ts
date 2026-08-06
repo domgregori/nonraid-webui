@@ -29,6 +29,7 @@ export const nmdApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ dropSlots }),
     }),
+  reloadDriver: () => request<NmdCommandResult>('/api/array/reload-driver', { method: 'POST' }),
   setLabel: (label: string) =>
     request<NmdCommandResult>('/api/array/label', {
       method: 'PUT',

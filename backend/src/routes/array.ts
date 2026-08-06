@@ -99,6 +99,29 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
     }
   });
 
+  router.post('/array/reload-driver', async (_req, res) => {
+    try {
+      // Best-effort here, unlike /array/stop and /array/shrink — this is a
+      // recovery action meant to work from an already-broken state (e.g.
+      // ERROR:TOO_MANY_MISSING_DISKS), where the array may already be
+      // stopped with nothing mounted; failing the whole recovery because
+      // there was nothing to unmount would defeat the point.
+      await shares.unmountAll().catch(() => {});
+      await nmd.unmountDisks().catch(() => {});
+      const result = await nmd.reloadDriver();
+      try {
+        await nmd.mountDisks();
+        await shares.remountAll();
+      } catch (err) {
+        activity.log(`Driver reloaded, but remounting disks failed: ${(err as Error).message}`, 'amber').catch(() => {});
+      }
+      activity.log('Driver reloaded to recover from stale array state', 'amber').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   router.put('/array/label', async (req, res) => {
     try {
       const label = typeof req.body?.label === 'string' ? req.body.label : '';

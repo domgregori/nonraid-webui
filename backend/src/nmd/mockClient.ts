@@ -427,6 +427,11 @@ export class MockNmdClient implements NmdClient {
     return { ok: true, message: `Array reconfigured to drop slot(s) ${dropSlots.join(', ')} (mock).` };
   }
 
+  /** No stale-counter quirk to simulate in mock mode — the array's state model is always internally consistent, so this is just a no-op success. */
+  async reloadDriver(): Promise<NmdCommandResult> {
+    return { ok: true, message: 'Driver reloaded (mock) — nothing needed re-importing.' };
+  }
+
   /**
    * Undoes an uncommitted unassign — only while the slot is still in
    * unassignedSlots (DISK_NP_MISSING, identity intact). Once startArray()

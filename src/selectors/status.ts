@@ -29,13 +29,27 @@ export function isDegraded(status: NmdStatusResponse): boolean {
   return !isPhantomSecondParityGlitch(status);
 }
 
+// The kernel driver itself bakes this prefix into the state name for the
+// handful of states that mean something needs a human look (confirmed
+// against md_unraid.c this session — TOO_MANY_MISSING_DISKS,
+// INVALID_EXPANSION, PARITY_NOT_BIGGEST, NEW_DISK_TOO_SMALL, NO_DATA_DISKS —
+// every other abnormal state doesn't carry it). Distinct from DEGRADED:
+// this means the array likely isn't even running right now, not just
+// running with reduced protection.
+export function isArrayError(status: NmdStatusResponse): boolean {
+  return status.array.state.startsWith('ERROR:');
+}
+
 export function deriveArrayStatus(status: NmdStatusResponse | null) {
   if (!status) return { text: 'LOADING', color: COLORS.textDim, pillBg: tint(COLORS.textDim, 14) };
 
   const arrayStarted = status.array.state === 'STARTED';
   let text: string;
   let color: string;
-  if (!arrayStarted) {
+  if (isArrayError(status)) {
+    text = 'ERROR';
+    color = COLORS.red;
+  } else if (!arrayStarted) {
     text = 'STOPPED';
     color = COLORS.textDim;
   } else if (isDegraded(status)) {

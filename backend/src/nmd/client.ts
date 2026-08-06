@@ -71,6 +71,17 @@ export interface NmdClient {
   // first and remounting them after, same composition as /array/stop and
   // /array/start already use around stopArray()/startArray().
   shrinkArray(dropSlots: number[]): Promise<NmdCommandResult>;
+  // Recovers from stale/inconsistent driver-side counters (mdNumMissing,
+  // mdNumInvalid, etc. — they accumulate across import calls within a
+  // module's lifetime and are never recomputed from scratch except by a
+  // fresh module load, e.g. landing in ERROR:TOO_MANY_MISSING_DISKS after
+  // one ordinary unassign) without changing anything about the array's
+  // actual configuration. Unlike shrinkArray(), the superblock file itself
+  // is never touched or replaced — this only reloads the module against the
+  // same persisted file and re-imports each slot's already-known identity.
+  // Same risk category as shrinkArray()'s module reload; the caller is
+  // responsible for the same unmount-before/remount-after composition.
+  reloadDriver(): Promise<NmdCommandResult>;
   // The driver has no readback for write method — it's a write-only kernel
   // command (confirmed: absent from both `status -o json` and /proc/nmdstat)
   // — so the caller is the source of truth for what's "currently" set, same
