@@ -44,16 +44,61 @@ export class ShareService {
    * directory from before the restart. Best-effort per share: one share
    * with an offline disk shouldn't block the others (or startup) from
    * mounting.
+   *
+   * Also the natural checkpoint for growing `allDisks` shares: this runs
+   * after every operation that can change which disks are actually live
+   * (array start, shrink, reload-driver, backend startup) — see
+   * growAllDisksShares()'s own doc comment for why growth belongs here
+   * rather than hooked directly off Add/Replace Disk.
    */
   async remountAll(): Promise<void> {
     const [shares, ctx] = await Promise.all([this.store.list(), this.buildContext()]);
-    for (const share of shares) {
+    const grown = await this.growAllDisksShares(shares, ctx);
+    for (const share of grown) {
       try {
         await this.applier.mountShare(share, ctx);
       } catch (err) {
         console.error(`Failed to remount share "${share.name}" at startup:`, (err as Error).message);
       }
     }
+  }
+
+  /**
+   * For every share configured with `allDisks: true`, adds any currently-live
+   * data disk it doesn't already cover — never removes one, so a disk taken
+   * offline or dropped via Shrink Array doesn't silently disappear from a
+   * share's config out from under it; that stays an explicit, deliberate
+   * action. Persists each change before returning so the growth survives even
+   * if the mount attempt right after this fails, and so GET /shares reflects
+   * it immediately.
+   *
+   * Hooked into remountAll() rather than directly off Add/Replace Disk
+   * because those two endpoints only commit the disk at the driver level —
+   * they don't mount its filesystem (see /array/start's own comment on why
+   * that's a separate step) — so at the moment a disk is added there's no
+   * mountpoint yet to add it with. By the time remountAll() actually runs
+   * next (the user hits Start Array, same as for any newly added disk today),
+   * ctx has a real mountpoint for it.
+   */
+  private async growAllDisksShares(shares: Share[], ctx: ApplyContext): Promise<Share[]> {
+    const liveSlots = Object.keys(ctx.diskMountpoints).map(Number);
+    const result: Share[] = [];
+    for (const share of shares) {
+      if (!share.allDisks) {
+        result.push(share);
+        continue;
+      }
+      const missing = liveSlots.filter((slot) => !share.disks.includes(slot));
+      if (missing.length === 0) {
+        result.push(share);
+        continue;
+      }
+      const updated: Share = { ...share, disks: [...share.disks, ...missing].sort((a, b) => a - b) };
+      await this.store.upsert(updated);
+      this.activity.log(`Share "${share.name}" extended to new disk(s) ${missing.join(', ')}`, 'blue').catch(() => {});
+      result.push(updated);
+    }
+    return result;
   }
 
   /**

@@ -26,9 +26,12 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
   const [name, setName] = useState(initial?.name ?? '');
   const [disks, setDisks] = useState<number[]>(initial?.disks ?? allDiskSlots);
   const [allocationMethod, setAllocationMethod] = useState<AllocationMethod>(initial?.allocationMethod ?? 'most-free');
-  // Default to "all drives" on create, or on edit if the share already uses every data disk.
+  // Default to "all drives" on create. On edit, trust the share's own persisted
+  // allDisks flag when present — falls back to inferring from the current disk
+  // list only for shares saved before that flag existed.
   const [useAllDisks, setUseAllDisks] = useState<boolean>(() => {
     if (initial?.allocationMethod === 'single-disk') return false;
+    if (initial && initial.allDisks !== undefined) return initial.allDisks;
     const disksAtLoad = initial?.disks ?? allDiskSlots;
     return (
       disksAtLoad.length === allDiskSlots.length &&
@@ -88,6 +91,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
     const input: ShareInput = {
       name,
       disks,
+      allDisks: useAllDisks,
       allocationMethod,
       protocols: [...(smbEnabled ? (['smb'] as const) : []), ...(nfsEnabled ? (['nfs'] as const) : [])],
       smb: smbEnabled ? { public: smbPublic } : undefined,
@@ -125,7 +129,9 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
               <div>
                 <div className="toggle-row__title">Use all drives</div>
                 <div className="toggle-row__desc">
-                  {useAllDisks ? `Using all ${allDiskSlots.length} data disk(s)` : 'Choose specific disks below'}
+                  {useAllDisks
+                    ? `Using all ${allDiskSlots.length} data disk(s) — new disks are added automatically`
+                    : 'Choose specific disks below'}
                 </div>
               </div>
               <ToggleSwitch

@@ -14,6 +14,10 @@ export interface ShareAccess {
 export interface ShareInput {
   name: string;
   disks: number[]; // data disk slots
+  // When true, ShareService.remountAll() grows `disks` to cover any data disk
+  // that becomes live and isn't already included — new disk, never a removal,
+  // see remountAll()'s doc comment. Meaningless (and rejected) for single-disk.
+  allDisks?: boolean;
   allocationMethod: AllocationMethod;
   protocols: ShareProtocol[];
   smb?: { public: boolean };

@@ -5,6 +5,7 @@ export type ShareProtocol = 'smb' | 'nfs';
 export interface ShareInput {
   name: string;
   disks: number[];
+  allDisks?: boolean;
   allocationMethod: AllocationMethod;
   protocols: ShareProtocol[];
   smb?: { public: boolean };

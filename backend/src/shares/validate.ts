@@ -23,6 +23,12 @@ export function validateShareInput(input: unknown): ShareInput {
   if (i.allocationMethod === 'single-disk' && i.disks.length !== 1) {
     throw new HttpError(400, 'Single-disk allocation requires exactly one disk.');
   }
+  if (i.allDisks !== undefined && typeof i.allDisks !== 'boolean') {
+    throw new HttpError(400, 'allDisks must be a boolean.');
+  }
+  if (i.allDisks === true && i.allocationMethod === 'single-disk') {
+    throw new HttpError(400, 'allDisks cannot be combined with single-disk allocation.');
+  }
   if (
     !Array.isArray(i.protocols) ||
     i.protocols.length === 0 ||
@@ -34,6 +40,7 @@ export function validateShareInput(input: unknown): ShareInput {
   return {
     name: i.name,
     disks: i.disks as number[],
+    allDisks: i.allDisks === true,
     allocationMethod: i.allocationMethod as AllocationMethod,
     protocols: i.protocols as ShareProtocol[],
     smb: i.smb as ShareInput['smb'],
