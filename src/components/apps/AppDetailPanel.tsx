@@ -22,6 +22,25 @@ function namespaceOf(repository: string): string {
   return repository.split('/')[0] ?? repository;
 }
 
+/**
+ * Catalog fields typed as `string` aren't actually guaranteed to be one at
+ * runtime — the feed is converted from community-maintained XML templates,
+ * and some genuinely nest a field instead of using plain text (e.g. one real
+ * template has `Maintainer: { WebPage: "https://..." }`). Rendering an
+ * object directly as a React child throws an uncaught error with no error
+ * boundary around it, which unmounts the *entire* page — not just this
+ * panel — so every catalog value shown as text or used as a link goes
+ * through this first rather than trusting the declared type.
+ */
+function asText(value: unknown): string | null {
+  if (typeof value === 'string') return value || null;
+  if (value && typeof value === 'object') {
+    const firstString = Object.values(value as Record<string, unknown>).find((v) => typeof v === 'string');
+    return (firstString as string | undefined) ?? null;
+  }
+  return null;
+}
+
 export function AppDetailPanel({ name, repository, installed, onClose, onInstall, onViewNamespace }: AppDetailPanelProps) {
   const [app, setApp] = useState<CaApp | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,9 +59,15 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
   }, [name, repository]);
 
   const namespace = namespaceOf(repository);
-  const maintainer = app?.Maintainer || app?.Author;
+  const maintainer = asText(app?.Maintainer) || asText(app?.Author);
   const added = formatUnixSeconds(app?.FirstSeen);
   const updated = formatUnixSeconds(app?.LastUpdate);
+  const support = asText(app?.Support);
+  const project = asText(app?.Project);
+  const license = asText(app?.License);
+  const network = asText(app?.Network);
+  const repositoryText = asText(app?.Repository);
+  const overview = asText(app?.Overview);
 
   return (
     <>
@@ -75,13 +100,13 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
                   Install
                 </button>
               )}
-              {app.Support && (
-                <a className="btn" href={app.Support} target="_blank" rel="noreferrer">
+              {support && (
+                <a className="btn" href={support} target="_blank" rel="noreferrer">
                   Support
                 </a>
               )}
-              {app.Project && (
-                <a className="btn" href={app.Project} target="_blank" rel="noreferrer">
+              {project && (
+                <a className="btn" href={project} target="_blank" rel="noreferrer">
                   Source
                 </a>
               )}
@@ -102,7 +127,7 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
                 </div>
                 {installed.updateAvailable && (
                   <div className="apps-update-note">
-                    A different image is now in the template: {app.Repository} (currently running{' '}
+                    A different image is now in the template: {repositoryText ?? repository} (currently running{' '}
                     {installed.installedRepository}). Remove the existing container from the Docker page, then
                     reinstall this template to update.
                   </div>
@@ -110,7 +135,7 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
               </div>
             )}
 
-            {app.Overview && <div className="apps-detail__overview">{app.Overview.replace(/\r\n/g, '\n').trim()}</div>}
+            {overview && <div className="apps-detail__overview">{overview.replace(/\r\n/g, '\n').trim()}</div>}
 
             <div className="detail-section">
               <div className="detail-section__title">Details</div>
@@ -119,19 +144,23 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
                   <span className="detail-row__label">Application type</span>
                   <span className="detail-row__value">Docker</span>
                 </div>
-                {app.CategoryList && app.CategoryList.length > 0 && (
+                {app.CategoryList && app.CategoryList.filter((c) => typeof c === 'string').length > 0 && (
                   <div className="detail-row">
                     <span className="detail-row__label">Categories</span>
-                    <span className="detail-row__value">{app.CategoryList.map((c) => c.replace(/-/g, ' ')).join(', ')}</span>
+                    <span className="detail-row__value">
+                      {app.CategoryList.filter((c) => typeof c === 'string')
+                        .map((c) => c.replace(/-/g, ' '))
+                        .join(', ')}
+                    </span>
                   </div>
                 )}
                 <div className="detail-row">
                   <span className="detail-row__label">Repository</span>
-                  <span className="detail-row__value">{app.Repository}</span>
+                  <span className="detail-row__value">{repositoryText ?? repository}</span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-row__label">Network</span>
-                  <span className="detail-row__value">{app.Network || 'bridge'}</span>
+                  <span className="detail-row__value">{network || 'bridge'}</span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-row__label">Privileged</span>
@@ -161,10 +190,10 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
                     <span className="detail-row__value">{updated}</span>
                   </div>
                 )}
-                {app.License && (
+                {license && (
                   <div className="detail-row">
                     <span className="detail-row__label">License</span>
-                    <span className="detail-row__value">{app.License}</span>
+                    <span className="detail-row__value">{license}</span>
                   </div>
                 )}
               </div>

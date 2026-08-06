@@ -33,7 +33,14 @@ export const APP_NAME_LABEL = 'com.nonraid.apps.name';
 export const APP_REPOSITORY_LABEL = 'com.nonraid.apps.repository';
 
 function toSummary(app: CaApp, installedContainer: DockerContainerSummary | undefined): AppSummary {
-  const overview = (app.Overview ?? '').replace(/\s+/g, ' ').trim();
+  // Fields typed as string on CaApp aren't actually guaranteed to be one at
+  // runtime — the feed is converted from community-maintained XML, and some
+  // templates genuinely nest a field instead of using plain text (e.g. a
+  // real one has Maintainer: { WebPage: "..." } instead of a string). This
+  // runs once per catalog entry for every /apps list request, so a `string`
+  // method call on the wrong type here would 500 the whole listing, not
+  // just one app's detail view.
+  const overview = (typeof app.Overview === 'string' ? app.Overview : '').replace(/\s+/g, ' ').trim();
   const installed: InstalledInfo | null = installedContainer
     ? {
         containerId: installedContainer.id,
