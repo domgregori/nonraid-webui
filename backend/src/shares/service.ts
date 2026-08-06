@@ -1,4 +1,4 @@
-import { rm } from 'node:fs/promises';
+import { rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { ActivityStore } from '../activity/index.js';
 import { config } from '../config.js';
@@ -142,7 +142,8 @@ export class ShareService {
   }
 
   async update(name: string, input: unknown): Promise<Share> {
-    if (!(await this.store.get(name))) {
+    const existing = await this.store.get(name);
+    if (!existing) {
       throw new HttpError(404, `Share "${name}" not found.`);
     }
     const share = validateShareInput(input);
@@ -154,6 +155,15 @@ export class ShareService {
         throw new HttpError(409, `Share "${share.name}" already exists.`);
       }
       await this.applier.unmountShare(name);
+      // mountShare() only ever creates a fresh, empty directory for whatever
+      // name it's given — it has no idea a same-data directory under the old
+      // name exists. Without this, a rename would silently orphan every real
+      // file on disk: still present, but invisible through the renamed
+      // share's mount and effectively unreachable to anyone who doesn't know
+      // to go hunting through /mnt/diskN/<old-name> directly. Uses the
+      // *old* share's own disk list — the data lives wherever it was
+      // actually assigned before, not wherever the new config points.
+      await this.moveShareData(existing, share.name, ctx);
       await this.store.remove(name);
       await this.renameAccess(name, share.name);
     }
@@ -188,5 +198,38 @@ export class ShareService {
     await this.aclStore.removeShare(oldName);
     for (const [user, perm] of Object.entries(access.users)) await this.aclStore.setEntry(newName, 'users', user, perm);
     for (const [group, perm] of Object.entries(access.groups)) await this.aclStore.setEntry(newName, 'groups', group, perm);
+  }
+
+  /**
+   * Moves a share's real per-disk directories from its old name to its new
+   * one, on every disk it was actually assigned to before the rename (not
+   * wherever the new config points — a rename can change disks in the same
+   * call). Refuses the whole rename if any of those disks is currently
+   * offline, rather than proceeding partially — going ahead anyway would
+   * strand that disk's data under the old name, unreachable through the
+   * renamed share, until someone happens to notice and fix it up by hand.
+   * A disk with no old-named directory (nothing was ever written there) is
+   * a normal no-op, not an error.
+   */
+  private async moveShareData(oldShare: Share, newName: string, ctx: ApplyContext): Promise<void> {
+    const skipped: number[] = [];
+    for (const slot of oldShare.disks) {
+      const mountpoint = ctx.diskMountpoints[slot];
+      if (!mountpoint) {
+        skipped.push(slot);
+        continue;
+      }
+      const oldPath = `${mountpoint}/${oldShare.name}`;
+      const newPath = `${mountpoint}/${newName}`;
+      const exists = await stat(oldPath).then(() => true, () => false);
+      if (!exists) continue;
+      await rename(oldPath, newPath);
+    }
+    if (skipped.length > 0) {
+      throw new HttpError(
+        409,
+        `Slot(s) ${skipped.join(', ')} are offline — their data under "${oldShare.name}" can't be moved right now. Bring them back online before renaming, or the data would be stranded under the old name.`,
+      );
+    }
   }
 }
