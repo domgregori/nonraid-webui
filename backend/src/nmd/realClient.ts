@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { closeSync, constants, openSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, rmdir, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
@@ -230,6 +230,17 @@ export class RealNmdClient implements NmdClient {
     const afterStart = await this.getStatus();
     const pendingAction = afterStart.resync.action?.trim().split(/\s+/)[0];
     if (pendingAction) await this.run(['check', pendingAction]);
+
+    // nmdctl's own mount command creates /mnt/diskN on demand but never
+    // removes it — a dropped slot would otherwise leave an empty, orphaned
+    // mount point behind forever. Best-effort and deliberately the plain
+    // (non-recursive) rmdir: it only succeeds on a genuinely empty
+    // directory, so anything unexpectedly left there (or still mounted —
+    // rmdir also refuses on an active mount point) is left alone rather
+    // than risking deleting something real.
+    for (const slot of dropSlots) {
+      await rmdir(`/mnt/disk${slot}`).catch(() => {});
+    }
 
     return { ok: true, message: `Array reconfigured to ${keep.length} disks (backup of old superblock at ${backupPath}); parity rebuild started.` };
   }
