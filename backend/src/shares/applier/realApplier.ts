@@ -121,7 +121,16 @@ export class RealShareApplier implements ShareApplier {
       // makes every branch ineligible (ENOSPC on every write) on small disks. ctx.minFreeSpaceMb
       // comes from Settings (default 100M, matching this repo's small test disks) rather than
       // being hardcoded, so real deployments can raise it back toward mergerfs's own default.
-      await run('mergerfs', ['-o', `category.create=${policy},use_ino,minfreespace=${ctx.minFreeSpaceMb}M`, branches.join(':'), mountPoint]);
+      //
+      // `allow_other` is required or FUSE denies every non-root process access to the mount
+      // outright, regardless of the underlying directory's own permission bits — confirmed live:
+      // smbd (which drops to the connecting user's uid for file access, per Samba's own security
+      // model) got ACCESS_DENIED on every multi-disk share for every user, guest or fully
+      // authenticated, while single-disk shares (bind-mounted below, no FUSE layer involved) were
+      // unaffected. This is the real root cause behind what looked like a guest-only SMB gap.
+      // Safe here specifically because this process runs as root — allow_other otherwise needs
+      // `user_allow_other` in /etc/fuse.conf, which only matters for a non-root mounting process.
+      await run('mergerfs', ['-o', `allow_other,category.create=${policy},use_ino,minfreespace=${ctx.minFreeSpaceMb}M`, branches.join(':'), mountPoint]);
     }
 
     return { ok: true, message: `Share "${share.name}" mounted at ${mountPoint} (${branches.length} disk${branches.length === 1 ? '' : 's'})` };
