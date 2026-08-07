@@ -24,6 +24,16 @@ function envBool(name: string, fallback: boolean): boolean {
 export const config = {
   port: Number(process.env.PORT ?? 3001),
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5183',
+  // Single admin account — see backend/src/auth/.
+  authConfigPath: process.env.AUTH_CONFIG_PATH ?? path.join(process.cwd(), 'data', 'auth.json'),
+  // MUST be true once real TLS termination exists in front of this backend —
+  // see ../nonraid/REQUIREMENTS.md's Security section. false is only correct
+  // for the current non-TLS dev/test setup; a Secure cookie sent over plain
+  // HTTP is simply dropped by the browser, silently breaking login.
+  cookieSecure: envBool('COOKIE_SECURE', false),
+  sessionTtlMs: Number(process.env.SESSION_TTL_MS ?? 30 * 24 * 60 * 60 * 1000),
+  loginRateLimitWindowMs: Number(process.env.LOGIN_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),
+  loginRateLimitMax: Number(process.env.LOGIN_RATE_LIMIT_MAX ?? 10),
   nmdMode: (process.env.NMD_MODE as NmdMode | undefined) ?? 'real',
   nmdBin: process.env.NMD_BIN ?? 'nmdctl',
   nmdSuperblock: process.env.NMD_SUPERBLOCK, // optional -s override, undefined = nmdctl default

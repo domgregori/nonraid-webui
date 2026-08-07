@@ -1,10 +1,12 @@
 import { deriveToggleButton } from '../../selectors/status';
 import { useArrayStatus } from '../../state/useArrayStatus';
+import { useAuth } from '../../state/useAuth';
 import { ArrayStatusPill } from './ArrayStatusPill';
 import { HeaderSystemInfo } from './HeaderSystemInfo';
 
 export function Header() {
   const { status, arrayPending, toggleArray } = useArrayStatus();
+  const { logout } = useAuth();
   const toggleBtn = deriveToggleButton(status);
 
   return (
@@ -26,6 +28,9 @@ export function Header() {
           style={{ borderColor: toggleBtn.border, background: toggleBtn.bg, color: toggleBtn.fg }}
         >
           {toggleBtn.label}
+        </button>
+        <button type="button" className="btn" onClick={() => logout()}>
+          Log out
         </button>
       </div>
     </div>

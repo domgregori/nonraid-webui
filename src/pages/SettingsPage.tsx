@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { authApi } from '../api/authApi';
 import { nmdApi } from '../api/nmdApi';
 import { settingsApi } from '../api/settingsApi';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
@@ -31,6 +32,13 @@ export function SettingsPage() {
   const [importRunning, setImportRunning] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [showImportOutput, setShowImportOutput] = useState(false);
+
+  const [currentPasswordDraft, setCurrentPasswordDraft] = useState('');
+  const [newPasswordDraft, setNewPasswordDraft] = useState('');
+  const [confirmPasswordDraft, setConfirmPasswordDraft] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordResult, setPasswordResult] = useState<string | null>(null);
 
   // Only seed the drafts the first time data arrives — re-syncing on every
   // later status/settings poll would clobber whatever the user is mid-typing
@@ -116,6 +124,27 @@ export function SettingsPage() {
       setTestError((err as Error).message);
     } finally {
       setTestSending(false);
+    }
+  };
+
+  const changePassword = async () => {
+    if (newPasswordDraft !== confirmPasswordDraft) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+    setPasswordSaving(true);
+    setPasswordError(null);
+    setPasswordResult(null);
+    try {
+      await authApi.changePassword(currentPasswordDraft, newPasswordDraft);
+      setCurrentPasswordDraft('');
+      setNewPasswordDraft('');
+      setConfirmPasswordDraft('');
+      setPasswordResult('Password changed. Any other signed-in session has been logged out.');
+    } catch (err) {
+      setPasswordError((err as Error).message);
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -334,6 +363,51 @@ export function SettingsPage() {
           </div>
           {testResult && <div className="status-note">{testResult}</div>}
           {testError && <div className="status-note status-note--error">{testError}</div>}
+        </div>
+      </div>
+
+      <div className="settings-card">
+        <div className="settings-card__title">Security</div>
+        <div className="settings-field">
+          <div className="toggle-row__title">Change admin password</div>
+          <div className="toggle-row__desc">
+            Also signs out every other session — this stateless-cookie design has no other way to revoke a session
+            early.
+          </div>
+          <input
+            type="password"
+            className="history-input"
+            style={{ width: '100%' }}
+            value={currentPasswordDraft}
+            onChange={(e) => setCurrentPasswordDraft(e.target.value)}
+            placeholder="Current password"
+            autoComplete="current-password"
+          />
+          <input
+            type="password"
+            className="history-input"
+            style={{ width: '100%' }}
+            value={newPasswordDraft}
+            onChange={(e) => setNewPasswordDraft(e.target.value)}
+            placeholder="New password"
+            autoComplete="new-password"
+          />
+          <input
+            type="password"
+            className="history-input"
+            style={{ width: '100%' }}
+            value={confirmPasswordDraft}
+            onChange={(e) => setConfirmPasswordDraft(e.target.value)}
+            placeholder="Confirm new password"
+            autoComplete="new-password"
+          />
+          <div className="settings-field__row">
+            <button type="button" className="btn" disabled={passwordSaving} onClick={changePassword}>
+              {passwordSaving ? 'Changing…' : 'Change password'}
+            </button>
+          </div>
+          {passwordResult && <div className="status-note">{passwordResult}</div>}
+          {passwordError && <div className="status-note status-note--error">{passwordError}</div>}
         </div>
       </div>
     </div>

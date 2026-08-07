@@ -2,15 +2,15 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
-import App from './App.tsx'
-import { ArrayStatusProvider } from './state/ArrayStatusProvider'
+import { AuthGate } from './AuthGate.tsx'
+import { AuthProvider } from './state/AuthProvider'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <ArrayStatusProvider>
-        <App />
-      </ArrayStatusProvider>
+      <AuthProvider>
+        <AuthGate />
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 )

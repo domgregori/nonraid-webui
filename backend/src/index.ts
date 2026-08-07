@@ -2,6 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import { ActivityStore, ActivityWatcher } from './activity/index.js';
 import { AppsService, CaFeedStore } from './apps/index.js';
+import { AuthService, AuthStore, requireAuth } from './auth/index.js';
 import { BrowseService } from './browse/service.js';
 import { config } from './config.js';
 import { createDockerClient } from './docker/index.js';
@@ -12,6 +13,7 @@ import { createNmdClient } from './nmd/index.js';
 import { activityRouter } from './routes/activity.js';
 import { appsRouter } from './routes/apps.js';
 import { arrayRouter } from './routes/array.js';
+import { authRouter } from './routes/auth.js';
 import { browseRouter } from './routes/browse.js';
 import { disksRouter } from './routes/disks.js';
 import { dockerRouter } from './routes/docker.js';
@@ -38,6 +40,9 @@ async function main() {
   const smart = new SmartService(createSmartClient());
   const activity = new ActivityStore();
   new ActivityWatcher(nmd, smart, activity);
+  const authStore = new AuthStore();
+  const authService = new AuthService(authStore);
+  await authStore.get(); // fail fast at boot on a corrupt auth.json
   const settingsStore = new SettingsStore();
   const shareApplier = createShareApplier();
   const shareStore = new ShareStore();
@@ -73,7 +78,7 @@ async function main() {
   await shares.remountAll();
 
   const app = express();
-  app.use(cors({ origin: config.corsOrigin }));
+  app.use(cors({ origin: config.corsOrigin, credentials: true }));
   app.use(express.json());
 
   app.get('/api/health', (_req, res) => {
@@ -87,6 +92,18 @@ async function main() {
       usersMode: usersClient.mode,
     });
   });
+
+  // Auth routes handle their own access rules (setup/login/status/logout are
+  // public by design, password-change checks the session itself) — mounted
+  // before the gate below so none of them get blocked by it.
+  app.use('/api', authRouter(authService));
+  // Everything mounted after this point requires a valid session. This bare
+  // app.use() currently guards every remaining route because nothing but
+  // /api/* is mounted on this app — if a later change serves the built
+  // frontend as static files from this same Express instance, that
+  // middleware must be registered *before* this gate (or the gate scoped to
+  // /api specifically), or it would end up gating the frontend's own assets.
+  app.use(requireAuth(authService));
 
   app.use('/api', statusRouter(nmd));
   app.use('/api', arrayRouter(nmd, settingsStore, activity, shares));
