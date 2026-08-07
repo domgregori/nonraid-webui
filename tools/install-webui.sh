@@ -20,6 +20,30 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 
 [ "$(id -u)" = 0 ] || fail "must be run as root (sudo tools/install-webui.sh)."
 
+log "Checking for the NonRAID kernel driver and nmdctl"
+
+# This only installs the webui itself — it's useless without the actual
+# NonRAID kernel driver (md_nonraid/nonraid6_pq) and the nmdctl CLI already
+# on this host. `modinfo` checks the driver is built/installed even if not
+# currently loaded (e.g. right after boot, before nonraid.service starts it);
+# `command -v` checks nmdctl is on PATH. Either missing means array-related
+# pages will just show errors until both exist — ask before proceeding rather
+# than silently installing something that can't work yet.
+if ! modinfo md_nonraid >/dev/null 2>&1 || ! command -v nmdctl >/dev/null 2>&1; then
+  cat >&2 <<'EOF'
+
+The NonRAID kernel driver and/or nmdctl were not detected on this host.
+nonraid-webui needs both already installed and working — this script only
+installs the webui itself. See https://github.com/qvr/nonraid for driver and
+nmdctl installation instructions.
+EOF
+  read -r -p "Continue installing nonraid-webui anyway? [y/N] " reply
+  case "$reply" in
+    [yY] | [yY][eE][sS]) log "Continuing without a confirmed driver/nmdctl install." ;;
+    *) fail "Aborted. Install the NonRAID driver and nmdctl first, then re-run this script." ;;
+  esac
+fi
+
 log "Checking prerequisites"
 
 [ -x "$NODE_BIN" ] || fail "$NODE_BIN not found. Install Node.js 20.6+ (or 21.7+) system-wide, e.g. from NodeSource — see ../nonraid/REQUIREMENTS.md."
