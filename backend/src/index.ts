@@ -1,5 +1,7 @@
 import cors from 'cors';
 import express from 'express';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { ActivityStore, ActivityWatcher } from './activity/index.js';
 import { AppsService, CaFeedStore } from './apps/index.js';
 import { AuthService, AuthStore, requireAuth } from './auth/index.js';
@@ -43,6 +45,9 @@ async function main() {
   const authStore = new AuthStore();
   const authService = new AuthService(authStore);
   await authStore.get(); // fail fast at boot on a corrupt auth.json
+  if (config.serveFrontend && !existsSync(path.join(config.frontendDistPath, 'index.html'))) {
+    throw new Error(`serveFrontend is true but no index.html at ${config.frontendDistPath} — did the frontend build run?`);
+  }
   const settingsStore = new SettingsStore();
   const shareApplier = createShareApplier();
   const shareStore = new ShareStore();
@@ -97,12 +102,33 @@ async function main() {
   // public by design, password-change checks the session itself) — mounted
   // before the gate below so none of them get blocked by it.
   app.use('/api', authRouter(authService));
-  // Everything mounted after this point requires a valid session. This bare
-  // app.use() currently guards every remaining route because nothing but
-  // /api/* is mounted on this app — if a later change serves the built
-  // frontend as static files from this same Express instance, that
-  // middleware must be registered *before* this gate (or the gate scoped to
-  // /api specifically), or it would end up gating the frontend's own assets.
+
+  // Production deployment shape (see tools/systemd/nonraid-webui.service):
+  // this backend also serves the frontend's built static bundle and falls
+  // back to index.html for client-side routes, so a logged-out browser can
+  // still load the app shell (whose own JS renders the Login/Setup screen)
+  // instead of getting a raw 401 on first load or on a hard refresh of a
+  // route like /disks. Must stay before the requireAuth gate below for
+  // exactly that reason. Both handlers are bare app.use()/app.get() with no
+  // path scoping of their own, so they'd otherwise see every request
+  // including ones meant for the /api/* routers mounted after the gate —
+  // isApiPath keeps this scoped to non-API paths only. Relies on
+  // express.static's default { fallthrough: true }; if that's ever
+  // overridden, a missing static file 404s directly instead of falling
+  // through to the SPA route below.
+  if (config.serveFrontend) {
+    const isApiPath = (req: express.Request): boolean => req.path === '/api' || req.path.startsWith('/api/');
+    app.use((req, res, next) => {
+      if (isApiPath(req)) return next();
+      express.static(config.frontendDistPath)(req, res, next);
+    });
+    app.get('*', (req, res, next) => {
+      if (isApiPath(req)) return next();
+      res.sendFile(path.join(config.frontendDistPath, 'index.html'));
+    });
+  }
+
+  // Everything mounted after this point requires a valid session.
   app.use(requireAuth(authService));
 
   app.use('/api', statusRouter(nmd));

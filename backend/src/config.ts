@@ -24,6 +24,17 @@ function envBool(name: string, fallback: boolean): boolean {
 export const config = {
   port: Number(process.env.PORT ?? 3001),
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5183',
+  // When true, this backend also serves the frontend's built static files
+  // (and falls back to index.html for client-side routes) from this same
+  // Express instance — the production deployment shape, see
+  // tools/systemd/nonraid-webui.service. Must stay false for today's dev
+  // setup, where Vite's own dev server serves the frontend separately on
+  // its own origin/port (see corsOrigin above).
+  serveFrontend: envBool('SERVE_FRONTEND', false),
+  // Absolute path to the frontend's built dist/ output (`npm run build` at
+  // the repo root — Vite's default outDir, see vite.config.ts). Only read
+  // when serveFrontend is true.
+  frontendDistPath: process.env.FRONTEND_DIST_PATH ?? path.join(process.cwd(), 'frontend-dist'),
   // Single admin account — see backend/src/auth/.
   authConfigPath: process.env.AUTH_CONFIG_PATH ?? path.join(process.cwd(), 'data', 'auth.json'),
   // MUST be true once real TLS termination exists in front of this backend —

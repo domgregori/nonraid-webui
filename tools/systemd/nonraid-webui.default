@@ -1,0 +1,33 @@
+# This file is sourced by the nonraid-webui.service systemd unit
+
+# TCP port the backend listens on (also serves the frontend from this same
+# port and origin when SERVE_FRONTEND=true, below).
+# Default: 3001
+#PORT=3001
+
+# Serve the frontend's built static files (and the SPA's index.html for
+# client-side routes) from this backend, so the whole app is reachable from
+# one origin/port with no separate frontend server or reverse proxy needed.
+# This is what makes this the production deployment shape, as opposed to the
+# dev setup (Vite's own dev server serving the frontend separately) — see
+# backend/src/config.ts's serveFrontend doc comment. The backend's own
+# code-level default is false (for dev); this file's default is true since
+# it's only installed for this production service.
+# Default: true
+#SERVE_FRONTEND=true
+
+# Absolute path to the frontend's built dist/ output (`npm run build` at the
+# nonraid-webui repo root — see vite.config.ts). Only read when
+# SERVE_FRONTEND=true above.
+# Default: /opt/nonraid-webui/frontend-dist (where install-webui.sh installs it)
+#FRONTEND_DIST_PATH=/opt/nonraid-webui/frontend-dist
+
+# Whether the session cookie gets the Secure attribute (HTTPS-only).
+# MUST be changed to true once real TLS termination sits in front of this
+# backend — until then, false is correct: a Secure cookie sent over plain
+# HTTP is silently dropped by the browser, breaking login outright. See
+# backend/src/config.ts's cookieSecure doc comment and
+# ../nonraid/REQUIREMENTS.md's Security section — TLS is a documented,
+# currently unmet requirement for this box.
+# Default: false
+#COOKIE_SECURE=false
