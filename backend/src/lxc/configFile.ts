@@ -18,9 +18,7 @@ import path from 'node:path';
  *
  * The line-parsing logic itself (`parseVariable`/`applyVariable`) is
  * exported as pure string → string functions, separate from the fs-backed
- * ones below, so MockLxcClient can run identical parsing against its
- * in-memory config text — one implementation of the format, not two
- * drifting copies.
+ * ones below, for easy unit testing against in-memory config text.
  */
 
 function findLineIndex(lines: string[], key: string): number {

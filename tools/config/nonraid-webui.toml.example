@@ -44,7 +44,6 @@ frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
 #login_rate_limit_max = 10
 
 [nmd]
-#mode = "real"  # "real" or "mock" — mock only ever runs if you set this by hand
 #bin = "nmdctl"
 # Optional -s superblock path override — omit to use nmdctl's own default.
 #superblock = "/nonraid.dat"
@@ -54,11 +53,7 @@ frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
 #timeout_ms = 15000
 #cmd_path = "/proc/nmdcmd"
 
-[docker]
-#mode = "real"  # "real" or "mock"
-
 [smart]
-#mode = "real"  # "real" or "mock"
 #bin = "smartctl"
 #use_sudo = false
 #timeout_ms = 10000
@@ -66,7 +61,6 @@ frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
 #attributes_cache_ttl_ms = 4000
 
 [shares]
-#mode = "real"  # "real" or "mock"
 #config_path = "./data/shares.json"
 #mount_root = "/mnt/user"
 #smb_conf_path = "/etc/samba/smb.conf"
@@ -84,7 +78,6 @@ frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
 #stats_interval_ms = 2000
 
 [users]
-#mode = "real"  # "real" or "mock"
 #use_sudo = false
 # Managed users/groups live in [uid_range_start, uid_range_end] — never
 # touches real host accounts outside this range.
@@ -112,7 +105,6 @@ frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
 #watcher_interval_ms = 30000
 
 [lxc]
-#mode = "real"  # "real" or "mock"
 #default_path = "/var/lib/lxc"
 #use_sudo = false
 #timeout_ms = 15000

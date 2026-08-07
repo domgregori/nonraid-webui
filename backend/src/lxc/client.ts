@@ -8,7 +8,6 @@ import type {
 } from './types.js';
 
 export interface LxcClient {
-  readonly mode: 'real' | 'mock';
   listContainers(): Promise<LxcContainerSummary[]>;
   inspectContainer(name: string): Promise<LxcContainerDetail>;
   startContainer(name: string): Promise<LxcCommandResult>;
@@ -26,9 +25,7 @@ export interface LxcClient {
   // Host bridge/veth-parent interfaces a new container's network can attach
   // to — see the "Networking note" in the LXC handoff.
   listBridges(): Promise<string[]>;
-  // Distribution/release combos the create form can offer. RealLxcClient
-  // fetches this live from the image server (via the download template's
-  // own `--list`); MockLxcClient returns a fixed list since it never shells
-  // out to anything.
+  // Distribution/release combos the create form can offer — fetched live
+  // from the image server via the download template's own `--list`.
   listDistros(): Promise<{ distros: LxcDistroOption[]; defaultArch: string }>;
 }

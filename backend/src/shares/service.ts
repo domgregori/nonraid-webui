@@ -24,16 +24,14 @@ export class ShareService {
   private async buildContext(): Promise<ApplyContext> {
     const [status, settings] = await Promise.all([this.nmd.getStatus(), this.settingsStore.get()]);
     const diskMountpoints: Record<number, string> = {};
-    const diskSizesGb: Record<number, number> = {};
 
     for (const d of status.disks) {
       if (d.type !== 'data') continue;
-      diskSizesGb[d.slot] = d.size_gb;
       const mp = d.filesystem?.mountpoint;
       if (mp && mp !== '-') diskMountpoints[d.slot] = mp;
     }
 
-    return { diskMountpoints, diskSizesGb, minFreeSpaceMb: settings.minFreeSpaceMb };
+    return { diskMountpoints, minFreeSpaceMb: settings.minFreeSpaceMb };
   }
 
   /**

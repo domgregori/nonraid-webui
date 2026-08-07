@@ -51,7 +51,7 @@ function t(section: string, key: string): TomlValue | undefined {
 
 // Every config value resolves env var (if set) > TOML value (if the winning
 // file sets it) > hardcoded fallback. Env vars stay authoritative so quick
-// ad hoc overrides keep working (e.g. `NMD_MODE=mock npm run dev`) — TOML is
+// ad hoc overrides keep working (e.g. `PORT=4000 npm run dev`) — TOML is
 // the preferred *durable* surface, layered underneath.
 function str(envName: string, tomlValue: TomlValue | undefined, fallback: string): string {
   const envVal = process.env[envName];
@@ -80,15 +80,6 @@ function strArray(envName: string, tomlValue: TomlValue | undefined, fallback: s
   if (Array.isArray(tomlValue)) return tomlValue.filter((v): v is string => typeof v === 'string');
   return fallback;
 }
-
-// 'real' is the default and only picks mock when a person sets MODE=mock by hand.
-// No 'auto' — the system must not switch to mock data by itself.
-export type NmdMode = 'real' | 'mock';
-export type DockerMode = 'real' | 'mock';
-export type SmartMode = 'real' | 'mock';
-export type SharesMode = 'real' | 'mock';
-export type UsersMode = 'real' | 'mock';
-export type LxcMode = 'real' | 'mock';
 
 // See appsBindRoots below — resolved once, ahead of the object literal, so
 // both its own field and appsBindRoots's cross-key fallback can reuse the one
@@ -119,7 +110,6 @@ export const config = {
   sessionTtlMs: num('SESSION_TTL_MS', t('auth', 'session_ttl_ms'), 30 * 24 * 60 * 60 * 1000),
   loginRateLimitWindowMs: num('LOGIN_RATE_LIMIT_WINDOW_MS', t('auth', 'login_rate_limit_window_ms'), 15 * 60 * 1000),
   loginRateLimitMax: num('LOGIN_RATE_LIMIT_MAX', t('auth', 'login_rate_limit_max'), 10),
-  nmdMode: str('NMD_MODE', t('nmd', 'mode'), 'real') as NmdMode,
   nmdBin: str('NMD_BIN', t('nmd', 'bin'), 'nmdctl'),
   nmdSuperblock: optStr('NMD_SUPERBLOCK', t('nmd', 'superblock')), // optional -s override, undefined = nmdctl default
   nmdUseSudo: bool('NMD_USE_SUDO', t('nmd', 'use_sudo'), false),
@@ -128,8 +118,6 @@ export const config = {
   // no unattended bypass, so unassign writes this driver command directly instead
   // (see docs/manual-management.md in the main nonraid repo).
   nmdCmdPath: str('NMD_CMD_PATH', t('nmd', 'cmd_path'), '/proc/nmdcmd'),
-  dockerMode: str('DOCKER_MODE', t('docker', 'mode'), 'real') as DockerMode,
-  smartMode: str('SMART_MODE', t('smart', 'mode'), 'real') as SmartMode,
   smartctlBin: str('SMARTCTL_BIN', t('smart', 'bin'), 'smartctl'),
   smartUseSudo: bool('SMART_USE_SUDO', t('smart', 'use_sudo'), false),
   smartTimeoutMs: num('SMART_TIMEOUT_MS', t('smart', 'timeout_ms'), 10_000),
@@ -138,7 +126,6 @@ export const config = {
   // polled continuously like temperature — short TTL so self-test progress
   // (see smart/service.ts) shows up promptly without hammering smartctl.
   smartAttributesCacheTtlMs: num('SMART_ATTRIBUTES_CACHE_TTL_MS', t('smart', 'attributes_cache_ttl_ms'), 4_000),
-  sharesMode: str('SHARES_MODE', t('shares', 'mode'), 'real') as SharesMode,
   sharesConfigPath: str('SHARES_CONFIG_PATH', t('shares', 'config_path'), path.join(process.cwd(), 'data', 'shares.json')),
   shareMountRoot,
   // The file Browse page's own ceiling/starting point — independent of
@@ -152,7 +139,6 @@ export const config = {
   sharesUseSudo: bool('SHARES_USE_SUDO', t('shares', 'use_sudo'), false),
   shareAccessConfigPath: str('SHARE_ACCESS_CONFIG_PATH', t('shares', 'access_config_path'), path.join(process.cwd(), 'data', 'share-access.json')),
   systemStatsIntervalMs: num('SYSTEM_STATS_INTERVAL_MS', t('system', 'stats_interval_ms'), 2_000),
-  usersMode: str('USERS_MODE', t('users', 'mode'), 'real') as UsersMode,
   usersUseSudo: bool('USERS_USE_SUDO', t('users', 'use_sudo'), false),
   // Managed users/groups live in [start, end], so they're clearly distinguishable
   // from real host system accounts (never touches anything outside this range).
@@ -197,7 +183,6 @@ export const config = {
   // toolset ich777's unraid-lxc-plugin wraps in PHP. `lxcDefaultPath` is
   // passed as `-P` to every lxc-* call, matching that plugin's configurable
   // storage root (analogous to appsBindRoots above).
-  lxcMode: str('LXC_MODE', t('lxc', 'mode'), 'real') as LxcMode,
   lxcDefaultPath: str('LXC_DEFAULT_PATH', t('lxc', 'default_path'), '/var/lib/lxc'),
   lxcUseSudo: bool('LXC_USE_SUDO', t('lxc', 'use_sudo'), false),
   lxcTimeoutMs: num('LXC_TIMEOUT_MS', t('lxc', 'timeout_ms'), 15_000),

@@ -80,7 +80,6 @@ function parseImportOutput(output: string): ImportResult {
  * and --no-color so output stays parseable.
  */
 export class RealNmdClient implements NmdClient {
-  readonly mode = 'real' as const;
 
   private nmdArgs(args: string[]): { bin: string; fullArgs: string[] } {
     const baseArgs = ['-u', '--no-color'];

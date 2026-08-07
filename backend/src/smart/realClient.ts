@@ -202,7 +202,6 @@ function extractTemperatureC(data: SmartctlJson): number | null {
 }
 
 export class RealSmartClient implements SmartClient {
-  readonly mode = 'real' as const;
 
   private async run(device: string): Promise<SmartctlJson> {
     // -n standby: don't spin up a sleeping disk just to check its temperature.

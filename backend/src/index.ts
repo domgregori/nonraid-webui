@@ -87,15 +87,7 @@ async function main() {
   app.use(express.json());
 
   app.get('/api/health', (_req, res) => {
-    res.json({
-      ok: true,
-      nmdMode: nmd.mode,
-      dockerMode: docker.mode,
-      lxcMode: lxc.mode,
-      smartMode: smart.mode,
-      sharesMode: shareApplier.mode,
-      usersMode: usersClient.mode,
-    });
+    res.json({ ok: true });
   });
 
   // Auth routes handle their own access rules (setup/login/status/logout are
@@ -149,10 +141,7 @@ async function main() {
   app.use('/api', activityRouter(activity));
 
   app.listen(config.port, () => {
-    console.log(
-      `nonraid-webui backend listening on http://localhost:${config.port} ` +
-        `(nmd mode: ${nmd.mode}, docker mode: ${docker.mode}, lxc mode: ${lxc.mode}, smart mode: ${smart.mode}, shares mode: ${shareApplier.mode}, users mode: ${usersClient.mode})`,
-    );
+    console.log(`nonraid-webui backend listening on http://localhost:${config.port}`);
   });
 }
 

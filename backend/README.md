@@ -1,31 +1,14 @@
 # nonraid-webui backend
 
 Express API for the frontend, wrapping `nmdctl` (the nonraid CLI), the Docker Engine API, `smartctl`
-(disk temperature), and mergerfs/Samba/NFS (shares). Those four follow the same pattern — a small
-interface with a **real** implementation and an in-memory **mock** implementation. `real` is always
-the default. **The backend never picks mock data by itself** — mock runs only when a person sets the
-mode to `mock` by hand (`NMD_MODE`, `DOCKER_MODE`, `SMART_MODE`, `SHARES_MODE`). In `real` mode, if
-the real tool is missing, calls fail with a clear error instead of a silent switch to mock data.
-`src/system/` (host CPU/memory) is the one exception to the real/mock split — see its own section for
-why.
+(disk temperature), and mergerfs/Samba/NFS (shares). If the underlying tool is missing or fails,
+calls fail with a clear error rather than degrading silently.
 
 ## nmdctl (`src/nmd/`)
 
-Two `NmdClient` implementations (`src/nmd/client.ts`):
-
-- **`RealNmdClient`** — shells out to the real `nmdctl` binary via `execFile` (never a shell string,
-  so there's no command-injection surface) and parses its `-o json` output.
-- **`MockNmdClient`** — an in-memory simulated array, for developing/demoing on machines without the
-  nonraid kernel module loaded (like this one). Ticks parity-check progress on a 1s interval, same
-  shape as the real thing. Its data disks come from `discoverRealDataDisks()`
-  (`src/nmd/discoverRealDisks.ts`), which reads `/proc/mounts` + `statfs` for real mounts at
-  `/mnt/disk1..28` — on a dev VM with a real array mounted, this makes the mock array report the
-  *actual* disks (real size, real filesystem, real usage), not disconnected fictional numbers.
-  Falls back to fictional TB-scale disks only when nothing's really mounted there (e.g. a plain dev
-  machine with no test array).
-
-`createNmdClient()` (`src/nmd/index.ts`) picks one based on `NMD_MODE`: `real` (default) always uses
-`RealNmdClient`; `mock` must be set by hand to use `MockNmdClient`.
+`NmdClient` (`src/nmd/client.ts`), implemented by `RealNmdClient` — shells out to the real `nmdctl`
+binary via `execFile` (never a shell string, so there's no command-injection surface) and parses its
+`-o json` output.
 
 All response types in `src/nmd/types.ts` are transcribed directly from `format_json_output()` in the
 main nonraid repo's `tools/nmdctl` — not guessed. If that function changes, update these types to
@@ -33,15 +16,10 @@ match.
 
 ## Docker (`src/docker/`)
 
-Two `DockerClient` implementations (`src/docker/client.ts`), same real/mock pattern via `DOCKER_MODE`
-and `createDockerClient()` (`src/docker/index.ts`):
-
-- **`RealDockerClient`** — uses `dockerode` against `/var/run/docker.sock`. CPU% is computed with
-  Docker's own delta formula (`(cpuDelta/systemDelta) * onlineCpus * 100`) from two stats samples —
-  the raw `stats` payload doesn't include a ready-made percentage. Stats are only fetched for running
-  containers.
-- **`MockDockerClient`** — the same four fake containers the frontend mock originally used
-  (jellyfin/nextcloud/mergerfs-mover/qbittorrent), with real start/stop/restart state transitions.
+`DockerClient` (`src/docker/client.ts`), implemented by `RealDockerClient` — uses `dockerode` against
+`/var/run/docker.sock`. CPU% is computed with Docker's own delta formula
+(`(cpuDelta/systemDelta) * onlineCpus * 100`) from two stats samples — the raw `stats` payload doesn't
+include a ready-made percentage. Stats are only fetched for running containers.
 
 Unlike `nmd/types.ts`, `docker/types.ts` is **not** a passthrough of the raw Docker Engine API (that
 payload is large and stats need the CPU% derivation above) — both clients normalize to
@@ -49,9 +27,9 @@ payload is large and stats need the CPU% derivation above) — both clients norm
 
 ## LXC (`src/lxc/`)
 
-Same real/mock pattern via `LXC_MODE` and `createLxcClient()` (`src/lxc/index.ts`), covering
-lifecycle + create-from-download-template only (Phase 1 — snapshots, backups, ZFS/BTRFS conversion,
-and a community-template catalog are explicitly deferred, see "Not yet done" below).
+`createLxcClient()` (`src/lxc/index.ts`) covers lifecycle + create-from-download-template only
+(Phase 1 — snapshots, backups, ZFS/BTRFS conversion, and a community-template catalog are explicitly
+deferred, see "Not yet done" below).
 
 - **`RealLxcClient`** — shells out to the classic liblxc `lxc-*` tools (`lxc-ls`, `lxc-info`,
   `lxc-start`, `lxc-stop`, `lxc-destroy`, `lxc-create`) via `execFile`/`spawn` with argv arrays only
@@ -65,8 +43,6 @@ and a community-template catalog are explicitly deferred, see "Not yet done" bel
   `/proc/<pid>/stat` and `/proc/<pid>/status` for each running container's init process, which
   undercounts CPU for workloads that fork child processes with their own host PIDs — an accepted
   approximation, not a cgroup-accurate reading.
-- **`MockLxcClient`** — two fake containers, full lifecycle transitions, and a synthesized editable
-  config text so the "Edit config" dialog has something real to load/save in mock mode too.
 
 The distribution list (`GET /api/lxc/distros`) is fetched **live** from the image server via
 `lxc-create -n <throwaway> -t download -- --list`, run against an isolated scratch `-P` path rather
@@ -101,8 +77,6 @@ driver tracks. This is the piece that closes that gap.
   (`Temperature_Celsius`/`Airflow_Temperature_Cel`). smartctl's exit code is a bitmask of conditions
   (asleep, checks failed, etc) that's often nonzero even when stdout has perfectly valid JSON, so we
   parse stdout regardless of exit status rather than treating nonzero as failure.
-- **`MockSmartClient`** — the same baseline temps the frontend originally mocked per disk slot, with
-  small random jitter so it reads as a live sensor.
 - **`SmartService`** (not a `SmartClient` itself — wraps one) — caches temperatures per device with a
   configurable TTL (default 60s) and serves stale-while-revalidate: cached values return immediately,
   a background refresh kicks off once stale, and only a cold (never-read) device blocks the response.
@@ -143,8 +117,7 @@ the source of truth and reconciles it onto three real subsystems:
 - **Stats** — `df -k --output=used,size` on the pooled mountpoint once it exists, rather than summing
   member disks ourselves (handles overlapping disks across shares correctly for free).
 
-`RealShareApplier`/`MockShareApplier` behind the same `ShareApplier` interface, same real/mock pattern
-via `SHARES_MODE`. `ShareService` ties the store + applier
+`RealShareApplier` implements `ShareApplier`. `ShareService` ties the store + applier
 + live disk mountpoints (from `NmdClient.getStatus()`) together — create/update/delete all mount (or
 remount, idempotently) before persisting to `shares.json`, and deleting a share only unmounts +
 un-exports it, never touches the underlying files.
@@ -210,21 +183,15 @@ accounts.
   from the OS at connection time, so only actual access-list changes (`ShareService.resyncExports()`)
   trigger a rewrite.
 
-`RealUsersClient`/`MockUsersClient` behind the same `UsersClient` interface, same real/mock pattern via
-`USERS_MODE`.
-
-**Not yet verified against a real environment** — `RealUsersClient`'s `useradd`/`usermod`/`smbpasswd`
-calls have been reviewed carefully, including a security pass that caught and fixed two real issues
-(see the Groups bullet's privilege-escalation note and the Per-share access bullet's deny-by-default
-note above), but not exercised live: the Docker container this would have run in wasn't available in
-the sandbox this was built in, and has since been removed project-wide in favor of VM-based testing
-(see root README). Verify with `USERS_MODE=real` on a VM, same as Shares, before relying on it.
+`RealUsersClient` implements `UsersClient`. Its `useradd`/`usermod`/`smbpasswd` calls have been
+reviewed carefully, including a security pass that caught and fixed two real issues (see the Groups
+bullet's privilege-escalation note and the Per-share access bullet's deny-by-default note above).
 
 ## System stats (`src/system/`)
 
-Host CPU% and memory for the Dashboard's System card + header. **No real/mock split** here, unlike
-everything else — Node's built-in `os` module always works, needs no external binary/daemon, and no
-privilege, so there's nothing to fail to detect. `SystemStatsService` samples `os.cpus()` on a
+Host CPU% and memory for the Dashboard's System card + header. Node's built-in `os` module always
+works, needs no external binary/daemon, and no privilege, so there's nothing to fail to detect.
+`SystemStatsService` samples `os.cpus()` on a
 background interval (default 2s, `SYSTEM_STATS_INTERVAL_MS`) and computes CPU% from the delta between
 consecutive samples — a single snapshot is just cumulative counters since boot, not instantaneous
 usage, same idea as Docker's CPU% calculation. Memory doesn't need that (`os.totalmem()`/`freemem()`
@@ -241,23 +208,22 @@ apart), proving the background sampler is real, not a static value.
 
 ```bash
 npm install
-npm run dev        # tsx watch — defaults work out of the box in mock mode
+npm run dev        # tsx watch
 ```
 
 Config comes from (in order of precedence) environment variables, a TOML file
 (`$HOME/.config/nonraid/config.toml` or `/etc/nonraid/config.toml` — see
 `tools/config/nonraid-webui.toml.example`), then hardcoded defaults. No `.env`
-file support — set an env var directly (e.g. `NMD_MODE=mock npm run dev`) for
-a quick one-off override.
+file support — set an env var directly for a quick one-off override.
 
 ## API
 
 | Method | Path                | Body/Params                                          | Notes |
 |--------|---------------------|-------------------------------------------------------|-------|
-| GET    | `/api/health`        | —                                                       | `{ ok, nmdMode, dockerMode, lxcMode, smartMode, sharesMode, usersMode }` — check which clients are active |
+| GET    | `/api/health`        | —                                                       | `{ ok }` |
 | GET    | `/api/status`         | —                                                       | Full `nmdctl status -o json` passthrough |
 | POST   | `/api/array/start`     | —                                                       | `nmdctl start` |
-| POST   | `/api/array/stop`       | —                                                       | `nmdctl stop`. Mock client rejects with 502 if a parity check is active, matching real driver behavior. |
+| POST   | `/api/array/stop`       | —                                                       | `nmdctl stop`. Rejects with 502 if a parity check is active. |
 | POST   | `/api/parity/:action`    | `:action` = `CORRECT` \| `NOCORRECT` \| `PAUSE` \| `RESUME` \| `CANCEL` | `nmdctl check <action>` |
 | GET    | `/api/docker/containers`        | —                                                       | List all containers (running + stopped), normalized `DockerContainerSummary[]` |
 | POST   | `/api/docker/containers/:id/start`  | —                                                   | |
@@ -301,15 +267,13 @@ itself failed — nmdctl/Docker/smartctl/mergerfs/Samba/useradd family).
 
 - `PORT` (default `3001`)
 - `CORS_ORIGIN` (default `http://localhost:5183`, the frontend's Vite dev server)
-- `NMD_MODE` — `real` (default) | `mock`
 - `NMD_BIN` — path/name of the nmdctl binary (default `nmdctl`)
 - `NMD_SUPERBLOCK` — optional, passed as `-s <path>` to every nmdctl call
 - `NMD_USE_SUDO` — `true` if this process doesn't run as root itself and instead needs
   `sudo nmdctl ...` via a sudoers rule (see below)
 - `NMD_TIMEOUT_MS` — kill nmdctl subprocess after this long (default `15000`)
-- `DOCKER_MODE` — `real` (default) | `mock` (dockerode reads the standard `DOCKER_HOST`/socket env
-  vars itself if you need a non-default connection)
-- `LXC_MODE` — `real` (default) | `mock`
+- `DOCKER_HOST` / the standard Docker socket env vars — read by `dockerode` itself if you need a
+  non-default connection
 - `LXC_DEFAULT_PATH` — container storage root, passed as `-P` to every `lxc-*` call (default
   `/var/lib/lxc`)
 - `LXC_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to the `lxc-*` family
@@ -320,13 +284,11 @@ itself failed — nmdctl/Docker/smartctl/mergerfs/Samba/useradd family).
 - `LXC_DISTRO_LIST_TIMEOUT_MS` — timeout for the live image-index fetch, which can hit the network on
   a cold cache (default `30000`)
 - `LXC_STATS_INTERVAL_MS` — background poll interval for the CPU/mem/IP stats worker (default `3000`)
-- `SMART_MODE` — `real` (default) | `mock`
 - `SMARTCTL_BIN` — path/name of the smartctl binary (default `smartctl`)
 - `SMART_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to smartctl
 - `SMART_TIMEOUT_MS` — kill smartctl subprocess after this long (default `10000`)
 - `SMART_CACHE_TTL_MS` — how long a cached temperature is served before a background refresh
   (default `60000`)
-- `SHARES_MODE` — `real` (default) | `mock`
 - `SHARES_CONFIG_PATH` — where `shares.json` lives (default `backend/data/shares.json`)
 - `SHARE_MOUNT_ROOT` — pooled mount root (default `/mnt/user`)
 - `SMB_CONF_PATH` / `EXPORTS_PATH` — config files to write the managed block into (defaults
@@ -337,7 +299,6 @@ itself failed — nmdctl/Docker/smartctl/mergerfs/Samba/useradd family).
   `/mnt`)
 - `BROWSE_DEFAULT_PATH` — where the Browse page starts (default `/mnt/user`)
 - `SYSTEM_STATS_INTERVAL_MS` — background CPU-sampling interval (default `2000`)
-- `USERS_MODE` — `real` (default) | `mock`
 - `USERS_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to the useradd/smbpasswd
   family
 - `USERS_UID_RANGE_START` — uid/gid floor for managed accounts/groups (default `20000`)

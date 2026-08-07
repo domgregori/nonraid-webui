@@ -84,7 +84,6 @@ async function replaceManagedBlock(filePath: string, replacementLines: string[])
  * so it can't clobber anything a real user hand-configured there.
  */
 export class RealShareApplier implements ShareApplier {
-  readonly mode = 'real' as const;
 
   private branchPaths(share: Share, ctx: ApplyContext): string[] {
     return share.disks

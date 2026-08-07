@@ -1,7 +1,7 @@
 /**
  * Types mirror nmdctl's `status -o json` output verbatim (see format_json_output()
  * in tools/nmdctl in the main nonraid repo). Keep these in sync with that function,
- * not with the frontend's mock DiskViewModel shape — nmdctl has no concept of disk
+ * not with the frontend's own DiskViewModel shape — nmdctl has no concept of disk
  * temperature (that's SMART/hddtemp data, a separate future integration).
  */
 

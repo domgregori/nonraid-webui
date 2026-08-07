@@ -33,12 +33,12 @@ function cpuSnapshot(): CpuSnapshot {
 }
 
 /**
- * No real/mock split here, unlike nmd/docker/smart/shares — Node's `os` module
- * always works, needs no external binary/daemon and no privilege, so there's
- * nothing to fail to detect. CPU% needs two samples over time (a single
- * snapshot is just cumulative counters since boot), so this samples in the
- * background on an interval and serves the latest computed value, same
- * "don't add latency to every request" reasoning as SmartService's caching.
+ * Node's `os` module always works, needs no external binary/daemon and no
+ * privilege, so there's nothing to fail to detect. CPU% needs two samples
+ * over time (a single snapshot is just cumulative counters since boot), so
+ * this samples in the background on an interval and serves the latest
+ * computed value, same "don't add latency to every request" reasoning as
+ * SmartService's caching.
  *
  * Caveat: os.cpus()/totalmem()/freemem() are container-oblivious — inside a
  * Docker container they'd report the HOST's stats, not the container's own

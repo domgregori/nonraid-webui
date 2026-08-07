@@ -7,7 +7,6 @@ import type {
 } from './types.js';
 
 export interface DockerClient {
-  readonly mode: 'real' | 'mock';
   listContainers(): Promise<DockerContainerSummary[]>;
   inspectContainer(id: string): Promise<ContainerDetail>;
   startContainer(id: string): Promise<DockerCommandResult>;

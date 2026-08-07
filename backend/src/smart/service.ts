@@ -31,10 +31,6 @@ export class SmartService {
     private attrTtlMs: number = config.smartAttributesCacheTtlMs,
   ) {}
 
-  get mode() {
-    return this.client.mode;
-  }
-
   async getTemperatures(devices: string[]): Promise<Record<string, number | null>> {
     return this.getCached(devices, this.tempCache, this.tempInFlight, (d) => this.client.getTemperature(d), null, this.ttlMs);
   }

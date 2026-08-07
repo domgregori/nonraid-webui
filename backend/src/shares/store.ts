@@ -4,9 +4,9 @@ import { config } from '../config.js';
 import type { Share } from './types.js';
 
 /**
- * Owns shares.json — the source of truth for what shares should exist, regardless
- * of real/mock mode (there's no external system to treat as authoritative here,
- * unlike nmd/docker/smart). Writes are serialized through one promise chain so
+ * Owns shares.json — the source of truth for what shares should exist (there's
+ * no external system to treat as authoritative here, unlike nmd/docker/smart).
+ * Writes are serialized through one promise chain so
  * concurrent requests can't interleave and corrupt the file, and each write is
  * atomic (write to a temp file, then rename) so a crash mid-write can't leave a
  * truncated/corrupt shares.json behind.

@@ -65,7 +65,6 @@ function randomLocallyAdministeredMac(): string {
 }
 
 export class RealLxcClient implements LxcClient {
-  readonly mode = 'real' as const;
   private stats = new LxcStatsPoller();
 
   private async run(bin: string, args: string[], timeoutMs = config.lxcTimeoutMs): Promise<{ stdout: string; stderr: string }> {

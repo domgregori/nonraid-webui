@@ -97,7 +97,6 @@ function parseGetentGroup(stdout: string): { name: string; gid: number; members:
  * and get misidentified as app-managed — confirmed live on a real host.
  */
 export class RealUsersClient implements UsersClient {
-  readonly mode = 'real' as const;
 
   private async allGroups() {
     const { stdout } = await run('getent', ['group']);

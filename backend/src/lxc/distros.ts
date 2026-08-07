@@ -5,9 +5,9 @@ export const DEFAULT_ARCH = 'amd64';
 /**
  * Used only when the live index fetch (RealLxcClient.listDistros(), which
  * shells out to `lxc-create --template download -- --list`) fails — no
- * network, tool not installed, etc — and by MockLxcClient, which never
- * shells out at all. When the live fetch succeeds this list plays no part;
- * see FRIENDLY_LABELS below for how live entries get a human label.
+ * network, tool not installed, etc. When the live fetch succeeds this list
+ * plays no part; see FRIENDLY_LABELS below for how live entries get a human
+ * label.
  */
 export const FALLBACK_DISTROS: LxcDistroOption[] = [
   { distribution: 'debian', release: 'bookworm', label: 'Debian 12 (bookworm)' },

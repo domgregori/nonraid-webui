@@ -123,7 +123,6 @@ function isDockerUnreachable(err: unknown): boolean {
 }
 
 export class RealDockerClient implements DockerClient {
-  readonly mode = 'real' as const;
   private docker = new Docker();
 
   private async guard<T>(fn: () => Promise<T>): Promise<T> {

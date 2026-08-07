@@ -1,7 +1,6 @@
 import type { AddDiskResult, AvailableDevice, ImportResult, NmdCommandResult, NmdStatusResponse, ParityCheckAction } from './types.js';
 
 export interface NmdClient {
-  readonly mode: 'real' | 'mock';
   getStatus(): Promise<NmdStatusResponse>;
   startArray(): Promise<NmdCommandResult>;
   stopArray(): Promise<NmdCommandResult>;
@@ -22,7 +21,7 @@ export interface NmdClient {
   // everything's already imported (it just reports 0 newly imported).
   importDisks(): Promise<ImportResult>;
   // Physical block devices not already claimed by an array slot — for an
-  // "Unassigned Devices" list. Real/mock only, doesn't touch array state.
+  // "Unassigned Devices" list. Read-only, doesn't touch array state.
   listAvailableDevices(): Promise<AvailableDevice[]>;
   // Assigns a device to an *empty* slot only: `add -f slot:device[:id]`,
   // then start the array (naming whatever abnormal state it reports, since

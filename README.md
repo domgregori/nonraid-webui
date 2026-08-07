@@ -6,10 +6,7 @@ containers, LXC containers, historical metrics (via Grafana), and array settings
 
 Two-part repo: a React frontend (this directory) and an Express backend (`backend/`) that wraps
 `nmdctl`, the Docker Engine API, the `lxc-*` command-line tools, `smartctl`, mergerfs/Samba/NFS
-(shares), and host CPU/memory. **Dashboard, Docker, LXC, Sharing, and Users pages are wired to the
-real backend** (polling, with mock fallbacks when nonraid/Docker/liblxc/smartmontools/mergerfs/useradd
-aren't available — see `backend/README.md`). History/Settings and the Dashboard sidebar's Activity
-feed are still mock-only — there's no backend concept for any of those yet.
+(shares), and host CPU/memory — see `backend/README.md`.
 
 Users means SMB/NFS share accounts (real Linux/Samba users, uid/gid ≥ 20000), **not** a webui login
 system — the API itself still has no auth layer at all (see `backend/README.md`'s Privileges section);
@@ -34,15 +31,14 @@ npm run dev
 ```bash
 cd backend
 npm install
-npm run dev   # http://localhost:3001, real mode by default (see backend/README.md to set mock)
+npm run dev   # http://localhost:3001
 ```
 
-Run both, then open the frontend — Dashboard, Docker, Sharing, and Users will show live data. Real mode
-is the default everywhere; the backend only uses mock data for a part when you set that part's mode to
-`mock` by hand. Users' real mode needs root (`useradd`/`smbpasswd` family) — see
-`backend/README.md`'s Privileges section. For a real end-to-end test environment (real kernel driver,
-real array, real Samba/NFS), use a VM — see the main `nonraid` repo's development docs. There is no
-Docker-based test environment for this project; don't reintroduce one.
+Run both, then open the frontend — Dashboard, Docker, Sharing, and Users will show live data. Users
+needs root (`useradd`/`smbpasswd` family) — see `backend/README.md`'s Privileges section. For a real
+end-to-end test environment (real kernel driver, real array, real Samba/NFS), use a VM — see the main
+`nonraid` repo's development docs. There is no Docker-based test environment for this project; don't
+reintroduce one.
 
 See `backend/README.md` for the API and configuration.
 
@@ -55,7 +51,6 @@ src/
                wire types)
   api/         fetch wrappers for the backend (nmdApi, dockerApi, smartApi, sharesApi, usersApi,
                systemApi)
-  mock/        hardcoded mock data for still-unwired pages (activity log)
   state/       AppStoreProvider (settings + Grafana URL, local-only) and
                ArrayStatusProvider (polls the backend for array/parity/disk/temp state,
                owns disk-detail selection — this is the real one)
@@ -69,19 +64,18 @@ src/
 
 backend/                 Express API wrapping nmdctl, Docker, lxc-*, smartctl, shares, users, and
                          system stats
-  src/nmd/     NmdClient interface + RealNmdClient (shells out to nmdctl) + MockNmdClient
-  src/docker/  DockerClient interface + RealDockerClient (dockerode) + MockDockerClient
+  src/nmd/     NmdClient interface + RealNmdClient (shells out to nmdctl)
+  src/docker/  DockerClient interface + RealDockerClient (dockerode)
   src/lxc/     LxcClient interface + RealLxcClient (shells out to lxc-ls/lxc-info/lxc-create/...) +
-               MockLxcClient + configFile.ts (line-based get/set against a container's real config
-               file — its only metadata store) + statsPoller.ts (poll-and-cache CPU/mem/IPs)
-  src/smart/   SmartClient interface + RealSmartClient (smartctl) + MockSmartClient + caching service
+               configFile.ts (line-based get/set against a container's real config file — its only
+               metadata store) + statsPoller.ts (poll-and-cache CPU/mem/IPs)
+  src/smart/   SmartClient interface + RealSmartClient (smartctl) + caching service
   src/shares/  ShareStore (owns shares.json) + ShareAccessStore (owns share-access.json, per-user/
-               group SMB permissions) + ShareApplier interface (mergerfs/Samba/NFS, real or mock) +
+               group SMB permissions) + ShareApplier interface (mergerfs/Samba/NFS) +
                ShareService (orchestrates all three)
   src/users/   UsersClient interface + RealUsersClient (shells out to useradd/smbpasswd/etc., host
-               /etc/passwd+/etc/group as source of truth) + MockUsersClient + UsersService
-  src/system/  SystemStatsService (host CPU/memory via Node's os module — no mock variant, see
-               backend/README.md for why)
+               /etc/passwd+/etc/group as source of truth) + UsersService
+  src/system/  SystemStatsService (host CPU/memory via Node's os module)
   src/routes/  /api/status, /api/array/*, /api/parity/*, /api/docker/*, /api/lxc/*, /api/smart/*,
                /api/shares/*, /api/users/*, /api/groups/*, /api/system
 ```
