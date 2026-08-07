@@ -3,12 +3,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { parse as parseToml, TomlError, type TomlTable, type TomlValue } from 'smol-toml';
 
-try {
-  process.loadEnvFile('.env');
-} catch {
-  // no .env file — fine, all vars have defaults below
-}
-
 /**
  * Structured config file, checked in this order — whichever is found first is
  * the only one read (not merged): $HOME/.config/nonraid/config.toml (for a
@@ -56,10 +50,9 @@ function t(section: string, key: string): TomlValue | undefined {
 }
 
 // Every config value resolves env var (if set) > TOML value (if the winning
-// file sets it) > hardcoded fallback. Env vars stay authoritative so the
-// existing dev workflow (.env file, inline `NMD_MODE=mock npm run dev`, ...)
-// keeps working unchanged — TOML is the new preferred *durable* surface,
-// layered underneath, not a replacement for ad hoc overrides.
+// file sets it) > hardcoded fallback. Env vars stay authoritative so quick
+// ad hoc overrides keep working (e.g. `NMD_MODE=mock npm run dev`) — TOML is
+// the preferred *durable* surface, layered underneath.
 function str(envName: string, tomlValue: TomlValue | undefined, fallback: string): string {
   const envVal = process.env[envName];
   if (envVal !== undefined) return envVal;

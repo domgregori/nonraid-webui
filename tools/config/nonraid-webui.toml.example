@@ -7,9 +7,10 @@
 # on every later run/update — edit it freely).
 #
 # Every value below is also settable via an environment variable of the same
-# name (see backend/.env.example) — an env var always wins over this file, for
-# quick one-off overrides. Everything shown here commented out is the backend's
-# own built-in default; uncomment and edit only what you need to change.
+# name (see backend/README.md's Config section) — an env var always wins over
+# this file, for quick one-off overrides. Everything shown here commented out
+# is the backend's own built-in default; uncomment and edit only what you need
+# to change.
 #
 # A value present in this file but with the wrong type (e.g. port = "abc")
 # silently falls back to the built-in default. A syntax error in this file

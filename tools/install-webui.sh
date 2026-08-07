@@ -25,8 +25,10 @@ log "Checking prerequisites"
 [ -x "$NODE_BIN" ] || fail "$NODE_BIN not found. Install Node.js 20.6+ (or 21.7+) system-wide, e.g. from NodeSource — see ../nonraid/REQUIREMENTS.md."
 
 # Node requirement is unusual: 20.6+ OR 21.7+ (not 18.x, not 21.0-21.6) —
-# process.loadEnvFile (used unconditionally in backend/src/config.ts) only
-# stabilized in those exact minor versions.
+# kept as the known-good floor this app has been verified against. (No
+# longer strictly required by process.loadEnvFile specifically — that call
+# was removed along with .env file support — but not yet re-verified against
+# anything older, so the check stays as-is.)
 node_version="$("$NODE_BIN" -v)"
 node_version="${node_version#v}"
 node_major="${node_version%%.*}"

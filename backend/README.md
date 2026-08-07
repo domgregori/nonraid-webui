@@ -241,12 +241,14 @@ apart), proving the background sampler is real, not a static value.
 
 ```bash
 npm install
-npm run dev        # tsx watch, reads .env if present (see .env.example)
+npm run dev        # tsx watch — defaults work out of the box in mock mode
 ```
 
-```bash
-cp .env.example .env   # optional, defaults work out of the box in mock mode
-```
+Config comes from (in order of precedence) environment variables, a TOML file
+(`$HOME/.config/nonraid/config.toml` or `/etc/nonraid/config.toml` — see
+`tools/config/nonraid-webui.toml.example`), then hardcoded defaults. No `.env`
+file support — set an env var directly (e.g. `NMD_MODE=mock npm run dev`) for
+a quick one-off override.
 
 ## API
 
@@ -295,7 +297,7 @@ name/disks/allocation method that fails validation), 404 (share/user/group not f
 already exists, or none of a share's disks are currently mounted), or 502 (the underlying command
 itself failed — nmdctl/Docker/smartctl/mergerfs/Samba/useradd family).
 
-## Config (env vars, see `.env.example`)
+## Config (env vars, see `tools/config/nonraid-webui.toml.example` for the TOML equivalents)
 
 - `PORT` (default `3001`)
 - `CORS_ORIGIN` (default `http://localhost:5183`, the frontend's Vite dev server)
