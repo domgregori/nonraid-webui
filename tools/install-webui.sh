@@ -2,7 +2,7 @@
 # Builds and installs nonraid-webui as a systemd service. Safe to re-run for
 # updates: never touches this checkout's own node_modules (prunes a staged
 # copy in /opt instead), never overwrites an already-customized
-# /etc/default/nonraid-webui, and always ends with `systemctl restart` so
+# /etc/nonraid/config.toml, and always ends with `systemctl restart` so
 # first-install and every later update take the same code path.
 #
 # Run from inside a nonraid-webui checkout, as root:
@@ -64,11 +64,12 @@ rsync -a --delete "$REPO_ROOT/dist/" "$INSTALL_ROOT/frontend-dist/"
 log "Installing systemd unit"
 install -m 644 "$REPO_ROOT/tools/systemd/nonraid-webui.service" /etc/systemd/system/nonraid-webui.service
 
-if [ ! -e /etc/default/nonraid-webui ]; then
-  log "Installing default env file (/etc/default/nonraid-webui)"
-  install -m 600 "$REPO_ROOT/tools/systemd/nonraid-webui.default" /etc/default/nonraid-webui
+if [ ! -e /etc/nonraid/config.toml ]; then
+  log "Installing default config (/etc/nonraid/config.toml)"
+  mkdir -p /etc/nonraid
+  install -m 644 "$REPO_ROOT/tools/config/nonraid-webui.toml.example" /etc/nonraid/config.toml
 else
-  log "/etc/default/nonraid-webui already exists — leaving it as-is"
+  log "/etc/nonraid/config.toml already exists — leaving it as-is"
 fi
 
 log "Reloading systemd and (re)starting the service"
@@ -80,4 +81,4 @@ echo
 systemctl status nonraid-webui --no-pager || true
 echo
 log "Done. Visit http://<this-host>:3001/ — first boot shows the admin account setup screen."
-log "Reminder: COOKIE_SECURE must be set to true in /etc/default/nonraid-webui once real TLS exists in front of this host, or login will break outright once it does."
+log "Reminder: [auth] cookie_secure must be set to true in /etc/nonraid/config.toml once real TLS exists in front of this host, or login will break outright once it does."

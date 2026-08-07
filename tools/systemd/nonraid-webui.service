@@ -6,11 +6,6 @@ After=network.target nonraid.service
 Type=simple
 StateDirectory=nonraid-webui
 WorkingDirectory=/var/lib/nonraid-webui
-Environment="PORT=3001"
-Environment="SERVE_FRONTEND=true"
-Environment="FRONTEND_DIST_PATH=/opt/nonraid-webui/frontend-dist"
-Environment="COOKIE_SECURE=false"
-EnvironmentFile=-/etc/default/nonraid-webui
 ExecStart=/usr/bin/node /opt/nonraid-webui/backend/dist/index.js
 Restart=on-failure
 RestartSec=5

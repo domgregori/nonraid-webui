@@ -1,0 +1,126 @@
+# nonraid-webui config file.
+#
+# Checked in this order — whichever is found first is the only one read (not
+# merged): $HOME/.config/nonraid/config.toml (for a non-root dev run, or the
+# systemd service's own $HOME, typically /root), then /etc/nonraid/config.toml
+# (installed here by tools/install-webui.sh on first install, then left alone
+# on every later run/update — edit it freely).
+#
+# Every value below is also settable via an environment variable of the same
+# name (see backend/.env.example) — an env var always wins over this file, for
+# quick one-off overrides. Everything shown here commented out is the backend's
+# own built-in default; uncomment and edit only what you need to change.
+#
+# A value present in this file but with the wrong type (e.g. port = "abc")
+# silently falls back to the built-in default. A syntax error in this file
+# fails the backend at startup with a clear message naming the problem.
+
+[server]
+#port = 3001
+#cors_origin = "http://localhost:5183"
+# Serve the frontend's built static files (and the SPA's index.html for
+# client-side routes) from this backend, so the whole app is reachable from
+# one origin/port with no separate frontend server or reverse proxy needed.
+# This is what makes this the production deployment shape, as opposed to the
+# dev setup (Vite's own dev server serving the frontend separately).
+serve_frontend = true
+# Absolute path to the frontend's built dist/ output (`npm run build` at the
+# nonraid-webui repo root). Only read when serve_frontend is true.
+frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
+
+[auth]
+# Single admin account, created via the frontend's first-run setup screen —
+# not something you set here.
+#config_path = "./data/auth.json"
+# Whether the session cookie gets the Secure attribute (HTTPS-only). MUST be
+# true once real TLS termination sits in front of this backend — until then,
+# false is correct: a Secure cookie sent over plain HTTP is silently dropped
+# by the browser, breaking login outright. See ../nonraid/REQUIREMENTS.md's
+# Security section — TLS is a documented, currently unmet requirement.
+#cookie_secure = false
+#session_ttl_ms = 2592000000
+#login_rate_limit_window_ms = 900000
+#login_rate_limit_max = 10
+
+[nmd]
+#mode = "real"  # "real" or "mock" — mock only ever runs if you set this by hand
+#bin = "nmdctl"
+# Optional -s superblock path override — omit to use nmdctl's own default.
+#superblock = "/nonraid.dat"
+# Set to true if this backend doesn't run as root and instead relies on a
+# sudoers rule, e.g.: www-data ALL=(root) NOPASSWD: /usr/local/sbin/nmdctl
+#use_sudo = false
+#timeout_ms = 15000
+#cmd_path = "/proc/nmdcmd"
+
+[docker]
+#mode = "real"  # "real" or "mock"
+
+[smart]
+#mode = "real"  # "real" or "mock"
+#bin = "smartctl"
+#use_sudo = false
+#timeout_ms = 10000
+#cache_ttl_ms = 60000
+#attributes_cache_ttl_ms = 4000
+
+[shares]
+#mode = "real"  # "real" or "mock"
+#config_path = "./data/shares.json"
+#mount_root = "/mnt/user"
+#smb_conf_path = "/etc/samba/smb.conf"
+#exports_path = "/etc/exports"
+#use_sudo = false
+#access_config_path = "./data/share-access.json"
+
+[browse]
+# Ceiling/starting point for the file Browse page — spans the whole /mnt
+# tree (shares, individual array disks, cache, etc.), not just shares.mount_root.
+#root = "/mnt"
+#default_path = "/mnt/user"
+
+[system]
+#stats_interval_ms = 2000
+
+[users]
+#mode = "real"  # "real" or "mock"
+#use_sudo = false
+# Managed users/groups live in [uid_range_start, uid_range_end] — never
+# touches real host accounts outside this range.
+#uid_range_start = 20000
+#uid_range_end = 59999
+#timeout_ms = 15000
+#shell_path = "/usr/sbin/nologin"
+
+[apps]
+# Community Applications template feed. primary is Unraid's own CDN; backup
+# is the GitHub-hosted mirror the CA plugin itself falls back to.
+#feed_primary_url = "https://assets.ca.unraid.net/feed/applicationFeed.json"
+#feed_backup_url = "https://raw.githubusercontent.com/Squidly271/AppFeed/master/applicationFeed.json"
+#feed_cache_path = "./data/ca-feed.json"
+#feed_refresh_interval_ms = 86400000
+# Host paths a container's volumes may bind-mount. Defaults to [shares.mount_root].
+#bind_roots = ["/mnt/user"]
+
+[settings]
+#config_path = "./data/settings.json"
+#apprise_bin = "apprise"
+
+[activity]
+#config_path = "./data/activity.json"
+#watcher_interval_ms = 30000
+
+[lxc]
+#mode = "real"  # "real" or "mock"
+#default_path = "/var/lib/lxc"
+#use_sudo = false
+#timeout_ms = 15000
+#create_timeout_ms = 600000
+#stop_timeout_sec = 30
+#distro_list_timeout_ms = 30000
+#stats_interval_ms = 3000
+
+[metrics]
+#db_path = "./data/metrics.db"
+#sample_interval_ms = 60000
+#retention_days = 30
