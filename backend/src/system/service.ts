@@ -1,11 +1,15 @@
-import { execSync } from 'node:child_process';
+import { execFile, execFileSync, execSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { config } from '../config.js';
-import type { SystemStats } from './types.js';
+import type { SmartService } from '../smart/service.js';
+import type { BootDiskInfo, SystemStats } from './types.js';
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
+const execFileAsync = promisify(execFile);
+const BOOT_DISK_REFRESH_MS = 60_000;
 
 function readBuildVersion(): string | null {
   try {
@@ -14,6 +18,45 @@ function readBuildVersion(): string | null {
       .trim();
   } catch {
     return null; // not a git checkout (e.g. a packaged deployment with no .git) — fine, just omit it
+  }
+}
+
+interface BootDiskIdentity {
+  device: string;
+  model: string | null;
+}
+
+/**
+ * Resolves the physical disk backing `/` — not part of the array, so nothing
+ * else in this app already knows this. Run once at construction (this
+ * identity never changes at runtime), same pattern as readBuildVersion()
+ * above. Never throws — a packaged/unusual environment (no lsblk, root on
+ * something exotic) just means no boot disk info, not a broken /api/system.
+ */
+function resolveBootDiskIdentity(): BootDiskIdentity | null {
+  try {
+    // argv arrays only, never shell strings — same discipline as every other
+    // command execution in this codebase (see e.g. nmd/realClient.ts).
+    const partition = execFileSync('df', ['-k', '--output=source', '/'], { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+      .split('\n')
+      .at(-1)
+      ?.trim();
+    if (!partition) return null;
+
+    const pkname = execFileSync('lsblk', ['-n', '-p', '-o', 'PKNAME', partition], { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+    const device = pkname || partition; // fall back to the partition itself if PKNAME resolution fails
+
+    const model = execFileSync('lsblk', ['-n', '-d', '-o', 'MODEL', device], { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+
+    return { device, model: model || null };
+  } catch {
+    return null;
   }
 }
 
@@ -51,10 +94,22 @@ export class SystemStatsService {
   private cpuPercent = 0;
   private timer: NodeJS.Timeout;
   private readonly buildVersion = readBuildVersion();
+  private readonly bootDiskIdentity = resolveBootDiskIdentity();
+  private bootDisk: BootDiskInfo | null = null;
+  private bootDiskTimer: NodeJS.Timeout | null = null;
 
-  constructor(intervalMs: number = config.systemStatsIntervalMs) {
+  constructor(
+    private smart: SmartService,
+    intervalMs: number = config.systemStatsIntervalMs,
+  ) {
     this.timer = setInterval(() => this.tick(), intervalMs);
     this.timer.unref();
+
+    if (this.bootDiskIdentity) {
+      this.refreshBootDisk(); // fire-and-forget — getStats() serves null until this resolves
+      this.bootDiskTimer = setInterval(() => this.refreshBootDisk(), BOOT_DISK_REFRESH_MS);
+      this.bootDiskTimer.unref();
+    }
   }
 
   private tick(): void {
@@ -63,6 +118,39 @@ export class SystemStatsService {
     const totalDelta = snap.total - this.last.total;
     this.cpuPercent = totalDelta > 0 ? Math.max(0, Math.min(100, 100 * (1 - idleDelta / totalDelta))) : 0;
     this.last = snap;
+  }
+
+  /**
+   * Capacity + temperature change over time, unlike device/model identity —
+   * refreshed on its own slower cadence (not tied to the CPU-sampling
+   * interval), same "don't hammer external tools on every poll" reasoning as
+   * SmartService's own TTL cache. Temperature is read through SmartService
+   * itself rather than a second smartctl call site, reusing its caching.
+   */
+  private async refreshBootDisk(): Promise<void> {
+    const identity = this.bootDiskIdentity;
+    if (!identity) return;
+    try {
+      const { stdout } = await execFileAsync('df', ['-k', '--output=source,fstype,used,size', '/']);
+      const lastLine = stdout.trim().split('\n').at(-1) ?? '';
+      const [, fstype, usedKbStr, sizeKbStr] = lastLine.trim().split(/\s+/);
+      const usedKb = Number(usedKbStr);
+      const sizeKb = Number(sizeKbStr);
+
+      const temps = await this.smart.getTemperatures([identity.device]);
+
+      this.bootDisk = {
+        device: identity.device,
+        filesystem: fstype || null,
+        usedBytes: Number.isFinite(usedKb) ? usedKb * 1024 : null,
+        totalBytes: Number.isFinite(sizeKb) ? sizeKb * 1024 : null,
+        model: identity.model,
+        tempCelsius: temps[identity.device] ?? null,
+      };
+    } catch {
+      // leave the last-known snapshot in place (or null, on the first-ever
+      // refresh) rather than erroring the whole /api/system response
+    }
   }
 
   getStats(): SystemStats {
@@ -75,6 +163,7 @@ export class SystemStatsService {
       memUsedBytes: memTotalBytes - memFreeBytes,
       memTotalBytes,
       buildVersion: this.buildVersion,
+      bootDisk: this.bootDisk,
     };
   }
 }

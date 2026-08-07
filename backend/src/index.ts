@@ -55,7 +55,7 @@ async function main() {
   const shares = new ShareService(shareStore, shareApplier, nmd, shareAccessStore, activity, settingsStore);
   const browse = new BrowseService(shares);
   const emptyDisk = new EmptyDiskService(nmd, shareStore);
-  const system = new SystemStatsService();
+  const system = new SystemStatsService(smart);
   const usersClient = createUsersClient();
   const users = new UsersService(usersClient, shareAccessStore, shareStore, shares, activity);
   const caFeedStore = new CaFeedStore();

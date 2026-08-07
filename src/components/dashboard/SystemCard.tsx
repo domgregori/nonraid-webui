@@ -9,6 +9,9 @@ export function SystemCard() {
   if (!stats) return null;
 
   const memPct = Math.round((stats.memUsedBytes / stats.memTotalBytes) * 100);
+  const boot = stats.bootDisk;
+  const bootPct =
+    boot && boot.usedBytes !== null && boot.totalBytes !== null ? Math.round((boot.usedBytes / boot.totalBytes) * 100) : null;
 
   return (
     <Card className="bars-card">
@@ -29,6 +32,20 @@ export function SystemCard() {
         </div>
         <ProgressBar pct={memPct} color={COLORS.blue} />
       </div>
+      {boot && bootPct !== null && boot.usedBytes !== null && boot.totalBytes !== null && (
+        <div>
+          <div className="bar-row__head">
+            <span>Boot Disk</span>
+            <span className="bar-row__value">{formatMemLabel(boot.usedBytes, boot.totalBytes)}</span>
+          </div>
+          <ProgressBar pct={bootPct} color={COLORS.blue} />
+          <div className="status-note" style={{ margin: '4px 0 0' }}>
+            {[boot.device, boot.model, boot.filesystem, boot.tempCelsius !== null ? `${boot.tempCelsius}°C` : null]
+              .filter(Boolean)
+              .join(' · ')}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
