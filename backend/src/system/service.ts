@@ -153,6 +153,12 @@ export class SystemStatsService {
     }
   }
 
+  /** Parent whole-disk device backing `/` (e.g. `/dev/sda`, not a partition) — used by the boot
+   *  disk backup routes. `null` when detection failed, same as bootDisk in getStats(). */
+  getBootDiskDevice(): string | null {
+    return this.bootDiskIdentity?.device ?? null;
+  }
+
   getStats(): SystemStats {
     const memTotalBytes = os.totalmem();
     const memFreeBytes = os.freemem();

@@ -139,6 +139,11 @@ export const config = {
   sharesUseSudo: bool('SHARES_USE_SUDO', t('shares', 'use_sudo'), false),
   shareAccessConfigPath: str('SHARE_ACCESS_CONFIG_PATH', t('shares', 'access_config_path'), path.join(process.cwd(), 'data', 'share-access.json')),
   systemStatsIntervalMs: num('SYSTEM_STATS_INTERVAL_MS', t('system', 'stats_interval_ms'), 2_000),
+  // Boot disk backups (backend/src/system/backupStream.ts) shell out to dd/tar
+  // to read raw block devices and root-owned config files — same "this
+  // process may not itself have permission, only sudo does" reasoning as
+  // nmdUseSudo/sharesUseSudo/usersUseSudo.
+  systemUseSudo: bool('SYSTEM_USE_SUDO', t('system', 'use_sudo'), false),
   usersUseSudo: bool('USERS_USE_SUDO', t('users', 'use_sudo'), false),
   // Managed users/groups live in [start, end], so they're clearly distinguishable
   // from real host system accounts (never touches anything outside this range).

@@ -135,7 +135,7 @@ async function main() {
   app.use('/api', smartRouter(nmd, smart));
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
-  app.use('/api', systemRouter(system));
+  app.use('/api', systemRouter(system, nmd, activity));
   app.use('/api', usersRouter(users));
   app.use('/api', appsRouter(apps));
   app.use('/api', activityRouter(activity));

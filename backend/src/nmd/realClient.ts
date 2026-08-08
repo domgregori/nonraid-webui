@@ -349,16 +349,23 @@ export class RealNmdClient implements NmdClient {
    * The caller (routes/array.ts) is responsible for the same unmount-before
    * composition reloadDriver()'s callers use.
    */
-  async commitImportedSuperblock(stagedFilePath: string): Promise<{ result: ImportResult; targetPath: string; backedUpTo: string | null }> {
-    let targetPath: string;
+  /**
+   * The superblock file actually in play right now: the live path
+   * (`status.array.superblock`) when something's loaded, else this app's own
+   * configured override, else nmdctl's own hardcoded default. `getStatus()`
+   * can throw on a genuinely fresh host — see check_module_loaded() in
+   * tools/nmdctl — so that's the fallback trigger, not a real error here.
+   */
+  async getSuperblockPath(): Promise<string> {
     try {
-      targetPath = (await this.getStatus()).array.superblock;
+      return (await this.getStatus()).array.superblock;
     } catch {
-      // No array configured yet (or nothing loaded and no file at the default
-      // path — see check_module_loaded() in tools/nmdctl) — fall back to this
-      // app's own configured path, then nmdctl's own hardcoded default.
-      targetPath = config.nmdSuperblock || DEFAULT_SUPERBLOCK_PATH;
+      return config.nmdSuperblock || DEFAULT_SUPERBLOCK_PATH;
     }
+  }
+
+  async commitImportedSuperblock(stagedFilePath: string): Promise<{ result: ImportResult; targetPath: string; backedUpTo: string | null }> {
+    const targetPath = await this.getSuperblockPath();
 
     let backedUpTo: string | null = null;
     try {

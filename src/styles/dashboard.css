@@ -200,6 +200,11 @@
   background: var(--color-surface-elevated);
 }
 
+.disk-card--boot {
+  flex: 1 1 200px;
+  min-width: 180px;
+}
+
 .disk-card__head {
   display: flex;
   align-items: center;

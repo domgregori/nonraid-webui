@@ -76,6 +76,10 @@ frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
 
 [system]
 #stats_interval_ms = 2000
+# Boot disk backups shell out to dd/tar to read the raw boot device and
+# root-owned config files. Set to true if this backend doesn't run as root —
+# see the [nmd] use_sudo comment above for the sudoers rule shape.
+#use_sudo = false
 
 [users]
 #use_sudo = false

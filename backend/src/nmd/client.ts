@@ -96,6 +96,11 @@ export interface NmdClient {
   // caller (routes/array.ts) is responsible for the same unmount-before
   // composition those use.
   commitImportedSuperblock(stagedFilePath: string): Promise<{ result: ImportResult; targetPath: string; backedUpTo: string | null }>;
+  // The superblock file actually in play right now — same resolution
+  // commitImportedSuperblock() uses internally (live status, falling back to
+  // config/nmdctl's default), exposed for callers that just need to know the
+  // path without committing anything (the boot disk config backup). Read-only.
+  getSuperblockPath(): Promise<string>;
   // The driver has no readback for write method — it's a write-only kernel
   // command (confirmed: absent from both `status -o json` and /proc/nmdstat)
   // — so the caller is the source of truth for what's "currently" set, same
