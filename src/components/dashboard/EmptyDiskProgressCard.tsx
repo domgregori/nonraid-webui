@@ -37,7 +37,7 @@ export function EmptyDiskProgressCard() {
   const isTerminal = TERMINAL_STATUSES.includes(job.status);
 
   return (
-    <Card>
+    <Card className="parity-card">
       <div className="parity-card__head">
         <div className="eyebrow">Empty Disk</div>
         {job.status === 'running' && (

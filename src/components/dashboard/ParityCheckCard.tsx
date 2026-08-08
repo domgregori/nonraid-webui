@@ -10,7 +10,7 @@ export function ParityCheckCard() {
   const parity = deriveParityViewModel(status, parityPending, parityAction);
 
   return (
-    <Card>
+    <Card className="parity-card">
       <div className="parity-card__head">
         <div className="eyebrow">Parity Check</div>
         <div className="parity-card__actions">

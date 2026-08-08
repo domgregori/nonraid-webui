@@ -100,7 +100,7 @@
 }
 
 .parity-card .progress-track {
-  margin-top: 14px;
+  margin-top: var(--space-xl);
   height: 8px;
 }
 
