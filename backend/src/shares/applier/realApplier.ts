@@ -56,6 +56,53 @@ async function isMounted(mountPoint: string): Promise<boolean> {
   }
 }
 
+/**
+ * Releases knfsd's own hold on `mountPoint` before it gets unmounted. Without this, editing (or
+ * removing) any currently NFS-exported share fails with a real `umount: target is busy` —
+ * confirmed live: nfsd keeps an exported path pinned in its own export table independent of
+ * whether any client is actually connected, and mountShare()/unmountShare() below always run
+ * before resyncExports() gets a chance to refresh that table with the new state. Best-effort and
+ * safe to call unconditionally: unexporting a path that was never exported (SMB-only shares, or
+ * an NFS server not installed at all) is a harmless no-op here, not an error worth surfacing.
+ */
+async function unexport(mountPoint: string): Promise<void> {
+  await run('exportfs', ['-u', mountPoint]).catch(() => {});
+}
+
+/**
+ * True when `mountPoint` is currently a FUSE mount (mergerfs, in this app's case). knfsd can
+ * derive a stable filesystem id from a real block device or bind mount on its own, but not from
+ * FUSE — exporting one without an explicit `fsid=` fails outright ("Cannot export ... possibly
+ * unsupported filesystem or fsid= required", confirmed live). Reads /proc/mounts directly rather
+ * than re-deriving branch count from share config, since what's actually mounted right now (which
+ * can differ from the configured disk list if some are currently offline) is what NFS needs to
+ * match — same live-state source of truth mountShare() itself uses via its own branches.length.
+ */
+async function isFuseMount(mountPoint: string): Promise<boolean> {
+  try {
+    const mounts = await readFile('/proc/mounts', 'utf8');
+    const line = mounts.split('\n').find((l) => l.split(' ')[1] === mountPoint);
+    return line?.split(' ')[2]?.startsWith('fuse.') ?? false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Deterministic, non-zero fsid for a FUSE-backed NFS export — stable across re-syncs since it's a
+ * pure function of the share name (fsid=0 is reserved for the NFSv4 pseudo-root, so the hash is
+ * shifted off it). FNV-1a, more than collision-resistant enough for the small number of shares any
+ * one host will realistically have.
+ */
+function stableFsid(name: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < name.length; i++) {
+    hash ^= name.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return ((hash >>> 0) % 0xfffffffe) + 1;
+}
+
 async function replaceManagedBlock(filePath: string, replacementLines: string[]): Promise<void> {
   let content: string;
   try {
@@ -107,6 +154,7 @@ export class RealShareApplier implements ShareApplier {
 
     // idempotent: branch list or policy may have changed since last apply
     if (await isMounted(mountPoint)) {
+      await unexport(mountPoint);
       await run('umount', [mountPoint]);
     }
 
@@ -138,6 +186,7 @@ export class RealShareApplier implements ShareApplier {
   async unmountShare(name: string): Promise<ShareCommandResult> {
     const mountPoint = userMountPath(name);
     if (await isMounted(mountPoint)) {
+      await unexport(mountPoint);
       await run('umount', [mountPoint]);
     }
     return { ok: true, message: `Share "${name}" unmounted` };
@@ -248,7 +297,20 @@ export class RealShareApplier implements ShareApplier {
     for (const s of shares) {
       if (!s.protocols.includes('nfs')) continue;
       const hosts = s.nfs?.allowedHosts?.length ? s.nfs.allowedHosts : ['*'];
-      const opts = s.nfs?.readOnly ? 'ro,sync,no_subtree_check' : 'rw,sync,no_subtree_check';
+      // Multi-disk shares are mergerfs (FUSE) mounts, which knfsd can't export without an
+      // explicit fsid — see isFuseMount()'s comment.
+      const fsidOpt = (await isFuseMount(userMountPath(s.name))) ? `,fsid=${stableFsid(s.name)}` : '';
+      // NFS access control here is host-based only (allowedHosts) — there's no per-user identity
+      // at all, unlike SMB. Share directories are root:root (see the `force user` comment in
+      // writeSmbBlock() above for why), so without this every connecting uid, root included via
+      // the server's own default root_squash, gets a real POSIX permission denied on write —
+      // confirmed live on both a mergerfs and a plain bind-mounted share. `all_squash` makes every
+      // connecting uid (not just root) map to `anonuid`/`anongid`, so being on the allowed host
+      // list is what actually grants access, matching the same "this app's own ACL is the sole
+      // authority" model the SMB fix already established — not a wider hole than that, since a
+      // host allowed onto the mount at all was already being trusted with the whole share.
+      const squashOpt = ',all_squash,anonuid=0,anongid=0';
+      const opts = (s.nfs?.readOnly ? 'ro,sync,no_subtree_check' : 'rw,sync,no_subtree_check') + fsidOpt + squashOpt;
       for (const host of hosts) {
         lines.push(`${userMountPath(s.name)} ${host}(${opts})`);
       }
