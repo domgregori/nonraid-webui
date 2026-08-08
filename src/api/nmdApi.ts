@@ -1,11 +1,29 @@
 import { request } from './request';
-import type { AddDiskResult, AvailableDevice, ImportResult, NmdCommandResult, NmdStatusResponse, ParityCheckAction } from '../types/nmdApi';
+import type {
+  AddDiskResult,
+  AvailableDevice,
+  ImportCommitResponse,
+  ImportPreview,
+  NmdCommandResult,
+  NmdStatusResponse,
+  ParityCheckAction,
+} from '../types/nmdApi';
 
 export const nmdApi = {
   getStatus: () => request<NmdStatusResponse>('/api/status'),
   startArray: () => request<NmdCommandResult>('/api/array/start', { method: 'POST' }),
   stopArray: () => request<NmdCommandResult>('/api/array/stop', { method: 'POST' }),
-  importDisks: () => request<ImportResult>('/api/array/import', { method: 'POST' }),
+  previewImport: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request<ImportPreview>('/api/array/import/preview', { method: 'POST', body: form });
+  },
+  commitImport: (token: string) =>
+    request<ImportCommitResponse>('/api/array/import/commit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }),
   parityCheck: (action: ParityCheckAction) => request<NmdCommandResult>(`/api/parity/${action}`, { method: 'POST' }),
   unassignDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/unassign`, { method: 'POST' }),
   listAvailableDevices: () => request<AvailableDevice[]>('/api/disks/available'),

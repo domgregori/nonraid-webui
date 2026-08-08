@@ -113,3 +113,32 @@
   max-height: 300px;
   overflow-y: auto;
 }
+
+.dialog.import-array-wizard {
+  width: 640px;
+}
+
+.import-status-pill {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: var(--radius-btn);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.import-status-pill--ok {
+  color: var(--color-green);
+  background: var(--color-green-tint);
+}
+
+.import-status-pill--size-mismatch {
+  color: var(--color-red);
+  background: var(--color-red-tint);
+}
+
+.import-status-pill--missing {
+  color: var(--color-amber);
+  background: color-mix(in oklch, var(--color-amber) 15%, transparent);
+}

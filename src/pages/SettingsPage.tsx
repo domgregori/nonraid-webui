@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { authApi } from '../api/authApi';
 import { nmdApi } from '../api/nmdApi';
 import { settingsApi } from '../api/settingsApi';
+import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
 import { useSettings } from '../hooks/useSettings';
 import { useSystemStats } from '../hooks/useSystemStats';
 import { useArrayStatus } from '../state/useArrayStatus';
-import type { ImportResult } from '../types/nmdApi';
 import { formatMemLabel, formatUptime } from '../utils/format';
 
 export function SettingsPage() {
@@ -28,10 +28,7 @@ export function SettingsPage() {
   const [minFreeSpaceSaving, setMinFreeSpaceSaving] = useState(false);
   const [minFreeSpaceError, setMinFreeSpaceError] = useState<string | null>(null);
 
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [importRunning, setImportRunning] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
-  const [showImportOutput, setShowImportOutput] = useState(false);
+  const [showImportWizard, setShowImportWizard] = useState(false);
 
   const [currentPasswordDraft, setCurrentPasswordDraft] = useState('');
   const [newPasswordDraft, setNewPasswordDraft] = useState('');
@@ -97,20 +94,6 @@ export function SettingsPage() {
     setMinFreeSpaceError(null);
     await update({ minFreeSpaceMb: value });
     setMinFreeSpaceSaving(false);
-  };
-
-  const runImport = async () => {
-    setImportRunning(true);
-    setImportError(null);
-    setImportResult(null);
-    setShowImportOutput(false);
-    try {
-      setImportResult(await nmdApi.importDisks());
-    } catch (err) {
-      setImportError((err as Error).message);
-    } finally {
-      setImportRunning(false);
-    }
   };
 
   const sendTest = async () => {
@@ -229,71 +212,17 @@ export function SettingsPage() {
       <div className="settings-card">
         <div className="settings-card__title">Import from Unraid</div>
         <div className="toggle-row__desc">
-          Migrating an existing Unraid array? Follow{' '}
-          <a href="https://github.com/qvr/nonraid#migrating-an-existing-unraid-array" target="_blank" rel="noreferrer">
-            the migration guide
-          </a>{' '}
-          first — move the disks over, copy the original superblock file from Unraid to this system's superblock
-          path (shown above), then stop the array here and scan below. This only scans and imports disks that match
-          the superblock; it never starts the array itself.
+          Migrating an existing Unraid array? This walks through picking the original superblock file, checking it
+          against what's physically connected, and importing only once everything checks out.
         </div>
-
-        {arrayStarted ? (
-          <div className="status-note status-note--error">Stop the array before importing.</div>
-        ) : (
-          <div className="settings-field__row">
-            <button type="button" className="btn" disabled={importRunning || !status} onClick={runImport}>
-              {importRunning ? 'Scanning…' : 'Scan & Import Disks'}
-            </button>
-          </div>
-        )}
-
-        {importError && <div className="status-note status-note--error">{importError}</div>}
-
-        {importResult && (
-          <div className="import-result">
-            {importResult.sizeMismatches.length > 0 && (
-              <div className="import-warning import-warning--danger">
-                <div className="import-warning__title">Size mismatch — do not start the array</div>
-                <div className="import-warning__desc">
-                  Starting the array with a mismatched partition size will lead to filesystem corruption and possible
-                  data loss (see the migration guide above). Resolve the mismatch, or unassign the affected disk,
-                  before starting.
-                </div>
-                {importResult.sizeMismatches.map((m) => (
-                  <div key={m.slot} className="import-warning__row">
-                    Slot {m.slot}: partition is {m.partitionSizeKb ?? 'unknown'} KB, superblock expects{' '}
-                    {m.expectedSizeKb ?? 'unknown'} KB
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {importResult.errors.length > 0 && (
-              <div className="import-warning import-warning--amber">
-                <div className="import-warning__title">Errors during import</div>
-                {importResult.errors.map((e, i) => (
-                  <div key={i} className="import-warning__row">
-                    {e}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {importResult.sizeMismatches.length === 0 && importResult.errors.length === 0 && (
-              <div className="status-note">
-                Imported {importResult.importedCount} disk(s). Review the array status, then start the array from
-                the Dashboard when you're ready.
-              </div>
-            )}
-
-            <button type="button" className="btn" style={{ marginTop: 8 }} onClick={() => setShowImportOutput((v) => !v)}>
-              {showImportOutput ? 'Hide' : 'Show'} raw output
-            </button>
-            {showImportOutput && <pre className="import-raw-output">{importResult.output}</pre>}
-          </div>
-        )}
+        <div className="settings-field__row">
+          <button type="button" className="btn" onClick={() => setShowImportWizard(true)}>
+            Import array…
+          </button>
+        </div>
       </div>
+
+      {showImportWizard && <ImportArrayWizard onClose={() => setShowImportWizard(false)} />}
 
       <div className="settings-card">
         <div className="settings-card__title">Shares</div>

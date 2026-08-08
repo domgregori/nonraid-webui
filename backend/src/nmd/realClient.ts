@@ -9,6 +9,11 @@ import type { AddDiskResult, AvailableDevice, ImportResult, NmdCommandResult, Nm
 
 const execFileAsync = promisify(execFile);
 
+// Matches DEFAULT_SUPERBLOCK in tools/nmdctl (the main nonraid repo) exactly
+// — the path nmdctl itself falls back to when neither -s/--super nor
+// SUPERBLOCK_PATH is given.
+const DEFAULT_SUPERBLOCK_PATH = '/nonraid.dat';
+
 /**
  * Deterministic fallback ID for a device with no real udev-visible serial
  * (common for virtio test disks, and any real disk without `serial=` set).
@@ -329,6 +334,77 @@ export class RealNmdClient implements NmdClient {
     };
   }
 
+  /**
+   * Puts an uploaded superblock file into place and loads it, importing
+   * whatever disks match — the guided import wizard's commit step. Mirrors
+   * reloadDriver()'s already-proven stop/unload/reload structure exactly,
+   * the only differences being *which* file gets loaded (backed up first,
+   * same as shrinkArray()) and that the disk matching is a fresh `import`
+   * (nmdctl's own scan) rather than re-importing previously-known
+   * identities. All filesystem touches go through runSystem (not plain
+   * Node fs) for the same reason every other privileged operation here
+   * does: this process may not itself have permission on the real
+   * superblock path, only sudo does (see nmdUseSudo).
+   *
+   * The caller (routes/array.ts) is responsible for the same unmount-before
+   * composition reloadDriver()'s callers use.
+   */
+  async commitImportedSuperblock(stagedFilePath: string): Promise<{ result: ImportResult; targetPath: string; backedUpTo: string | null }> {
+    let targetPath: string;
+    try {
+      targetPath = (await this.getStatus()).array.superblock;
+    } catch {
+      // No array configured yet (or nothing loaded and no file at the default
+      // path — see check_module_loaded() in tools/nmdctl) — fall back to this
+      // app's own configured path, then nmdctl's own hardcoded default.
+      targetPath = config.nmdSuperblock || DEFAULT_SUPERBLOCK_PATH;
+    }
+
+    let backedUpTo: string | null = null;
+    try {
+      await this.runSystem('test', ['-f', targetPath]);
+      backedUpTo = `${targetPath}.bak-import-${Date.now()}`;
+      await this.runSystem('mv', [targetPath, backedUpTo]);
+    } catch {
+      // Nothing at targetPath yet — first-ever import, nothing to back up.
+    }
+
+    try {
+      await this.runSystem('cp', [stagedFilePath, targetPath]);
+    } catch (err) {
+      // Restore the backup filename before surfacing the error — nothing
+      // kernel-side has changed yet at this point, same recovery shape as
+      // shrinkArray()'s modprobe-failure branch.
+      if (backedUpTo) await this.runSystem('mv', [backedUpTo, targetPath]).catch(() => {});
+      throw err;
+    }
+
+    await this.run(['stop']);
+
+    try {
+      await this.runSystem('modprobe', ['-r', 'nonraid']);
+    } catch (err) {
+      throw new Error(
+        `Module unload failed — the new superblock is in place at ${targetPath} but the module wasn't reloaded. ` +
+          `Underlying error: ${(err as Error).message}`,
+      );
+    }
+
+    try {
+      await this.runSystem('modprobe', ['nonraid', `super=${targetPath}`]);
+    } catch (err) {
+      throw new Error(
+        `Module reload failed after unloading — the array is currently down. ` +
+          `Run manually: sudo modprobe nonraid super=${targetPath}` +
+          `${backedUpTo ? ` (previous superblock backed up at ${backedUpTo})` : ''}. ` +
+          `Underlying error: ${(err as Error).message}`,
+      );
+    }
+
+    const { stdout } = await this.run(['import']);
+    return { result: parseImportOutput(stdout), targetPath, backedUpTo };
+  }
+
   async getStatus(): Promise<NmdStatusResponse> {
     const stdout = await this.runStatusJson(['status', '-o', 'json']);
     return JSON.parse(stdout) as NmdStatusResponse;
@@ -382,6 +458,21 @@ export class RealNmdClient implements NmdClient {
   }
 
   async parityCheck(action: ParityCheckAction): Promise<NmdCommandResult> {
+    // Same nmdctl unattended-mode quirk as commitNewDisk()/addDisk() above:
+    // a pending non-check resync (e.g. "recon P", the array's first-ever
+    // parity build) only accepts its own action word in -u mode, not
+    // CORRECT/NOCORRECT — those always hit nmdctl's interactive-confirm
+    // path and fail with "Cannot start parity check with another sync
+    // operation pending (unattended mode)". PAUSE/RESUME/CANCEL are exempt
+    // in nmdctl itself (handled before this check), so only substitute here.
+    if (action === 'CORRECT' || action === 'NOCORRECT') {
+      const status = await this.getStatus();
+      if (status.resync.pending && !status.resync.action.trim().toLowerCase().startsWith('check')) {
+        const pendingAction = status.resync.action.trim().split(/\s+/)[0]!;
+        const { stdout } = await this.run(['check', pendingAction]);
+        return { ok: true, message: stdout.trim() };
+      }
+    }
     const { stdout } = await this.run(['check', action]);
     return { ok: true, message: stdout.trim() };
   }
@@ -394,11 +485,6 @@ export class RealNmdClient implements NmdClient {
   async setLabel(label: string): Promise<NmdCommandResult> {
     const { stdout } = await this.run(['set', 'label', label]);
     return { ok: true, message: stdout.trim() };
-  }
-
-  async importDisks(): Promise<ImportResult> {
-    const { stdout } = await this.run(['import']);
-    return parseImportOutput(stdout);
   }
 
   /** Major numbers for virtio-blk devices, read fresh — they're not fixed, unlike SCSI/SATA's. */
@@ -541,6 +627,43 @@ export class RealNmdClient implements NmdClient {
       if (!d.diskId) return true;
       return !claimedIds.some((id) => d.diskId!.includes(id) || id.includes(d.diskId!));
     });
+  }
+
+  /**
+   * Mirrors get_disk_size_kb() in tools/nmdctl exactly: raw sectors via
+   * blockdev, rounded *down* to a multiple of 8 (the driver's own
+   * read/write granularity), then converted to 1024-byte KB. Confirmed live
+   * against a real array's own already-imported disks that this genuinely
+   * differs from scanDevice()'s plain lsblk-byte-size-rounded-to-KB by a few
+   * KB whenever the raw sector count isn't itself a multiple of 8 — nmdctl
+   * itself reports the aligned value (see status.disks[].size_kb), so
+   * that's the number to predict here, not lsblk's.
+   */
+  private async alignedSizeKb(partitionOrDevice: string): Promise<number | null> {
+    try {
+      const { stdout } = await execFileAsync('blockdev', ['--getsz', partitionOrDevice]);
+      const sectors = Number(stdout.trim());
+      if (!Number.isFinite(sectors)) return null;
+      return (Math.floor(sectors / 8) * 8) / 2;
+    } catch {
+      return null;
+    }
+  }
+
+  async scanAllDisks(): Promise<AvailableDevice[]> {
+    const devicePaths = await this.enumerateDevicePaths();
+    const scanned = await Promise.all(devicePaths.map((dev) => this.scanDevice(dev)));
+    const devices = scanned.filter((d): d is AvailableDevice => d !== null);
+    // Only this method's callers (the import preview) need nmdctl-exact
+    // sizes — scanDevice()'s own callers (listAvailableDevices(), the
+    // Unassigned Devices list) just display it, where lsblk's number is
+    // fine, so this corrects it here rather than in scanDevice() itself.
+    await Promise.all(
+      devices.map(async (d) => {
+        d.sizeKb = await this.alignedSizeKb(d.partition ?? d.device);
+      }),
+    );
+    return devices;
   }
 
   /**

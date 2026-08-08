@@ -14,15 +14,16 @@ export interface NmdClient {
   // /array/start runs this (then ShareService.remountAll) right after
   // startArray() succeeds, or shares would silently stay unmounted.
   mountDisks(): Promise<NmdCommandResult>;
-  // Scans for disks matching the superblock's recorded disk IDs and imports
-  // whichever aren't already imported — the same command a fresh Unraid
-  // migration needs (see qvr/nonraid's README "Migrating an existing Unraid
-  // array"). Safe to call any time the array is stopped, including when
-  // everything's already imported (it just reports 0 newly imported).
-  importDisks(): Promise<ImportResult>;
   // Physical block devices not already claimed by an array slot — for an
   // "Unassigned Devices" list. Read-only, doesn't touch array state.
   listAvailableDevices(): Promise<AvailableDevice[]>;
+  // Every currently-visible physical disk, regardless of whether an array
+  // slot already claims it — unlike listAvailableDevices(), which
+  // deliberately excludes those. Used by the guided import wizard to cross-
+  // reference an uploaded superblock's recorded disks against what's
+  // actually connected, including disks that are part of whatever array
+  // might currently be loaded. Read-only, doesn't touch array state.
+  scanAllDisks(): Promise<AvailableDevice[]>;
   // Assigns a device to an *empty* slot only: `add -f slot:device[:id]`,
   // then start the array (naming whatever abnormal state it reports, since
   // unattended mode refuses to start in one otherwise), then kick off the
@@ -81,6 +82,20 @@ export interface NmdClient {
   // Same risk category as shrinkArray()'s module reload; the caller is
   // responsible for the same unmount-before/remount-after composition.
   reloadDriver(): Promise<NmdCommandResult>;
+  // Puts an uploaded superblock file (still at its staged temp path) into
+  // place and loads it, importing whatever disks match — the guided import
+  // wizard's commit step, for bringing in a whole prior Unraid array's
+  // worth of disks at once. Unlike reloadDriver(), the file itself really is
+  // different, so this is the one case where nmdctl's own disk matching
+  // (not just this driver's re-import of already-known identities) decides
+  // what comes in. Resolves the real target path itself (the live array's
+  // own reported superblock path, falling back to config/nmdctl's default),
+  // backs up whatever was already there, and only then copies the staged
+  // file in — see realClient.ts for the full sequence and its risk profile
+  // (same category as shrinkArray()/reloadDriver()'s module reload). The
+  // caller (routes/array.ts) is responsible for the same unmount-before
+  // composition those use.
+  commitImportedSuperblock(stagedFilePath: string): Promise<{ result: ImportResult; targetPath: string; backedUpTo: string | null }>;
   // The driver has no readback for write method — it's a write-only kernel
   // command (confirmed: absent from both `status -o json` and /proc/nmdstat)
   // — so the caller is the source of truth for what's "currently" set, same

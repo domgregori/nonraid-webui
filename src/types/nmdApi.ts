@@ -136,3 +136,34 @@ export interface AddDiskResult {
   message: string;
   output: string;
 }
+
+// Mirrors backend/src/nmd/superblock.ts's parsed shape plus the per-slot
+// disk-matching result — see the import wizard.
+export type SuperblockDiskRole = 'parity' | 'parity2' | 'data';
+export type DiskMatchStatus = 'ok' | 'size-mismatch' | 'missing';
+
+export interface ImportSlotPreview {
+  slot: number;
+  role: SuperblockDiskRole;
+  sizeKb: number;
+  id: string;
+  status: DiskMatchStatus;
+  matchedDevice: { device: string; partition: string | null; model: string | null; sizeKb: number | null } | null;
+}
+
+export interface ImportPreview {
+  token: string;
+  label: string;
+  slots: ImportSlotPreview[];
+  parityTooSmall: boolean;
+  currentArrayActive: boolean;
+  hasSizeMismatch: boolean;
+  hasMissing: boolean;
+}
+
+export interface ImportCommitResponse {
+  importResult: ImportResult;
+  targetPath: string;
+  backedUpTo: string | null;
+  status: NmdStatusResponse;
+}
