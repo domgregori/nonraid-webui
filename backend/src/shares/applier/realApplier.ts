@@ -188,6 +188,17 @@ export class RealShareApplier implements ShareApplier {
       // carves out per-user read-only *exceptions* to that default instead.
       lines.push(`   writable = yes`);
       lines.push(`   guest ok = ${isPublic ? 'yes' : 'no'}`);
+      // Share directories are created root:root at mkdir time (see mountShare()) and
+      // never chmod'd open — access control is meant to live entirely in this Samba
+      // block (valid/invalid/read list above), not in Unix permission bits. Without
+      // this, every non-root grantee (every managed user — none of them are actually
+      // root) hits a real POSIX permission wall on write regardless of what read-write
+      // Samba grants them: confirmed live, a user granted read-write could authenticate
+      // and list a share but got NT_STATUS_ACCESS_DENIED on any actual write. `force
+      // user` makes smbd perform the real filesystem operation as root for every
+      // connection on this share, so Samba's own ACL logic above is the sole authority,
+      // matching what the `writable = yes` comment already assumed was true.
+      lines.push(`   force user = root`);
 
       const validUsers = [...writeUsers, ...readOnlyUsers];
       // Non-public shares require real accounts, so only they get `valid users` — for
