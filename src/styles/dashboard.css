@@ -255,6 +255,19 @@
   height: 5px;
 }
 
+.disk-card__clear-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.disk-card__clear-actions .btn {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: 11px;
+  text-align: center;
+}
+
 .disk-card__row--sub {
   margin-top: 6px;
   display: flex;

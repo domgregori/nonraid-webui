@@ -30,6 +30,7 @@ export function deriveParityViewModel(
 
   return {
     isRunning: resync.active,
+    isClearing: resync.action.trim().toLowerCase().startsWith('clear'),
     canStart,
     progressPct,
     barColor: degraded ? COLORS.red : COLORS.blue,

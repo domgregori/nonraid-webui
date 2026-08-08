@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { deriveDisks } from '../../selectors/disks';
+import { deriveParityViewModel } from '../../selectors/parity';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { DataDiskCard, ParityDiskCard } from './DiskCard';
 
@@ -8,10 +9,17 @@ interface ArrayDisksProps {
 }
 
 export function ArrayDisks({ showManageLink }: ArrayDisksProps = {}) {
-  const { status, temps, selectDisk } = useArrayStatus();
+  const { status, temps, selectDisk, parityPending, parityAction } = useArrayStatus();
   if (!status) return null;
 
   const { parity, data } = deriveDisks(status, temps);
+  // A new-disk clear reuses the same resync status a parity check would — reuse the same view
+  // model, just route it to the clearing disk's own card instead of the Parity Check card (which
+  // hides itself while isClearing is true, see ParityCheckCard).
+  const clearingView = deriveParityViewModel(status, parityPending, parityAction);
+  const clearingDiskId = clearingView.isClearing
+    ? data.find((d) => d.rawStatus === 'DISK_NEW' || d.rawStatus === 'DISK_DSBL_NEW')?.id
+    : undefined;
 
   return (
     <div>
@@ -32,7 +40,12 @@ export function ArrayDisks({ showManageLink }: ArrayDisksProps = {}) {
 
       <div className="disk-grid">
         {data.map((disk) => (
-          <DataDiskCard key={disk.id} disk={disk} onClick={() => selectDisk(disk.id)} />
+          <DataDiskCard
+            key={disk.id}
+            disk={disk}
+            onClick={() => selectDisk(disk.id)}
+            clearing={disk.id === clearingDiskId ? clearingView : undefined}
+          />
         ))}
       </div>
     </div>

@@ -8,6 +8,9 @@ export function ParityCheckCard() {
   if (!status) return null;
 
   const parity = deriveParityViewModel(status, parityPending, parityAction);
+  // A new-disk clear reuses this same resync status but isn't a parity check — its progress
+  // shows on the clearing disk's own card instead (see ArrayDisks).
+  if (parity.isClearing) return null;
 
   return (
     <Card className="parity-card">
