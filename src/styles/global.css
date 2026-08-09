@@ -95,6 +95,20 @@ button {
   border-radius: var(--radius-pill);
 }
 
+.progress-track__fill--indeterminate {
+  width: 40%;
+  animation: progress-sweep 1.2s ease-in-out infinite;
+}
+
+@keyframes progress-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
 .btn {
   font-family: inherit;
   cursor: pointer;

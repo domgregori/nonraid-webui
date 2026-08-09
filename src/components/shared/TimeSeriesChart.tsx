@@ -12,6 +12,9 @@ interface TimeSeriesChartProps {
   series: TimeSeriesChartSeries[];
   height?: number;
   formatValue?: (v: number) => string;
+  /** Defaults to an absolute date/time — override for non-wall-clock X axes (e.g. a benchmark's
+   *  elapsed-seconds domain, where every point would otherwise round to the same minute). */
+  formatTs?: (ts: number) => string;
 }
 
 // Fallback/minimum only — the real left padding is computed per-chart from the actual axis label
@@ -34,7 +37,7 @@ function defaultFormatValue(v: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
-function formatTs(ts: number): string {
+function defaultFormatTs(ts: number): string {
   return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
@@ -60,7 +63,7 @@ function nearestPoint(points: { ts: number; value: number }[], ts: number): { ts
  * all the SVG <text> glyphs horizontally and made them unreadable. Matching
  * the viewBox to the real pixel size keeps the scale 1:1 in both directions.
  */
-export function TimeSeriesChart({ series, height = 180, formatValue = defaultFormatValue }: TimeSeriesChartProps) {
+export function TimeSeriesChart({ series, height = 180, formatValue = defaultFormatValue, formatTs = defaultFormatTs }: TimeSeriesChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(FALLBACK_WIDTH);
