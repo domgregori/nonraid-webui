@@ -13,7 +13,13 @@ interface TimeSeriesChartProps {
   formatValue?: (v: number) => string;
 }
 
-const PAD_LEFT = 44;
+// Fallback/minimum only — the real left padding is computed per-chart from the actual axis label
+// text (see padLeft below), since a fixed 44 was sized for short labels like "30%" and genuinely
+// overflowed the card for wider ones like "630.6 MB/s" (confirmed live: text-anchor="end" text
+// extends leftward from its anchor, so a label wider than the reserved space bleeds past the
+// SVG's own left edge and out of the card entirely, not just close to it).
+const PAD_LEFT_MIN = 30;
+const AXIS_LABEL_CHAR_WIDTH = 6.6; // ~0.6em at the axis label's 11px monospace font
 const PAD_RIGHT = 8;
 // The top axis label (11px font, .ts-chart__axis-label) sits vertically centered on this exact
 // y — at the old PAD_TOP=10 its own glyph came within ~2px of the SVG's own top edge, reading as
@@ -91,19 +97,24 @@ export function TimeSeriesChart({ series, height = 180, formatValue = defaultFor
     return { minTs: lowTs, maxTs: highTs, minVal: 0, maxVal: highVal > 0 ? highVal * 1.25 : 1 };
   }, [allPoints]);
 
-  const xFor = (ts: number) => PAD_LEFT + ((ts - minTs) / (maxTs - minTs)) * (width - PAD_LEFT - PAD_RIGHT);
-  const yFor = (v: number) => height - PAD_BOTTOM - ((v - minVal) / (maxVal - minVal)) * (height - PAD_TOP - PAD_BOTTOM);
-
   const gridValues = [0, 0.5, 1].map((f) => minVal + f * (maxVal - minVal));
+  // Sized to the widest label actually being drawn (e.g. "630.6 MB/s" vs "30%") rather than a
+  // fixed constant — text-anchor="end" labels extend leftward from their anchor, so anything
+  // narrower than the real text overflows the card, not just crowds it.
+  const widestLabelChars = Math.max(0, ...gridValues.map((v) => formatValue(v).length));
+  const padLeft = Math.max(PAD_LEFT_MIN, widestLabelChars * AXIS_LABEL_CHAR_WIDTH + 12);
+
+  const xFor = (ts: number) => padLeft + ((ts - minTs) / (maxTs - minTs)) * (width - padLeft - PAD_RIGHT);
+  const yFor = (v: number) => height - PAD_BOTTOM - ((v - minVal) / (maxVal - minVal)) * (height - PAD_TOP - PAD_BOTTOM);
 
   function handleMouseMove(e: MouseEvent<SVGSVGElement>) {
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    setHoverX(Math.min(Math.max(e.clientX - rect.left, PAD_LEFT), width - PAD_RIGHT));
+    setHoverX(Math.min(Math.max(e.clientX - rect.left, padLeft), width - PAD_RIGHT));
   }
 
-  const hoverTs = hoverX !== null ? minTs + ((hoverX - PAD_LEFT) / (width - PAD_LEFT - PAD_RIGHT)) * (maxTs - minTs) : null;
+  const hoverTs = hoverX !== null ? minTs + ((hoverX - padLeft) / (width - padLeft - PAD_RIGHT)) * (maxTs - minTs) : null;
 
   return (
     <div className="ts-chart" ref={containerRef}>
@@ -121,14 +132,14 @@ export function TimeSeriesChart({ series, height = 180, formatValue = defaultFor
           >
             {gridValues.map((v, i) => (
               <g key={i}>
-                <line x1={PAD_LEFT} x2={width - PAD_RIGHT} y1={yFor(v)} y2={yFor(v)} className="ts-chart__gridline" />
-                <text x={PAD_LEFT - 6} y={yFor(v)} textAnchor="end" dominantBaseline="middle" className="ts-chart__axis-label">
+                <line x1={padLeft} x2={width - PAD_RIGHT} y1={yFor(v)} y2={yFor(v)} className="ts-chart__gridline" />
+                <text x={padLeft - 6} y={yFor(v)} textAnchor="end" dominantBaseline="middle" className="ts-chart__axis-label">
                   {formatValue(v)}
                 </text>
               </g>
             ))}
 
-            <text x={PAD_LEFT} y={height - 6} textAnchor="start" className="ts-chart__axis-label">
+            <text x={padLeft} y={height - 6} textAnchor="start" className="ts-chart__axis-label">
               {formatTs(minTs)}
             </text>
             <text x={width - PAD_RIGHT} y={height - 6} textAnchor="end" className="ts-chart__axis-label">
