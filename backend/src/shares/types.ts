@@ -22,6 +22,10 @@ export interface ShareInput {
   protocols: ShareProtocol[];
   smb?: { public: boolean };
   nfs?: { allowedHosts: string[]; readOnly: boolean };
+  // Optional, free-text, purely informational — also surfaced as smb.conf's
+  // `comment =` so it's visible to real SMB clients browsing shares, not just
+  // this app's own UI. See realApplier.ts's writeSmbBlock().
+  description?: string;
 }
 
 // Same shape today, but kept as a distinct type — Share is "validated ShareInput
@@ -35,6 +39,11 @@ export interface ShareStats {
 
 export interface ShareWithStats extends Share {
   stats: ShareStats;
+  // Live SMB tree-connections right now (from `smbstatus --json`). NFS has no
+  // reliable equivalent on this host (see getActiveConnectionCounts()'s doc
+  // comment), so this deliberately only ever reflects SMB.
+  activeConnections: number;
+  access: ShareAccess;
 }
 
 export interface ShareCommandResult {

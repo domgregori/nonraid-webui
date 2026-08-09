@@ -3,7 +3,6 @@ import { ArrayDisks } from '../components/dashboard/ArrayDisks';
 import { DockerWidgetCard } from '../components/dashboard/DockerWidgetCard';
 import { LxcWidgetCard } from '../components/dashboard/LxcWidgetCard';
 import { ParityCheckCard } from '../components/dashboard/ParityCheckCard';
-import { SettingsQuickCard } from '../components/dashboard/SettingsQuickCard';
 import { SharesCard } from '../components/dashboard/SharesCard';
 import { StatCards } from '../components/dashboard/StatCards';
 import { SystemCard } from '../components/dashboard/SystemCard';
@@ -32,7 +31,6 @@ export function DashboardPage() {
       <div className="dashboard__sidebar">
         <SystemCard />
         <SharesCard />
-        <SettingsQuickCard />
         <ActivityCard />
       </div>
     </div>

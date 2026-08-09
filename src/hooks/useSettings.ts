@@ -13,11 +13,7 @@ export interface UseSettings {
   update: (patch: AppSettingsUpdate) => Promise<void>;
 }
 
-/**
- * Single source of truth for persisted app settings — used by SettingsPage
- * and the dashboard's SettingsQuickCard, so both stay in sync with the
- * backend rather than each keeping their own local copy.
- */
+/** Single source of truth for persisted app settings, used by SettingsPage. */
 export function useSettings(): UseSettings {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loadState, setLoadState] = useState<SettingsLoadState>('loading');

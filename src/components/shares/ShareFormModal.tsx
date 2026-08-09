@@ -24,6 +24,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
   const allDiskSlots = dataDisks.map((d) => d.slot);
 
   const [name, setName] = useState(initial?.name ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
   const [disks, setDisks] = useState<number[]>(initial?.disks ?? allDiskSlots);
   const [allocationMethod, setAllocationMethod] = useState<AllocationMethod>(initial?.allocationMethod ?? 'most-free');
   // Default to "all drives" on create. On edit, trust the share's own persisted
@@ -98,6 +99,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
       nfs: nfsEnabled
         ? { readOnly: nfsReadOnly, allowedHosts: nfsHosts.split(',').map((h) => h.trim()).filter(Boolean) }
         : undefined,
+      description: description.trim() || undefined,
     };
 
     setSubmitting(true);
@@ -122,6 +124,18 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
           <label className="form-field">
             <span className="form-field__label">Name</span>
             <input className="history-input" style={{ width: '100%' }} value={name} onChange={(e) => setName(e.target.value)} placeholder="media" />
+          </label>
+
+          <label className="form-field">
+            <span className="form-field__label">Description (optional)</span>
+            <input
+              className="history-input"
+              style={{ width: '100%' }}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What's this share for?"
+              maxLength={200}
+            />
           </label>
 
           <div className="form-field">

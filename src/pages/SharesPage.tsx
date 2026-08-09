@@ -43,6 +43,7 @@ export function SharesPage() {
             <div className="list-card__col--name">
               <div className="list-card__title">{share.name}</div>
               <div className="list-card__subtitle">{share.protocolLabel}</div>
+              {share.description && <div className="list-card__subtitle">{share.description}</div>}
             </div>
             <div className="list-card__col">
               <div>Allocation: {share.allocationLabel}</div>

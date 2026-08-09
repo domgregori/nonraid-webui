@@ -36,6 +36,10 @@ export function validateShareInput(input: unknown): ShareInput {
   ) {
     throw new HttpError(400, `protocols must be a non-empty array of: ${PROTOCOLS.join(', ')}`);
   }
+  if (i.description !== undefined && typeof i.description !== 'string') {
+    throw new HttpError(400, 'description must be a string.');
+  }
+  const description = typeof i.description === 'string' ? i.description.trim().slice(0, 200) : undefined;
 
   return {
     name: i.name,
@@ -45,5 +49,6 @@ export function validateShareInput(input: unknown): ShareInput {
     protocols: i.protocols as ShareProtocol[],
     smb: i.smb as ShareInput['smb'],
     nfs: i.nfs as ShareInput['nfs'],
+    description: description || undefined,
   };
 }

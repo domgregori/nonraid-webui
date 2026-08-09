@@ -166,8 +166,20 @@ export class ShareService {
   }
 
   async list(): Promise<ShareWithStats[]> {
-    const [shares, ctx] = await Promise.all([this.store.list(), this.buildContext()]);
-    return Promise.all(shares.map(async (s) => ({ ...s, stats: await this.applier.getStats(s, ctx) })));
+    const [shares, ctx, access, connectionCounts] = await Promise.all([
+      this.store.list(),
+      this.buildContext(),
+      this.aclStore.getAll(),
+      this.applier.getActiveConnectionCounts(),
+    ]);
+    return Promise.all(
+      shares.map(async (s) => ({
+        ...s,
+        stats: await this.applier.getStats(s, ctx),
+        activeConnections: connectionCounts[s.name] ?? 0,
+        access: access[s.name] ?? { users: {}, groups: {} },
+      })),
+    );
   }
 
   async create(input: unknown): Promise<Share> {

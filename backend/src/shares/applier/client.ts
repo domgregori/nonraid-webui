@@ -15,4 +15,7 @@ export interface ShareApplier {
    */
   syncExports(allShares: Share[], accessByShare: Record<string, ShareAccess>): Promise<ShareCommandResult>;
   getStats(share: Share, ctx: ApplyContext): Promise<ShareStats>;
+  // Live SMB tree-connection count per share name, right now — best-effort, returns {} on any
+  // failure (smbstatus missing, smbd not running) rather than throwing. See realApplier.ts.
+  getActiveConnectionCounts(): Promise<Record<string, number>>;
 }

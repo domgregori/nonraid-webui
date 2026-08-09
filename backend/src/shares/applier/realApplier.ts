@@ -206,6 +206,30 @@ export class RealShareApplier implements ShareApplier {
     }
   }
 
+  /**
+   * NFS is deliberately not counted here — this host has no reliable equivalent to smbstatus for
+   * it (showmount/nfs-common isn't installed, and NFSv3's rmtab-based client tracking is widely
+   * disabled/unreliable on modern distros anyway), so a fabricated NFS number would be worse than
+   * just not showing one. Best-effort: any failure here (smbstatus missing, smbd not running)
+   * returns {} rather than throwing — this is a nice-to-have overlay on the share list, not
+   * something that should ever break it.
+   */
+  async getActiveConnectionCounts(): Promise<Record<string, number>> {
+    try {
+      const { stdout } = await run('smbstatus', ['--json']);
+      const data = JSON.parse(stdout) as { tcons?: Record<string, { service?: string }> };
+      const counts: Record<string, number> = {};
+      for (const tcon of Object.values(data.tcons ?? {})) {
+        const service = tcon.service;
+        if (!service || service === 'IPC$' || service === 'print$') continue;
+        counts[service] = (counts[service] ?? 0) + 1;
+      }
+      return counts;
+    } catch {
+      return {};
+    }
+  }
+
   async syncExports(allShares: Share[], accessByShare: Record<string, ShareAccess>): Promise<ShareCommandResult> {
     await this.writeSmbBlock(allShares, accessByShare);
     await this.writeExportsBlock(allShares);
@@ -231,6 +255,10 @@ export class RealShareApplier implements ShareApplier {
 
       lines.push(`[${s.name}]`);
       lines.push(`   path = ${userMountPath(s.name)}`);
+      // Purely informational for this app's own UI, but also real, visible value for actual SMB
+      // clients: Windows Explorer/Finder show this when browsing the server's shares. smb.conf
+      // comment values are single-line, so newlines are stripped rather than escaped.
+      if (s.description) lines.push(`   comment = ${s.description.replace(/[\r\n]+/g, ' ')}`);
       lines.push(`   browseable = yes`);
       // Share stays writable by default, same as before per-user ACLs existed — this
       // must not silently lock guest/public shares to read-only. `read list` (below)

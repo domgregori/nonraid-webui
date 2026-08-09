@@ -10,12 +10,31 @@ const ALLOCATION_LABELS: Record<AllocationMethod, string> = {
 
 export interface ShareViewModel {
   name: string;
+  description: string | null;
   protocolLabel: string;
   allocationLabel: string;
   disksLabel: string;
   usedLabel: string;
   totalLabel: string;
   pct: number;
+  connectionsLabel: string;
+  accessLabel: string;
+}
+
+/** Groups get Samba's own "@groupname" convention, matching how they're already written into
+ *  smb.conf's valid/invalid/read lists elsewhere in this app. */
+export function deriveAccessLabel(share: Pick<ShareWithStats, 'access' | 'smb'>): string {
+  const principals = [
+    ...Object.entries(share.access.users)
+      .filter(([, p]) => p === 'read-write' || p === 'read-only')
+      .map(([name]) => name),
+    ...Object.entries(share.access.groups)
+      .filter(([, p]) => p === 'read-write' || p === 'read-only')
+      .map(([name]) => `@${name}`),
+  ];
+  if (principals.length > 0) return principals.join(', ');
+  if (share.smb?.public !== false) return 'Public';
+  return 'No access configured';
 }
 
 export function deriveShareViewModel(share: ShareWithStats): ShareViewModel {
@@ -24,6 +43,7 @@ export function deriveShareViewModel(share: ShareWithStats): ShareViewModel {
 
   return {
     name: share.name,
+    description: share.description?.trim() || null,
     protocolLabel: share.protocols.map((p) => p.toUpperCase()).join(', '),
     allocationLabel:
       share.allocationMethod === 'single-disk'
@@ -33,5 +53,7 @@ export function deriveShareViewModel(share: ShareWithStats): ShareViewModel {
     usedLabel: usedBytes !== null ? formatBytesHuman(usedBytes) : '—',
     totalLabel: totalBytes !== null ? formatBytesHuman(totalBytes) : '—',
     pct,
+    connectionsLabel: share.activeConnections > 0 ? `${share.activeConnections} connection${share.activeConnections === 1 ? '' : 's'}` : '—',
+    accessLabel: deriveAccessLabel(share),
   };
 }
