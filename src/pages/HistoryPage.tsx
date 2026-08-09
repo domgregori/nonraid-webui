@@ -27,7 +27,16 @@ const ALL_METRICS: MetricName[] = [
 // Rotates for however many disks the array has — COLORS only has 4 semantic
 // colors (blue/green/amber/red), so a per-disk chart with 5+ disks needs a
 // few extra swatches beyond those.
-const DISK_PALETTE = [COLORS.blue, COLORS.green, COLORS.amber, COLORS.red, '#a78bfa', '#22d3ee', '#f472b6', '#84cc16'];
+const DISK_PALETTE = [
+  COLORS.blue,
+  COLORS.green,
+  COLORS.amber,
+  COLORS.red,
+  COLORS.chartPurple,
+  COLORS.chartCyan,
+  COLORS.chartPink,
+  COLORS.chartLime,
+];
 
 function formatPercent(v: number): string {
   return `${Math.round(v)}%`;

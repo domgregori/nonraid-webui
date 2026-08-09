@@ -8,11 +8,13 @@ import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
 import { useSettings } from '../hooks/useSettings';
 import { useSystemStats } from '../hooks/useSystemStats';
+import { type ThemePreference, useTheme } from '../hooks/useTheme';
 import { useArrayStatus } from '../state/useArrayStatus';
 import { formatMemLabel, formatUptime } from '../utils/format';
 
 export function SettingsPage() {
   const { settings, loadState, error, saving, saveError, update } = useSettings();
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const stats = useSystemStats();
   const { status } = useArrayStatus();
 
@@ -389,6 +391,21 @@ export function SettingsPage() {
             </div>
           ))
         )}
+      </div>
+
+      <div className="settings-card">
+        <div className="settings-card__title">Appearance</div>
+        <div className="settings-field">
+          <div className="toggle-row__title">Theme</div>
+          <div className="toggle-row__desc">Stored in this browser only — doesn't sync across devices.</div>
+          <div className="settings-field__row">
+            <select className="history-input" value={themePreference} onChange={(e) => setThemePreference(e.target.value as ThemePreference)}>
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div className="settings-card">

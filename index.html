@@ -2,6 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Applies a stored light/dark theme preference before first paint, so
+      // switching themes doesn't cause a flash of the wrong one on load. No
+      // preference stored means "system" — leaves data-theme unset, letting
+      // tokens.css's prefers-color-scheme media query decide.
+      (function () {
+        try {
+          var t = localStorage.getItem('nonraid-theme-preference');
+          if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
