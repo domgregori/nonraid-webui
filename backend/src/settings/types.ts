@@ -7,6 +7,12 @@ export interface NotificationSettings {
   appriseUrls: string;
 }
 
+export interface ParitySchedule {
+  enabled: boolean;
+  dayOfWeek: number; // 0 (Sun) – 6 (Sat), server local time
+  hour: number; // 0–23, server local time
+}
+
 export interface AppSettings {
   // Desired state for the array's write method (nmdctl's md_write_method /
   // "turbo write") — see nmd/client.ts's setWriteMethod doc comment for why
@@ -19,10 +25,12 @@ export interface AppSettings {
   // 4096 (4G), a sane margin on real multi-TB disks but one that silently
   // makes every branch ineligible (ENOSPC on every write) on small disks.
   minFreeSpaceMb: number;
+  paritySchedule: ParitySchedule;
 }
 
 export type AppSettingsUpdate = Partial<{
   turboWrite: boolean;
   notifications: Partial<NotificationSettings>;
   minFreeSpaceMb: number;
+  paritySchedule: Partial<ParitySchedule>;
 }>;

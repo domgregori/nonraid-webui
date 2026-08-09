@@ -9,6 +9,12 @@ import { useSystemStats } from '../hooks/useSystemStats';
 import { useArrayStatus } from '../state/useArrayStatus';
 import { formatMemLabel, formatUptime } from '../utils/format';
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
+  value: h,
+  label: h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`,
+}));
+
 export function SettingsPage() {
   const { settings, loadState, error, saving, saveError, update } = useSettings();
   const stats = useSystemStats();
@@ -28,6 +34,11 @@ export function SettingsPage() {
   const [minFreeSpaceSaving, setMinFreeSpaceSaving] = useState(false);
   const [minFreeSpaceError, setMinFreeSpaceError] = useState<string | null>(null);
 
+  const [paritySchedEnabled, setParitySchedEnabled] = useState(false);
+  const [paritySchedDay, setParitySchedDay] = useState(0);
+  const [paritySchedHour, setParitySchedHour] = useState(2);
+  const [paritySchedSaving, setParitySchedSaving] = useState(false);
+
   const [showImportWizard, setShowImportWizard] = useState(false);
 
   const [currentPasswordDraft, setCurrentPasswordDraft] = useState('');
@@ -44,6 +55,7 @@ export function SettingsPage() {
   const labelInitialized = useRef(false);
   const appriseInitialized = useRef(false);
   const minFreeSpaceInitialized = useRef(false);
+  const paritySchedInitialized = useRef(false);
 
   useEffect(() => {
     if (status && !labelInitialized.current) {
@@ -63,6 +75,15 @@ export function SettingsPage() {
     if (settings && !minFreeSpaceInitialized.current) {
       setMinFreeSpaceDraft(String(settings.minFreeSpaceMb));
       minFreeSpaceInitialized.current = true;
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    if (settings && !paritySchedInitialized.current) {
+      setParitySchedEnabled(settings.paritySchedule.enabled);
+      setParitySchedDay(settings.paritySchedule.dayOfWeek);
+      setParitySchedHour(settings.paritySchedule.hour);
+      paritySchedInitialized.current = true;
     }
   }, [settings]);
 
@@ -94,6 +115,12 @@ export function SettingsPage() {
     setMinFreeSpaceError(null);
     await update({ minFreeSpaceMb: value });
     setMinFreeSpaceSaving(false);
+  };
+
+  const saveParitySchedule = async () => {
+    setParitySchedSaving(true);
+    await update({ paritySchedule: { enabled: paritySchedEnabled, dayOfWeek: paritySchedDay, hour: paritySchedHour } });
+    setParitySchedSaving(false);
   };
 
   const sendTest = async () => {
@@ -210,6 +237,46 @@ export function SettingsPage() {
       </div>
 
       <div className="settings-card">
+        <div className="settings-card__title">Parity</div>
+        <div className="toggle-row">
+          <div>
+            <div className="toggle-row__title">Automatic weekly check</div>
+            <div className="toggle-row__desc">
+              Runs a correcting parity check automatically once a week. Skipped if the array isn't started or a check
+              is already running.
+            </div>
+          </div>
+          <ToggleSwitch
+            on={paritySchedEnabled}
+            onToggle={() => setParitySchedEnabled((v) => !v)}
+            label="Automatic weekly check"
+            disabled={!settings}
+          />
+        </div>
+        <div className="settings-field toggle-row--bordered">
+          <div className="settings-field__row">
+            <select className="history-input" value={paritySchedDay} onChange={(e) => setParitySchedDay(Number(e.target.value))} disabled={!settings}>
+              {DAY_NAMES.map((day, i) => (
+                <option key={day} value={i}>
+                  {day}
+                </option>
+              ))}
+            </select>
+            <select className="history-input" value={paritySchedHour} onChange={(e) => setParitySchedHour(Number(e.target.value))} disabled={!settings}>
+              {HOUR_OPTIONS.map((h) => (
+                <option key={h.value} value={h.value}>
+                  {h.label}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="btn" disabled={paritySchedSaving || !settings} onClick={saveParitySchedule}>
+              {paritySchedSaving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="settings-card">
         <div className="settings-card__title">Import from Unraid</div>
         <div className="toggle-row__desc">
           Migrating an existing Unraid array? This walks through picking the original superblock file, checking it
@@ -256,7 +323,10 @@ export function SettingsPage() {
         <div className="toggle-row">
           <div>
             <div className="toggle-row__title">Event notifications</div>
-            <div className="toggle-row__desc">Enable dispatching notifications via apprise</div>
+            <div className="toggle-row__desc">
+              Enable dispatching notifications via apprise. Sent automatically when a parity check finishes, a disk
+              reports a new error or goes offline, or a SMART health check fails.
+            </div>
           </div>
           <ToggleSwitch
             on={settings?.notifications.enabled ?? false}

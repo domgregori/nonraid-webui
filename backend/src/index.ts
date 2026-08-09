@@ -12,6 +12,7 @@ import { EmptyDiskService } from './emptyDisk/index.js';
 import { createLxcClient } from './lxc/index.js';
 import { MetricsSampler, MetricsService, openMetricsDb } from './metrics/index.js';
 import { createNmdClient } from './nmd/index.js';
+import { ParityScheduler } from './parity/index.js';
 import { activityRouter } from './routes/activity.js';
 import { appsRouter } from './routes/apps.js';
 import { arrayRouter } from './routes/array.js';
@@ -41,14 +42,15 @@ async function main() {
   const lxc = createLxcClient();
   const smart = new SmartService(createSmartClient());
   const activity = new ActivityStore();
-  new ActivityWatcher(nmd, smart, activity);
+  const settingsStore = new SettingsStore();
+  new ActivityWatcher(nmd, smart, activity, settingsStore);
+  new ParityScheduler(nmd, settingsStore, activity);
   const authStore = new AuthStore();
   const authService = new AuthService(authStore);
   await authStore.get(); // fail fast at boot on a corrupt auth.json
   if (config.serveFrontend && !existsSync(path.join(config.frontendDistPath, 'index.html'))) {
     throw new Error(`serveFrontend is true but no index.html at ${config.frontendDistPath} — did the frontend build run?`);
   }
-  const settingsStore = new SettingsStore();
   const shareApplier = createShareApplier();
   const shareStore = new ShareStore();
   const shareAccessStore = new ShareAccessStore();

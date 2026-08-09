@@ -7,6 +7,7 @@ const DEFAULTS: AppSettings = {
   turboWrite: false,
   notifications: { enabled: false, appriseUrls: '' },
   minFreeSpaceMb: 100,
+  paritySchedule: { enabled: false, dayOfWeek: 0, hour: 2 },
 };
 
 /**
@@ -23,7 +24,7 @@ export class SettingsStore {
 
   async get(): Promise<AppSettings> {
     const settings = await this.load();
-    return { ...settings, notifications: { ...settings.notifications } };
+    return { ...settings, notifications: { ...settings.notifications }, paritySchedule: { ...settings.paritySchedule } };
   }
 
   update(patch: AppSettingsUpdate): Promise<AppSettings> {
@@ -33,6 +34,7 @@ export class SettingsStore {
         ...current,
         ...patch,
         notifications: { ...current.notifications, ...patch.notifications },
+        paritySchedule: { ...current.paritySchedule, ...patch.paritySchedule },
       };
       await this.persistAtomic(next);
     });
@@ -44,7 +46,12 @@ export class SettingsStore {
     try {
       const raw = await readFile(this.filePath, 'utf8');
       const parsed = JSON.parse(raw) as Partial<AppSettings>;
-      this.cache = { ...DEFAULTS, ...parsed, notifications: { ...DEFAULTS.notifications, ...parsed.notifications } };
+      this.cache = {
+        ...DEFAULTS,
+        ...parsed,
+        notifications: { ...DEFAULTS.notifications, ...parsed.notifications },
+        paritySchedule: { ...DEFAULTS.paritySchedule, ...parsed.paritySchedule },
+      };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
         this.cache = { ...DEFAULTS };

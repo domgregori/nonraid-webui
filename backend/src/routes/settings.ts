@@ -31,6 +31,18 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
           throw new Error('minFreeSpaceMb must be a non-negative integer (MB).');
         }
       }
+      if (patch.paritySchedule) {
+        const { enabled, dayOfWeek, hour } = patch.paritySchedule;
+        if ('enabled' in patch.paritySchedule && typeof enabled !== 'boolean') {
+          throw new Error('paritySchedule.enabled must be a boolean.');
+        }
+        if ('dayOfWeek' in patch.paritySchedule && (!Number.isInteger(dayOfWeek) || (dayOfWeek as number) < 0 || (dayOfWeek as number) > 6)) {
+          throw new Error('paritySchedule.dayOfWeek must be an integer 0–6 (Sunday–Saturday).');
+        }
+        if ('hour' in patch.paritySchedule && (!Number.isInteger(hour) || (hour as number) < 0 || (hour as number) > 23)) {
+          throw new Error('paritySchedule.hour must be an integer 0–23.');
+        }
+      }
       const updated = await store.update(patch);
       if ('minFreeSpaceMb' in patch) {
         // mergerfs's minfreespace is a mount option — only takes effect on

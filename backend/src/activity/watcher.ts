@@ -1,6 +1,8 @@
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { DiskStatus, NmdDisk } from '../nmd/types.js';
+import { sendAppriseNotification } from '../settings/notify.js';
+import type { SettingsStore } from '../settings/store.js';
 import type { SmartHealth, SmartService } from '../smart/index.js';
 import type { ActivityStore } from './store.js';
 
@@ -44,10 +46,22 @@ export class ActivityWatcher {
     private nmd: NmdClient,
     private smart: SmartService,
     private activity: ActivityStore,
+    private settings: SettingsStore,
     intervalMs: number = config.activityWatcherIntervalMs,
   ) {
     this.timer = setInterval(() => this.tick(), intervalMs);
     this.timer.unref();
+  }
+
+  /** Best-effort — a bad/unreachable apprise target must never break this watcher's tick. */
+  private async notify(title: string, body: string): Promise<void> {
+    try {
+      const settings = await this.settings.get();
+      if (!settings.notifications.enabled || !settings.notifications.appriseUrls.trim()) return;
+      await sendAppriseNotification(settings.notifications.appriseUrls, title, body);
+    } catch {
+      // swallowed — the activity log entry is the record of what happened either way
+    }
   }
 
   private async tick(): Promise<void> {
@@ -70,9 +84,12 @@ export class ActivityWatcher {
     if (seen === null || lastSync.timestamp === seen || lastSync.timestamp === 0) return;
 
     if (lastSync.status === 'errors') {
-      this.activity.log(`Parity check finished with ${syncErrors} sync error${syncErrors === 1 ? '' : 's'}`, 'red').catch(() => {});
+      const text = `Parity check finished with ${syncErrors} sync error${syncErrors === 1 ? '' : 's'}`;
+      this.activity.log(text, 'red').catch(() => {});
+      this.notify('NonRAID: parity errors', text);
     } else if (lastSync.status === 'completed') {
       this.activity.log('Parity check finished with no errors', 'green').catch(() => {});
+      this.notify('NonRAID: parity check complete', 'Parity check finished with no errors');
     }
   }
 
@@ -83,16 +100,18 @@ export class ActivityWatcher {
       if (!prev) continue; // first observation of this slot — seed only
 
       if (disk.errors > prev.errors) {
-        this.activity
-          .log(`Disk ${disk.slot} (${diskLabel(disk)}) reported new errors — total now ${disk.errors}`, 'red')
-          .catch(() => {});
+        const text = `Disk ${disk.slot} (${diskLabel(disk)}) reported new errors — total now ${disk.errors}`;
+        this.activity.log(text, 'red').catch(() => {});
+        this.notify('NonRAID: disk errors', text);
         continue; // one log line per tick per disk is plenty
       }
 
       const wasBad = BAD_DISK_STATUSES.has(prev.status);
       const isBad = BAD_DISK_STATUSES.has(disk.status);
       if (isBad && !wasBad) {
-        this.activity.log(`Disk ${disk.slot} (${diskLabel(disk)}) status changed to ${disk.status}`, 'red').catch(() => {});
+        const text = `Disk ${disk.slot} (${diskLabel(disk)}) status changed to ${disk.status}`;
+        this.activity.log(text, 'red').catch(() => {});
+        this.notify('NonRAID: disk status changed', text);
       }
     }
   }
@@ -115,7 +134,9 @@ export class ActivityWatcher {
       this.healthSnapshots.set(disk.device, health);
 
       if (prev === 'passed' && health === 'failed') {
-        this.activity.log(`SMART health check failed for disk ${disk.slot} (${diskLabel(disk)})`, 'red').catch(() => {});
+        const text = `SMART health check failed for disk ${disk.slot} (${diskLabel(disk)})`;
+        this.activity.log(text, 'red').catch(() => {});
+        this.notify('NonRAID: SMART health failed', text);
       }
     }
   }
