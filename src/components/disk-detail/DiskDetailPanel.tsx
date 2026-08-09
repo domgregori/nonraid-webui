@@ -337,8 +337,8 @@ export function DiskDetailPanel() {
 
           {smartSlot !== null && (
             <BenchmarkSection
-              onRead={() => nmdApi.benchmarkRead(disk.slot)}
-              onWrite={disk.role === 'data' ? () => nmdApi.benchmarkWrite(disk.slot) : undefined}
+              onRead={(durationSeconds) => nmdApi.benchmarkRead(disk.slot, durationSeconds)}
+              onWrite={disk.role === 'data' ? (durationSeconds) => nmdApi.benchmarkWrite(disk.slot, durationSeconds) : undefined}
             />
           )}
         </div>

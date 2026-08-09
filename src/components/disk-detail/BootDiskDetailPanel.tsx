@@ -105,7 +105,10 @@ export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
             {smartAttrs && <SmartOverviewRows attributes={smartAttrs} />}
           </div>
 
-          <BenchmarkSection onRead={() => systemApi.benchmarkBootRead()} onWrite={() => systemApi.benchmarkBootWrite()} />
+          <BenchmarkSection
+            onRead={(durationSeconds) => systemApi.benchmarkBootRead(durationSeconds)}
+            onWrite={(durationSeconds) => systemApi.benchmarkBootWrite(durationSeconds)}
+          />
 
           <div className="detail-card">
             <div className="eyebrow">Operations</div>

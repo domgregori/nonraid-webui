@@ -24,6 +24,16 @@ export const systemApi = {
       body: JSON.stringify({ timezone }),
     }),
 
-  benchmarkBootRead: () => request<BenchmarkResult>('/api/system/boot-disk/benchmark/read', { method: 'POST' }),
-  benchmarkBootWrite: () => request<BenchmarkResult>('/api/system/boot-disk/benchmark/write', { method: 'POST' }),
+  benchmarkBootRead: (durationSeconds: number) =>
+    request<BenchmarkResult>('/api/system/boot-disk/benchmark/read', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ durationSeconds }),
+    }),
+  benchmarkBootWrite: (durationSeconds: number) =>
+    request<BenchmarkResult>('/api/system/boot-disk/benchmark/write', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ durationSeconds }),
+    }),
 };

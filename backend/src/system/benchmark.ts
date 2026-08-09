@@ -16,10 +16,15 @@ export interface BenchmarkResult {
 // A fixed time window (rather than a fixed byte count) bounds worst-case wait time regardless of
 // how slow the target disk is — confirmed live: the boot disk's USB stick took ~55 real seconds to
 // write a fixed 512MB, which a duration cap turns into a predictable ~4s regardless of device speed.
-// MAX_MB is a generous safety ceiling for the opposite case (an unexpectedly fast device).
-const BENCHMARK_DURATION_MS = 4000;
+// The caller picks the duration (see resolveDurationMs); MAX_MB is a generous safety ceiling for the
+// opposite case (an unexpectedly fast device, or a deliberately long test) — 16GB is still a small
+// fraction of any real disk in this app's NAS context, so it only ever caps a genuinely fast/long
+// combination rather than a normal run.
+export const DEFAULT_BENCHMARK_DURATION_SECONDS = 4;
+const MIN_DURATION_MS = 1000;
+const MAX_DURATION_MS = 10 * 60 * 1000;
 const SAMPLE_INTERVAL_MS = 250;
-const MAX_MB = 2048;
+const MAX_MB = 16384;
 const READ_CHUNK_BYTES = 4 * 1024 * 1024;
 const WRITE_CHUNK_BYTES = 1024 * 1024;
 const BENCHMARK_FILENAME = '.nonraid-benchmark-tmp';
@@ -28,6 +33,22 @@ const BENCHMARK_FILENAME = '.nonraid-benchmark-tmp';
 // hdparm.ts's own devicePath().
 function devicePath(device: string): string {
   return device.startsWith('/dev/') ? device : `/dev/${device}`;
+}
+
+/**
+ * Validates and converts a client-supplied duration (seconds) into milliseconds, clamped to a sane
+ * range — null on invalid input (not a positive number), which route handlers turn into a 400
+ * rather than letting a nonsense value silently become e.g. a 10-minute benchmark. Undefined/null
+ * input (the param wasn't supplied) falls back to the existing 4s default rather than being an error,
+ * so existing callers that don't yet pass a duration keep working unchanged.
+ */
+export function resolveDurationMs(durationSeconds: unknown): number | null {
+  if (durationSeconds === undefined || durationSeconds === null) {
+    return DEFAULT_BENCHMARK_DURATION_SECONDS * 1000;
+  }
+  const n = Number(durationSeconds);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.min(Math.max(n * 1000, MIN_DURATION_MS), MAX_DURATION_MS);
 }
 
 // Only one benchmark at a time, system-wide: concurrent reads/writes would contend for I/O and
@@ -45,14 +66,14 @@ async function withLock<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Reads sequentially from the start of the raw device for up to BENCHMARK_DURATION_MS (or MAX_MB,
- * whichever comes first), sampling instantaneous throughput every SAMPLE_INTERVAL_MS so callers can
- * chart speed over time, not just a single aggregate number. Deliberately a plain buffered read (no
+ * Reads sequentially from the start of the raw device for up to durationMs (or MAX_MB, whichever
+ * comes first), sampling instantaneous throughput every SAMPLE_INTERVAL_MS so callers can chart
+ * speed over time, not just a single aggregate number. Deliberately a plain buffered read (no
  * O_DIRECT) — same "reflects real OS+drive behavior" philosophy the previous hdparm -t based
  * implementation used, just without needing an external binary now that this needs per-interval
  * samples hdparm has no way to report.
  */
-export async function benchmarkRead(device: string): Promise<BenchmarkResult> {
+export async function benchmarkRead(device: string, durationMs: number): Promise<BenchmarkResult> {
   return withLock(async () => {
     const target = devicePath(device);
     const chunk = Buffer.alloc(READ_CHUNK_BYTES);
@@ -64,7 +85,7 @@ export async function benchmarkRead(device: string): Promise<BenchmarkResult> {
     let handle;
     try {
       handle = await open(target, 'r');
-      while (Date.now() - start < BENCHMARK_DURATION_MS && totalBytes < MAX_MB * 1024 * 1024) {
+      while (Date.now() - start < durationMs && totalBytes < MAX_MB * 1024 * 1024) {
         const { bytesRead } = await handle.read(chunk, 0, chunk.length, null);
         if (bytesRead === 0) break; // hit end of device — shouldn't happen within this window on any real disk
         totalBytes += bytesRead;
@@ -101,7 +122,7 @@ export async function benchmarkRead(device: string): Promise<BenchmarkResult> {
  * fs, no subprocess: the backend already runs as root on the real deployment (confirmed live — the
  * systemd unit has no User=), so no sudo wrapping is needed for a normal file write.
  */
-export async function benchmarkWrite(mountpoint: string): Promise<BenchmarkResult> {
+export async function benchmarkWrite(mountpoint: string, durationMs: number): Promise<BenchmarkResult> {
   return withLock(async () => {
     const target = path.join(mountpoint, BENCHMARK_FILENAME);
     const chunk = Buffer.alloc(WRITE_CHUNK_BYTES);
@@ -113,7 +134,7 @@ export async function benchmarkWrite(mountpoint: string): Promise<BenchmarkResul
     let handle;
     try {
       handle = await open(target, 'w');
-      while (Date.now() - start < BENCHMARK_DURATION_MS && totalBytes < MAX_MB * 1024 * 1024) {
+      while (Date.now() - start < durationMs && totalBytes < MAX_MB * 1024 * 1024) {
         await handle.write(chunk);
         await handle.datasync();
         totalBytes += chunk.length;

@@ -4,7 +4,7 @@ import type { NmdClient } from '../nmd/index.js';
 import { notifyEvent } from '../settings/notify.js';
 import type { SettingsStore } from '../settings/store.js';
 import type { SelfTestType, SmartService } from '../smart/index.js';
-import { benchmarkRead, benchmarkWrite } from '../system/benchmark.js';
+import { benchmarkRead, benchmarkWrite, resolveDurationMs } from '../system/benchmark.js';
 import { spinDown, spinUp } from '../system/hdparm.js';
 
 const SELF_TEST_TYPES: SelfTestType[] = ['short', 'long', 'conveyance'];
@@ -220,6 +220,11 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
       res.status(400).json({ error: 'device is required.' });
       return;
     }
+    const durationMs = resolveDurationMs(req.body?.durationSeconds);
+    if (durationMs === null) {
+      res.status(400).json({ error: 'durationSeconds must be a positive number.' });
+      return;
+    }
     try {
       // Same fresh-scan validation addDisk uses — this shells out with `device`, so it must be a
       // real, currently available device, not attacker-controlled input.
@@ -228,7 +233,7 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
         res.status(400).json({ error: `${device} is not a currently available device.` });
         return;
       }
-      const result = await benchmarkRead(device);
+      const result = await benchmarkRead(device, durationMs);
       activity.log(`Read benchmark on ${device}: ${result.mbPerSecond.toFixed(1)} MB/s`, 'blue').catch(() => {});
       res.json(result);
     } catch (err) {
@@ -242,6 +247,11 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
       res.status(400).json({ error: 'Slot must be a number 0-29.' });
       return;
     }
+    const durationMs = resolveDurationMs(req.body?.durationSeconds);
+    if (durationMs === null) {
+      res.status(400).json({ error: 'durationSeconds must be a positive number.' });
+      return;
+    }
     try {
       const status = await nmd.getStatus();
       if (status.resync.active) {
@@ -253,7 +263,7 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
         res.status(404).json({ error: `No disk assigned to slot ${slot}.` });
         return;
       }
-      const result = await benchmarkRead(disk.device);
+      const result = await benchmarkRead(disk.device, durationMs);
       activity
         .log(`Read benchmark on disk ${slot} (${disk.disk_name || disk.device}): ${result.mbPerSecond.toFixed(1)} MB/s`, 'blue')
         .catch(() => {});
@@ -267,6 +277,11 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
     const slot = parseSlot(req.params.slot);
     if (slot === null) {
       res.status(400).json({ error: 'Slot must be a number 0-29.' });
+      return;
+    }
+    const durationMs = resolveDurationMs(req.body?.durationSeconds);
+    if (durationMs === null) {
+      res.status(400).json({ error: 'durationSeconds must be a positive number.' });
       return;
     }
     try {
@@ -285,7 +300,7 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
         res.status(400).json({ error: `Disk ${slot} isn't currently mounted — write benchmark needs an existing mount.` });
         return;
       }
-      const result = await benchmarkWrite(mountpoint);
+      const result = await benchmarkWrite(mountpoint, durationMs);
       activity
         .log(`Write benchmark on disk ${slot} (${disk.disk_name || disk.device}): ${result.mbPerSecond.toFixed(1)} MB/s`, 'blue')
         .catch(() => {});

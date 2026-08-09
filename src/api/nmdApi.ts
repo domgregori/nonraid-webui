@@ -38,13 +38,23 @@ export const nmdApi = {
   mountDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/mount`, { method: 'POST' }),
   spinDownDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/spin-down`, { method: 'POST' }),
   spinUpDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/spin-up`, { method: 'POST' }),
-  benchmarkRead: (slot: number) => request<BenchmarkResult>(`/api/disks/${slot}/benchmark/read`, { method: 'POST' }),
-  benchmarkWrite: (slot: number) => request<BenchmarkResult>(`/api/disks/${slot}/benchmark/write`, { method: 'POST' }),
-  benchmarkReadDevice: (device: string) =>
+  benchmarkRead: (slot: number, durationSeconds: number) =>
+    request<BenchmarkResult>(`/api/disks/${slot}/benchmark/read`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ durationSeconds }),
+    }),
+  benchmarkWrite: (slot: number, durationSeconds: number) =>
+    request<BenchmarkResult>(`/api/disks/${slot}/benchmark/write`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ durationSeconds }),
+    }),
+  benchmarkReadDevice: (device: string, durationSeconds: number) =>
     request<BenchmarkResult>('/api/disks/benchmark/read-device', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ device }),
+      body: JSON.stringify({ device, durationSeconds }),
     }),
   replaceDisk: (slot: number, device: string) =>
     request<AddDiskResult>(`/api/disks/${slot}/replace`, {

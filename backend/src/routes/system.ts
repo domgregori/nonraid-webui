@@ -3,7 +3,7 @@ import type { ActivityStore } from '../activity/store.js';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/client.js';
-import { benchmarkRead, benchmarkWrite } from '../system/benchmark.js';
+import { benchmarkRead, benchmarkWrite, resolveDurationMs } from '../system/benchmark.js';
 import { resolveConfigBackupPaths, streamBootDiskImage, streamConfigBackup } from '../system/backupStream.js';
 import { listTimezones, setHostname, setTimezone } from '../system/hostConfig.js';
 import type { SystemStatsService } from '../system/service.js';
@@ -40,10 +40,15 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
     }
   });
 
-  router.post('/system/boot-disk/benchmark/read', async (_req, res) => {
+  router.post('/system/boot-disk/benchmark/read', async (req, res) => {
     const device = system.getBootDiskDevice();
     if (!device) {
       res.status(404).json({ error: 'Boot disk could not be detected on this host.' });
+      return;
+    }
+    const durationMs = resolveDurationMs(req.body?.durationSeconds);
+    if (durationMs === null) {
+      res.status(400).json({ error: 'durationSeconds must be a positive number.' });
       return;
     }
     try {
@@ -52,7 +57,7 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
         res.status(409).json({ error: 'A parity check or clear is in progress — refusing to benchmark mid-operation.' });
         return;
       }
-      const result = await benchmarkRead(device);
+      const result = await benchmarkRead(device, durationMs);
       activity.log(`Read benchmark on boot disk: ${result.mbPerSecond.toFixed(1)} MB/s`, 'blue').catch(() => {});
       res.json(result);
     } catch (err) {
@@ -60,7 +65,12 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
     }
   });
 
-  router.post('/system/boot-disk/benchmark/write', async (_req, res) => {
+  router.post('/system/boot-disk/benchmark/write', async (req, res) => {
+    const durationMs = resolveDurationMs(req.body?.durationSeconds);
+    if (durationMs === null) {
+      res.status(400).json({ error: 'durationSeconds must be a positive number.' });
+      return;
+    }
     try {
       const status = await nmd.getStatus();
       if (status.resync.active) {
@@ -68,7 +78,7 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
         return;
       }
       // The boot disk's mountpoint is always `/` — no lookup needed, unlike an array disk.
-      const result = await benchmarkWrite('/');
+      const result = await benchmarkWrite('/', durationMs);
       activity.log(`Write benchmark on boot disk: ${result.mbPerSecond.toFixed(1)} MB/s`, 'blue').catch(() => {});
       res.json(result);
     } catch (err) {

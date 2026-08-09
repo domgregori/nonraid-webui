@@ -88,7 +88,7 @@ export function UnassignedDeviceDetailPanel({ device, onClose, onAddToArray }: U
             {attrs && <SmartOverviewRows attributes={attrs} typeLabel={typeLabel} />}
           </div>
 
-          <BenchmarkSection onRead={() => nmdApi.benchmarkReadDevice(device.device)} />
+          <BenchmarkSection onRead={(durationSeconds) => nmdApi.benchmarkReadDevice(device.device, durationSeconds)} />
         </div>
 
         <div className="detail-actions">

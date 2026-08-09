@@ -5,13 +5,22 @@ import { ProgressBar } from '../shared/ProgressBar';
 import { TimeSeriesChart, type TimeSeriesChartSeries } from '../shared/TimeSeriesChart';
 
 interface BenchmarkSectionProps {
-  onRead: () => Promise<BenchmarkResult>;
+  onRead: (durationSeconds: number) => Promise<BenchmarkResult>;
   /** Omitted entirely — the test runs read-only — for disks with no real mountpoint to write
    *  through (parity disks, unassigned devices). */
-  onWrite?: () => Promise<BenchmarkResult>;
+  onWrite?: (durationSeconds: number) => Promise<BenchmarkResult>;
 }
 
 type RunPhase = 'idle' | 'reading' | 'writing';
+
+const DURATION_PRESETS: { label: string; seconds: number }[] = [
+  { label: '4s', seconds: 4 },
+  { label: '10s', seconds: 10 },
+  { label: '30s', seconds: 30 },
+  { label: '1 min', seconds: 60 },
+  { label: '2 min', seconds: 120 },
+  { label: '5 min', seconds: 300 },
+];
 
 function formatElapsed(s: number): string {
   return `${s.toFixed(1)}s`;
@@ -26,6 +35,7 @@ function formatMbPerSecond(v: number): string {
  *  resync: the server already guards it (409), surfaced here the same way every other mutating
  *  action in this codebase reports a server-side rejection — via catch, after the fact. */
 export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
+  const [durationSeconds, setDurationSeconds] = useState(DURATION_PRESETS[0].seconds);
   const [phase, setPhase] = useState<RunPhase>('idle');
   const [readResult, setReadResult] = useState<BenchmarkResult | null>(null);
   const [writeResult, setWriteResult] = useState<BenchmarkResult | null>(null);
@@ -39,11 +49,11 @@ export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
     setWriteResult(null);
     setPhase('reading');
     try {
-      const read = await onRead();
+      const read = await onRead(durationSeconds);
       setReadResult(read);
       if (onWrite) {
         setPhase('writing');
-        setWriteResult(await onWrite());
+        setWriteResult(await onWrite(durationSeconds));
       }
     } catch (err) {
       setError((err as Error).message);
@@ -78,7 +88,24 @@ export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
   return (
     <div className="detail-card">
       <div className="eyebrow">Benchmark</div>
-      <button type="button" className="btn" disabled={busy} onClick={run}>
+
+      <div className="detail-row">
+        <span className="detail-row__label">Duration</span>
+        <select
+          className="history-input"
+          value={durationSeconds}
+          disabled={busy}
+          onChange={(e) => setDurationSeconds(Number(e.target.value))}
+        >
+          {DURATION_PRESETS.map((p) => (
+            <option key={p.seconds} value={p.seconds}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <button type="button" className="btn btn--block" disabled={busy} onClick={run}>
         {phase === 'reading' ? 'Reading…' : phase === 'writing' ? 'Writing…' : 'Run Benchmark'}
       </button>
 
