@@ -7,7 +7,7 @@ const DEFAULTS: AppSettings = {
   turboWrite: false,
   notifications: { enabled: false, appriseUrls: '' },
   minFreeSpaceMb: 100,
-  paritySchedule: { enabled: false, dayOfWeek: 0, hour: 2 },
+  paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2 },
 };
 
 /**

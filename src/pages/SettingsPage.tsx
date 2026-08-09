@@ -14,6 +14,10 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
   value: h,
   label: h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`,
 }));
+// 1–28 only — every month has at least 28 days, so this sidesteps "the 30th
+// doesn't exist in February" without needing month-length logic, matching
+// backend/src/settings/types.ts's ParitySchedule.dayOfMonth.
+const DAY_OF_MONTH_OPTIONS = Array.from({ length: 28 }, (_, i) => i + 1);
 
 export function SettingsPage() {
   const { settings, loadState, error, saving, saveError, update } = useSettings();
@@ -35,7 +39,9 @@ export function SettingsPage() {
   const [minFreeSpaceError, setMinFreeSpaceError] = useState<string | null>(null);
 
   const [paritySchedEnabled, setParitySchedEnabled] = useState(false);
+  const [paritySchedFrequency, setParitySchedFrequency] = useState<'weekly' | 'monthly'>('weekly');
   const [paritySchedDay, setParitySchedDay] = useState(0);
+  const [paritySchedDayOfMonth, setParitySchedDayOfMonth] = useState(1);
   const [paritySchedHour, setParitySchedHour] = useState(2);
   const [paritySchedSaving, setParitySchedSaving] = useState(false);
 
@@ -81,7 +87,9 @@ export function SettingsPage() {
   useEffect(() => {
     if (settings && !paritySchedInitialized.current) {
       setParitySchedEnabled(settings.paritySchedule.enabled);
+      setParitySchedFrequency(settings.paritySchedule.frequency);
       setParitySchedDay(settings.paritySchedule.dayOfWeek);
+      setParitySchedDayOfMonth(settings.paritySchedule.dayOfMonth);
       setParitySchedHour(settings.paritySchedule.hour);
       paritySchedInitialized.current = true;
     }
@@ -119,7 +127,15 @@ export function SettingsPage() {
 
   const saveParitySchedule = async () => {
     setParitySchedSaving(true);
-    await update({ paritySchedule: { enabled: paritySchedEnabled, dayOfWeek: paritySchedDay, hour: paritySchedHour } });
+    await update({
+      paritySchedule: {
+        enabled: paritySchedEnabled,
+        frequency: paritySchedFrequency,
+        dayOfWeek: paritySchedDay,
+        dayOfMonth: paritySchedDayOfMonth,
+        hour: paritySchedHour,
+      },
+    });
     setParitySchedSaving(false);
   };
 
@@ -240,28 +256,52 @@ export function SettingsPage() {
         <div className="settings-card__title">Parity</div>
         <div className="toggle-row">
           <div>
-            <div className="toggle-row__title">Automatic weekly check</div>
+            <div className="toggle-row__title">Automatic check</div>
             <div className="toggle-row__desc">
-              Runs a correcting parity check automatically once a week. Skipped if the array isn't started or a check
-              is already running.
+              Runs a correcting parity check automatically on the schedule below. Skipped if the array isn't started
+              or a check is already running.
             </div>
           </div>
           <ToggleSwitch
             on={paritySchedEnabled}
             onToggle={() => setParitySchedEnabled((v) => !v)}
-            label="Automatic weekly check"
+            label="Automatic check"
             disabled={!settings}
           />
         </div>
         <div className="settings-field toggle-row--bordered">
           <div className="settings-field__row">
-            <select className="history-input" value={paritySchedDay} onChange={(e) => setParitySchedDay(Number(e.target.value))} disabled={!settings}>
-              {DAY_NAMES.map((day, i) => (
-                <option key={day} value={i}>
-                  {day}
-                </option>
-              ))}
+            <select
+              className="history-input"
+              value={paritySchedFrequency}
+              onChange={(e) => setParitySchedFrequency(e.target.value as 'weekly' | 'monthly')}
+              disabled={!settings}
+            >
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
             </select>
+            {paritySchedFrequency === 'weekly' ? (
+              <select className="history-input" value={paritySchedDay} onChange={(e) => setParitySchedDay(Number(e.target.value))} disabled={!settings}>
+                {DAY_NAMES.map((day, i) => (
+                  <option key={day} value={i}>
+                    {day}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                className="history-input"
+                value={paritySchedDayOfMonth}
+                onChange={(e) => setParitySchedDayOfMonth(Number(e.target.value))}
+                disabled={!settings}
+              >
+                {DAY_OF_MONTH_OPTIONS.map((day) => (
+                  <option key={day} value={day}>
+                    Day {day}
+                  </option>
+                ))}
+              </select>
+            )}
             <select className="history-input" value={paritySchedHour} onChange={(e) => setParitySchedHour(Number(e.target.value))} disabled={!settings}>
               {HOUR_OPTIONS.map((h) => (
                 <option key={h.value} value={h.value}>
@@ -273,6 +313,9 @@ export function SettingsPage() {
               {paritySchedSaving ? 'Saving…' : 'Save'}
             </button>
           </div>
+          {paritySchedFrequency === 'monthly' && (
+            <div className="toggle-row__desc">Only days 1–28 are offered, so every month always has a matching date.</div>
+          )}
         </div>
       </div>
 

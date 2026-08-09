@@ -32,12 +32,18 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
         }
       }
       if (patch.paritySchedule) {
-        const { enabled, dayOfWeek, hour } = patch.paritySchedule;
+        const { enabled, frequency, dayOfWeek, dayOfMonth, hour } = patch.paritySchedule;
         if ('enabled' in patch.paritySchedule && typeof enabled !== 'boolean') {
           throw new Error('paritySchedule.enabled must be a boolean.');
         }
+        if ('frequency' in patch.paritySchedule && frequency !== 'weekly' && frequency !== 'monthly') {
+          throw new Error('paritySchedule.frequency must be "weekly" or "monthly".');
+        }
         if ('dayOfWeek' in patch.paritySchedule && (!Number.isInteger(dayOfWeek) || (dayOfWeek as number) < 0 || (dayOfWeek as number) > 6)) {
           throw new Error('paritySchedule.dayOfWeek must be an integer 0–6 (Sunday–Saturday).');
+        }
+        if ('dayOfMonth' in patch.paritySchedule && (!Number.isInteger(dayOfMonth) || (dayOfMonth as number) < 1 || (dayOfMonth as number) > 28)) {
+          throw new Error('paritySchedule.dayOfMonth must be an integer 1–28.');
         }
         if ('hour' in patch.paritySchedule && (!Number.isInteger(hour) || (hour as number) < 0 || (hour as number) > 23)) {
           throw new Error('paritySchedule.hour must be an integer 0–23.');

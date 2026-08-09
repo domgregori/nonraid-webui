@@ -7,7 +7,9 @@ export interface NotificationSettings {
 
 export interface ParitySchedule {
   enabled: boolean;
-  dayOfWeek: number; // 0 (Sun) – 6 (Sat), server local time
+  frequency: 'weekly' | 'monthly';
+  dayOfWeek: number; // 0 (Sun) – 6 (Sat), server local time — used when frequency is 'weekly'
+  dayOfMonth: number; // 1–28, server local time — used when frequency is 'monthly'
   hour: number; // 0–23, server local time
 }
 

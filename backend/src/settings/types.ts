@@ -9,7 +9,11 @@ export interface NotificationSettings {
 
 export interface ParitySchedule {
   enabled: boolean;
-  dayOfWeek: number; // 0 (Sun) – 6 (Sat), server local time
+  frequency: 'weekly' | 'monthly';
+  dayOfWeek: number; // 0 (Sun) – 6 (Sat), server local time — used when frequency is 'weekly'
+  // 1–28 rather than 1–31: every month has at least 28 days, so this sidesteps
+  // "the 30th doesn't exist in February" without needing month-length logic.
+  dayOfMonth: number; // 1–28, server local time — used when frequency is 'monthly'
   hour: number; // 0–23, server local time
 }
 

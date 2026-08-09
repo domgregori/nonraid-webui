@@ -4,11 +4,12 @@ import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
 
 /**
- * Fires an automatic correcting parity check at the configured weekly
- * day/hour, in the server's own local time. nmdctl has no scheduling of its
- * own, so this lives entirely here — no cron dependency needed, a 1-minute
- * tick comparing against the stored schedule is enough for an hour-granularity
- * weekly trigger. Same self-unref'd background-ticker shape as ActivityWatcher.
+ * Fires an automatic correcting parity check at the configured weekly or
+ * monthly day/hour, in the server's own local time. nmdctl has no scheduling
+ * of its own, so this lives entirely here — no cron dependency needed, a
+ * 1-minute tick comparing against the stored schedule is enough for an
+ * hour-granularity trigger. Same self-unref'd background-ticker shape as
+ * ActivityWatcher.
  *
  * Caveat: lastFiredDateKey is in-memory only, so a backend restart during the
  * scheduled hour resets it and could refire that same day — acceptable for a
@@ -34,7 +35,9 @@ export class ParityScheduler {
     if (!schedule.enabled) return;
 
     const now = new Date();
-    if (now.getDay() !== schedule.dayOfWeek || now.getHours() !== schedule.hour) return;
+    if (now.getHours() !== schedule.hour) return;
+    const dayMatches = schedule.frequency === 'monthly' ? now.getDate() === schedule.dayOfMonth : now.getDay() === schedule.dayOfWeek;
+    if (!dayMatches) return;
 
     const dateKey = now.toISOString().slice(0, 10);
     if (this.lastFiredDateKey === dateKey) return;
