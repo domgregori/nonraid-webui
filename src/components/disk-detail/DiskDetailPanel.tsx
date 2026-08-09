@@ -5,6 +5,7 @@ import { deriveDisks } from '../../selectors/disks';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { COLORS } from '../../styles/colors';
 import { ProgressBar } from '../shared/ProgressBar';
+import { BenchmarkSection } from './BenchmarkSection';
 import { EmptyDiskDialog } from './EmptyDiskDialog';
 import { ReplaceDiskDialog } from './ReplaceDiskDialog';
 import { ShrinkArrayDialog } from './ShrinkArrayDialog';
@@ -117,50 +118,54 @@ export function DiskDetailPanel() {
           </span>
         </div>
 
-        <div className="detail-rows">
-          <div className="detail-row">
-            <span className="detail-row__label">Slot</span>
-            <span className="detail-row__value">{disk.slot}</span>
+        <div className="detail-panel__body">
+          <div className="detail-card">
+            <div className="eyebrow">Info</div>
+            <div className="detail-rows">
+              <div className="detail-row">
+                <span className="detail-row__label">Slot</span>
+                <span className="detail-row__value">{disk.slot}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Device</span>
+                <span className="detail-row__value">{disk.device}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Size</span>
+                <span className="detail-row__value">{disk.sizeLabel}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Used</span>
+                <span className="detail-row__value">{disk.usedLabel}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Filesystem</span>
+                <span className="detail-row__value">{disk.fsType}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Mountpoint</span>
+                <span className="detail-row__value">{disk.mountpoint}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Temperature</span>
+                <span className="detail-row__value" style={{ color: disk.tempColor }}>
+                  {disk.tempLabel}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Device</span>
-            <span className="detail-row__value">{disk.device}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Size</span>
-            <span className="detail-row__value">{disk.sizeLabel}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Used</span>
-            <span className="detail-row__value">{disk.usedLabel}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Filesystem</span>
-            <span className="detail-row__value">{disk.fsType}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Mountpoint</span>
-            <span className="detail-row__value">{disk.mountpoint}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Temperature</span>
-            <span className="detail-row__value" style={{ color: disk.tempColor }}>
-              {disk.tempLabel}
-            </span>
-          </div>
-        </div>
 
-        {smartSlot !== null && (
-          <div className="smart-section">
-            <div className="eyebrow">SMART</div>
+          {smartSlot !== null && (
+            <div className="detail-card">
+              <div className="eyebrow">SMART</div>
 
-            {smartStatus === 'loading' && <div className="status-note">Loading SMART data…</div>}
-            {smartError && <div className="status-note status-note--error">{smartError}</div>}
-            {smartStatus === 'ready' && !attributes && <div className="status-note">No SMART data available for this disk.</div>}
+              {smartStatus === 'loading' && <div className="status-note">Loading SMART data…</div>}
+              {smartError && <div className="status-note status-note--error">{smartError}</div>}
+              {smartStatus === 'ready' && !attributes && <div className="status-note">No SMART data available for this disk.</div>}
 
-            {attributes && (
-              <>
-                <div className="smart-tabs">
+              {attributes && (
+                <>
+                  <div className="smart-tabs">
                   {(['overview', 'attributes', 'capabilities'] as SmartTab[]).map((tab) => (
                     <button
                       key={tab}
@@ -328,7 +333,15 @@ export function DiskDetailPanel() {
               </>
             )}
           </div>
-        )}
+          )}
+
+          {smartSlot !== null && (
+            <BenchmarkSection
+              onRead={() => nmdApi.benchmarkRead(disk.slot)}
+              onWrite={disk.role === 'data' ? () => nmdApi.benchmarkWrite(disk.slot) : undefined}
+            />
+          )}
+        </div>
 
         {isRestorable && (
           <div className="status-note status-note--error">

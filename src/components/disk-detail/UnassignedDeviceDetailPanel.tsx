@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { nmdApi } from '../../api/nmdApi';
 import { smartApi } from '../../api/smartApi';
 import type { AvailableDevice } from '../../types/nmdApi';
 import type { SmartAttributes } from '../../types/smart';
 import { formatBytesHuman } from '../../utils/format';
+import { BenchmarkSection } from './BenchmarkSection';
 import { SmartOverviewRows } from './SmartOverviewRows';
 
 interface UnassignedDeviceDetailPanelProps {
@@ -51,35 +53,42 @@ export function UnassignedDeviceDetailPanel({ device, onClose, onAddToArray }: U
           </button>
         </div>
 
-        <div className="detail-rows">
-          <div className="detail-row">
-            <span className="detail-row__label">Device</span>
-            <span className="detail-row__value">{device.device}</span>
+        <div className="detail-panel__body">
+          <div className="detail-card">
+            <div className="eyebrow">Info</div>
+            <div className="detail-rows">
+              <div className="detail-row">
+                <span className="detail-row__label">Device</span>
+                <span className="detail-row__value">{device.device}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Size</span>
+                <span className="detail-row__value">{device.sizeKb != null ? formatBytesHuman(device.sizeKb * 1024) : '—'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Filesystem UUID</span>
+                <span className="detail-row__value">{device.uuid ?? 'none (unformatted)'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Serial</span>
+                <span className="detail-row__value">{device.diskId ?? '—'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Locked</span>
+                <span className="detail-row__value">{device.locked ? 'Yes — likely in use elsewhere' : 'No'}</span>
+              </div>
+            </div>
           </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Size</span>
-            <span className="detail-row__value">{device.sizeKb != null ? formatBytesHuman(device.sizeKb * 1024) : '—'}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Filesystem UUID</span>
-            <span className="detail-row__value">{device.uuid ?? 'none (unformatted)'}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Serial</span>
-            <span className="detail-row__value">{device.diskId ?? '—'}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Locked</span>
-            <span className="detail-row__value">{device.locked ? 'Yes — likely in use elsewhere' : 'No'}</span>
-          </div>
-        </div>
 
-        <div className="smart-section">
-          <div className="eyebrow">SMART</div>
-          {loadState === 'loading' && <div className="status-note">Loading SMART data…</div>}
-          {loadState === 'error' && <div className="status-note status-note--error">Failed to read SMART data for this device.</div>}
-          {loadState === 'ready' && !attrs && <div className="status-note">No SMART data available for this disk.</div>}
-          {attrs && <SmartOverviewRows attributes={attrs} typeLabel={typeLabel} />}
+          <div className="detail-card">
+            <div className="eyebrow">SMART</div>
+            {loadState === 'loading' && <div className="status-note">Loading SMART data…</div>}
+            {loadState === 'error' && <div className="status-note status-note--error">Failed to read SMART data for this device.</div>}
+            {loadState === 'ready' && !attrs && <div className="status-note">No SMART data available for this disk.</div>}
+            {attrs && <SmartOverviewRows attributes={attrs} typeLabel={typeLabel} />}
+          </div>
+
+          <BenchmarkSection onRead={() => nmdApi.benchmarkReadDevice(device.device)} />
         </div>
 
         <div className="detail-actions">

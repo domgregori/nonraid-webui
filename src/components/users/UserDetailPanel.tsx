@@ -95,78 +95,83 @@ export function UserDetailPanel({ user, groups, pending, onClose, onUpdateGroups
           </button>
         </div>
 
-        <div className="detail-rows">
-          <div className="detail-row">
-            <span className="detail-row__label">UID</span>
-            <span className="detail-row__value">{user.uid}</span>
-          </div>
-        </div>
-
-        <div className="detail-section">
-          <div className="detail-section__title">Groups</div>
-          {groups.length === 0 && <div className="status-note">No groups yet — create one from the Groups panel.</div>}
-          <div className="disk-checkbox-grid">
-            {groups.map((g) => (
-              <label key={g.name} className="disk-checkbox">
-                <input type="checkbox" checked={user.groups.includes(g.name)} disabled={pending} onChange={() => toggleGroup(g.name)} />
-                {g.name}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="detail-section">
-          <div className="detail-section__title">Share access</div>
-          {accessError && <div className="status-note status-note--error">{accessError}</div>}
-          {access === null && !accessError && <div className="status-note">Loading…</div>}
-          {access !== null && access.length === 0 && <div className="status-note">No shares exist yet.</div>}
-          <div className="access-rows">
-            {access?.map((entry) => (
-              <div className="access-row" key={entry.shareName}>
-                <span className="access-row__name">{entry.shareName}</span>
-                <select
-                  className="history-input"
-                  value={entry.permission}
-                  disabled={savingShare === entry.shareName}
-                  onChange={(e) => handleAccessChange(entry.shareName, e.target.value as SharePermission)}
-                >
-                  {PERMISSIONS.map((p) => (
-                    <option key={p} value={p}>
-                      {PERMISSION_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
+        <div className="detail-panel__body">
+          <div className="detail-card">
+            <div className="eyebrow">Info</div>
+            <div className="detail-rows">
+              <div className="detail-row">
+                <span className="detail-row__label">UID</span>
+                <span className="detail-row__value">{user.uid}</span>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
 
-        <div className="detail-section">
-          <div className="detail-section__title">Reset password</div>
-          <div className="form-field">
-            <input
-              type="password"
-              className="history-input"
-              style={{ width: '100%' }}
-              placeholder="New password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+          <div className="detail-card">
+            <div className="eyebrow">Groups</div>
+            {groups.length === 0 && <div className="status-note">No groups yet — create one from the Groups panel.</div>}
+            <div className="disk-checkbox-grid">
+              {groups.map((g) => (
+                <label key={g.name} className="disk-checkbox">
+                  <input type="checkbox" checked={user.groups.includes(g.name)} disabled={pending} onChange={() => toggleGroup(g.name)} />
+                  {g.name}
+                </label>
+              ))}
+            </div>
           </div>
-          <div className="form-field">
-            <input
-              type="password"
-              className="history-input"
-              style={{ width: '100%' }}
-              placeholder="Confirm new password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
+
+          <div className="detail-card">
+            <div className="eyebrow">Share access</div>
+            {accessError && <div className="status-note status-note--error">{accessError}</div>}
+            {access === null && !accessError && <div className="status-note">Loading…</div>}
+            {access !== null && access.length === 0 && <div className="status-note">No shares exist yet.</div>}
+            <div className="access-rows">
+              {access?.map((entry) => (
+                <div className="access-row" key={entry.shareName}>
+                  <span className="access-row__name">{entry.shareName}</span>
+                  <select
+                    className="history-input"
+                    value={entry.permission}
+                    disabled={savingShare === entry.shareName}
+                    onChange={(e) => handleAccessChange(entry.shareName, e.target.value as SharePermission)}
+                  >
+                    {PERMISSIONS.map((p) => (
+                      <option key={p} value={p}>
+                        {PERMISSION_LABELS[p]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
           </div>
-          {passwordNote && <div className="status-note">{passwordNote}</div>}
-          <button type="button" className="btn btn--block" disabled={pending} onClick={handleResetPassword}>
-            {pending ? 'Saving…' : 'Reset Password'}
-          </button>
+
+          <div className="detail-card">
+            <div className="eyebrow">Reset password</div>
+            <div className="form-field">
+              <input
+                type="password"
+                className="history-input"
+                style={{ width: '100%' }}
+                placeholder="New password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <div className="form-field">
+              <input
+                type="password"
+                className="history-input"
+                style={{ width: '100%' }}
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+            {passwordNote && <div className="status-note">{passwordNote}</div>}
+            <button type="button" className="btn btn--block" disabled={pending} onClick={handleResetPassword}>
+              {pending ? 'Saving…' : 'Reset Password'}
+            </button>
+          </div>
         </div>
 
         <div className="detail-actions">

@@ -4,6 +4,7 @@ import { systemApi } from '../../api/systemApi';
 import { useSystemStats } from '../../hooks/useSystemStats';
 import type { SmartAttributes } from '../../types/smart';
 import { formatMemLabel } from '../../utils/format';
+import { BenchmarkSection } from './BenchmarkSection';
 import { SmartOverviewRows } from './SmartOverviewRows';
 
 interface BootDiskDetailPanelProps {
@@ -61,101 +62,108 @@ export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
           </button>
         </div>
 
-        <div className="detail-rows">
-          <div className="detail-row">
-            <span className="detail-row__label">Device</span>
-            <span className="detail-row__value">{boot.device}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Model</span>
-            <span className="detail-row__value">{boot.model ?? '—'}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Filesystem</span>
-            <span className="detail-row__value">{boot.filesystem ?? '—'}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">UUID</span>
-            <span className="detail-row__value">{boot.uuid ?? '—'}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Used</span>
-            <span className="detail-row__value">
-              {usedPct !== null && boot.usedBytes !== null && boot.totalBytes !== null
-                ? `${formatMemLabel(boot.usedBytes, boot.totalBytes)} (${usedPct}%)`
-                : '—'}
-            </span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-row__label">Temperature</span>
-            <span className="detail-row__value">{boot.tempCelsius !== null ? `${Math.round(boot.tempCelsius)}°C` : '—'}</span>
-          </div>
-        </div>
-
-        <div className="smart-section">
-          <div className="eyebrow">SMART</div>
-          {smartLoadState === 'loading' && <div className="status-note">Loading SMART data…</div>}
-          {smartLoadState === 'error' && <div className="status-note status-note--error">Failed to read SMART data for this device.</div>}
-          {smartLoadState === 'ready' && !smartAttrs && <div className="status-note">No SMART data available for this disk.</div>}
-          {smartAttrs && <SmartOverviewRows attributes={smartAttrs} />}
-        </div>
-
-        <div className="smart-section">
-          <div className="eyebrow">Operations</div>
-
-          <div className="status-note" style={{ marginTop: 8 }}>
-            <strong>Config Backup</strong> — a small archive of Samba/NFS config, this app's own
-            settings/shares/users data, and the current array superblock. Does not include the OS
-            itself.
-          </div>
-          {configStep === 'idle' ? (
-            <button type="button" className="btn" style={{ marginTop: 8 }} onClick={() => setConfigStep('confirm')}>
-              Download Config Backup
-            </button>
-          ) : (
-            <a
-              className="btn btn--primary-sm"
-              style={{ marginTop: 8, display: 'inline-block' }}
-              href={systemApi.bootDiskConfigBackupUrl()}
-              download
-              onClick={() => setConfigStep('idle')}
-            >
-              Confirm Download
-            </a>
-          )}
-
-          <div className="status-note status-note--error" style={{ marginTop: 16 }}>
-            <strong>Full Disk Image</strong> — a complete byte-for-byte copy of this device
-            (compressed), read live while it's mounted and in use — not a guaranteed
-            filesystem-consistent snapshot. Can take a long time and produce a file up to the full
-            device capacity.
-          </div>
-          {imageStep === 'idle' && (
-            <button type="button" className="btn btn--danger" style={{ marginTop: 8 }} onClick={() => setImageStep('warn')}>
-              Download Full Disk Image
-            </button>
-          )}
-          {imageStep === 'warn' && (
-            <div className="dialog__actions" style={{ marginTop: 8 }}>
-              <button type="button" className="btn" onClick={() => setImageStep('idle')}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn--danger" onClick={() => setImageStep('confirm')}>
-                I understand, continue
-              </button>
+        <div className="detail-panel__body">
+          <div className="detail-card">
+            <div className="eyebrow">Info</div>
+            <div className="detail-rows">
+              <div className="detail-row">
+                <span className="detail-row__label">Device</span>
+                <span className="detail-row__value">{boot.device}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Model</span>
+                <span className="detail-row__value">{boot.model ?? '—'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Filesystem</span>
+                <span className="detail-row__value">{boot.filesystem ?? '—'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">UUID</span>
+                <span className="detail-row__value">{boot.uuid ?? '—'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Used</span>
+                <span className="detail-row__value">
+                  {usedPct !== null && boot.usedBytes !== null && boot.totalBytes !== null
+                    ? `${formatMemLabel(boot.usedBytes, boot.totalBytes)} (${usedPct}%)`
+                    : '—'}
+                </span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-row__label">Temperature</span>
+                <span className="detail-row__value">{boot.tempCelsius !== null ? `${Math.round(boot.tempCelsius)}°C` : '—'}</span>
+              </div>
             </div>
-          )}
-          {imageStep === 'confirm' && (
-            <a
-              className="btn btn--danger"
-              style={{ marginTop: 8, display: 'inline-block' }}
-              href={systemApi.bootDiskImageBackupUrl()}
-              download
-              onClick={() => setImageStep('idle')}
-            >
-              Confirm Download
-            </a>
-          )}
+          </div>
+
+          <div className="detail-card">
+            <div className="eyebrow">SMART</div>
+            {smartLoadState === 'loading' && <div className="status-note">Loading SMART data…</div>}
+            {smartLoadState === 'error' && <div className="status-note status-note--error">Failed to read SMART data for this device.</div>}
+            {smartLoadState === 'ready' && !smartAttrs && <div className="status-note">No SMART data available for this disk.</div>}
+            {smartAttrs && <SmartOverviewRows attributes={smartAttrs} />}
+          </div>
+
+          <BenchmarkSection onRead={() => systemApi.benchmarkBootRead()} onWrite={() => systemApi.benchmarkBootWrite()} />
+
+          <div className="detail-card">
+            <div className="eyebrow">Operations</div>
+
+            <div className="status-note">
+              <strong>Config Backup</strong> — a small archive of Samba/NFS config, this app's own
+              settings/shares/users data, and the current array superblock. Does not include the OS
+              itself.
+            </div>
+            {configStep === 'idle' ? (
+              <button type="button" className="btn" onClick={() => setConfigStep('confirm')}>
+                Download Config Backup
+              </button>
+            ) : (
+              <a
+                className="btn btn--primary-sm"
+                style={{ display: 'inline-block' }}
+                href={systemApi.bootDiskConfigBackupUrl()}
+                download
+                onClick={() => setConfigStep('idle')}
+              >
+                Confirm Download
+              </a>
+            )}
+
+            <div className="status-note status-note--error">
+              <strong>Full Disk Image</strong> — a complete byte-for-byte copy of this device
+              (compressed), read live while it's mounted and in use — not a guaranteed
+              filesystem-consistent snapshot. Can take a long time and produce a file up to the full
+              device capacity.
+            </div>
+            {imageStep === 'idle' && (
+              <button type="button" className="btn btn--danger" onClick={() => setImageStep('warn')}>
+                Download Full Disk Image
+              </button>
+            )}
+            {imageStep === 'warn' && (
+              <div className="dialog__actions">
+                <button type="button" className="btn" onClick={() => setImageStep('idle')}>
+                  Cancel
+                </button>
+                <button type="button" className="btn btn--danger" onClick={() => setImageStep('confirm')}>
+                  I understand, continue
+                </button>
+              </div>
+            )}
+            {imageStep === 'confirm' && (
+              <a
+                className="btn btn--danger"
+                style={{ display: 'inline-block' }}
+                href={systemApi.bootDiskImageBackupUrl()}
+                download
+                onClick={() => setImageStep('idle')}
+              >
+                Confirm Download
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </>

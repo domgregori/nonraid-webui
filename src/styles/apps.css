@@ -553,10 +553,6 @@
 
 /* App detail panel */
 
-.apps-detail-panel {
-  width: 420px;
-}
-
 .apps-detail__identity {
   display: flex;
   align-items: center;

@@ -72,7 +72,7 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
   return (
     <>
       <div className="detail-overlay" onClick={onClose} />
-      <div className="detail-panel apps-detail-panel">
+      <div className="detail-panel">
         <div className="detail-panel__head">
           <div className="detail-panel__title">{name}</div>
           <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
@@ -112,100 +112,102 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
               )}
             </div>
 
-            {installed && (
-              <div className="detail-section">
-                <div className="detail-section__title">Installed</div>
-                <div className="detail-rows">
-                  <div className="detail-row">
-                    <span className="detail-row__label">Container</span>
-                    <span className="detail-row__value">{installed.containerName}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-row__label">Status</span>
-                    <span className="detail-row__value">{installed.state === 'running' ? 'Running' : 'Stopped'}</span>
-                  </div>
-                </div>
-                {installed.updateAvailable && (
-                  <div className="apps-update-note">
-                    A different image is now in the template: {repositoryText ?? repository} (currently running{' '}
-                    {installed.installedRepository}). Remove the existing container from the Docker page, then
-                    reinstall this template to update.
-                  </div>
-                )}
-              </div>
-            )}
-
             {overview && <div className="apps-detail__overview">{overview.replace(/\r\n/g, '\n').trim()}</div>}
 
-            <div className="detail-section">
-              <div className="detail-section__title">Details</div>
-              <div className="detail-rows">
-                <div className="detail-row">
-                  <span className="detail-row__label">Application type</span>
-                  <span className="detail-row__value">Docker</span>
+            <div className="detail-panel__body">
+              {installed && (
+                <div className="detail-card">
+                  <div className="eyebrow">Installed</div>
+                  <div className="detail-rows">
+                    <div className="detail-row">
+                      <span className="detail-row__label">Container</span>
+                      <span className="detail-row__value">{installed.containerName}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-row__label">Status</span>
+                      <span className="detail-row__value">{installed.state === 'running' ? 'Running' : 'Stopped'}</span>
+                    </div>
+                  </div>
+                  {installed.updateAvailable && (
+                    <div className="apps-update-note">
+                      A different image is now in the template: {repositoryText ?? repository} (currently running{' '}
+                      {installed.installedRepository}). Remove the existing container from the Docker page, then
+                      reinstall this template to update.
+                    </div>
+                  )}
                 </div>
-                {app.CategoryList && app.CategoryList.filter((c) => typeof c === 'string').length > 0 && (
-                  <div className="detail-row">
-                    <span className="detail-row__label">Categories</span>
-                    <span className="detail-row__value">
-                      {app.CategoryList.filter((c) => typeof c === 'string')
-                        .map((c) => c.replace(/-/g, ' '))
-                        .join(', ')}
-                    </span>
-                  </div>
-                )}
-                <div className="detail-row">
-                  <span className="detail-row__label">Repository</span>
-                  <span className="detail-row__value">{repositoryText ?? repository}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-row__label">Network</span>
-                  <span className="detail-row__value">{network || 'bridge'}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-row__label">Privileged</span>
-                  <span className="detail-row__value">{app.Privileged === 'true' ? 'Yes' : 'No'}</span>
-                </div>
-                {typeof app.stars === 'number' && (
-                  <div className="detail-row">
-                    <span className="detail-row__label">Docker Hub stars</span>
-                    <span className="detail-row__value">{app.stars.toLocaleString()}</span>
-                  </div>
-                )}
-                {typeof app.downloads === 'number' && (
-                  <div className="detail-row">
-                    <span className="detail-row__label">Downloads</span>
-                    <span className="detail-row__value">{app.downloads.toLocaleString()}</span>
-                  </div>
-                )}
-                {added && (
-                  <div className="detail-row">
-                    <span className="detail-row__label">Added</span>
-                    <span className="detail-row__value">{added}</span>
-                  </div>
-                )}
-                {updated && (
-                  <div className="detail-row">
-                    <span className="detail-row__label">Last update</span>
-                    <span className="detail-row__value">{updated}</span>
-                  </div>
-                )}
-                {license && (
-                  <div className="detail-row">
-                    <span className="detail-row__label">License</span>
-                    <span className="detail-row__value">{license}</span>
-                  </div>
-                )}
-              </div>
-            </div>
+              )}
 
-            <div className="detail-section">
-              <div className="detail-section__title">Maintainer</div>
-              <div className="apps-detail__maintainer">
-                <span>{maintainer || namespace}</span>
-                <button type="button" className="btn" onClick={() => onViewNamespace(namespace)}>
-                  All apps
-                </button>
+              <div className="detail-card">
+                <div className="eyebrow">Details</div>
+                <div className="detail-rows">
+                  <div className="detail-row">
+                    <span className="detail-row__label">Application type</span>
+                    <span className="detail-row__value">Docker</span>
+                  </div>
+                  {app.CategoryList && app.CategoryList.filter((c) => typeof c === 'string').length > 0 && (
+                    <div className="detail-row">
+                      <span className="detail-row__label">Categories</span>
+                      <span className="detail-row__value">
+                        {app.CategoryList.filter((c) => typeof c === 'string')
+                          .map((c) => c.replace(/-/g, ' '))
+                          .join(', ')}
+                      </span>
+                    </div>
+                  )}
+                  <div className="detail-row">
+                    <span className="detail-row__label">Repository</span>
+                    <span className="detail-row__value">{repositoryText ?? repository}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-row__label">Network</span>
+                    <span className="detail-row__value">{network || 'bridge'}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="detail-row__label">Privileged</span>
+                    <span className="detail-row__value">{app.Privileged === 'true' ? 'Yes' : 'No'}</span>
+                  </div>
+                  {typeof app.stars === 'number' && (
+                    <div className="detail-row">
+                      <span className="detail-row__label">Docker Hub stars</span>
+                      <span className="detail-row__value">{app.stars.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {typeof app.downloads === 'number' && (
+                    <div className="detail-row">
+                      <span className="detail-row__label">Downloads</span>
+                      <span className="detail-row__value">{app.downloads.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {added && (
+                    <div className="detail-row">
+                      <span className="detail-row__label">Added</span>
+                      <span className="detail-row__value">{added}</span>
+                    </div>
+                  )}
+                  {updated && (
+                    <div className="detail-row">
+                      <span className="detail-row__label">Last update</span>
+                      <span className="detail-row__value">{updated}</span>
+                    </div>
+                  )}
+                  {license && (
+                    <div className="detail-row">
+                      <span className="detail-row__label">License</span>
+                      <span className="detail-row__value">{license}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="detail-card">
+                <div className="eyebrow">Maintainer</div>
+                <div className="apps-detail__maintainer">
+                  <span>{maintainer || namespace}</span>
+                  <button type="button" className="btn" onClick={() => onViewNamespace(namespace)}>
+                    All apps
+                  </button>
+                </div>
               </div>
             </div>
 
