@@ -62,10 +62,10 @@ export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
     }
   };
 
-  // One continuous timeline for the whole test: write's samples are offset by the read phase's
-  // total duration, so the chart reads as "read, then write" in the order they actually ran —
-  // read and write never run concurrently (same single-flight lock the backend already enforces),
-  // so overlapping them on a shared 0-based axis would misleadingly suggest they were simultaneous.
+  // Both series share the same 0-based elapsed-time axis (read and write each start counting from
+  // their own start, even though write runs after read finishes) so the two curves overlap and can
+  // be compared directly — e.g. "at 2s into its run, was read faster than write was at 2s into
+  // its own run" — rather than reading as a single chronological timeline of the whole test.
   const series: TimeSeriesChartSeries[] = [];
   if (readResult && readResult.samples.length > 1) {
     series.push({
@@ -76,12 +76,11 @@ export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
     });
   }
   if (writeResult && writeResult.samples.length > 1) {
-    const offset = readResult?.elapsedSeconds ?? 0;
     series.push({
       key: 'write',
       label: 'Write',
       color: COLORS.green,
-      points: writeResult.samples.map((s) => ({ ts: s.elapsedSeconds + offset, value: s.mbPerSecond })),
+      points: writeResult.samples.map((s) => ({ ts: s.elapsedSeconds, value: s.mbPerSecond })),
     });
   }
 
