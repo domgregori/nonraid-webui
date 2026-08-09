@@ -126,6 +126,10 @@ export const config = {
   // polled continuously like temperature — short TTL so self-test progress
   // (see smart/service.ts) shows up promptly without hammering smartctl.
   smartAttributesCacheTtlMs: num('SMART_ATTRIBUTES_CACHE_TTL_MS', t('smart', 'attributes_cache_ttl_ms'), 4_000),
+  // Spin up/down actions (backend/src/system/hdparm.ts) — not bundled with this project, same
+  // "clear error if missing" treatment appriseBin/smartctlBin get rather than a hard crash.
+  hdparmBin: str('HDPARM_BIN', t('hdparm', 'bin'), 'hdparm'),
+  hdparmUseSudo: bool('HDPARM_USE_SUDO', t('hdparm', 'use_sudo'), false),
   sharesConfigPath: str('SHARES_CONFIG_PATH', t('shares', 'config_path'), path.join(process.cwd(), 'data', 'shares.json')),
   shareMountRoot,
   // The file Browse page's own ceiling/starting point — independent of

@@ -4,6 +4,7 @@ import type { NmdClient } from '../nmd/index.js';
 import { notifyEvent } from '../settings/notify.js';
 import type { SettingsStore } from '../settings/store.js';
 import type { SelfTestType, SmartService } from '../smart/index.js';
+import { spinDown, spinUp } from '../system/hdparm.js';
 
 const SELF_TEST_TYPES: SelfTestType[] = ['short', 'long', 'conveyance'];
 
@@ -124,6 +125,33 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
     }
   });
 
+  router.post('/disks/:slot/mount', async (req, res) => {
+    const slot = parseSlot(req.params.slot);
+    if (slot === null) {
+      res.status(400).json({ error: 'Slot must be a number 0-29.' });
+      return;
+    }
+    try {
+      // nmdctl has no per-slot mount subcommand — this mounts every currently-unmounted disk in
+      // one pass (confirmed live: skips disks with no filesystem rather than erroring), then
+      // reports specifically whether the requested slot ended up mounted.
+      await nmd.mountDisks();
+      const status = await nmd.getStatus();
+      const disk = status.disks.find((d) => d.slot === slot);
+      const mountpoint = disk?.filesystem?.mountpoint;
+      if (!mountpoint || mountpoint === 'unmounted') {
+        res
+          .status(502)
+          .json({ error: `Disk ${slot} is still unmounted — it may have no filesystem yet, or nmdctl couldn't mount it.` });
+        return;
+      }
+      activity.log(`Disk ${slot} mounted at ${mountpoint}`, 'blue').catch(() => {});
+      res.json({ ok: true, message: `Disk ${slot} mounted at ${mountpoint}` });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   router.post('/disks/:slot/unassign', async (req, res) => {
     const slot = parseSlot(req.params.slot);
     if (slot === null) {
@@ -134,6 +162,52 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
       const result = await nmd.unassignDisk(slot);
       activity.log(`Disk unassigned from slot ${slot}`, 'amber').catch(() => {});
       res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/disks/:slot/spin-down', async (req, res) => {
+    const slot = parseSlot(req.params.slot);
+    if (slot === null) {
+      res.status(400).json({ error: 'Slot must be a number 0-29.' });
+      return;
+    }
+    try {
+      const status = await nmd.getStatus();
+      if (status.resync.active) {
+        res.status(409).json({ error: 'A parity check or clear is in progress — refusing to spin down a disk mid-operation.' });
+        return;
+      }
+      const disk = status.disks.find((d) => d.slot === slot);
+      if (!disk || !disk.device || disk.device === 'none') {
+        res.status(404).json({ error: `No disk assigned to slot ${slot}.` });
+        return;
+      }
+      await spinDown(disk.device);
+      activity.log(`Disk ${slot} (${disk.disk_name || disk.device}) spun down`, 'blue').catch(() => {});
+      res.json({ ok: true, message: `Disk ${slot} spun down.` });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/disks/:slot/spin-up', async (req, res) => {
+    const slot = parseSlot(req.params.slot);
+    if (slot === null) {
+      res.status(400).json({ error: 'Slot must be a number 0-29.' });
+      return;
+    }
+    try {
+      const status = await nmd.getStatus();
+      const disk = status.disks.find((d) => d.slot === slot);
+      if (!disk || !disk.device || disk.device === 'none') {
+        res.status(404).json({ error: `No disk assigned to slot ${slot}.` });
+        return;
+      }
+      await spinUp(disk.device);
+      activity.log(`Disk ${slot} (${disk.disk_name || disk.device}) spun up`, 'blue').catch(() => {});
+      res.json({ ok: true, message: `Disk ${slot} spun up.` });
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

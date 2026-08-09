@@ -34,6 +34,9 @@ export const nmdApi = {
       body: JSON.stringify({ device }),
     }),
   formatDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/format`, { method: 'POST' }),
+  mountDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/mount`, { method: 'POST' }),
+  spinDownDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/spin-down`, { method: 'POST' }),
+  spinUpDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/spin-up`, { method: 'POST' }),
   replaceDisk: (slot: number, device: string) =>
     request<AddDiskResult>(`/api/disks/${slot}/replace`, {
       method: 'POST',
