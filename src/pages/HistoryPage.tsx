@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { TimeSeriesChart, type TimeSeriesChartSeries } from '../components/shared/TimeSeriesChart';
 import { useMetrics } from '../hooks/useMetrics';
+import { ChartHoverProvider } from '../state/ChartHoverProvider';
 import { useArrayStatus } from '../state/useArrayStatus';
 import { COLORS } from '../styles/colors';
 import type { MetricName, MetricRange } from '../types/metricsApi';
@@ -91,48 +92,50 @@ export function HistoryPage() {
       {status === 'loading' && <div className="status-note">Loading history…</div>}
       {error && <div className="status-note status-note--error">{error}</div>}
 
-      <div className="metrics-grid">
-        <div className="card metric-card">
-          <div className="eyebrow">CPU</div>
-          <TimeSeriesChart series={totalSeries('cpu_percent', 'CPU', COLORS.blue)} formatValue={formatPercent} />
-        </div>
+      <ChartHoverProvider>
+        <div className="metrics-grid">
+          <div className="card metric-card">
+            <div className="eyebrow">CPU</div>
+            <TimeSeriesChart series={totalSeries('cpu_percent', 'CPU', COLORS.blue)} formatValue={formatPercent} />
+          </div>
 
-        <div className="card metric-card">
-          <div className="eyebrow">Memory</div>
-          <TimeSeriesChart series={totalSeries('mem_used_bytes', 'Memory used', COLORS.blue)} formatValue={formatBytesHuman} />
-        </div>
+          <div className="card metric-card">
+            <div className="eyebrow">Memory</div>
+            <TimeSeriesChart series={totalSeries('mem_used_bytes', 'Memory used', COLORS.blue)} formatValue={formatBytesHuman} />
+          </div>
 
-        <div className="card metric-card">
-          <div className="eyebrow">Network</div>
-          <TimeSeriesChart
-            series={[
-              { key: 'rx', label: 'Download', color: COLORS.blue, points: (seriesByMetric.net_rx_kb_s ?? [])[0]?.points ?? [] },
-              { key: 'tx', label: 'Upload', color: COLORS.green, points: (seriesByMetric.net_tx_kb_s ?? [])[0]?.points ?? [] },
-            ]}
-            formatValue={formatKbs}
-          />
-        </div>
+          <div className="card metric-card">
+            <div className="eyebrow">Network</div>
+            <TimeSeriesChart
+              series={[
+                { key: 'rx', label: 'Download', color: COLORS.blue, points: (seriesByMetric.net_rx_kb_s ?? [])[0]?.points ?? [] },
+                { key: 'tx', label: 'Upload', color: COLORS.green, points: (seriesByMetric.net_tx_kb_s ?? [])[0]?.points ?? [] },
+              ]}
+              formatValue={formatKbs}
+            />
+          </div>
 
-        <div className="card metric-card">
-          <div className="eyebrow">Disk Temperature</div>
-          <TimeSeriesChart series={perDiskSeries('disk_temp_c')} formatValue={(v) => `${Math.round(v)}°C`} />
-        </div>
+          <div className="card metric-card">
+            <div className="eyebrow">Disk Temperature</div>
+            <TimeSeriesChart series={perDiskSeries('disk_temp_c')} formatValue={(v) => `${Math.round(v)}°C`} />
+          </div>
 
-        <div className="card metric-card">
-          <div className="eyebrow">Disk Read</div>
-          <TimeSeriesChart series={perDiskSeries('disk_read_kb_s')} formatValue={formatKbs} />
-        </div>
+          <div className="card metric-card">
+            <div className="eyebrow">Disk Read</div>
+            <TimeSeriesChart series={perDiskSeries('disk_read_kb_s')} formatValue={formatKbs} />
+          </div>
 
-        <div className="card metric-card">
-          <div className="eyebrow">Disk Write</div>
-          <TimeSeriesChart series={perDiskSeries('disk_write_kb_s')} formatValue={formatKbs} />
-        </div>
+          <div className="card metric-card">
+            <div className="eyebrow">Disk Write</div>
+            <TimeSeriesChart series={perDiskSeries('disk_write_kb_s')} formatValue={formatKbs} />
+          </div>
 
-        <div className="card metric-card metric-card--wide">
-          <div className="eyebrow">Disk Usage</div>
-          <TimeSeriesChart series={perDiskSeries('disk_usage_pct')} formatValue={formatPercent} />
+          <div className="card metric-card metric-card--wide">
+            <div className="eyebrow">Disk Usage</div>
+            <TimeSeriesChart series={perDiskSeries('disk_usage_pct')} formatValue={formatPercent} />
+          </div>
         </div>
-      </div>
+      </ChartHoverProvider>
     </div>
   );
 }

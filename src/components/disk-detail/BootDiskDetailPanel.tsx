@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { smartApi } from '../../api/smartApi';
 import { systemApi } from '../../api/systemApi';
 import { useSystemStats } from '../../hooks/useSystemStats';
+import type { SmartAttributes } from '../../types/smart';
 import { formatMemLabel } from '../../utils/format';
+import { SmartOverviewRows } from './SmartOverviewRows';
 
 interface BootDiskDetailPanelProps {
   onClose: () => void;
@@ -9,6 +12,7 @@ interface BootDiskDetailPanelProps {
 
 type ConfigStep = 'idle' | 'confirm';
 type ImageStep = 'idle' | 'warn' | 'confirm';
+type SmartLoadState = 'loading' | 'ready' | 'error';
 
 /** No async mutation here to await, unlike the array disks' detail panel — the browser's own
  *  download manager takes over completely once the link is clicked, so this just gates that link
@@ -17,6 +21,29 @@ export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
   const stats = useSystemStats();
   const [configStep, setConfigStep] = useState<ConfigStep>('idle');
   const [imageStep, setImageStep] = useState<ImageStep>('idle');
+  const [smartAttrs, setSmartAttrs] = useState<SmartAttributes | null>(null);
+  const [smartLoadState, setSmartLoadState] = useState<SmartLoadState>('loading');
+
+  const bootDevice = stats?.bootDisk?.device ?? null;
+
+  useEffect(() => {
+    if (!bootDevice) return;
+    let alive = true;
+    setSmartLoadState('loading');
+    smartApi
+      .getAttributesByDevice(bootDevice)
+      .then((attrs) => {
+        if (!alive) return;
+        setSmartAttrs(attrs);
+        setSmartLoadState('ready');
+      })
+      .catch(() => {
+        if (alive) setSmartLoadState('error');
+      });
+    return () => {
+      alive = false;
+    };
+  }, [bootDevice]);
 
   const boot = stats?.bootDisk;
   if (!boot) return null;
@@ -59,6 +86,14 @@ export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
             <span className="detail-row__label">Temperature</span>
             <span className="detail-row__value">{boot.tempCelsius !== null ? `${Math.round(boot.tempCelsius)}°C` : '—'}</span>
           </div>
+        </div>
+
+        <div className="smart-section">
+          <div className="eyebrow">SMART</div>
+          {smartLoadState === 'loading' && <div className="status-note">Loading SMART data…</div>}
+          {smartLoadState === 'error' && <div className="status-note status-note--error">Failed to read SMART data for this device.</div>}
+          {smartLoadState === 'ready' && !smartAttrs && <div className="status-note">No SMART data available for this disk.</div>}
+          {smartAttrs && <SmartOverviewRows attributes={smartAttrs} />}
         </div>
 
         <div className="smart-section">

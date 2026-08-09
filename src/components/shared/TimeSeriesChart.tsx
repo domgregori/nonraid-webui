@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useChartHover } from '../../state/ChartHoverContext';
 
 export interface TimeSeriesChartSeries {
   key: string;
@@ -63,7 +64,7 @@ export function TimeSeriesChart({ series, height = 180, formatValue = defaultFor
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(FALLBACK_WIDTH);
-  const [hoverX, setHoverX] = useState<number | null>(null);
+  const { hoverTs, setHoverTs } = useChartHover();
 
   useEffect(() => {
     const el = containerRef.current;
@@ -111,10 +112,16 @@ export function TimeSeriesChart({ series, height = 180, formatValue = defaultFor
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    setHoverX(Math.min(Math.max(e.clientX - rect.left, padLeft), width - PAD_RIGHT));
+    const x = Math.min(Math.max(e.clientX - rect.left, padLeft), width - PAD_RIGHT);
+    setHoverTs(minTs + ((x - padLeft) / (width - padLeft - PAD_RIGHT)) * (maxTs - minTs));
   }
 
-  const hoverTs = hoverX !== null ? minTs + ((hoverX - padLeft) / (width - padLeft - PAD_RIGHT)) * (maxTs - minTs) : null;
+  // Derived from the shared hoverTs (not the other way around) — every chart in a
+  // <ChartHoverProvider> group converts the same timestamp to its own pixel position via its own
+  // xFor, so a hover anywhere lands each chart's crosshair/tooltip at the matching time correctly
+  // even across different widths. Clamped to this chart's own range so a stray shared timestamp
+  // outside it (different series, different gaps) doesn't draw a crosshair off the visible axis.
+  const hoverX = hoverTs !== null && hoverTs >= minTs && hoverTs <= maxTs ? xFor(hoverTs) : null;
 
   return (
     <div className="ts-chart" ref={containerRef}>
@@ -128,7 +135,7 @@ export function TimeSeriesChart({ series, height = 180, formatValue = defaultFor
             viewBox={`0 0 ${width} ${height}`}
             style={{ height }}
             onMouseMove={handleMouseMove}
-            onMouseLeave={() => setHoverX(null)}
+            onMouseLeave={() => setHoverTs(null)}
           >
             {gridValues.map((v, i) => (
               <g key={i}>
