@@ -1,8 +1,33 @@
 // Mirrors backend/src/settings/types.ts. Keep in sync.
 
+export type NotificationEventType =
+  | 'diskFailed'
+  | 'diskErrors'
+  | 'smartFailed'
+  | 'parityErrors'
+  | 'backupFailed'
+  | 'tempAlert'
+  | 'diskAdded'
+  | 'arrayReconfigured'
+  | 'parityStarted'
+  | 'parityCompleted'
+  | 'backupCompleted'
+  | 'arrayStarted'
+  | 'arrayStopped';
+
+export type NotificationSeverity = 'high' | 'medium' | 'low';
+
+export interface NotificationEventDef {
+  id: NotificationEventType;
+  label: string;
+  severity: NotificationSeverity;
+  defaultEnabled: boolean;
+}
+
 export interface NotificationSettings {
   enabled: boolean;
   appriseUrls: string;
+  eventTypes: Record<NotificationEventType, boolean>;
 }
 
 export interface WeeklyOrMonthlySchedule {
@@ -36,7 +61,9 @@ export interface AppSettings {
 
 export type AppSettingsUpdate = Partial<{
   turboWrite: boolean;
-  notifications: Partial<NotificationSettings>;
+  notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {
+    eventTypes?: Partial<Record<NotificationEventType, boolean>>;
+  };
   minFreeSpaceMb: number;
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<BackupSchedule>;

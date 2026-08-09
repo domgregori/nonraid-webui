@@ -1,7 +1,7 @@
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { DiskStatus, NmdDisk } from '../nmd/types.js';
-import { sendAppriseNotification } from '../settings/notify.js';
+import { notifyEvent } from '../settings/notify.js';
 import type { SettingsStore } from '../settings/store.js';
 import type { SmartHealth, SmartService } from '../smart/index.js';
 import { readCpuTempCelsius } from '../system/cpuTemp.js';
@@ -58,17 +58,6 @@ export class ActivityWatcher {
     this.timer.unref();
   }
 
-  /** Best-effort — a bad/unreachable apprise target must never break this watcher's tick. */
-  private async notify(title: string, body: string): Promise<void> {
-    try {
-      const settings = await this.settings.get();
-      if (!settings.notifications.enabled || !settings.notifications.appriseUrls.trim()) return;
-      await sendAppriseNotification(settings.notifications.appriseUrls, title, body);
-    } catch {
-      // swallowed — the activity log entry is the record of what happened either way
-    }
-  }
-
   private async tick(): Promise<void> {
     let status;
     try {
@@ -92,10 +81,10 @@ export class ActivityWatcher {
     if (lastSync.status === 'errors') {
       const text = `Parity check finished with ${syncErrors} sync error${syncErrors === 1 ? '' : 's'}`;
       this.activity.log(text, 'red').catch(() => {});
-      this.notify('NonRAID: parity errors', text);
+      notifyEvent(this.settings, 'parityErrors', 'NonRAID: parity errors', text);
     } else if (lastSync.status === 'completed') {
       this.activity.log('Parity check finished with no errors', 'green').catch(() => {});
-      this.notify('NonRAID: parity check complete', 'Parity check finished with no errors');
+      notifyEvent(this.settings, 'parityCompleted', 'NonRAID: parity check complete', 'Parity check finished with no errors');
     }
   }
 
@@ -108,7 +97,7 @@ export class ActivityWatcher {
       if (disk.errors > prev.errors) {
         const text = `Disk ${disk.slot} (${diskLabel(disk)}) reported new errors — total now ${disk.errors}`;
         this.activity.log(text, 'red').catch(() => {});
-        this.notify('NonRAID: disk errors', text);
+        notifyEvent(this.settings, 'diskErrors', 'NonRAID: disk errors', text);
         continue; // one log line per tick per disk is plenty
       }
 
@@ -117,7 +106,7 @@ export class ActivityWatcher {
       if (isBad && !wasBad) {
         const text = `Disk ${disk.slot} (${diskLabel(disk)}) status changed to ${disk.status}`;
         this.activity.log(text, 'red').catch(() => {});
-        this.notify('NonRAID: disk status changed', text);
+        notifyEvent(this.settings, 'diskFailed', 'NonRAID: disk failed', text);
       }
     }
   }
@@ -142,7 +131,7 @@ export class ActivityWatcher {
       if (prev === 'passed' && health === 'failed') {
         const text = `SMART health check failed for disk ${disk.slot} (${diskLabel(disk)})`;
         this.activity.log(text, 'red').catch(() => {});
-        this.notify('NonRAID: SMART health failed', text);
+        notifyEvent(this.settings, 'smartFailed', 'NonRAID: SMART health failed', text);
       }
     }
   }
@@ -155,7 +144,7 @@ export class ActivityWatcher {
     if (isOver && !wasOver) {
       const text = `${label} temperature is ${Math.round(celsius)}°C, at or above the ${threshold}°C alert threshold`;
       this.activity.log(text, 'amber').catch(() => {});
-      this.notify('NonRAID: temperature alert', text);
+      notifyEvent(this.settings, 'tempAlert', 'NonRAID: temperature alert', text);
     }
   }
 

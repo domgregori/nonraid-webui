@@ -2,6 +2,8 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
 import type { NmdCommandResult } from '../nmd/types.js';
+import type { NotificationEventType } from './notificationCatalog.js';
+import type { SettingsStore } from './store.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -28,5 +30,23 @@ export async function sendAppriseNotification(appriseUrls: string, title: string
       throw new Error(`"${config.appriseBin}" isn't installed or isn't on PATH.`);
     }
     throw new Error(e.stderr?.trim() || e.stdout?.trim() || e.message);
+  }
+}
+
+/**
+ * Gate + send for one specific event type — respects the master enabled toggle, the per-event
+ * toggle (see notificationCatalog.ts), and whether any apprise target is configured. Best-effort:
+ * a bad/unreachable target must never break the caller's own tick/request, so every failure here is
+ * swallowed — the activity log entry each call site already writes is the record either way.
+ */
+export async function notifyEvent(settingsStore: SettingsStore, eventType: NotificationEventType, title: string, body: string): Promise<void> {
+  try {
+    const settings = await settingsStore.get();
+    if (!settings.notifications.enabled || !settings.notifications.eventTypes[eventType] || !settings.notifications.appriseUrls.trim()) {
+      return;
+    }
+    await sendAppriseNotification(settings.notifications.appriseUrls, title, body);
+  } catch {
+    // swallowed — see doc comment above
   }
 }

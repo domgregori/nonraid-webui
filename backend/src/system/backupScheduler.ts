@@ -4,6 +4,7 @@ import type { ActivityStore } from '../activity/index.js';
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
+import { notifyEvent } from '../settings/notify.js';
 import { scheduleMatchesHour } from '../settings/scheduleMatch.js';
 import { resolveConfigBackupPaths, writeConfigBackupToFile } from './backupStream.js';
 
@@ -66,10 +67,14 @@ export class BackupScheduler {
       const destPath = path.join(schedule.destDir, `${BACKUP_PREFIX}${Date.now()}${BACKUP_SUFFIX}`);
       const bytes = await writeConfigBackupToFile(paths, config.systemUseSudo, destPath);
       const sizeLabel = bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-      this.activity.log(`Scheduled backup completed (${sizeLabel})`, 'blue').catch(() => {});
+      const completedText = `Scheduled backup completed (${sizeLabel})`;
+      this.activity.log(completedText, 'blue').catch(() => {});
+      notifyEvent(this.settings, 'backupCompleted', 'NonRAID: scheduled backup completed', completedText);
       await this.prune(schedule.destDir, schedule.retain);
     } catch (err) {
-      this.activity.log(`Scheduled backup failed: ${(err as Error).message}`, 'red').catch(() => {});
+      const failedText = `Scheduled backup failed: ${(err as Error).message}`;
+      this.activity.log(failedText, 'red').catch(() => {});
+      notifyEvent(this.settings, 'backupFailed', 'NonRAID: scheduled backup failed', failedText);
     }
   }
 

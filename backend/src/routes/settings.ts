@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
 import type { NmdClient } from '../nmd/index.js';
-import { sendAppriseNotification, type SettingsStore } from '../settings/index.js';
+import { NOTIFICATION_EVENTS, sendAppriseNotification, type SettingsStore } from '../settings/index.js';
 import type { ShareService } from '../shares/index.js';
+
+const KNOWN_EVENT_TYPES = new Set<string>(NOTIFICATION_EVENTS.map((e) => e.id));
 
 /** Shared by paritySchedule and backupSchedule — both are WeeklyOrMonthlySchedule patches. */
 function validateSchedulePatch(fieldName: string, schedule: Record<string, unknown>): void {
@@ -35,6 +37,10 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
     }
   });
 
+  router.get('/settings/notification-events', (_req, res) => {
+    res.json(NOTIFICATION_EVENTS);
+  });
+
   // Applies turboWrite live before persisting it, so a failed apply (e.g. the
   // array isn't started, or the driver module isn't loaded) doesn't silently
   // save a setting nothing actually honored — the whole request fails
@@ -62,6 +68,16 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
         }
         if ('retain' in patch.backupSchedule && (!Number.isInteger(retain) || (retain as number) < 1)) {
           throw new Error('backupSchedule.retain must be a positive integer.');
+        }
+      }
+      if (patch.notifications?.eventTypes) {
+        for (const [key, value] of Object.entries(patch.notifications.eventTypes)) {
+          if (!KNOWN_EVENT_TYPES.has(key)) {
+            throw new Error(`Unknown notification event type "${key}".`);
+          }
+          if (typeof value !== 'boolean') {
+            throw new Error(`notifications.eventTypes.${key} must be a boolean.`);
+          }
         }
       }
       if (patch.tempAlerts) {

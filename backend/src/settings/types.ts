@@ -1,3 +1,5 @@
+import type { NotificationEventType } from './notificationCatalog.js';
+
 export interface NotificationSettings {
   enabled: boolean;
   // Apprise target URLs (https://github.com/caronc/apprise), space/newline
@@ -5,6 +7,9 @@ export interface NotificationSettings {
   // Stored as-is and passed straight through to the apprise CLI; this project
   // doesn't validate or understand individual service URL formats itself.
   appriseUrls: string;
+  // Per-event opt-in, gated behind `enabled` above — see notificationCatalog.ts
+  // for the full event list, severities, and defaults.
+  eventTypes: Record<NotificationEventType, boolean>;
 }
 
 export interface WeeklyOrMonthlySchedule {
@@ -51,7 +56,9 @@ export interface AppSettings {
 
 export type AppSettingsUpdate = Partial<{
   turboWrite: boolean;
-  notifications: Partial<NotificationSettings>;
+  notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {
+    eventTypes?: Partial<Record<NotificationEventType, boolean>>;
+  };
   minFreeSpaceMb: number;
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<BackupSchedule>;

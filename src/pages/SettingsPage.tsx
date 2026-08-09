@@ -4,12 +4,14 @@ import { nmdApi } from '../api/nmdApi';
 import { settingsApi } from '../api/settingsApi';
 import { systemApi } from '../api/systemApi';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
+import { NotificationEventToggles } from '../components/settings/NotificationEventToggles';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
 import { useSettings } from '../hooks/useSettings';
 import { useSystemStats } from '../hooks/useSystemStats';
 import { type ThemePreference, useTheme } from '../hooks/useTheme';
 import { useArrayStatus } from '../state/useArrayStatus';
+import type { NotificationEventType } from '../types/settingsApi';
 import { formatMemLabel, formatUptime } from '../utils/format';
 
 export function SettingsPage() {
@@ -24,6 +26,7 @@ export function SettingsPage() {
   const [labelSaving, setLabelSaving] = useState(false);
 
   const [appriseDraft, setAppriseDraft] = useState('');
+  const [eventTypesDraft, setEventTypesDraft] = useState<Record<NotificationEventType, boolean>>({} as Record<NotificationEventType, boolean>);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
   const [testSending, setTestSending] = useState(false);
@@ -115,6 +118,7 @@ export function SettingsPage() {
   useEffect(() => {
     if (settings && !appriseInitialized.current) {
       setAppriseDraft(settings.notifications.appriseUrls);
+      setEventTypesDraft(settings.notifications.eventTypes);
       appriseInitialized.current = true;
     }
   }, [settings]);
@@ -202,7 +206,12 @@ export function SettingsPage() {
     }
   };
 
-  const saveNotifications = () => update({ notifications: { appriseUrls: appriseDraft } });
+  const saveNotifications = () => update({ notifications: { appriseUrls: appriseDraft, eventTypes: eventTypesDraft } });
+
+  const toggleEventType = (eventType: NotificationEventType, enabled: boolean) => {
+    setEventTypesDraft((prev) => ({ ...prev, [eventType]: enabled }));
+    update({ notifications: { eventTypes: { [eventType]: enabled } } });
+  };
 
   const saveMinFreeSpace = async () => {
     const value = Number(minFreeSpaceDraft);
@@ -605,8 +614,8 @@ export function SettingsPage() {
           <div>
             <div className="toggle-row__title">Event notifications</div>
             <div className="toggle-row__desc">
-              Enable dispatching notifications via apprise. Sent automatically when a parity check finishes, a disk
-              reports a new error or goes offline, or a SMART health check fails.
+              Master switch for dispatching notifications via apprise — turns off every event below regardless of
+              its own toggle.
             </div>
           </div>
           <ToggleSwitch
@@ -615,6 +624,14 @@ export function SettingsPage() {
             label="Event notifications"
             disabled={!settings || saving}
           />
+        </div>
+
+        <div className="settings-field toggle-row--bordered">
+          <div className="toggle-row__title">Which events notify</div>
+          <div className="toggle-row__desc" style={{ marginBottom: 8 }}>
+            Grouped by severity — saves each toggle immediately.
+          </div>
+          <NotificationEventToggles eventTypes={eventTypesDraft} onChange={toggleEventType} disabled={!settings} />
         </div>
 
         <div className="settings-field toggle-row--bordered">

@@ -2,6 +2,8 @@ import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { ParityCheckAction } from '../nmd/types.js';
+import { notifyEvent } from '../settings/notify.js';
+import type { SettingsStore } from '../settings/store.js';
 
 const VALID_ACTIONS: ParityCheckAction[] = ['CORRECT', 'NOCORRECT', 'PAUSE', 'RESUME', 'CANCEL'];
 
@@ -13,7 +15,11 @@ const ACTIVITY_MESSAGE: Record<ParityCheckAction, { text: string; color: 'blue' 
   CANCEL: { text: 'Parity check cancelled', color: 'amber' },
 };
 
-export function parityRouter(nmd: NmdClient, activity: ActivityStore): Router {
+// Only the actions that actually begin a check — not pause/resume/cancel — count as "started" for
+// notification purposes.
+const START_ACTIONS = new Set<ParityCheckAction>(['CORRECT', 'NOCORRECT']);
+
+export function parityRouter(nmd: NmdClient, activity: ActivityStore, settingsStore: SettingsStore): Router {
   const router = Router();
 
   router.post('/parity/:action', async (req, res) => {
@@ -26,6 +32,9 @@ export function parityRouter(nmd: NmdClient, activity: ActivityStore): Router {
       const result = await nmd.parityCheck(action);
       const { text, color } = ACTIVITY_MESSAGE[action];
       activity.log(text, color).catch(() => {});
+      if (START_ACTIONS.has(action)) {
+        notifyEvent(settingsStore, 'parityStarted', 'NonRAID: parity check started', text);
+      }
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });

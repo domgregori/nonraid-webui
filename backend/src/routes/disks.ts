@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
 import type { NmdClient } from '../nmd/index.js';
+import { notifyEvent } from '../settings/notify.js';
+import type { SettingsStore } from '../settings/store.js';
 import type { SelfTestType, SmartService } from '../smart/index.js';
 
 const SELF_TEST_TYPES: SelfTestType[] = ['short', 'long', 'conveyance'];
@@ -10,7 +12,7 @@ function parseSlot(param: string): number | null {
   return Number.isInteger(slot) && slot >= 0 && slot <= 29 ? slot : null;
 }
 
-export function disksRouter(nmd: NmdClient, smart: SmartService, activity: ActivityStore): Router {
+export function disksRouter(nmd: NmdClient, smart: SmartService, activity: ActivityStore, settingsStore: SettingsStore): Router {
   const router = Router();
 
   router.get('/disks/available', async (_req, res) => {
@@ -53,7 +55,9 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
       // zeroed this project's own test VM's root filesystem once already.
       const target = match.partition ?? match.device;
       const result = await nmd.addDisk(slot, target, match.diskId ?? undefined);
-      activity.log(`Disk ${device} added to slot ${slot}`, 'blue').catch(() => {});
+      const text = `Disk ${device} added to slot ${slot}`;
+      activity.log(text, 'blue').catch(() => {});
+      notifyEvent(settingsStore, 'diskAdded', 'NonRAID: disk added', text);
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
@@ -81,7 +85,9 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
       }
       const target = match.partition ?? match.device;
       const result = await nmd.replaceDisk(slot, target, match.diskId ?? undefined);
-      activity.log(`Disk in slot ${slot} replaced with ${device}`, 'amber').catch(() => {});
+      const text = `Disk in slot ${slot} replaced with ${device}`;
+      activity.log(text, 'amber').catch(() => {});
+      notifyEvent(settingsStore, 'diskAdded', 'NonRAID: disk replaced', text);
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });

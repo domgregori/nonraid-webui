@@ -2,6 +2,7 @@ import type { ActivityStore } from '../activity/index.js';
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
+import { notifyEvent } from '../settings/notify.js';
 import { scheduleMatchesHour } from '../settings/scheduleMatch.js';
 
 /**
@@ -53,6 +54,7 @@ export class ParityScheduler {
     try {
       await this.nmd.parityCheck('CORRECT');
       this.activity.log('Parity check started automatically (scheduled)', 'blue').catch(() => {});
+      notifyEvent(this.settings, 'parityStarted', 'NonRAID: parity check started', 'Parity check started automatically (scheduled)');
     } catch (err) {
       this.activity.log(`Scheduled parity check failed to start: ${(err as Error).message}`, 'red').catch(() => {});
     }

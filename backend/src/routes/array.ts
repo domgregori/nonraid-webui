@@ -8,6 +8,7 @@ import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
 import { matchSlotToDisk, parseSuperblock } from '../nmd/superblock.js';
 import type { SettingsStore } from '../settings/index.js';
+import { notifyEvent } from '../settings/notify.js';
 import type { ShareService } from '../shares/index.js';
 
 // A superblock is always exactly 4096 bytes (see nmd/superblock.ts); this
@@ -64,6 +65,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       }
 
       activity.log('Array started', 'green').catch(() => {});
+      notifyEvent(settingsStore, 'arrayStarted', 'NonRAID: array started', 'Array started');
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
@@ -80,6 +82,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       await nmd.unmountDisks();
       const result = await nmd.stopArray();
       activity.log('Array stopped', 'blue').catch(() => {});
+      notifyEvent(settingsStore, 'arrayStopped', 'NonRAID: array stopped', 'Array stopped');
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
@@ -223,7 +226,9 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       } catch (err) {
         activity.log(`Array reconfigured, but remounting disks failed: ${(err as Error).message}`, 'amber').catch(() => {});
       }
-      activity.log(`Array reconfigured, dropping slot(s) ${dropSlots.join(', ')}`, 'amber').catch(() => {});
+      const text = `Array reconfigured, dropping slot(s) ${dropSlots.join(', ')}`;
+      activity.log(text, 'amber').catch(() => {});
+      notifyEvent(settingsStore, 'arrayReconfigured', 'NonRAID: array reconfigured', text);
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });

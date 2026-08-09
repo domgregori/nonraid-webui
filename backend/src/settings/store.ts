@@ -1,11 +1,12 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
+import { DEFAULT_EVENT_TYPES } from './notificationCatalog.js';
 import type { AppSettings, AppSettingsUpdate } from './types.js';
 
 const DEFAULTS: AppSettings = {
   turboWrite: false,
-  notifications: { enabled: false, appriseUrls: '' },
+  notifications: { enabled: false, appriseUrls: '', eventTypes: DEFAULT_EVENT_TYPES },
   minFreeSpaceMb: 100,
   paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2 },
   backupSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3, destDir: '', retain: 7 },
@@ -28,7 +29,7 @@ export class SettingsStore {
     const settings = await this.load();
     return {
       ...settings,
-      notifications: { ...settings.notifications },
+      notifications: { ...settings.notifications, eventTypes: { ...settings.notifications.eventTypes } },
       paritySchedule: { ...settings.paritySchedule },
       backupSchedule: { ...settings.backupSchedule },
       tempAlerts: { ...settings.tempAlerts },
@@ -41,7 +42,11 @@ export class SettingsStore {
       const next: AppSettings = {
         ...current,
         ...patch,
-        notifications: { ...current.notifications, ...patch.notifications },
+        notifications: {
+          ...current.notifications,
+          ...patch.notifications,
+          eventTypes: { ...current.notifications.eventTypes, ...patch.notifications?.eventTypes },
+        },
         paritySchedule: { ...current.paritySchedule, ...patch.paritySchedule },
         backupSchedule: { ...current.backupSchedule, ...patch.backupSchedule },
         tempAlerts: { ...current.tempAlerts, ...patch.tempAlerts },
@@ -59,7 +64,11 @@ export class SettingsStore {
       this.cache = {
         ...DEFAULTS,
         ...parsed,
-        notifications: { ...DEFAULTS.notifications, ...parsed.notifications },
+        notifications: {
+          ...DEFAULTS.notifications,
+          ...parsed.notifications,
+          eventTypes: { ...DEFAULTS.notifications.eventTypes, ...parsed.notifications?.eventTypes },
+        },
         paritySchedule: { ...DEFAULTS.paritySchedule, ...parsed.paritySchedule },
         backupSchedule: { ...DEFAULTS.backupSchedule, ...parsed.backupSchedule },
         tempAlerts: { ...DEFAULTS.tempAlerts, ...parsed.tempAlerts },
