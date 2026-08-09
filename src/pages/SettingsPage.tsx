@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { authApi } from '../api/authApi';
 import { nmdApi } from '../api/nmdApi';
 import { settingsApi } from '../api/settingsApi';
+import { systemApi } from '../api/systemApi';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
@@ -51,6 +52,17 @@ export function SettingsPage() {
   const [backupSchedSaving, setBackupSchedSaving] = useState(false);
   const [backupSchedError, setBackupSchedError] = useState<string | null>(null);
 
+  const [hostnameDraft, setHostnameDraft] = useState('');
+  const [hostnameSaving, setHostnameSaving] = useState(false);
+  const [hostnameResult, setHostnameResult] = useState<string | null>(null);
+  const [hostnameError, setHostnameError] = useState<string | null>(null);
+
+  const [timezones, setTimezones] = useState<string[]>([]);
+  const [timezoneDraft, setTimezoneDraft] = useState('');
+  const [timezoneSaving, setTimezoneSaving] = useState(false);
+  const [timezoneResult, setTimezoneResult] = useState<string | null>(null);
+  const [timezoneError, setTimezoneError] = useState<string | null>(null);
+
   const [showImportWizard, setShowImportWizard] = useState(false);
 
   const [currentPasswordDraft, setCurrentPasswordDraft] = useState('');
@@ -70,6 +82,8 @@ export function SettingsPage() {
   const paritySchedInitialized = useRef(false);
   const tempAlertsInitialized = useRef(false);
   const backupSchedInitialized = useRef(false);
+  const hostnameInitialized = useRef(false);
+  const timezoneInitialized = useRef(false);
 
   useEffect(() => {
     if (status && !labelInitialized.current) {
@@ -77,6 +91,24 @@ export function SettingsPage() {
       labelInitialized.current = true;
     }
   }, [status]);
+
+  useEffect(() => {
+    if (stats && !hostnameInitialized.current) {
+      setHostnameDraft(stats.hostname);
+      hostnameInitialized.current = true;
+    }
+  }, [stats]);
+
+  useEffect(() => {
+    if (stats && !timezoneInitialized.current) {
+      setTimezoneDraft(stats.timezone);
+      timezoneInitialized.current = true;
+    }
+  }, [stats]);
+
+  useEffect(() => {
+    systemApi.getTimezones().then(setTimezones).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (settings && !appriseInitialized.current) {
@@ -125,6 +157,34 @@ export function SettingsPage() {
   }, [settings]);
 
   const arrayStarted = status?.array.state === 'STARTED';
+
+  const saveHostname = async () => {
+    setHostnameSaving(true);
+    setHostnameError(null);
+    setHostnameResult(null);
+    try {
+      const result = await systemApi.setHostname(hostnameDraft.trim());
+      setHostnameResult(result.message);
+    } catch (err) {
+      setHostnameError((err as Error).message);
+    } finally {
+      setHostnameSaving(false);
+    }
+  };
+
+  const saveTimezone = async () => {
+    setTimezoneSaving(true);
+    setTimezoneError(null);
+    setTimezoneResult(null);
+    try {
+      const result = await systemApi.setTimezone(timezoneDraft);
+      setTimezoneResult(result.message);
+    } catch (err) {
+      setTimezoneError((err as Error).message);
+    } finally {
+      setTimezoneSaving(false);
+    }
+  };
 
   const saveLabel = async () => {
     setLabelSaving(true);
@@ -266,6 +326,44 @@ export function SettingsPage() {
           />
           <InfoRow label="Superblock" value={status?.array.superblock ?? '—'} mono />
           <InfoRow label="Build" value={stats?.buildVersion ?? 'unknown'} mono />
+        </div>
+
+        <div className="settings-field toggle-row--bordered">
+          <div className="toggle-row__title">Hostname</div>
+          <div className="settings-field__row">
+            <input
+              className="history-input"
+              style={{ width: '100%' }}
+              value={hostnameDraft}
+              onChange={(e) => setHostnameDraft(e.target.value)}
+              disabled={!stats}
+            />
+            <button type="button" className="btn" disabled={hostnameSaving || !stats} onClick={saveHostname}>
+              {hostnameSaving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+          <div className="toggle-row__desc">Some services (e.g. mDNS/.local advertisement) may need a restart to fully pick up a new hostname.</div>
+          {hostnameResult && <div className="status-note">{hostnameResult}</div>}
+          {hostnameError && <div className="status-note status-note--error">{hostnameError}</div>}
+        </div>
+
+        <div className="settings-field toggle-row--bordered">
+          <div className="toggle-row__title">Timezone</div>
+          <div className="settings-field__row">
+            <select className="history-input" style={{ width: '100%' }} value={timezoneDraft} onChange={(e) => setTimezoneDraft(e.target.value)} disabled={!stats}>
+              {!timezones.includes(timezoneDraft) && timezoneDraft && <option value={timezoneDraft}>{timezoneDraft}</option>}
+              {timezones.map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="btn" disabled={timezoneSaving || !stats} onClick={saveTimezone}>
+              {timezoneSaving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+          {timezoneResult && <div className="status-note">{timezoneResult}</div>}
+          {timezoneError && <div className="status-note status-note--error">{timezoneError}</div>}
         </div>
       </div>
 

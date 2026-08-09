@@ -9,6 +9,9 @@ export interface BootDiskInfo {
 
 export interface SystemStats {
   hostname: string;
+  // The process's effective IANA zone (Intl.DateTimeFormat, no subprocess) —
+  // reflects the OS timezone Node inherited at startup.
+  timezone: string;
   uptimeSeconds: number;
   cpuPercent: number;
   // Best-effort package temperature from the kernel's hwmon sysfs interface.

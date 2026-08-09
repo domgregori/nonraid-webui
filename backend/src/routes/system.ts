@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/client.js';
 import { resolveConfigBackupPaths, streamBootDiskImage, streamConfigBackup } from '../system/backupStream.js';
+import { listTimezones, setHostname, setTimezone } from '../system/hostConfig.js';
 import type { SystemStatsService } from '../system/service.js';
 
 export function systemRouter(system: SystemStatsService, nmd: NmdClient, activity: ActivityStore): Router {
@@ -35,6 +36,44 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
       } else {
         res.status(502).json({ error: (err as Error).message });
       }
+    }
+  });
+
+  router.get('/system/timezones', async (_req, res) => {
+    try {
+      res.json(await listTimezones());
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.put('/system/hostname', async (req, res) => {
+    const name = typeof req.body?.hostname === 'string' ? req.body.hostname.trim() : '';
+    if (!name) {
+      res.status(400).json({ error: 'hostname is required.' });
+      return;
+    }
+    try {
+      await setHostname(name, config.systemUseSudo);
+      activity.log(`Hostname changed to "${name}"`, 'blue').catch(() => {});
+      res.json({ ok: true, message: `Hostname set to "${name}". Some services may need a restart to fully pick it up.` });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.put('/system/timezone', async (req, res) => {
+    const tz = typeof req.body?.timezone === 'string' ? req.body.timezone.trim() : '';
+    if (!tz) {
+      res.status(400).json({ error: 'timezone is required.' });
+      return;
+    }
+    try {
+      await setTimezone(tz, config.systemUseSudo);
+      activity.log(`Timezone changed to "${tz}"`, 'blue').catch(() => {});
+      res.json({ ok: true, message: `Timezone set to "${tz}".` });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
     }
   });
 

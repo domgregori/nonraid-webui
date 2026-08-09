@@ -165,6 +165,7 @@ export class SystemStatsService {
     const memFreeBytes = os.freemem();
     return {
       hostname: os.hostname(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       uptimeSeconds: os.uptime(),
       cpuPercent: Math.round(this.cpuPercent * 10) / 10,
       cpuTempCelsius: readCpuTempCelsius(),

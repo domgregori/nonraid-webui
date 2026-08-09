@@ -10,6 +10,7 @@ export interface BootDiskInfo {
 
 export interface SystemStats {
   hostname: string;
+  timezone: string;
   uptimeSeconds: number;
   cpuPercent: number;
   cpuTempCelsius: number | null;
