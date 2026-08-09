@@ -151,12 +151,16 @@
 }
 
 .unassigned-device-row {
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
   padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--color-border);
+  /* SMART health color, set inline per-row — see the disk-card__health-dot doc comment history for
+     why this replaced a small dot. */
+  border-top-width: 3px;
   border-radius: var(--radius-btn);
   background: var(--color-surface-elevated);
 }
@@ -191,6 +195,10 @@
   border-radius: 10px;
   padding: var(--space-md);
   border: 1px solid var(--color-border);
+  /* SMART health color, set inline per-card (borderTopColor) — a dot proved too easy to miss, so
+     health now reads as the card's own top border instead, distinct from the full border which
+     still reflects the array driver's own status (borderColor). */
+  border-top-width: 3px;
   background: var(--color-surface);
 }
 
@@ -233,15 +241,6 @@
 .disk-card--data .disk-card__status-dot {
   width: 7px;
   height: 7px;
-}
-
-/* SMART self-assessment, distinct from the driver-status dot above — a disk can be DISK_OK while
-   SMART already reports failing, so this needs its own marker rather than folding into the same one. */
-.disk-card__health-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  flex-shrink: 0;
 }
 
 .disk-card__device {

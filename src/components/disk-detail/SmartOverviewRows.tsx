@@ -44,7 +44,15 @@ export function SmartOverviewRows({ attributes, typeLabel }: SmartOverviewRowsPr
           <span className="detail-row__label">Type</span>
           <span className="detail-row__value">
             {typeLabel ?? ''}
-            {attributes.rotationRpm != null ? `${typeLabel ? ' · ' : ''}${attributes.rotationRpm} RPM` : ''}
+            {attributes.rotationRpm != null
+              ? `${typeLabel ? ' · ' : ''}${attributes.rotationRpm} RPM`
+              : // Confirmed live: some drives (e.g. this project's own WD Blue test disk) don't
+                // report rotation rate at all — not through smartctl JSON, smartctl's classic
+                // text output, or hdparm's raw ATA IDENTIFY data. Says so explicitly rather than
+                // silently omitting RPM, which reads as broken rather than as the drive's own gap.
+                typeLabel === 'HDD'
+                ? ' (RPM not reported by this drive)'
+                : ''}
           </span>
         </div>
       )}

@@ -22,11 +22,15 @@ function stopPropagation<T>(handler: () => T): (e: MouseEvent) => void {
 
 export function ParityDiskCard({ disk, onClick }: DiskCardProps) {
   return (
-    <div className="disk-card disk-card--parity" style={{ borderColor: disk.borderColor }} onClick={onClick}>
+    <div
+      className="disk-card disk-card--parity"
+      style={{ borderColor: disk.borderColor, borderTopColor: disk.healthColor }}
+      onClick={onClick}
+      title={`SMART: ${disk.health ?? 'unknown'}`}
+    >
       <div className="disk-card__head">
         <span className="disk-card__label">{disk.label}</span>
         <span className="disk-card__status" style={{ color: disk.statusColor }}>
-          <span className="disk-card__health-dot" style={{ background: disk.healthColor }} title={`SMART: ${disk.health ?? 'unknown'}`} />
           <span className="disk-card__status-dot" style={{ background: disk.statusColor }} />
           {disk.statusLabel}
         </span>
@@ -43,7 +47,12 @@ export function ParityDiskCard({ disk, onClick }: DiskCardProps) {
 export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
   if (clearing) {
     return (
-      <div className="disk-card disk-card--data" style={{ borderColor: disk.borderColor }} onClick={onClick}>
+      <div
+        className="disk-card disk-card--data"
+        style={{ borderColor: disk.borderColor, borderTopColor: disk.healthColor }}
+        onClick={onClick}
+        title={`SMART: ${disk.health ?? 'unknown'}`}
+      >
         <div className="disk-card__head">
           <span className="disk-card__label">{disk.label}</span>
         </div>
@@ -68,13 +77,15 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
   }
 
   return (
-    <div className="disk-card disk-card--data" style={{ borderColor: disk.borderColor }} onClick={onClick}>
+    <div
+      className="disk-card disk-card--data"
+      style={{ borderColor: disk.borderColor, borderTopColor: disk.healthColor }}
+      onClick={onClick}
+      title={`SMART: ${disk.health ?? 'unknown'}`}
+    >
       <div className="disk-card__head">
         <span className="disk-card__label">{disk.label}</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span className="disk-card__health-dot" style={{ background: disk.healthColor }} title={`SMART: ${disk.health ?? 'unknown'}`} />
-          <span className="disk-card__status-dot" style={{ background: disk.statusColor }} />
-        </span>
+        <span className="disk-card__status-dot" style={{ background: disk.statusColor }} />
       </div>
       <div className="disk-card__device">{disk.device}</div>
       <div className="progress-track">

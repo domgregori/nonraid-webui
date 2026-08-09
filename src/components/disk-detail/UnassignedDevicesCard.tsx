@@ -6,10 +6,13 @@ import type { AvailableDevice } from '../../types/nmdApi';
 import { formatBytesHuman } from '../../utils/format';
 import { Card } from '../shared/Card';
 import { AddDiskDialog } from './AddDiskDialog';
+import { UnassignedDeviceDetailPanel } from './UnassignedDeviceDetailPanel';
 
 /** Fetched per row on mount — unassigned devices have no array-wide poll to piggyback on, and
- *  there are normally only a handful of them, so one on-demand call each is cheap enough. */
-function HealthDot({ device }: { device: string }) {
+ *  there are normally only a handful of them, so one on-demand call each is cheap enough. Drives
+ *  the row's top-border color (see the .disk-card__health-dot doc comment history — a dot read as
+ *  too easy to miss, so health is now a border color instead). */
+function useDeviceHealth(device: string): 'passed' | 'failed' | null {
   const [health, setHealth] = useState<'passed' | 'failed' | null>(null);
 
   useEffect(() => {
@@ -25,13 +28,43 @@ function HealthDot({ device }: { device: string }) {
     };
   }, [device]);
 
-  const color = health === 'failed' ? COLORS.red : health === 'passed' ? COLORS.green : COLORS.textDim;
-  return <span className="disk-card__health-dot" style={{ background: color, display: 'inline-block' }} title={`SMART: ${health ?? 'unknown'}`} />;
+  return health;
+}
+
+function DeviceRow({ device: d, onOpen, onAdd }: { device: AvailableDevice; onOpen: () => void; onAdd: () => void }) {
+  const health = useDeviceHealth(d.device);
+  const healthColor = health === 'failed' ? COLORS.red : health === 'passed' ? COLORS.green : COLORS.border;
+
+  return (
+    <div className="unassigned-device-row" style={{ borderTopColor: healthColor }} onClick={onOpen} title={`SMART: ${health ?? 'unknown'}`}>
+      <div>
+        <div className="unassigned-device-row__name">{d.model ?? 'Unknown drive'}</div>
+        <div className="unassigned-device-row__meta">
+          {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : 'unknown size'}
+          {d.isSSD !== null ? ` · ${d.isSSD ? 'SSD' : 'HDD'}` : ''}
+          {d.diskId ? ` · ${d.diskId}` : ''}
+          {d.uuid ? ` · ${d.uuid}` : ' · no filesystem'}
+          {d.locked ? ' · locked' : ''}
+        </div>
+      </div>
+      <button
+        type="button"
+        className="btn"
+        onClick={(e) => {
+          e.stopPropagation();
+          onAdd();
+        }}
+      >
+        Add to Array
+      </button>
+    </div>
+  );
 }
 
 export function UnassignedDevicesCard() {
   const { devices, status, error, refresh } = useAvailableDevices();
   const [selected, setSelected] = useState<AvailableDevice | null>(null);
+  const [inspecting, setInspecting] = useState<AvailableDevice | null>(null);
 
   return (
     <Card>
@@ -49,29 +82,22 @@ export function UnassignedDevicesCard() {
       {devices.length > 0 && (
         <div className="unassigned-devices">
           {devices.map((d) => (
-            <div key={d.device} className="unassigned-device-row">
-              <div>
-                <div className="unassigned-device-row__name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <HealthDot device={d.device} />
-                  {d.model ?? 'Unknown drive'}
-                </div>
-                <div className="unassigned-device-row__meta">
-                  {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : 'unknown size'}
-                  {d.isSSD !== null ? ` · ${d.isSSD ? 'SSD' : 'HDD'}` : ''}
-                  {d.diskId ? ` · ${d.diskId}` : ''}
-                  {d.uuid ? ` · ${d.uuid}` : ' · no filesystem'}
-                  {d.locked ? ' · locked' : ''}
-                </div>
-              </div>
-              <button type="button" className="btn" onClick={() => setSelected(d)}>
-                Add to Array
-              </button>
-            </div>
+            <DeviceRow key={d.device} device={d} onOpen={() => setInspecting(d)} onAdd={() => setSelected(d)} />
           ))}
         </div>
       )}
 
       {selected && <AddDiskDialog device={selected} onClose={() => setSelected(null)} onDone={refresh} />}
+      {inspecting && (
+        <UnassignedDeviceDetailPanel
+          device={inspecting}
+          onClose={() => setInspecting(null)}
+          onAddToArray={() => {
+            setSelected(inspecting);
+            setInspecting(null);
+          }}
+        />
+      )}
     </Card>
   );
 }
