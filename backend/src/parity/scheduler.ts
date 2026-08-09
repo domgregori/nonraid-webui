@@ -2,6 +2,7 @@ import type { ActivityStore } from '../activity/index.js';
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
+import { scheduleMatchesHour } from '../settings/scheduleMatch.js';
 
 /**
  * Fires an automatic correcting parity check at the configured weekly or
@@ -23,7 +24,7 @@ export class ParityScheduler {
     private nmd: NmdClient,
     private settings: SettingsStore,
     private activity: ActivityStore,
-    intervalMs: number = config.paritySchedulerIntervalMs,
+    intervalMs: number = config.schedulerTickIntervalMs,
   ) {
     this.timer = setInterval(() => this.tick(), intervalMs);
     this.timer.unref();
@@ -35,9 +36,7 @@ export class ParityScheduler {
     if (!schedule.enabled) return;
 
     const now = new Date();
-    if (now.getHours() !== schedule.hour) return;
-    const dayMatches = schedule.frequency === 'monthly' ? now.getDate() === schedule.dayOfMonth : now.getDay() === schedule.dayOfWeek;
-    if (!dayMatches) return;
+    if (!scheduleMatchesHour(schedule, now)) return;
 
     const dateKey = now.toISOString().slice(0, 10);
     if (this.lastFiredDateKey === dateKey) return;

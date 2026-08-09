@@ -8,6 +8,8 @@ const DEFAULTS: AppSettings = {
   notifications: { enabled: false, appriseUrls: '' },
   minFreeSpaceMb: 100,
   paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2 },
+  backupSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3, destDir: '', retain: 7 },
+  tempAlerts: { enabled: false, warnAboveCelsius: 55 },
 };
 
 /**
@@ -24,7 +26,13 @@ export class SettingsStore {
 
   async get(): Promise<AppSettings> {
     const settings = await this.load();
-    return { ...settings, notifications: { ...settings.notifications }, paritySchedule: { ...settings.paritySchedule } };
+    return {
+      ...settings,
+      notifications: { ...settings.notifications },
+      paritySchedule: { ...settings.paritySchedule },
+      backupSchedule: { ...settings.backupSchedule },
+      tempAlerts: { ...settings.tempAlerts },
+    };
   }
 
   update(patch: AppSettingsUpdate): Promise<AppSettings> {
@@ -35,6 +43,8 @@ export class SettingsStore {
         ...patch,
         notifications: { ...current.notifications, ...patch.notifications },
         paritySchedule: { ...current.paritySchedule, ...patch.paritySchedule },
+        backupSchedule: { ...current.backupSchedule, ...patch.backupSchedule },
+        tempAlerts: { ...current.tempAlerts, ...patch.tempAlerts },
       };
       await this.persistAtomic(next);
     });
@@ -51,6 +61,8 @@ export class SettingsStore {
         ...parsed,
         notifications: { ...DEFAULTS.notifications, ...parsed.notifications },
         paritySchedule: { ...DEFAULTS.paritySchedule, ...parsed.paritySchedule },
+        backupSchedule: { ...DEFAULTS.backupSchedule, ...parsed.backupSchedule },
+        tempAlerts: { ...DEFAULTS.tempAlerts, ...parsed.tempAlerts },
       };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {

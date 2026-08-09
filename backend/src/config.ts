@@ -183,10 +183,11 @@ export const config = {
   // for passive state changes (parity check completing on its own, a disk
   // erroring out, a SMART health check failing) worth logging on its own.
   activityWatcherIntervalMs: num('ACTIVITY_WATCHER_INTERVAL_MS', t('activity', 'watcher_interval_ms'), 30_000),
-  // How often the parity check scheduler (backend/src/parity/scheduler.ts)
-  // checks the stored weekly schedule against the current time. A 1-minute
-  // tick is plenty for an hour-granularity schedule — no cron dependency.
-  paritySchedulerIntervalMs: num('PARITY_SCHEDULER_INTERVAL_MS', t('parity', 'scheduler_interval_ms'), 60_000),
+  // How often the weekly/monthly background schedulers (ParityScheduler,
+  // BackupScheduler) check their stored schedule against the current time.
+  // A 1-minute tick is plenty for an hour-granularity schedule — no cron
+  // dependency needed for either.
+  schedulerTickIntervalMs: num('SCHEDULER_TICK_INTERVAL_MS', t('scheduler', 'tick_interval_ms'), 60_000),
   // LXC containers — see backend/src/lxc/. Shells out to the classic liblxc
   // `lxc-*` command-line tools (lxc-ls/lxc-info/lxc-create/...), the same
   // toolset ich777's unraid-lxc-plugin wraps in PHP. `lxcDefaultPath` is

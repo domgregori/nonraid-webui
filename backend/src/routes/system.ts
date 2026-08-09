@@ -1,20 +1,10 @@
-import { stat } from 'node:fs/promises';
 import { Router } from 'express';
 import type { ActivityStore } from '../activity/store.js';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/client.js';
-import { streamBootDiskImage, streamConfigBackup } from '../system/backupStream.js';
+import { resolveConfigBackupPaths, streamBootDiskImage, streamConfigBackup } from '../system/backupStream.js';
 import type { SystemStatsService } from '../system/service.js';
-
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await stat(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export function systemRouter(system: SystemStatsService, nmd: NmdClient, activity: ActivityStore): Router {
   const router = Router();
@@ -34,20 +24,7 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
 
   router.get('/system/boot-disk/backup/config', async (_req, res) => {
     try {
-      const candidates = [
-        config.smbConfPath,
-        config.exportsPath,
-        '/etc/nonraid',
-        config.authConfigPath,
-        config.sharesConfigPath,
-        config.shareAccessConfigPath,
-        config.settingsConfigPath,
-        config.activityConfigPath,
-        await nmd.getSuperblockPath(),
-      ];
-      const existing = (await Promise.all(candidates.map(async (p) => ((await pathExists(p)) ? p : null)))).filter(
-        (p): p is string => p !== null,
-      );
+      const existing = await resolveConfigBackupPaths(nmd);
       if (existing.length === 0) {
         throw new HttpError(400, 'No NonRAID config files were found to back up.');
       }

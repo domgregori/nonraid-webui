@@ -4,6 +4,7 @@ import type { DiskStatus, NmdDisk } from '../nmd/types.js';
 import { sendAppriseNotification } from '../settings/notify.js';
 import type { SettingsStore } from '../settings/store.js';
 import type { SmartHealth, SmartService } from '../smart/index.js';
+import { readCpuTempCelsius } from '../system/cpuTemp.js';
 import type { ActivityStore } from './store.js';
 
 // Statuses that mean something has actually gone wrong with an assigned
@@ -41,6 +42,10 @@ export class ActivityWatcher {
   private lastSyncTimestamp: number | null = null;
   private diskSnapshots = new Map<number, DiskSnapshot>();
   private healthSnapshots = new Map<string, SmartHealth | null>();
+  // Keyed by 'cpu' or a disk device path — tracks whether that source was
+  // already over the threshold, so a sustained high temp logs/notifies once
+  // on the crossing rather than every tick.
+  private overTemp = new Map<string, boolean>();
 
   constructor(
     private nmd: NmdClient,
@@ -75,6 +80,7 @@ export class ActivityWatcher {
     this.checkParitySync(status.array.last_sync, status.array.counters.sync_errors);
     this.checkDisks(status.disks);
     await this.checkSmartHealth(status.disks);
+    await this.checkTemperatures(status.disks);
   }
 
   private checkParitySync(lastSync: { timestamp: number; status: string }, syncErrors: number): void {
@@ -138,6 +144,39 @@ export class ActivityWatcher {
         this.activity.log(text, 'red').catch(() => {});
         this.notify('NonRAID: SMART health failed', text);
       }
+    }
+  }
+
+  private checkOneTemp(key: string, label: string, celsius: number | null, threshold: number): void {
+    if (celsius === null) return;
+    const wasOver = this.overTemp.get(key) ?? false;
+    const isOver = celsius >= threshold;
+    this.overTemp.set(key, isOver);
+    if (isOver && !wasOver) {
+      const text = `${label} temperature is ${Math.round(celsius)}°C, at or above the ${threshold}°C alert threshold`;
+      this.activity.log(text, 'amber').catch(() => {});
+      this.notify('NonRAID: temperature alert', text);
+    }
+  }
+
+  private async checkTemperatures(disks: NmdDisk[]): Promise<void> {
+    const settings = await this.settings.get();
+    if (!settings.tempAlerts.enabled) return;
+    const threshold = settings.tempAlerts.warnAboveCelsius;
+
+    this.checkOneTemp('cpu', 'CPU', readCpuTempCelsius(), threshold);
+
+    const devices = disks.filter((d) => d.device && d.device !== 'none').map((d) => d.device);
+    if (devices.length === 0) return;
+    let temps: Record<string, number | null>;
+    try {
+      temps = await this.smart.getTemperatures(devices);
+    } catch {
+      return; // SMART unreachable this round — try again next tick
+    }
+    for (const disk of disks) {
+      if (!disk.device || disk.device === 'none') continue;
+      this.checkOneTemp(disk.device, `Disk ${disk.slot} (${diskLabel(disk)})`, temps[disk.device] ?? null, threshold);
     }
   }
 }

@@ -4,6 +4,26 @@ import type { NmdClient } from '../nmd/index.js';
 import { sendAppriseNotification, type SettingsStore } from '../settings/index.js';
 import type { ShareService } from '../shares/index.js';
 
+/** Shared by paritySchedule and backupSchedule — both are WeeklyOrMonthlySchedule patches. */
+function validateSchedulePatch(fieldName: string, schedule: Record<string, unknown>): void {
+  const { enabled, frequency, dayOfWeek, dayOfMonth, hour } = schedule;
+  if ('enabled' in schedule && typeof enabled !== 'boolean') {
+    throw new Error(`${fieldName}.enabled must be a boolean.`);
+  }
+  if ('frequency' in schedule && frequency !== 'weekly' && frequency !== 'monthly') {
+    throw new Error(`${fieldName}.frequency must be "weekly" or "monthly".`);
+  }
+  if ('dayOfWeek' in schedule && (!Number.isInteger(dayOfWeek) || (dayOfWeek as number) < 0 || (dayOfWeek as number) > 6)) {
+    throw new Error(`${fieldName}.dayOfWeek must be an integer 0–6 (Sunday–Saturday).`);
+  }
+  if ('dayOfMonth' in schedule && (!Number.isInteger(dayOfMonth) || (dayOfMonth as number) < 1 || (dayOfMonth as number) > 28)) {
+    throw new Error(`${fieldName}.dayOfMonth must be an integer 1–28.`);
+  }
+  if ('hour' in schedule && (!Number.isInteger(hour) || (hour as number) < 0 || (hour as number) > 23)) {
+    throw new Error(`${fieldName}.hour must be an integer 0–23.`);
+  }
+}
+
 export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: ActivityStore, shares: ShareService): Router {
   const router = Router();
 
@@ -32,21 +52,28 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
         }
       }
       if (patch.paritySchedule) {
-        const { enabled, frequency, dayOfWeek, dayOfMonth, hour } = patch.paritySchedule;
-        if ('enabled' in patch.paritySchedule && typeof enabled !== 'boolean') {
-          throw new Error('paritySchedule.enabled must be a boolean.');
+        validateSchedulePatch('paritySchedule', patch.paritySchedule);
+      }
+      if (patch.backupSchedule) {
+        validateSchedulePatch('backupSchedule', patch.backupSchedule);
+        const { destDir, retain } = patch.backupSchedule;
+        if ('destDir' in patch.backupSchedule && typeof destDir !== 'string') {
+          throw new Error('backupSchedule.destDir must be a string.');
         }
-        if ('frequency' in patch.paritySchedule && frequency !== 'weekly' && frequency !== 'monthly') {
-          throw new Error('paritySchedule.frequency must be "weekly" or "monthly".');
+        if ('retain' in patch.backupSchedule && (!Number.isInteger(retain) || (retain as number) < 1)) {
+          throw new Error('backupSchedule.retain must be a positive integer.');
         }
-        if ('dayOfWeek' in patch.paritySchedule && (!Number.isInteger(dayOfWeek) || (dayOfWeek as number) < 0 || (dayOfWeek as number) > 6)) {
-          throw new Error('paritySchedule.dayOfWeek must be an integer 0–6 (Sunday–Saturday).');
+      }
+      if (patch.tempAlerts) {
+        const { enabled, warnAboveCelsius } = patch.tempAlerts;
+        if ('enabled' in patch.tempAlerts && typeof enabled !== 'boolean') {
+          throw new Error('tempAlerts.enabled must be a boolean.');
         }
-        if ('dayOfMonth' in patch.paritySchedule && (!Number.isInteger(dayOfMonth) || (dayOfMonth as number) < 1 || (dayOfMonth as number) > 28)) {
-          throw new Error('paritySchedule.dayOfMonth must be an integer 1–28.');
-        }
-        if ('hour' in patch.paritySchedule && (!Number.isInteger(hour) || (hour as number) < 0 || (hour as number) > 23)) {
-          throw new Error('paritySchedule.hour must be an integer 0–23.');
+        if (
+          'warnAboveCelsius' in patch.tempAlerts &&
+          (typeof warnAboveCelsius !== 'number' || !Number.isFinite(warnAboveCelsius) || warnAboveCelsius < 0 || warnAboveCelsius > 100)
+        ) {
+          throw new Error('tempAlerts.warnAboveCelsius must be a number 0–100.');
         }
       }
       const updated = await store.update(patch);

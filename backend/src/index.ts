@@ -33,6 +33,7 @@ import { usersRouter } from './routes/users.js';
 import { SettingsStore } from './settings/index.js';
 import { createShareApplier, ShareAccessStore, ShareService, ShareStore } from './shares/index.js';
 import { createSmartClient, SmartService } from './smart/index.js';
+import { BackupScheduler } from './system/backupScheduler.js';
 import { SystemStatsService } from './system/service.js';
 import { createUsersClient, UsersService } from './users/index.js';
 
@@ -45,6 +46,7 @@ async function main() {
   const settingsStore = new SettingsStore();
   new ActivityWatcher(nmd, smart, activity, settingsStore);
   new ParityScheduler(nmd, settingsStore, activity);
+  new BackupScheduler(nmd, settingsStore, activity);
   const authStore = new AuthStore();
   const authService = new AuthService(authStore);
   await authStore.get(); // fail fast at boot on a corrupt auth.json

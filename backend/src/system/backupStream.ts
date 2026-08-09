@@ -1,16 +1,14 @@
-import { spawn } from 'node:child_process';
+import { createWriteStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { createGzip } from 'node:zlib';
 import type { Response } from 'express';
 import type { ActivityStore } from '../activity/store.js';
+import { config } from '../config.js';
+import type { NmdClient } from '../nmd/index.js';
+import { spawnMaybeSudo } from './procUtil.js';
 
 const STDERR_TAIL_MAX = 4000;
-
-/** Same sudo-wrapping shape as RealNmdClient's runSystem() — this process may not itself have
- *  permission to read a raw block device or root-owned config files, only sudo does. */
-function spawnMaybeSudo(bin: string, args: string[], useSudo: boolean) {
-  return spawn(useSudo ? 'sudo' : bin, useSudo ? [bin, ...args] : args, { stdio: ['ignore', 'pipe', 'pipe'] });
-}
 
 /** A closed 'code' with no 'signal' means a clean exit; anything else means it was killed. */
 function describeExit(code: number | null, signal: NodeJS.Signals | null): string {
@@ -128,4 +126,70 @@ export function streamConfigBackup(paths: string[], useSudo: boolean, res: Respo
   });
 
   activity.log('Config backup started', 'blue').catch(() => {});
+}
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await stat(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The set of config paths worth backing up, filtered to ones that actually exist right now.
+ * Shared by the on-demand download route (routes/system.ts) and BackupScheduler, so both back up
+ * exactly the same things.
+ */
+export async function resolveConfigBackupPaths(nmd: NmdClient): Promise<string[]> {
+  const candidates = [
+    config.smbConfPath,
+    config.exportsPath,
+    '/etc/nonraid',
+    config.authConfigPath,
+    config.sharesConfigPath,
+    config.shareAccessConfigPath,
+    config.settingsConfigPath,
+    config.activityConfigPath,
+    await nmd.getSuperblockPath(),
+  ];
+  const existing = await Promise.all(candidates.map(async (p) => ((await pathExists(p)) ? p : null)));
+  return existing.filter((p): p is string => p !== null);
+}
+
+/**
+ * Non-streaming sibling of streamConfigBackup — writes the same gzip-compressed tar to a file on
+ * disk instead of an HTTP response, for BackupScheduler's unattended runs. Resolves with the byte
+ * count written, rejects with a message built the same way streamConfigBackup's error paths are.
+ */
+export function writeConfigBackupToFile(paths: string[], useSudo: boolean, destPath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const child = spawnMaybeSudo('tar', ['--ignore-failed-read', '-czf', '-', ...paths], useSudo);
+    const out = createWriteStream(destPath);
+    let stderrTail = '';
+    let bytes = 0;
+
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderrTail = (stderrTail + chunk.toString('utf8')).slice(-STDERR_TAIL_MAX);
+    });
+    child.stdout.on('data', (chunk: Buffer) => {
+      bytes += chunk.length;
+    });
+    child.stdout.pipe(out);
+
+    child.on('error', (err) => reject(new Error(`Failed to start config backup: ${err.message}`)));
+    out.on('error', (err) => {
+      if (!child.killed) child.kill();
+      reject(new Error(`Failed to write config backup file: ${err.message}`));
+    });
+
+    child.on('close', (code, signal) => {
+      if (code === 0) {
+        resolve(bytes);
+      } else {
+        reject(new Error(`tar ${describeExit(code, signal)}: ${stderrTail.trim()}`));
+      }
+    });
+  });
 }

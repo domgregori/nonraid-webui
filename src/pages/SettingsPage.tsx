@@ -3,21 +3,12 @@ import { authApi } from '../api/authApi';
 import { nmdApi } from '../api/nmdApi';
 import { settingsApi } from '../api/settingsApi';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
+import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
 import { useSettings } from '../hooks/useSettings';
 import { useSystemStats } from '../hooks/useSystemStats';
 import { useArrayStatus } from '../state/useArrayStatus';
 import { formatMemLabel, formatUptime } from '../utils/format';
-
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
-  value: h,
-  label: h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`,
-}));
-// 1–28 only — every month has at least 28 days, so this sidesteps "the 30th
-// doesn't exist in February" without needing month-length logic, matching
-// backend/src/settings/types.ts's ParitySchedule.dayOfMonth.
-const DAY_OF_MONTH_OPTIONS = Array.from({ length: 28 }, (_, i) => i + 1);
 
 export function SettingsPage() {
   const { settings, loadState, error, saving, saveError, update } = useSettings();
@@ -45,6 +36,21 @@ export function SettingsPage() {
   const [paritySchedHour, setParitySchedHour] = useState(2);
   const [paritySchedSaving, setParitySchedSaving] = useState(false);
 
+  const [tempAlertsEnabled, setTempAlertsEnabled] = useState(false);
+  const [tempAlertsThresholdDraft, setTempAlertsThresholdDraft] = useState('');
+  const [tempAlertsSaving, setTempAlertsSaving] = useState(false);
+  const [tempAlertsError, setTempAlertsError] = useState<string | null>(null);
+
+  const [backupSchedEnabled, setBackupSchedEnabled] = useState(false);
+  const [backupSchedFrequency, setBackupSchedFrequency] = useState<'weekly' | 'monthly'>('weekly');
+  const [backupSchedDay, setBackupSchedDay] = useState(0);
+  const [backupSchedDayOfMonth, setBackupSchedDayOfMonth] = useState(1);
+  const [backupSchedHour, setBackupSchedHour] = useState(3);
+  const [backupDestDirDraft, setBackupDestDirDraft] = useState('');
+  const [backupRetainDraft, setBackupRetainDraft] = useState('7');
+  const [backupSchedSaving, setBackupSchedSaving] = useState(false);
+  const [backupSchedError, setBackupSchedError] = useState<string | null>(null);
+
   const [showImportWizard, setShowImportWizard] = useState(false);
 
   const [currentPasswordDraft, setCurrentPasswordDraft] = useState('');
@@ -62,6 +68,8 @@ export function SettingsPage() {
   const appriseInitialized = useRef(false);
   const minFreeSpaceInitialized = useRef(false);
   const paritySchedInitialized = useRef(false);
+  const tempAlertsInitialized = useRef(false);
+  const backupSchedInitialized = useRef(false);
 
   useEffect(() => {
     if (status && !labelInitialized.current) {
@@ -92,6 +100,27 @@ export function SettingsPage() {
       setParitySchedDayOfMonth(settings.paritySchedule.dayOfMonth);
       setParitySchedHour(settings.paritySchedule.hour);
       paritySchedInitialized.current = true;
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    if (settings && !tempAlertsInitialized.current) {
+      setTempAlertsEnabled(settings.tempAlerts.enabled);
+      setTempAlertsThresholdDraft(String(settings.tempAlerts.warnAboveCelsius));
+      tempAlertsInitialized.current = true;
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    if (settings && !backupSchedInitialized.current) {
+      setBackupSchedEnabled(settings.backupSchedule.enabled);
+      setBackupSchedFrequency(settings.backupSchedule.frequency);
+      setBackupSchedDay(settings.backupSchedule.dayOfWeek);
+      setBackupSchedDayOfMonth(settings.backupSchedule.dayOfMonth);
+      setBackupSchedHour(settings.backupSchedule.hour);
+      setBackupDestDirDraft(settings.backupSchedule.destDir);
+      setBackupRetainDraft(String(settings.backupSchedule.retain));
+      backupSchedInitialized.current = true;
     }
   }, [settings]);
 
@@ -137,6 +166,44 @@ export function SettingsPage() {
       },
     });
     setParitySchedSaving(false);
+  };
+
+  const saveTempAlerts = async () => {
+    const value = Number(tempAlertsThresholdDraft);
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      setTempAlertsError('Enter a temperature between 0 and 100°C.');
+      return;
+    }
+    setTempAlertsSaving(true);
+    setTempAlertsError(null);
+    await update({ tempAlerts: { enabled: tempAlertsEnabled, warnAboveCelsius: value } });
+    setTempAlertsSaving(false);
+  };
+
+  const saveBackupSchedule = async () => {
+    const retain = Number(backupRetainDraft);
+    if (!Number.isInteger(retain) || retain < 1) {
+      setBackupSchedError('Enter a positive whole number for how many backups to keep.');
+      return;
+    }
+    if (backupSchedEnabled && !backupDestDirDraft.trim()) {
+      setBackupSchedError('Enter a destination directory before enabling the schedule.');
+      return;
+    }
+    setBackupSchedSaving(true);
+    setBackupSchedError(null);
+    await update({
+      backupSchedule: {
+        enabled: backupSchedEnabled,
+        frequency: backupSchedFrequency,
+        dayOfWeek: backupSchedDay,
+        dayOfMonth: backupSchedDayOfMonth,
+        hour: backupSchedHour,
+        destDir: backupDestDirDraft.trim(),
+        retain,
+      },
+    });
+    setBackupSchedSaving(false);
   };
 
   const sendTest = async () => {
@@ -270,52 +337,22 @@ export function SettingsPage() {
           />
         </div>
         <div className="settings-field toggle-row--bordered">
+          <ScheduleFields
+            frequency={paritySchedFrequency}
+            onFrequencyChange={setParitySchedFrequency}
+            dayOfWeek={paritySchedDay}
+            onDayOfWeekChange={setParitySchedDay}
+            dayOfMonth={paritySchedDayOfMonth}
+            onDayOfMonthChange={setParitySchedDayOfMonth}
+            hour={paritySchedHour}
+            onHourChange={setParitySchedHour}
+            disabled={!settings}
+          />
           <div className="settings-field__row">
-            <select
-              className="history-input"
-              value={paritySchedFrequency}
-              onChange={(e) => setParitySchedFrequency(e.target.value as 'weekly' | 'monthly')}
-              disabled={!settings}
-            >
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </select>
-            {paritySchedFrequency === 'weekly' ? (
-              <select className="history-input" value={paritySchedDay} onChange={(e) => setParitySchedDay(Number(e.target.value))} disabled={!settings}>
-                {DAY_NAMES.map((day, i) => (
-                  <option key={day} value={i}>
-                    {day}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <select
-                className="history-input"
-                value={paritySchedDayOfMonth}
-                onChange={(e) => setParitySchedDayOfMonth(Number(e.target.value))}
-                disabled={!settings}
-              >
-                {DAY_OF_MONTH_OPTIONS.map((day) => (
-                  <option key={day} value={day}>
-                    Day {day}
-                  </option>
-                ))}
-              </select>
-            )}
-            <select className="history-input" value={paritySchedHour} onChange={(e) => setParitySchedHour(Number(e.target.value))} disabled={!settings}>
-              {HOUR_OPTIONS.map((h) => (
-                <option key={h.value} value={h.value}>
-                  {h.label}
-                </option>
-              ))}
-            </select>
             <button type="button" className="btn" disabled={paritySchedSaving || !settings} onClick={saveParitySchedule}>
               {paritySchedSaving ? 'Saving…' : 'Save'}
             </button>
           </div>
-          {paritySchedFrequency === 'monthly' && (
-            <div className="toggle-row__desc">Only days 1–28 are offered, so every month always has a matching date.</div>
-          )}
         </div>
       </div>
 
@@ -358,6 +395,68 @@ export function SettingsPage() {
             </button>
           </div>
           {minFreeSpaceError && <div className="status-note status-note--error">{minFreeSpaceError}</div>}
+        </div>
+      </div>
+
+      <div className="settings-card">
+        <div className="settings-card__title">Backups</div>
+        <div className="toggle-row">
+          <div>
+            <div className="toggle-row__title">Automatic config backup</div>
+            <div className="toggle-row__desc">
+              Writes a config backup (Samba/NFS config, this app's settings/shares/users, the array superblock) on
+              the schedule below. Point this at a directory on the array, not the boot disk — the whole point is
+              surviving a boot disk failure.
+            </div>
+          </div>
+          <ToggleSwitch on={backupSchedEnabled} onToggle={() => setBackupSchedEnabled((v) => !v)} label="Automatic config backup" disabled={!settings} />
+        </div>
+        <div className="settings-field toggle-row--bordered">
+          <ScheduleFields
+            frequency={backupSchedFrequency}
+            onFrequencyChange={setBackupSchedFrequency}
+            dayOfWeek={backupSchedDay}
+            onDayOfWeekChange={setBackupSchedDay}
+            dayOfMonth={backupSchedDayOfMonth}
+            onDayOfMonthChange={setBackupSchedDayOfMonth}
+            hour={backupSchedHour}
+            onHourChange={setBackupSchedHour}
+            disabled={!settings}
+          />
+          <div className="toggle-row__title" style={{ marginTop: 10 }}>
+            Destination directory
+          </div>
+          <div className="settings-field__row">
+            <input
+              className="history-input"
+              style={{ width: '100%' }}
+              value={backupDestDirDraft}
+              onChange={(e) => setBackupDestDirDraft(e.target.value)}
+              placeholder="/mnt/user/backups"
+              disabled={!settings}
+            />
+          </div>
+          <div className="toggle-row__title" style={{ marginTop: 10 }}>
+            Keep last
+          </div>
+          <div className="settings-field__row">
+            <input
+              className="history-input"
+              type="number"
+              min={1}
+              step={1}
+              value={backupRetainDraft}
+              onChange={(e) => setBackupRetainDraft(e.target.value)}
+              disabled={!settings}
+            />
+            <span className="toggle-row__desc">backups — older ones are pruned automatically.</span>
+          </div>
+          <div className="settings-field__row">
+            <button type="button" className="btn" disabled={backupSchedSaving || !settings} onClick={saveBackupSchedule}>
+              {backupSchedSaving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+          {backupSchedError && <div className="status-note status-note--error">{backupSchedError}</div>}
         </div>
       </div>
 
@@ -405,6 +504,36 @@ export function SettingsPage() {
           </div>
           {testResult && <div className="status-note">{testResult}</div>}
           {testError && <div className="status-note status-note--error">{testError}</div>}
+        </div>
+
+        <div className="toggle-row toggle-row--bordered">
+          <div>
+            <div className="toggle-row__title">Temperature alerts</div>
+            <div className="toggle-row__desc">
+              Notify when the CPU or any array disk reaches this temperature. Fires once when it's crossed, not on
+              every check while it stays high.
+            </div>
+          </div>
+          <ToggleSwitch on={tempAlertsEnabled} onToggle={() => setTempAlertsEnabled((v) => !v)} label="Temperature alerts" disabled={!settings} />
+        </div>
+        <div className="settings-field">
+          <div className="settings-field__row">
+            <input
+              className="history-input"
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={tempAlertsThresholdDraft}
+              onChange={(e) => setTempAlertsThresholdDraft(e.target.value)}
+              disabled={!settings}
+            />
+            <span className="toggle-row__desc">°C</span>
+            <button type="button" className="btn" disabled={tempAlertsSaving || !settings} onClick={saveTempAlerts}>
+              {tempAlertsSaving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+          {tempAlertsError && <div className="status-note status-note--error">{tempAlertsError}</div>}
         </div>
       </div>
 
