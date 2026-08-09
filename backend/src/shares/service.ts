@@ -207,6 +207,12 @@ export class ShareService {
       // *old* share's own disk list — the data lives wherever it was
       // actually assigned before, not wherever the new config points.
       await this.moveShareData(existing, share.name, ctx);
+      // unmountShare() above only unmounts the old name's mountpoint — the now-empty directory
+      // itself (e.g. /mnt/user/<old-name>) is left behind, since nothing else ever removes it.
+      // Confirmed live: it lingers indefinitely, showing up as a stray empty folder in Browse,
+      // accumulating with every further rename. Best-effort, matching removeMountPointWithData()'s
+      // own cleanup — the rename itself is already done by this point either way.
+      await rm(path.join(config.shareMountRoot, name), { recursive: true, force: true }).catch(() => {});
       await this.store.remove(name);
       await this.renameAccess(name, share.name);
     }
