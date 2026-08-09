@@ -29,9 +29,10 @@ export interface SystemStats {
   memTotalBytes: number;
   // Short git commit hash the running backend was built from, or null when
   // not run from a git checkout (e.g. a packaged deployment with no .git).
-  // package.json's own "version" is a static "0.0.0" that's never bumped in
-  // this project, so it wouldn't tell an admin anything useful.
   buildVersion: string | null;
+  // Semantic version — see version.ts. Bumped by hand alongside package.json on release, not read
+  // from package.json at runtime (a packaged deployment doesn't necessarily have that file).
+  version: string;
   // The disk nonraid-webui itself runs from — not part of the array. null
   // when detection fails (unusual root filesystem setup, lsblk missing,
   // etc.) — never blocks the rest of this endpoint, same as buildVersion

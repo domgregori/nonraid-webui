@@ -24,6 +24,7 @@ export interface SystemStats {
   memUsedBytes: number;
   memTotalBytes: number;
   buildVersion: string | null;
+  version: string;
   bootDisk: BootDiskInfo | null;
   networkInterfaces: NetworkInterfaceInfo[];
 }

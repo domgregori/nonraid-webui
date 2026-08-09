@@ -10,6 +10,7 @@ import { ToggleSwitch } from '../components/shared/ToggleSwitch';
 import { useSettings } from '../hooks/useSettings';
 import { useSystemStats } from '../hooks/useSystemStats';
 import { type ThemePreference, useTheme } from '../hooks/useTheme';
+import { deriveProtection } from '../selectors/status';
 import { useArrayStatus } from '../state/useArrayStatus';
 import type { NotificationEventType } from '../types/settingsApi';
 import { formatMemLabel, formatUptime } from '../utils/format';
@@ -326,7 +327,7 @@ export function SettingsPage() {
           <InfoRow label="CPU" value={stats ? `${Math.round(stats.cpuPercent)}%` : '—'} />
           <InfoRow label="Memory" value={stats ? formatMemLabel(stats.memUsedBytes, stats.memTotalBytes) : '—'} />
           <InfoRow label="Array label" value={status?.array.label || '(unset)'} />
-          <InfoRow label="Array health" value={status?.array.health.status ?? '—'} />
+          <InfoRow label="Array health" value={status ? deriveProtection(status).short : '—'} />
           <InfoRow
             label="Array size"
             value={
@@ -336,7 +337,7 @@ export function SettingsPage() {
             }
           />
           <InfoRow label="Superblock" value={status?.array.superblock ?? '—'} mono />
-          <InfoRow label="Build" value={stats?.buildVersion ?? 'unknown'} mono />
+          <InfoRow label="Version" value={stats ? `v${stats.version}${stats.buildVersion ? ` (${stats.buildVersion})` : ''}` : '—'} mono />
         </div>
 
         <div className="settings-field toggle-row--bordered">

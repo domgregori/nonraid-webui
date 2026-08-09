@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
 import type { SmartService } from '../smart/service.js';
+import { VERSION } from '../version.js';
 import { readCpuTempCelsius } from './cpuTemp.js';
 import type { BootDiskInfo, NetworkInterfaceInfo, SystemStats } from './types.js';
 
@@ -198,6 +199,7 @@ export class SystemStatsService {
       memUsedBytes: memTotalBytes - memFreeBytes,
       memTotalBytes,
       buildVersion: this.buildVersion,
+      version: VERSION,
       bootDisk: this.bootDisk,
       networkInterfaces: getNetworkInterfaces(),
     };
