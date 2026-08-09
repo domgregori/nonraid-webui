@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { authApi } from '../api/authApi';
+import { dockerApi } from '../api/dockerApi';
+import { lxcApi } from '../api/lxcApi';
 import { nmdApi } from '../api/nmdApi';
 import { settingsApi } from '../api/settingsApi';
 import { systemApi } from '../api/systemApi';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
 import { NotificationEventToggles } from '../components/settings/NotificationEventToggles';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
+import { StorageLocationField } from '../components/settings/StorageLocationField';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
 import { useSettings } from '../hooks/useSettings';
 import { useSystemStats } from '../hooks/useSystemStats';
@@ -20,6 +23,7 @@ export function SettingsPage() {
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const stats = useSystemStats();
   const { status } = useArrayStatus();
+  const dataDisks = (status?.disks ?? []).filter((d) => d.type === 'data').map((d) => ({ slot: d.slot, label: `Disk ${d.slot}` }));
 
   const [labelDraft, setLabelDraft] = useState('');
   const [labelResult, setLabelResult] = useState<string | null>(null);
@@ -466,6 +470,24 @@ export function SettingsPage() {
             <div className="toggle-row__desc toggle-row__desc--mono">{status?.array.superblock ?? '—'}</div>
           </div>
         </div>
+      </div>
+
+      <div className="settings-card">
+        <div className="settings-card__title">Docker &amp; LXC Storage</div>
+        <StorageLocationField
+          title="Docker"
+          desc="Where Docker images and containers are stored."
+          dataDisks={dataDisks}
+          getStorage={dockerApi.getStorage}
+          moveStorage={dockerApi.moveStorage}
+        />
+        <StorageLocationField
+          title="LXC"
+          desc="Where LXC container storage lives."
+          dataDisks={dataDisks}
+          getStorage={lxcApi.getStorage}
+          moveStorage={lxcApi.moveStorage}
+        />
       </div>
 
       <div className="settings-card">

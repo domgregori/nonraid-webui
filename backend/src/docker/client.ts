@@ -15,4 +15,8 @@ export interface DockerClient {
   removeContainer(id: string, options?: { force?: boolean }): Promise<DockerCommandResult>;
   createContainer(options: CreateContainerOptions, onProgress?: CreateContainerProgressCallback): Promise<DockerCommandResult>;
   getContainerLogs(id: string, tail?: number): Promise<string>;
+  // The daemon's actual configured storage root (Docker Engine API's `DockerRootDir`) — the one
+  // source of truth for "where does Docker actually keep its data", since this app doesn't manage
+  // that path itself (see docker/storagePath.ts).
+  getDataRoot(): Promise<string>;
 }

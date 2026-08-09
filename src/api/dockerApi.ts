@@ -8,6 +8,7 @@ import type {
   ManualContainerPlan,
   ManualContainerRequest,
 } from '../types/dockerApi';
+import type { DockerStorageInfo, StorageLocation, StoragePathProgress, StoragePathResult } from '../types/storagePath';
 
 export const dockerApi = {
   listContainers: () => request<DockerContainerSummary[]>('/api/docker/containers'),
@@ -35,4 +36,11 @@ export const dockerApi = {
     ),
   getContainerLogs: (id: string, tail?: number) =>
     request<{ logs: string }>(`/api/docker/containers/${id}/logs${tail ? `?tail=${tail}` : ''}`),
+  getStorage: () => request<DockerStorageInfo>('/api/docker/storage'),
+  moveStorage: (target: StorageLocation, onProgress: (p: StoragePathProgress) => void) =>
+    streamNdjson<StoragePathProgress, StoragePathResult>(
+      '/api/docker/storage',
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(target) },
+      onProgress,
+    ),
 };

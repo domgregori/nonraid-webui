@@ -8,6 +8,7 @@ import type {
   LxcContainerSummary,
   LxcDistrosResponse,
 } from '../types/lxcApi';
+import type { LxcStorageInfo, StorageLocation, StoragePathProgress, StoragePathResult } from '../types/storagePath';
 
 export const lxcApi = {
   listContainers: () => request<LxcContainerSummary[]>('/api/lxc/containers'),
@@ -38,6 +39,13 @@ export const lxcApi = {
     streamNdjson<CreateLxcProgress, LxcCommandResult>(
       '/api/lxc/containers',
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
+      onProgress,
+    ),
+  getStorage: () => request<LxcStorageInfo>('/api/lxc/storage'),
+  moveStorage: (target: StorageLocation, onProgress: (p: StoragePathProgress) => void) =>
+    streamNdjson<StoragePathProgress, StoragePathResult>(
+      '/api/lxc/storage',
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(target) },
       onProgress,
     ),
 };

@@ -37,6 +37,15 @@ export interface TempAlertSettings {
   warnAboveCelsius: number;
 }
 
+// Where LXC container storage lives — the one thing this app needs to remember about it, since
+// config.lxcDefaultPath (the -P flag every lxc-* call gets) has no other source of truth and must
+// survive an app restart. Docker's equivalent isn't persisted here at all — its real storage root
+// lives in /etc/docker/daemon.json, so that file is read live instead (see docker/storagePath.ts).
+export interface StorageLocation {
+  mode: 'boot' | 'array';
+  diskSlot: number | null; // meaningful only when mode === 'array'
+}
+
 export interface AppSettings {
   // Desired state for the array's write method (nmdctl's md_write_method /
   // "turbo write") — see nmd/client.ts's setWriteMethod doc comment for why
@@ -52,6 +61,7 @@ export interface AppSettings {
   paritySchedule: ParitySchedule;
   backupSchedule: BackupSchedule;
   tempAlerts: TempAlertSettings;
+  lxcStorage: StorageLocation;
 }
 
 export type AppSettingsUpdate = Partial<{
@@ -63,4 +73,5 @@ export type AppSettingsUpdate = Partial<{
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<BackupSchedule>;
   tempAlerts: Partial<TempAlertSettings>;
+  lxcStorage: Partial<StorageLocation>;
 }>;

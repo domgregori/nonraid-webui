@@ -11,6 +11,7 @@ const DEFAULTS: AppSettings = {
   paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2 },
   backupSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3, destDir: '', retain: 7 },
   tempAlerts: { enabled: false, warnAboveCelsius: 55 },
+  lxcStorage: { mode: 'boot', diskSlot: null },
 };
 
 /**
@@ -33,6 +34,7 @@ export class SettingsStore {
       paritySchedule: { ...settings.paritySchedule },
       backupSchedule: { ...settings.backupSchedule },
       tempAlerts: { ...settings.tempAlerts },
+      lxcStorage: { ...settings.lxcStorage },
     };
   }
 
@@ -50,6 +52,7 @@ export class SettingsStore {
         paritySchedule: { ...current.paritySchedule, ...patch.paritySchedule },
         backupSchedule: { ...current.backupSchedule, ...patch.backupSchedule },
         tempAlerts: { ...current.tempAlerts, ...patch.tempAlerts },
+        lxcStorage: { ...current.lxcStorage, ...patch.lxcStorage },
       };
       await this.persistAtomic(next);
     });
@@ -72,6 +75,7 @@ export class SettingsStore {
         paritySchedule: { ...DEFAULTS.paritySchedule, ...parsed.paritySchedule },
         backupSchedule: { ...DEFAULTS.backupSchedule, ...parsed.backupSchedule },
         tempAlerts: { ...DEFAULTS.tempAlerts, ...parsed.tempAlerts },
+        lxcStorage: { ...DEFAULTS.lxcStorage, ...parsed.lxcStorage },
       };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {

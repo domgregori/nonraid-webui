@@ -10,6 +10,7 @@ import { config } from './config.js';
 import { createDockerClient } from './docker/index.js';
 import { EmptyDiskService } from './emptyDisk/index.js';
 import { createLxcClient } from './lxc/index.js';
+import { resolveLxcPath } from './lxc/storagePath.js';
 import { MetricsSampler, MetricsService, openMetricsDb } from './metrics/index.js';
 import { createNmdClient } from './nmd/index.js';
 import { ParityScheduler } from './parity/index.js';
@@ -79,6 +80,13 @@ async function main() {
     await nmd.setWriteMethod(true).catch(() => {});
   }
 
+  // config.lxcDefaultPath (the -P flag every lxc-* call gets) has no other source of truth, unlike
+  // Docker's own daemon.json — reapply a persisted relocation now, before anything handles a
+  // request, so it survives this app's own restart (see lxc/storagePath.ts).
+  if (persistedSettings.lxcStorage.mode === 'array') {
+    config.lxcDefaultPath = resolveLxcPath(persistedSettings.lxcStorage);
+  }
+
   // Share mounts live in the OS mount table, not shares.json, so they don't
   // survive a backend restart/reboot on their own — reapply them now so
   // /mnt/user/<name> reflects real disk data again instead of staying an
@@ -133,8 +141,8 @@ async function main() {
   app.use('/api', settingsRouter(settingsStore, nmd, activity, shares));
   app.use('/api', disksRouter(nmd, smart, activity, settingsStore));
   app.use('/api', emptyDiskRouter(emptyDisk, activity));
-  app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity));
-  app.use('/api', lxcRouter(lxc, activity));
+  app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity, nmd));
+  app.use('/api', lxcRouter(lxc, activity, nmd, settingsStore));
   app.use('/api', metricsRouter(metrics));
   app.use('/api', smartRouter(nmd, smart, system));
   app.use('/api', sharesRouter(shares));

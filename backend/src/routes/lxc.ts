@@ -3,6 +3,10 @@ import type { ActivityStore } from '../activity/index.js';
 import { HttpError } from '../httpError.js';
 import { DEFAULT_ARCH } from '../lxc/distros.js';
 import type { CreateLxcContainerOptions, LxcClient } from '../lxc/index.js';
+import { getCurrentLxcStorage, migrateLxcStorage } from '../lxc/storagePath.js';
+import type { NmdClient } from '../nmd/index.js';
+import type { SettingsStore } from '../settings/index.js';
+import type { StorageLocation } from '../settings/types.js';
 
 // Container names become directory names under lxcDefaultPath
 // (`<lxcDefaultPath>/<name>/`) and are interpolated into config-file paths
@@ -29,8 +33,47 @@ function requireNoLineBreaks(field: string, value: string): string {
   return value;
 }
 
-export function lxcRouter(lxc: LxcClient, activity: ActivityStore): Router {
+function parseStorageLocation(body: unknown): StorageLocation {
+  const mode = (body as { mode?: unknown })?.mode;
+  if (mode !== 'boot' && mode !== 'array') {
+    throw new HttpError(400, 'mode must be "boot" or "array".');
+  }
+  if (mode === 'boot') return { mode, diskSlot: null };
+  const diskSlot = (body as { diskSlot?: unknown })?.diskSlot;
+  if (typeof diskSlot !== 'number' || !Number.isInteger(diskSlot) || diskSlot < 0) {
+    throw new HttpError(400, 'diskSlot is required and must be a non-negative integer when mode is "array".');
+  }
+  return { mode, diskSlot };
+}
+
+export function lxcRouter(lxc: LxcClient, activity: ActivityStore, nmd: NmdClient, settingsStore: SettingsStore): Router {
   const router = Router();
+
+  router.get('/lxc/storage', async (_req, res) => {
+    try {
+      res.json(await getCurrentLxcStorage(settingsStore));
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  // Streams newline-delimited JSON progress events, same protocol as container creation below —
+  // stopping containers, copying potentially many GB, and restarting them can take a while.
+  router.post('/lxc/storage', async (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' });
+    const send = (event: object) => res.write(`${JSON.stringify(event)}\n`);
+    try {
+      const target = parseStorageLocation(req.body);
+      const result = await migrateLxcStorage(target, { nmd, lxc, settingsStore }, (progress) => send({ type: 'progress', ...progress }));
+      activity.log(`LXC storage moved to ${result.path}`, 'blue').catch(() => {});
+      send({ type: 'done', result });
+    } catch (err) {
+      const message = err instanceof HttpError ? err.message : (err as Error).message;
+      send({ type: 'error', message });
+    } finally {
+      res.end();
+    }
+  });
 
   router.get('/lxc/containers', async (_req, res) => {
     try {

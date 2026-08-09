@@ -4,10 +4,52 @@ import { resolveWebUiTemplate } from '../apps/webUi.js';
 import type { ActivityStore } from '../activity/index.js';
 import type { DockerClient, DockerContainerSummary } from '../docker/index.js';
 import { buildManualPlan } from '../docker/manualPlan.js';
+import { getCurrentDockerStorage, migrateDockerStorage } from '../docker/storagePath.js';
 import { HttpError } from '../httpError.js';
+import type { NmdClient } from '../nmd/index.js';
+import type { StorageLocation } from '../settings/types.js';
 
-export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: AppsService, activity: ActivityStore): Router {
+function parseStorageLocation(body: unknown): StorageLocation {
+  const mode = (body as { mode?: unknown })?.mode;
+  if (mode !== 'boot' && mode !== 'array') {
+    throw new HttpError(400, 'mode must be "boot" or "array".');
+  }
+  if (mode === 'boot') return { mode, diskSlot: null };
+  const diskSlot = (body as { diskSlot?: unknown })?.diskSlot;
+  if (typeof diskSlot !== 'number' || !Number.isInteger(diskSlot) || diskSlot < 0) {
+    throw new HttpError(400, 'diskSlot is required and must be a non-negative integer when mode is "array".');
+  }
+  return { mode, diskSlot };
+}
+
+export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: AppsService, activity: ActivityStore, nmd: NmdClient): Router {
   const router = Router();
+
+  router.get('/docker/storage', async (_req, res) => {
+    try {
+      res.json(await getCurrentDockerStorage(docker));
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  // Streams newline-delimited JSON progress events, same protocol as container creation below —
+  // stopping the Docker service, copying potentially many GB, and restarting it can take a while.
+  router.post('/docker/storage', async (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' });
+    const send = (event: object) => res.write(`${JSON.stringify(event)}\n`);
+    try {
+      const target = parseStorageLocation(req.body);
+      const result = await migrateDockerStorage(target, { nmd, docker }, (progress) => send({ type: 'progress', ...progress }));
+      activity.log(`Docker storage moved to ${result.path}`, 'blue').catch(() => {});
+      send({ type: 'done', result });
+    } catch (err) {
+      const message = err instanceof HttpError ? err.message : (err as Error).message;
+      send({ type: 'error', message });
+    } finally {
+      res.end();
+    }
+  });
 
   // The Docker layer itself has no notion of CA templates (kept as a clean
   // dependency direction — Apps depends on Docker, not the reverse), so a
