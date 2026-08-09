@@ -14,6 +14,19 @@ import type {
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * NmdDisk.device (from nmdctl status) is a bare name like "sda1" — every other caller in this
+ * codebase that needs a real path prepends /dev/ itself (see realClient.ts's own `add` command
+ * construction). This one didn't, so smartctl got literally "sda1" and failed outright
+ * ("Smartctl open device: sda1 failed: No such device") — confirmed live, every array disk's
+ * temperature/health/attributes silently came back null everywhere (live UI and history both).
+ * The boot disk's own identity (SystemStatsService) already resolves a full /dev/-prefixed path,
+ * so this has to be idempotent rather than a blind prepend, to stay correct for both callers.
+ */
+function devicePath(device: string): string {
+  return device.startsWith('/dev/') ? device : `/dev/${device}`;
+}
+
 interface SmartctlAtaAttributeFlags {
   value?: number;
   prefailure?: boolean;
@@ -205,7 +218,7 @@ export class RealSmartClient implements SmartClient {
 
   private async run(device: string): Promise<SmartctlJson> {
     // -n standby: don't spin up a sleeping disk just to check its temperature.
-    const args = ['-n', 'standby', '--json', '-a', device];
+    const args = ['-n', 'standby', '--json', '-a', devicePath(device)];
     const bin = config.smartUseSudo ? 'sudo' : config.smartctlBin;
     const fullArgs = config.smartUseSudo ? [config.smartctlBin, ...args] : args;
 
@@ -284,7 +297,7 @@ export class RealSmartClient implements SmartClient {
   }
 
   async startSelfTest(device: string, type: SelfTestType): Promise<void> {
-    const args = ['-t', type, device];
+    const args = ['-t', type, devicePath(device)];
     const bin = config.smartUseSudo ? 'sudo' : config.smartctlBin;
     const fullArgs = config.smartUseSudo ? [config.smartctlBin, ...args] : args;
     try {
