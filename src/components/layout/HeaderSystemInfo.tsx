@@ -11,6 +11,7 @@ export function HeaderSystemInfo() {
     ? `${deriveCapacity(deriveDisks(status, temps).data, status.array.state === 'STARTED').freeLabel} free`
     : '—';
   const memPct = stats ? Math.round((stats.memUsedBytes / stats.memTotalBytes) * 100) : null;
+  const cpuTempLabel = typeof stats?.cpuTempCelsius === 'number' ? ` (${Math.round(stats.cpuTempCelsius)}°C)` : '';
 
   return (
     <div className="header__info">
@@ -20,7 +21,9 @@ export function HeaderSystemInfo() {
       <span className="header__info-divider">·</span>
       <span className="header__info-item">{freeLabel}</span>
       <span className="header__info-divider">·</span>
-      <span className="header__info-item">CPU {stats ? Math.round(stats.cpuPercent) : '—'}%</span>
+      <span className="header__info-item">
+        CPU {stats ? Math.round(stats.cpuPercent) : '—'}%{cpuTempLabel}
+      </span>
       <span className="header__info-divider">·</span>
       <span className="header__info-item">Mem {memPct ?? '—'}%</span>
     </div>

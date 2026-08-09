@@ -12,6 +12,7 @@ export interface SystemStats {
   hostname: string;
   uptimeSeconds: number;
   cpuPercent: number;
+  cpuTempCelsius: number | null;
   memUsedBytes: number;
   memTotalBytes: number;
   buildVersion: string | null;

@@ -11,6 +11,10 @@ export interface SystemStats {
   hostname: string;
   uptimeSeconds: number;
   cpuPercent: number;
+  // Best-effort package temperature from the kernel's hwmon sysfs interface.
+  // null when no recognized CPU temp driver is present (containers, VMs,
+  // unusual hardware) — see cpuTemp.ts.
+  cpuTempCelsius: number | null;
   memUsedBytes: number;
   memTotalBytes: number;
   // Short git commit hash the running backend was built from, or null when

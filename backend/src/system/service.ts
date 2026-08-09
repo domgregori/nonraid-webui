@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
 import type { SmartService } from '../smart/service.js';
+import { readCpuTempCelsius } from './cpuTemp.js';
 import type { BootDiskInfo, SystemStats } from './types.js';
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -166,6 +167,7 @@ export class SystemStatsService {
       hostname: os.hostname(),
       uptimeSeconds: os.uptime(),
       cpuPercent: Math.round(this.cpuPercent * 10) / 10,
+      cpuTempCelsius: readCpuTempCelsius(),
       memUsedBytes: memTotalBytes - memFreeBytes,
       memTotalBytes,
       buildVersion: this.buildVersion,
