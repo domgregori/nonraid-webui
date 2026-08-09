@@ -1,9 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { smartApi } from '../../api/smartApi';
 import { useAvailableDevices } from '../../hooks/useAvailableDevices';
+import { COLORS } from '../../styles/colors';
 import type { AvailableDevice } from '../../types/nmdApi';
 import { formatBytesHuman } from '../../utils/format';
 import { Card } from '../shared/Card';
 import { AddDiskDialog } from './AddDiskDialog';
+
+/** Fetched per row on mount — unassigned devices have no array-wide poll to piggyback on, and
+ *  there are normally only a handful of them, so one on-demand call each is cheap enough. */
+function HealthDot({ device }: { device: string }) {
+  const [health, setHealth] = useState<'passed' | 'failed' | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    smartApi
+      .getAttributesByDevice(device)
+      .then((attrs) => {
+        if (alive) setHealth(attrs?.health ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [device]);
+
+  const color = health === 'failed' ? COLORS.red : health === 'passed' ? COLORS.green : COLORS.textDim;
+  return <span className="disk-card__health-dot" style={{ background: color, display: 'inline-block' }} title={`SMART: ${health ?? 'unknown'}`} />;
+}
 
 export function UnassignedDevicesCard() {
   const { devices, status, error, refresh } = useAvailableDevices();
@@ -27,9 +51,14 @@ export function UnassignedDevicesCard() {
           {devices.map((d) => (
             <div key={d.device} className="unassigned-device-row">
               <div>
-                <div className="unassigned-device-row__name">{d.model ?? 'Unknown drive'}</div>
+                <div className="unassigned-device-row__name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <HealthDot device={d.device} />
+                  {d.model ?? 'Unknown drive'}
+                </div>
                 <div className="unassigned-device-row__meta">
                   {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : 'unknown size'}
+                  {d.isSSD !== null ? ` · ${d.isSSD ? 'SSD' : 'HDD'}` : ''}
+                  {d.diskId ? ` · ${d.diskId}` : ''}
                   {d.uuid ? ` · ${d.uuid}` : ' · no filesystem'}
                   {d.locked ? ' · locked' : ''}
                 </div>

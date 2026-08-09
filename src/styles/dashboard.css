@@ -235,6 +235,15 @@
   height: 7px;
 }
 
+/* SMART self-assessment, distinct from the driver-status dot above — a disk can be DISK_OK while
+   SMART already reports failing, so this needs its own marker rather than folding into the same one. */
+.disk-card__health-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
 .disk-card__device {
   margin-top: 6px;
   font-size: 11px;

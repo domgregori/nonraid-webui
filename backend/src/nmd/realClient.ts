@@ -4,6 +4,7 @@ import { readFile, rmdir, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
+import { getDiskType } from '../system/diskType.js';
 import type { NmdClient } from './client.js';
 import type { AddDiskResult, AvailableDevice, ImportResult, NmdCommandResult, NmdStatusResponse, ParityCheckAction } from './types.js';
 
@@ -586,7 +587,9 @@ export class RealNmdClient implements NmdClient {
       uuid = null;
     }
 
-    return { device: dev, partition, sizeKb, diskId, model, uuid, locked };
+    const isSSD = await getDiskType(dev);
+
+    return { device: dev, partition, sizeKb, diskId, model, uuid, locked, isSSD };
   }
 
   /** Every currently-visible block device path this app is willing to consider — shared by listAvailableDevices() and findDeviceByDiskId(). */

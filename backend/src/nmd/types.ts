@@ -140,6 +140,7 @@ export interface AvailableDevice {
   model: string | null; // udevadm ID_MODEL — the drive's own reported product name
   uuid: string | null; // filesystem UUID of the partition (or whole device, if unpartitioned) — null if unformatted
   locked: boolean; // exclusive-open failed — device likely in use by another process
+  isSSD: boolean | null; // lsblk's ROTA flag — null if undetectable
 }
 
 export interface AddDiskResult {

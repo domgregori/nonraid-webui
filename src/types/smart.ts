@@ -2,6 +2,7 @@
 
 export type SelfTestType = 'short' | 'long' | 'conveyance';
 export type SelfTestState = 'idle' | 'running' | 'passed' | 'failed' | 'aborted' | 'unknown';
+export type SmartSpinState = 'active' | 'standby' | 'unknown';
 
 export interface SelfTestStatus {
   state: SelfTestState;
@@ -52,9 +53,12 @@ export interface SmartAttributes {
   device: string;
   model: string | null;
   serial: string | null;
+  wwn: string | null;
   capacityBytes: number | null;
   health: 'passed' | 'failed' | null;
   temperature: number | null;
+  rotationRpm: number | null;
+  spinState: SmartSpinState;
   powerOnHours: number | null;
   powerCycleCount: number | null;
   reallocatedSectors: number | null;

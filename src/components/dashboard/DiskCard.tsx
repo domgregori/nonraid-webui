@@ -26,6 +26,7 @@ export function ParityDiskCard({ disk, onClick }: DiskCardProps) {
       <div className="disk-card__head">
         <span className="disk-card__label">{disk.label}</span>
         <span className="disk-card__status" style={{ color: disk.statusColor }}>
+          <span className="disk-card__health-dot" style={{ background: disk.healthColor }} title={`SMART: ${disk.health ?? 'unknown'}`} />
           <span className="disk-card__status-dot" style={{ background: disk.statusColor }} />
           {disk.statusLabel}
         </span>
@@ -70,7 +71,10 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
     <div className="disk-card disk-card--data" style={{ borderColor: disk.borderColor }} onClick={onClick}>
       <div className="disk-card__head">
         <span className="disk-card__label">{disk.label}</span>
-        <span className="disk-card__status-dot" style={{ background: disk.statusColor }} />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span className="disk-card__health-dot" style={{ background: disk.healthColor }} title={`SMART: ${disk.health ?? 'unknown'}`} />
+          <span className="disk-card__status-dot" style={{ background: disk.statusColor }} />
+        </span>
       </div>
       <div className="disk-card__device">{disk.device}</div>
       <div className="progress-track">
@@ -81,7 +85,7 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
         <span>{disk.usedLabel}</span>
       </div>
       <div className="disk-card__row--sub">
-        <span>{disk.fsType}</span>
+        <span>{disk.typeLabel}</span>
         <span style={{ color: disk.tempColor }}>{disk.tempLabel}</span>
       </div>
     </div>

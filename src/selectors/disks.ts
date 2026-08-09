@@ -28,7 +28,13 @@ function normalize(value: string | undefined): string {
   return value && value !== '-' ? value : '—';
 }
 
-export function deriveDisk(disk: NmdDisk, arrayStarted: boolean, tempC: number | null | undefined): DiskViewModel {
+export function deriveDisk(
+  disk: NmdDisk,
+  arrayStarted: boolean,
+  tempC: number | null | undefined,
+  health: 'passed' | 'failed' | null | undefined,
+  isSSD: boolean | null | undefined,
+): DiskViewModel {
   const role: 'parity' | 'data' = disk.type === 'P' || disk.type === 'Q' ? 'parity' : 'data';
   const label = disk.type === 'P' ? 'Parity 1' : disk.type === 'Q' ? 'Parity 2' : `Disk ${disk.slot}`;
 
@@ -75,16 +81,22 @@ export function deriveDisk(disk: NmdDisk, arrayStarted: boolean, tempC: number |
     barWidth: `${usedPct}%`,
     barColor: usedPct >= 90 ? COLORS.red : usedPct >= 75 ? COLORS.amber : COLORS.blue,
     borderColor: status === 'missing' ? COLORS.red : status === 'standby' ? COLORS.border : COLORS.borderLit,
+    health: health ?? null,
+    healthColor: health === 'failed' ? COLORS.red : health === 'passed' ? COLORS.green : COLORS.textDim,
+    isSSD: isSSD ?? null,
+    typeLabel: isSSD === true ? 'SSD' : isSSD === false ? 'HDD' : '—',
   };
 }
 
 export function deriveDisks(
   status: NmdStatusResponse,
   temps: Record<string, number | null>,
+  diskHealths: Record<string, 'passed' | 'failed' | null> = {},
+  diskTypes: Record<string, boolean | null> = {},
 ): { parity: DiskViewModel[]; data: DiskViewModel[]; all: DiskViewModel[] } {
   const arrayStarted = status.array.state === 'STARTED';
   const sorted = [...status.disks].sort((a, b) => a.slot - b.slot);
-  const all = sorted.map((d) => deriveDisk(d, arrayStarted, temps[d.device]));
+  const all = sorted.map((d) => deriveDisk(d, arrayStarted, temps[d.device], diskHealths[d.device], diskTypes[d.device]));
   return {
     parity: all.filter((d) => d.role === 'parity'),
     data: all.filter((d) => d.role === 'data'),

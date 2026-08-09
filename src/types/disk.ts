@@ -27,4 +27,10 @@ export interface DiskViewModel extends DiskBase {
   barWidth: string;
   barColor: string;
   borderColor: string;
+  /** SMART self-assessment — distinct from `status` above, which reflects the array driver's own
+   *  view. A disk can be DISK_OK while SMART already reports failing. */
+  health: 'passed' | 'failed' | null;
+  healthColor: string;
+  isSSD: boolean | null;
+  typeLabel: string;
 }

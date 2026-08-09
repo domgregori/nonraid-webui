@@ -13,6 +13,10 @@ export interface ArrayStatusContextValue {
    *  visible long enough to actually read. */
   actionError: string | null;
   temps: Record<string, number | null>;
+  diskHealths: Record<string, 'passed' | 'failed' | null>;
+  /** SSD/HDD per array disk device — fetched once (not polled), since a disk's rotational type
+   *  never changes at runtime. */
+  diskTypes: Record<string, boolean | null>;
   selectedDiskId: string | null;
   actionNote: string | null;
   arrayPending: boolean;

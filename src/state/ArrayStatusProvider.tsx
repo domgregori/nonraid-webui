@@ -13,6 +13,8 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [temps, setTemps] = useState<Record<string, number | null>>({});
+  const [diskHealths, setDiskHealths] = useState<Record<string, 'passed' | 'failed' | null>>({});
+  const [diskTypes, setDiskTypes] = useState<Record<string, boolean | null>>({});
   const [selectedDiskId, setSelectedDiskId] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState<string | null>(null);
   const [arrayPending, setArrayPending] = useState(false);
@@ -47,18 +49,36 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshHealth = useCallback(async () => {
+    try {
+      const h = await smartApi.getHealthStatuses();
+      if (!mounted.current) return;
+      setDiskHealths(h);
+    } catch {
+      // best-effort, same as temps — leave the last-known values on failure
+    }
+  }, []);
+
   useEffect(() => {
     mounted.current = true;
     refreshStatus();
     refreshTemps();
+    refreshHealth();
+    // Rotational type never changes at runtime — fetched once, not on an interval.
+    smartApi
+      .getDiskTypes()
+      .then((t) => mounted.current && setDiskTypes(t))
+      .catch(() => {});
     const statusId = setInterval(refreshStatus, STATUS_POLL_MS);
     const tempId = setInterval(refreshTemps, TEMP_POLL_MS);
+    const healthId = setInterval(refreshHealth, TEMP_POLL_MS);
     return () => {
       mounted.current = false;
       clearInterval(statusId);
       clearInterval(tempId);
+      clearInterval(healthId);
     };
-  }, [refreshStatus, refreshTemps]);
+  }, [refreshStatus, refreshTemps, refreshHealth]);
 
   const toggleArray = useCallback(() => {
     const current = statusRef.current;
@@ -138,6 +158,8 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
         error,
         actionError,
         temps,
+        diskHealths,
+        diskTypes,
         selectedDiskId,
         actionNote,
         arrayPending,

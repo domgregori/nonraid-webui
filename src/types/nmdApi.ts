@@ -129,6 +129,7 @@ export interface AvailableDevice {
   model: string | null;
   uuid: string | null;
   locked: boolean;
+  isSSD: boolean | null;
 }
 
 export interface AddDiskResult {

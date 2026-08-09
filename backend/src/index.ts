@@ -136,7 +136,7 @@ async function main() {
   app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity));
   app.use('/api', lxcRouter(lxc, activity));
   app.use('/api', metricsRouter(metrics));
-  app.use('/api', smartRouter(nmd, smart));
+  app.use('/api', smartRouter(nmd, smart, system));
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
   app.use('/api', systemRouter(system, nmd, activity));

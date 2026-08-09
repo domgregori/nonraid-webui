@@ -9,10 +9,10 @@ interface ArrayDisksProps {
 }
 
 export function ArrayDisks({ showManageLink }: ArrayDisksProps = {}) {
-  const { status, temps, selectDisk, parityPending, parityAction } = useArrayStatus();
+  const { status, temps, diskHealths, diskTypes, selectDisk, parityPending, parityAction } = useArrayStatus();
   if (!status) return null;
 
-  const { parity, data } = deriveDisks(status, temps);
+  const { parity, data } = deriveDisks(status, temps, diskHealths, diskTypes);
   // A new-disk clear reuses the same resync status a parity check would — reuse the same view
   // model, just route it to the clearing disk's own card instead of the Parity Check card (which
   // hides itself while isClearing is true, see ParityCheckCard).

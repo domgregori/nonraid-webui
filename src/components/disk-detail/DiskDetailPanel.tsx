@@ -4,11 +4,11 @@ import { useDiskSmart } from '../../hooks/useDiskSmart';
 import { deriveDisks } from '../../selectors/disks';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { COLORS } from '../../styles/colors';
-import { formatBytesHuman } from '../../utils/format';
 import { ProgressBar } from '../shared/ProgressBar';
 import { EmptyDiskDialog } from './EmptyDiskDialog';
 import { ReplaceDiskDialog } from './ReplaceDiskDialog';
 import { ShrinkArrayDialog } from './ShrinkArrayDialog';
+import { SmartOverviewRows } from './SmartOverviewRows';
 import type { SelfTestType } from '../../types/smart';
 
 const SELF_TEST_LABELS: Record<SelfTestType, string> = { short: 'Short Test', long: 'Long Test', conveyance: 'Conveyance Test' };
@@ -20,9 +20,9 @@ function boolLabel(v: boolean | null): string {
 }
 
 export function DiskDetailPanel() {
-  const { status, temps, selectedDiskId, actionNote, unassignPending, restorePending, closeDetail, unassignDisk, restoreDisk } =
+  const { status, temps, diskHealths, diskTypes, selectedDiskId, actionNote, unassignPending, restorePending, closeDetail, unassignDisk, restoreDisk } =
     useArrayStatus();
-  const { all } = status ? deriveDisks(status, temps) : { all: [] };
+  const { all } = status ? deriveDisks(status, temps, diskHealths, diskTypes) : { all: [] };
   const disk = selectedDiskId ? all.find((d) => d.id === selectedDiskId) : undefined;
 
   const smartSlot = disk && disk.device && disk.device !== 'none' ? disk.slot : null;
@@ -30,6 +30,10 @@ export function DiskDetailPanel() {
   const [smartTab, setSmartTab] = useState<SmartTab>('overview');
   const [formatPending, setFormatPending] = useState(false);
   const [formatError, setFormatError] = useState<string | null>(null);
+  const [mountPending, setMountPending] = useState(false);
+  const [mountError, setMountError] = useState<string | null>(null);
+  const [spinPending, setSpinPending] = useState(false);
+  const [spinError, setSpinError] = useState<string | null>(null);
   const [showReplaceDialog, setShowReplaceDialog] = useState(false);
   const [showEmptyDialog, setShowEmptyDialog] = useState(false);
   const [showShrinkDialog, setShowShrinkDialog] = useState(false);
@@ -37,6 +41,7 @@ export function DiskDetailPanel() {
   if (!selectedDiskId || !status || !disk) return null;
 
   const needsFormat = disk.role === 'data' && disk.fsType === 'UNKNOWN';
+  const needsMount = disk.role === 'data' && !needsFormat && disk.mountpoint === '—';
   const arrayStarted = status.array.state === 'STARTED';
   // Unassigned but not yet committed via a start since — the disk's identity
   // is still intact and restoreUnassignedDisk() can put it back with no
@@ -55,6 +60,42 @@ export function DiskDetailPanel() {
       setFormatError((err as Error).message);
     } finally {
       setFormatPending(false);
+    }
+  };
+
+  const handleMount = async () => {
+    setMountPending(true);
+    setMountError(null);
+    try {
+      await nmdApi.mountDisk(disk.slot);
+    } catch (err) {
+      setMountError((err as Error).message);
+    } finally {
+      setMountPending(false);
+    }
+  };
+
+  const handleSpinDown = async () => {
+    setSpinPending(true);
+    setSpinError(null);
+    try {
+      await nmdApi.spinDownDisk(disk.slot);
+    } catch (err) {
+      setSpinError((err as Error).message);
+    } finally {
+      setSpinPending(false);
+    }
+  };
+
+  const handleSpinUp = async () => {
+    setSpinPending(true);
+    setSpinError(null);
+    try {
+      await nmdApi.spinUpDisk(disk.slot);
+    } catch (err) {
+      setSpinError((err as Error).message);
+    } finally {
+      setSpinPending(false);
     }
   };
 
@@ -134,49 +175,7 @@ export function DiskDetailPanel() {
 
                 {smartTab === 'overview' && (
                   <>
-                    <div className="detail-rows">
-                      <div className="detail-row">
-                        <span className="detail-row__label">Model</span>
-                        <span className="detail-row__value">{attributes.model ?? '—'}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="detail-row__label">Serial</span>
-                        <span className="detail-row__value">{attributes.serial ?? '—'}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="detail-row__label">Capacity</span>
-                        <span className="detail-row__value">{attributes.capacityBytes != null ? formatBytesHuman(attributes.capacityBytes) : '—'}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="detail-row__label">Health</span>
-                        <span
-                          className="detail-row__value"
-                          style={{ color: attributes.health === 'failed' ? COLORS.red : attributes.health === 'passed' ? COLORS.green : undefined }}
-                        >
-                          {attributes.health === 'failed' ? 'FAILED' : attributes.health === 'passed' ? 'Passed' : '—'}
-                        </span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="detail-row__label">Power-On Hours</span>
-                        <span className="detail-row__value">{attributes.powerOnHours ?? '—'}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="detail-row__label">Power Cycles</span>
-                        <span className="detail-row__value">{attributes.powerCycleCount ?? '—'}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="detail-row__label">Reallocated Sectors</span>
-                        <span className="detail-row__value">{attributes.reallocatedSectors ?? '—'}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="detail-row__label">Pending Sectors</span>
-                        <span className="detail-row__value">{attributes.pendingSectors ?? '—'}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="detail-row__label">Uncorrectable</span>
-                        <span className="detail-row__value">{attributes.uncorrectableSectors ?? '—'}</span>
-                      </div>
-                    </div>
+                    <SmartOverviewRows attributes={attributes} typeLabel={disk.typeLabel} />
 
                     <div className="smart-selftest">
                       <div className="smart-selftest__head">
@@ -365,10 +364,32 @@ export function DiskDetailPanel() {
               {formatError && <div className="status-note status-note--error">{formatError}</div>}
             </>
           )}
+          {needsMount && (
+            <>
+              <button type="button" className="btn btn--block" disabled={mountPending} onClick={handleMount}>
+                {mountPending ? 'Mounting…' : 'Mount Disk'}
+              </button>
+              {mountError && <div className="status-note status-note--error">{mountError}</div>}
+            </>
+          )}
           {disk.role === 'data' && !needsFormat && (
             <button type="button" className="btn btn--block" onClick={() => setShowEmptyDialog(true)}>
               Empty Disk
             </button>
+          )}
+          {disk.isSSD === false && disk.status === 'active' && (
+            <>
+              {attributes?.spinState === 'standby' ? (
+                <button type="button" className="btn btn--block" disabled={spinPending} onClick={handleSpinUp}>
+                  {spinPending ? 'Spinning up…' : 'Spin Up'}
+                </button>
+              ) : (
+                <button type="button" className="btn btn--block" disabled={spinPending || status.resync.active} onClick={handleSpinDown}>
+                  {spinPending ? 'Spinning down…' : 'Spin Down'}
+                </button>
+              )}
+              {spinError && <div className="status-note status-note--error">{spinError}</div>}
+            </>
           )}
           <button type="button" className="btn btn--block" onClick={() => setShowReplaceDialog(true)}>
             Replace Disk

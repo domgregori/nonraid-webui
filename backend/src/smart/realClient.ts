@@ -10,6 +10,7 @@ import type {
   SmartClient,
   SmartHealth,
   SmartRawAttribute,
+  SmartSpinState,
 } from './types.js';
 
 const execFileAsync = promisify(execFile);
@@ -50,9 +51,17 @@ interface SmartctlSelfTestLogEntry {
   lifetime_hours?: number;
 }
 
+interface SmartctlWwn {
+  naa?: number;
+  oui?: number;
+  id?: number;
+}
+
 interface SmartctlJson {
   model_name?: string;
   serial_number?: string;
+  wwn?: SmartctlWwn;
+  rotation_rate?: number;
   user_capacity?: { bytes?: number };
   temperature?: { current?: number };
   nvme_smart_health_information_log?: { temperature?: number; power_on_hours?: number; power_cycles?: number };
@@ -214,9 +223,23 @@ function extractTemperatureC(data: SmartctlJson): number | null {
   return null;
 }
 
+/** Concatenates naa+oui+id into the same hex string smartctl's own classic "LU WWN Device Id"
+ *  output shows (e.g. "5 0014ee 0038f42c5" without the spaces) — verified live against a real
+ *  drive's `smartctl -i` output this session. */
+function formatWwn(wwn: SmartctlWwn | undefined): string | null {
+  if (typeof wwn?.naa !== 'number' || typeof wwn?.oui !== 'number' || typeof wwn?.id !== 'number') return null;
+  return wwn.naa.toString(16) + wwn.oui.toString(16).padStart(6, '0') + wwn.id.toString(16).padStart(9, '0');
+}
+
+/** rotation_rate of 0 means SSD (not a meaningful RPM value) — null here for both that case and
+ *  drives that just don't report the field at all (confirmed live: some HDDs genuinely omit it). */
+function extractRotationRpm(data: SmartctlJson): number | null {
+  return typeof data.rotation_rate === 'number' && data.rotation_rate > 0 ? data.rotation_rate : null;
+}
+
 export class RealSmartClient implements SmartClient {
 
-  private async run(device: string): Promise<SmartctlJson> {
+  private async run(device: string): Promise<{ data: SmartctlJson; spinState: SmartSpinState }> {
     // -n standby: don't spin up a sleeping disk just to check its temperature.
     const args = ['-n', 'standby', '--json', '-a', devicePath(device)];
     const bin = config.smartUseSudo ? 'sudo' : config.smartctlBin;
@@ -224,25 +247,31 @@ export class RealSmartClient implements SmartClient {
 
     try {
       const { stdout } = await execFileAsync(bin, fullArgs, { timeout: config.smartTimeoutMs, maxBuffer: 4 * 1024 * 1024 });
-      return JSON.parse(stdout) as SmartctlJson;
+      return { data: JSON.parse(stdout) as SmartctlJson, spinState: 'active' };
     } catch (err) {
       // smartctl's exit code is a bitmask of conditions (device asleep, SMART
       // check failed, etc) — nonzero doesn't mean the JSON on stdout is bad.
+      // Bit 1 (value 2) specifically means the device didn't return an IDENTIFY
+      // structure because -n standby made it skip rather than spin up — smartctl's
+      // own documented exit-status bitmask, not stated anywhere in the JSON itself.
       const stdout = (err as { stdout?: string }).stdout;
+      const exitCode = (err as { code?: number | string }).code;
+      const isStandbySkip = typeof exitCode === 'number' && (exitCode & 2) !== 0;
       if (stdout) {
         try {
-          return JSON.parse(stdout) as SmartctlJson;
+          return { data: JSON.parse(stdout) as SmartctlJson, spinState: isStandbySkip ? 'standby' : 'active' };
         } catch {
-          // fall through to rethrow below
+          // fall through below
         }
       }
+      if (isStandbySkip) return { data: {}, spinState: 'standby' };
       throw err;
     }
   }
 
   async getTemperature(device: string): Promise<number | null> {
     try {
-      const data = await this.run(device);
+      const { data } = await this.run(device);
       return extractTemperatureC(data);
     } catch {
       return null;
@@ -251,7 +280,7 @@ export class RealSmartClient implements SmartClient {
 
   async getHealth(device: string): Promise<SmartHealth | null> {
     try {
-      const data = await this.run(device);
+      const { data } = await this.run(device);
       if (typeof data.smart_status?.passed !== 'boolean') return null;
       return data.smart_status.passed ? 'passed' : 'failed';
     } catch {
@@ -261,12 +290,20 @@ export class RealSmartClient implements SmartClient {
 
   async getAttributes(device: string): Promise<SmartAttributes | null> {
     let data: SmartctlJson;
+    let spinState: SmartSpinState;
     try {
-      data = await this.run(device);
+      ({ data, spinState } = await this.run(device));
     } catch {
       return null;
     }
-    if (typeof data.smart_status?.passed !== 'boolean' && !data.ata_smart_attributes && !data.nvme_smart_health_information_log) {
+    // A standby skip means "asleep", not "error" — worth reporting (mostly-null attributes plus
+    // the real spin state) rather than collapsing to null like a genuine read failure would.
+    if (
+      spinState !== 'standby' &&
+      typeof data.smart_status?.passed !== 'boolean' &&
+      !data.ata_smart_attributes &&
+      !data.nvme_smart_health_information_log
+    ) {
       return null; // no SMART data at all — e.g. a virtio-blk device with no pass-through
     }
 
@@ -275,9 +312,12 @@ export class RealSmartClient implements SmartClient {
       device,
       model: data.model_name ?? null,
       serial: data.serial_number ?? null,
+      wwn: formatWwn(data.wwn),
       capacityBytes: data.user_capacity?.bytes ?? null,
       health: typeof data.smart_status?.passed === 'boolean' ? (data.smart_status.passed ? 'passed' : 'failed') : null,
       temperature: extractTemperatureC(data),
+      rotationRpm: extractRotationRpm(data),
+      spinState,
       powerOnHours: data.power_on_time?.hours ?? data.nvme_smart_health_information_log?.power_on_hours ?? findAttr(data, ATTR_ID_POWER_ON_HOURS),
       powerCycleCount: data.power_cycle_count ?? data.nvme_smart_health_information_log?.power_cycles ?? findAttr(data, ATTR_ID_POWER_CYCLE_COUNT),
       reallocatedSectors: findAttr(data, ATTR_ID_REALLOCATED_SECTOR_CT),
