@@ -56,12 +56,14 @@ export function SmartOverviewRows({ attributes, typeLabel }: SmartOverviewRowsPr
           </span>
         </div>
       )}
-      <div className="detail-row">
-        <span className="detail-row__label">Spin State</span>
-        <span className="detail-row__value">
-          {attributes.spinState === 'standby' ? 'Standby (spun down)' : attributes.spinState === 'active' ? 'Active (spun up)' : '—'}
-        </span>
-      </div>
+      {typeLabel !== 'SSD' && (
+        <div className="detail-row">
+          <span className="detail-row__label">Spin State</span>
+          <span className="detail-row__value">
+            {attributes.spinState === 'standby' ? 'Standby (spun down)' : attributes.spinState === 'active' ? 'Active (spun up)' : '—'}
+          </span>
+        </div>
+      )}
       <div className="detail-row">
         <span className="detail-row__label">Power-On Hours</span>
         <span className="detail-row__value">{attributes.powerOnHours ?? '—'}</span>
