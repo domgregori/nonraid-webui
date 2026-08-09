@@ -2,16 +2,16 @@ import { useState } from 'react';
 import { COLORS } from '../../styles/colors';
 import type { BenchmarkResult } from '../../types/benchmark';
 import { ProgressBar } from '../shared/ProgressBar';
-import { TimeSeriesChart } from '../shared/TimeSeriesChart';
+import { TimeSeriesChart, type TimeSeriesChartSeries } from '../shared/TimeSeriesChart';
 
 interface BenchmarkSectionProps {
   onRead: () => Promise<BenchmarkResult>;
-  /** Omitted entirely — no Write button rendered — for disks with no real mountpoint to write
+  /** Omitted entirely — the test runs read-only — for disks with no real mountpoint to write
    *  through (parity disks, unassigned devices). */
   onWrite?: () => Promise<BenchmarkResult>;
 }
 
-type RunState = 'idle' | 'pending';
+type RunPhase = 'idle' | 'reading' | 'writing';
 
 function formatElapsed(s: number): string {
   return `${s.toFixed(1)}s`;
@@ -26,109 +26,84 @@ function formatMbPerSecond(v: number): string {
  *  resync: the server already guards it (409), surfaced here the same way every other mutating
  *  action in this codebase reports a server-side rejection — via catch, after the fact. */
 export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
-  const [readState, setReadState] = useState<RunState>('idle');
+  const [phase, setPhase] = useState<RunPhase>('idle');
   const [readResult, setReadResult] = useState<BenchmarkResult | null>(null);
-  const [readError, setReadError] = useState<string | null>(null);
-  const [writeState, setWriteState] = useState<RunState>('idle');
   const [writeResult, setWriteResult] = useState<BenchmarkResult | null>(null);
-  const [writeError, setWriteError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const busy = readState === 'pending' || writeState === 'pending';
+  const busy = phase !== 'idle';
 
-  const runRead = async () => {
-    setReadState('pending');
-    setReadError(null);
+  const run = async () => {
+    setError(null);
+    setReadResult(null);
+    setWriteResult(null);
+    setPhase('reading');
     try {
-      setReadResult(await onRead());
+      const read = await onRead();
+      setReadResult(read);
+      if (onWrite) {
+        setPhase('writing');
+        setWriteResult(await onWrite());
+      }
     } catch (err) {
-      setReadError((err as Error).message);
+      setError((err as Error).message);
     } finally {
-      setReadState('idle');
+      setPhase('idle');
     }
   };
 
-  const runWrite = async () => {
-    if (!onWrite) return;
-    setWriteState('pending');
-    setWriteError(null);
-    try {
-      setWriteResult(await onWrite());
-    } catch (err) {
-      setWriteError((err as Error).message);
-    } finally {
-      setWriteState('idle');
-    }
-  };
+  // One continuous timeline for the whole test: write's samples are offset by the read phase's
+  // total duration, so the chart reads as "read, then write" in the order they actually ran —
+  // read and write never run concurrently (same single-flight lock the backend already enforces),
+  // so overlapping them on a shared 0-based axis would misleadingly suggest they were simultaneous.
+  const series: TimeSeriesChartSeries[] = [];
+  if (readResult && readResult.samples.length > 1) {
+    series.push({
+      key: 'read',
+      label: 'Read',
+      color: COLORS.blue,
+      points: readResult.samples.map((s) => ({ ts: s.elapsedSeconds, value: s.mbPerSecond })),
+    });
+  }
+  if (writeResult && writeResult.samples.length > 1) {
+    const offset = readResult?.elapsedSeconds ?? 0;
+    series.push({
+      key: 'write',
+      label: 'Write',
+      color: COLORS.green,
+      points: writeResult.samples.map((s) => ({ ts: s.elapsedSeconds + offset, value: s.mbPerSecond })),
+    });
+  }
 
   return (
     <div className="detail-card">
       <div className="eyebrow">Benchmark</div>
-      <div className="smart-selftest__actions">
-        <button type="button" className="btn" disabled={busy} onClick={runRead}>
-          {readState === 'pending' ? 'Reading…' : 'Benchmark Read'}
-        </button>
-        {onWrite && (
-          <button type="button" className="btn" disabled={busy} onClick={runWrite}>
-            {writeState === 'pending' ? 'Writing…' : 'Benchmark Write'}
-          </button>
-        )}
-      </div>
+      <button type="button" className="btn" disabled={busy} onClick={run}>
+        {phase === 'reading' ? 'Reading…' : phase === 'writing' ? 'Writing…' : 'Run Benchmark'}
+      </button>
 
       {busy && <ProgressBar indeterminate color={COLORS.blue} height={6} />}
 
-      {readResult && (
-        <>
-          <div className="detail-rows">
+      {(readResult || writeResult) && (
+        <div className="detail-rows">
+          {readResult && (
             <div className="detail-row">
               <span className="detail-row__label">Read Speed</span>
               <span className="detail-row__value">{readResult.mbPerSecond.toFixed(1)} MB/s</span>
             </div>
-          </div>
-          {readResult.samples.length > 1 && (
-            <TimeSeriesChart
-              series={[
-                {
-                  key: 'read',
-                  label: 'Read',
-                  color: COLORS.blue,
-                  points: readResult.samples.map((s) => ({ ts: s.elapsedSeconds, value: s.mbPerSecond })),
-                },
-              ]}
-              formatTs={formatElapsed}
-              formatValue={formatMbPerSecond}
-              height={120}
-            />
           )}
-        </>
-      )}
-      {readError && <div className="status-note status-note--error">{readError}</div>}
-
-      {writeResult && (
-        <>
-          <div className="detail-rows">
+          {writeResult && (
             <div className="detail-row">
               <span className="detail-row__label">Write Speed</span>
               <span className="detail-row__value">{writeResult.mbPerSecond.toFixed(1)} MB/s</span>
             </div>
-          </div>
-          {writeResult.samples.length > 1 && (
-            <TimeSeriesChart
-              series={[
-                {
-                  key: 'write',
-                  label: 'Write',
-                  color: COLORS.green,
-                  points: writeResult.samples.map((s) => ({ ts: s.elapsedSeconds, value: s.mbPerSecond })),
-                },
-              ]}
-              formatTs={formatElapsed}
-              formatValue={formatMbPerSecond}
-              height={120}
-            />
           )}
-        </>
+        </div>
       )}
-      {writeError && <div className="status-note status-note--error">{writeError}</div>}
+
+      {series.length > 0 && <TimeSeriesChart series={series} formatTs={formatElapsed} formatValue={formatMbPerSecond} height={140} />}
+
+      {error && <div className="status-note status-note--error">{error}</div>}
     </div>
   );
 }
