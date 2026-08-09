@@ -80,7 +80,11 @@ export function TimeSeriesChart({ series, height = 180, formatValue = defaultFor
       if (p.value > highVal) highVal = p.value;
     }
     if (lowTs === highTs) highTs = lowTs + 1;
-    return { minTs: lowTs, maxTs: highTs, minVal: 0, maxVal: highVal > 0 ? highVal * 1.1 : 1 };
+    // 1.1x headroom put the peak only ~13px below the top gridline — close enough to the
+    // 11px-tall axis label sitting right at that same y that a tall spike visually crowded
+    // (looked like it was overlapping) the number instead of just approaching it. 1.25x
+    // roughly doubles that gap to ~29px, comfortably clear of the label's own glyph height.
+    return { minTs: lowTs, maxTs: highTs, minVal: 0, maxVal: highVal > 0 ? highVal * 1.25 : 1 };
   }, [allPoints]);
 
   const xFor = (ts: number) => PAD_LEFT + ((ts - minTs) / (maxTs - minTs)) * (width - PAD_LEFT - PAD_RIGHT);
