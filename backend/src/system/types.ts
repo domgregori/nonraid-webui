@@ -5,6 +5,11 @@ export interface BootDiskInfo {
   totalBytes: number | null;
   model: string | null;
   tempCelsius: number | null;
+  // Filesystem UUID of the root partition (lsblk), not a SMART/WWN identifier — most boot media
+  // (cheap USB sticks especially) don't support SMART/ATA passthrough at all, confirmed live on
+  // this project's own test rig (smartctl returns no usable data for it), so this is the only real
+  // UUID available for the boot disk.
+  uuid: string | null;
 }
 
 export interface NetworkInterfaceInfo {

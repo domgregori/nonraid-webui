@@ -6,6 +6,7 @@ export interface BootDiskInfo {
   totalBytes: number | null;
   model: string | null;
   tempCelsius: number | null;
+  uuid: string | null;
 }
 
 export interface NetworkInterfaceInfo {

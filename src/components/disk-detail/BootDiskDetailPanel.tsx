@@ -75,6 +75,10 @@ export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
             <span className="detail-row__value">{boot.filesystem ?? '—'}</span>
           </div>
           <div className="detail-row">
+            <span className="detail-row__label">UUID</span>
+            <span className="detail-row__value">{boot.uuid ?? '—'}</span>
+          </div>
+          <div className="detail-row">
             <span className="detail-row__label">Used</span>
             <span className="detail-row__value">
               {usedPct !== null && boot.usedBytes !== null && boot.totalBytes !== null

@@ -161,11 +161,21 @@ export class SystemStatsService {
     try {
       const { stdout } = await execFileAsync('df', ['-k', '--output=source,fstype,used,size', '/']);
       const lastLine = stdout.trim().split('\n').at(-1) ?? '';
-      const [, fstype, usedKbStr, sizeKbStr] = lastLine.trim().split(/\s+/);
+      const [source, fstype, usedKbStr, sizeKbStr] = lastLine.trim().split(/\s+/);
       const usedKb = Number(usedKbStr);
       const sizeKb = Number(sizeKbStr);
 
       const temps = await this.smart.getTemperatures([identity.device]);
+
+      let uuid: string | null = null;
+      if (source) {
+        try {
+          const { stdout: uuidOut } = await execFileAsync('lsblk', ['-n', '-d', '-o', 'UUID', source]);
+          uuid = uuidOut.trim() || null;
+        } catch {
+          uuid = null;
+        }
+      }
 
       this.bootDisk = {
         device: identity.device,
@@ -174,6 +184,7 @@ export class SystemStatsService {
         totalBytes: Number.isFinite(sizeKb) ? sizeKb * 1024 : null,
         model: identity.model,
         tempCelsius: temps[identity.device] ?? null,
+        uuid,
       };
     } catch {
       // leave the last-known snapshot in place (or null, on the first-ever
