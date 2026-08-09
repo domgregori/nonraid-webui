@@ -1,4 +1,5 @@
 import { request } from './request';
+import type { BenchmarkResult } from '../types/benchmark';
 import type {
   AddDiskResult,
   AvailableDevice,
@@ -37,6 +38,14 @@ export const nmdApi = {
   mountDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/mount`, { method: 'POST' }),
   spinDownDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/spin-down`, { method: 'POST' }),
   spinUpDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/spin-up`, { method: 'POST' }),
+  benchmarkRead: (slot: number) => request<BenchmarkResult>(`/api/disks/${slot}/benchmark/read`, { method: 'POST' }),
+  benchmarkWrite: (slot: number) => request<BenchmarkResult>(`/api/disks/${slot}/benchmark/write`, { method: 'POST' }),
+  benchmarkReadDevice: (device: string) =>
+    request<BenchmarkResult>('/api/disks/benchmark/read-device', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ device }),
+    }),
   replaceDisk: (slot: number, device: string) =>
     request<AddDiskResult>(`/api/disks/${slot}/replace`, {
       method: 'POST',

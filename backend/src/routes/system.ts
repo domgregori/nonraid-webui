@@ -3,6 +3,7 @@ import type { ActivityStore } from '../activity/store.js';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/client.js';
+import { benchmarkRead, benchmarkWrite } from '../system/benchmark.js';
 import { resolveConfigBackupPaths, streamBootDiskImage, streamConfigBackup } from '../system/backupStream.js';
 import { listTimezones, setHostname, setTimezone } from '../system/hostConfig.js';
 import type { SystemStatsService } from '../system/service.js';
@@ -36,6 +37,42 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
       } else {
         res.status(502).json({ error: (err as Error).message });
       }
+    }
+  });
+
+  router.post('/system/boot-disk/benchmark/read', async (_req, res) => {
+    const device = system.getBootDiskDevice();
+    if (!device) {
+      res.status(404).json({ error: 'Boot disk could not be detected on this host.' });
+      return;
+    }
+    try {
+      const status = await nmd.getStatus();
+      if (status.resync.active) {
+        res.status(409).json({ error: 'A parity check or clear is in progress — refusing to benchmark mid-operation.' });
+        return;
+      }
+      const result = await benchmarkRead(device);
+      activity.log(`Read benchmark on boot disk: ${result.mbPerSecond.toFixed(1)} MB/s`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/system/boot-disk/benchmark/write', async (_req, res) => {
+    try {
+      const status = await nmd.getStatus();
+      if (status.resync.active) {
+        res.status(409).json({ error: 'A parity check or clear is in progress — refusing to benchmark mid-operation.' });
+        return;
+      }
+      // The boot disk's mountpoint is always `/` — no lookup needed, unlike an array disk.
+      const result = await benchmarkWrite('/');
+      activity.log(`Write benchmark on boot disk: ${result.mbPerSecond.toFixed(1)} MB/s`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
     }
   });
 

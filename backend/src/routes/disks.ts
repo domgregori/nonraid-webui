@@ -4,6 +4,7 @@ import type { NmdClient } from '../nmd/index.js';
 import { notifyEvent } from '../settings/notify.js';
 import type { SettingsStore } from '../settings/store.js';
 import type { SelfTestType, SmartService } from '../smart/index.js';
+import { benchmarkRead, benchmarkWrite } from '../system/benchmark.js';
 import { spinDown, spinUp } from '../system/hdparm.js';
 
 const SELF_TEST_TYPES: SelfTestType[] = ['short', 'long', 'conveyance'];
@@ -208,6 +209,87 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
       await spinUp(disk.device);
       activity.log(`Disk ${slot} (${disk.disk_name || disk.device}) spun up`, 'blue').catch(() => {});
       res.json({ ok: true, message: `Disk ${slot} spun up.` });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/disks/benchmark/read-device', async (req, res) => {
+    const device = req.body?.device;
+    if (typeof device !== 'string' || !device) {
+      res.status(400).json({ error: 'device is required.' });
+      return;
+    }
+    try {
+      // Same fresh-scan validation addDisk uses — this shells out with `device`, so it must be a
+      // real, currently available device, not attacker-controlled input.
+      const available = await nmd.listAvailableDevices();
+      if (!available.some((d) => d.device === device)) {
+        res.status(400).json({ error: `${device} is not a currently available device.` });
+        return;
+      }
+      const result = await benchmarkRead(device);
+      activity.log(`Read benchmark on ${device}: ${result.mbPerSecond.toFixed(1)} MB/s`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/disks/:slot/benchmark/read', async (req, res) => {
+    const slot = parseSlot(req.params.slot);
+    if (slot === null) {
+      res.status(400).json({ error: 'Slot must be a number 0-29.' });
+      return;
+    }
+    try {
+      const status = await nmd.getStatus();
+      if (status.resync.active) {
+        res.status(409).json({ error: 'A parity check or clear is in progress — refusing to benchmark mid-operation.' });
+        return;
+      }
+      const disk = status.disks.find((d) => d.slot === slot);
+      if (!disk || !disk.device || disk.device === 'none') {
+        res.status(404).json({ error: `No disk assigned to slot ${slot}.` });
+        return;
+      }
+      const result = await benchmarkRead(disk.device);
+      activity
+        .log(`Read benchmark on disk ${slot} (${disk.disk_name || disk.device}): ${result.mbPerSecond.toFixed(1)} MB/s`, 'blue')
+        .catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/disks/:slot/benchmark/write', async (req, res) => {
+    const slot = parseSlot(req.params.slot);
+    if (slot === null) {
+      res.status(400).json({ error: 'Slot must be a number 0-29.' });
+      return;
+    }
+    try {
+      const status = await nmd.getStatus();
+      if (status.resync.active) {
+        res.status(409).json({ error: 'A parity check or clear is in progress — refusing to benchmark mid-operation.' });
+        return;
+      }
+      const disk = status.disks.find((d) => d.slot === slot);
+      if (!disk || !disk.device || disk.device === 'none') {
+        res.status(404).json({ error: `No disk assigned to slot ${slot}.` });
+        return;
+      }
+      const mountpoint = disk.filesystem?.mountpoint;
+      if (!mountpoint || mountpoint === 'unmounted') {
+        res.status(400).json({ error: `Disk ${slot} isn't currently mounted — write benchmark needs an existing mount.` });
+        return;
+      }
+      const result = await benchmarkWrite(mountpoint);
+      activity
+        .log(`Write benchmark on disk ${slot} (${disk.disk_name || disk.device}): ${result.mbPerSecond.toFixed(1)} MB/s`, 'blue')
+        .catch(() => {});
+      res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }
