@@ -7,6 +7,13 @@ export interface BootDiskInfo {
   tempCelsius: number | null;
 }
 
+export interface NetworkInterfaceInfo {
+  name: string;
+  ipv4: string[];
+  ipv6: string[];
+  mac: string | null;
+}
+
 export interface SystemStats {
   hostname: string;
   // The process's effective IANA zone (Intl.DateTimeFormat, no subprocess) —
@@ -30,4 +37,8 @@ export interface SystemStats {
   // etc.) — never blocks the rest of this endpoint, same as buildVersion
   // degrading to null outside a git checkout.
   bootDisk: BootDiskInfo | null;
+  // Live interface addresses only — deliberately doesn't attempt to report
+  // DHCP vs static (that would mean parsing /etc/network/interfaces, which
+  // risks stating something wrong about a setup this app doesn't manage).
+  networkInterfaces: NetworkInterfaceInfo[];
 }

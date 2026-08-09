@@ -6,7 +6,33 @@ import { promisify } from 'node:util';
 import { config } from '../config.js';
 import type { SmartService } from '../smart/service.js';
 import { readCpuTempCelsius } from './cpuTemp.js';
-import type { BootDiskInfo, SystemStats } from './types.js';
+import type { BootDiskInfo, NetworkInterfaceInfo, SystemStats } from './types.js';
+
+// Virtual bridges created by this app's own Docker/LXC support — not
+// something an admin cares about seeing alongside their real network
+// interfaces. `os.networkInterfaces()` already excludes loopback addresses
+// via their own `internal: true` flag, so 'lo' needs no special-casing here.
+const EXCLUDED_INTERFACES = new Set(['docker0', 'lxcbr0']);
+
+/** Built entirely from Node's own os.networkInterfaces() — no subprocess, no sudo, and
+ *  deliberately read-only (see the networkInterfaces doc comment on SystemStats). */
+function getNetworkInterfaces(): NetworkInterfaceInfo[] {
+  const all = os.networkInterfaces();
+  const result: NetworkInterfaceInfo[] = [];
+  for (const [name, addrs] of Object.entries(all)) {
+    if (!addrs || EXCLUDED_INTERFACES.has(name)) continue;
+    const real = addrs.filter((a) => !a.internal);
+    if (real.length === 0) continue;
+    const mac = real.find((a) => a.mac && a.mac !== '00:00:00:00:00:00')?.mac ?? null;
+    result.push({
+      name,
+      ipv4: real.filter((a) => a.family === 'IPv4').map((a) => a.address),
+      ipv6: real.filter((a) => a.family === 'IPv6').map((a) => a.address),
+      mac,
+    });
+  }
+  return result;
+}
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const execFileAsync = promisify(execFile);
@@ -173,6 +199,7 @@ export class SystemStatsService {
       memTotalBytes,
       buildVersion: this.buildVersion,
       bootDisk: this.bootDisk,
+      networkInterfaces: getNetworkInterfaces(),
     };
   }
 }

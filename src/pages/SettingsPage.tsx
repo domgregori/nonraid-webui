@@ -368,6 +368,30 @@ export function SettingsPage() {
       </div>
 
       <div className="settings-card">
+        <div className="settings-card__title">Network</div>
+        <div className="toggle-row__desc" style={{ marginBottom: 10 }}>
+          Live interface addresses, read-only — this app doesn't manage network configuration.
+        </div>
+        {!stats ? (
+          <div className="status-note">Loading…</div>
+        ) : stats.networkInterfaces.length === 0 ? (
+          <div className="status-note">No network interfaces detected.</div>
+        ) : (
+          stats.networkInterfaces.map((iface, i) => (
+            <div key={iface.name} className={`toggle-row${i > 0 ? ' toggle-row--bordered' : ''}`}>
+              <div>
+                <div className="toggle-row__title">{iface.name}</div>
+                <div className="toggle-row__desc toggle-row__desc--mono">
+                  {[...iface.ipv4, ...iface.ipv6].join(', ') || '—'}
+                  {iface.mac ? ` · ${iface.mac}` : ''}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="settings-card">
         <div className="settings-card__title">Array</div>
         <div className="toggle-row">
           <div>

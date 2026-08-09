@@ -8,6 +8,13 @@ export interface BootDiskInfo {
   tempCelsius: number | null;
 }
 
+export interface NetworkInterfaceInfo {
+  name: string;
+  ipv4: string[];
+  ipv6: string[];
+  mac: string | null;
+}
+
 export interface SystemStats {
   hostname: string;
   timezone: string;
@@ -18,4 +25,5 @@ export interface SystemStats {
   memTotalBytes: number;
   buildVersion: string | null;
   bootDisk: BootDiskInfo | null;
+  networkInterfaces: NetworkInterfaceInfo[];
 }
