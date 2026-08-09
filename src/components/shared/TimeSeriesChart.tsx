@@ -15,7 +15,11 @@ interface TimeSeriesChartProps {
 
 const PAD_LEFT = 44;
 const PAD_RIGHT = 8;
-const PAD_TOP = 10;
+// The top axis label (11px font, .ts-chart__axis-label) sits vertically centered on this exact
+// y — at the old PAD_TOP=10 its own glyph came within ~2px of the SVG's own top edge, reading as
+// sitting right at (or outside) the chart's boundary regardless of how far any data line stayed
+// below it. 18 gives the label itself proper clearance from the edge it's drawn against.
+const PAD_TOP = 18;
 const PAD_BOTTOM = 24;
 const FALLBACK_WIDTH = 600; // used only for the first render, before ResizeObserver reports the real width
 
