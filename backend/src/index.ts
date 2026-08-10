@@ -49,7 +49,8 @@ async function main() {
   const smart = new SmartService(createSmartClient());
   const activity = new ActivityStore();
   const settingsStore = new SettingsStore();
-  new ActivityWatcher(nmd, smart, activity, settingsStore);
+  const cache = new CacheService(nmd, smart, settingsStore);
+  new ActivityWatcher(nmd, smart, activity, settingsStore, cache);
   new ParityScheduler(nmd, settingsStore, activity);
   new BackupScheduler(nmd, settingsStore, activity);
   const authStore = new AuthStore();
@@ -61,7 +62,6 @@ async function main() {
   const shareApplier = createShareApplier();
   const shareStore = new ShareStore();
   const shareAccessStore = new ShareAccessStore();
-  const cache = new CacheService(nmd, smart, settingsStore);
   const shares = new ShareService(shareStore, shareApplier, nmd, shareAccessStore, activity, settingsStore, cache);
   const browse = new BrowseService(shares);
   const emptyDisk = new EmptyDiskService(nmd, shareStore);

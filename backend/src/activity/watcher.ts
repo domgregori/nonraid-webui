@@ -1,3 +1,5 @@
+import type { CacheHealth } from '../cache/types.js';
+import type { CacheService } from '../cache/service.js';
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { DiskStatus, NmdDisk } from '../nmd/types.js';
@@ -46,12 +48,14 @@ export class ActivityWatcher {
   // already over the threshold, so a sustained high temp logs/notifies once
   // on the crossing rather than every tick.
   private overTemp = new Map<string, boolean>();
+  private lastCacheHealth: CacheHealth | null = null;
 
   constructor(
     private nmd: NmdClient,
     private smart: SmartService,
     private activity: ActivityStore,
     private settings: SettingsStore,
+    private cache: CacheService,
     intervalMs: number = config.activityWatcherIntervalMs,
   ) {
     this.timer = setInterval(() => this.tick(), intervalMs);
@@ -70,6 +74,39 @@ export class ActivityWatcher {
     this.checkDisks(status.disks);
     await this.checkSmartHealth(status.disks);
     await this.checkTemperatures(status.disks);
+    await this.checkCacheMirror();
+  }
+
+  /**
+   * Same seed-silently-then-diff idiom as checkSmartHealth — only fires on a transition to a
+   * *worse* state (healthy -> degraded/unavailable, degraded -> unavailable), not on every tick a
+   * degraded mirror stays degraded, and not on recovery (no "cacheMirrorHealthy" event exists —
+   * the Dashboard/Disks page already show recovery the moment it happens, same reasoning
+   * notificationCatalog.ts gives for keeping this scoped to passive health events).
+   */
+  private async checkCacheMirror(): Promise<void> {
+    let status;
+    try {
+      status = await this.cache.getStatus();
+    } catch {
+      return; // unreachable this round — try again next tick
+    }
+
+    const prev = this.lastCacheHealth;
+    this.lastCacheHealth = status.health;
+    if (prev === null || prev === status.health || status.health === 'not-configured') return;
+
+    const gotWorse =
+      (prev === 'healthy' && (status.health === 'degraded' || status.health === 'unavailable')) ||
+      (prev === 'degraded' && status.health === 'unavailable');
+    if (!gotWorse) return;
+
+    const text =
+      status.health === 'unavailable'
+        ? 'Cache mirror is unavailable — both members appear to be missing or unmountable.'
+        : 'Cache mirror is degraded — one member is missing. It still works with zero redundancy until replaced.';
+    this.activity.log(text, 'red').catch(() => {});
+    notifyEvent(this.settings, 'cacheMirrorDegraded', 'NonRAID: cache mirror degraded', text);
   }
 
   private checkParitySync(lastSync: { timestamp: number; status: string }, syncErrors: number): void {
