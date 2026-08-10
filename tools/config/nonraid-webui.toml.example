@@ -33,11 +33,10 @@ frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
 # Single admin account, created via the frontend's first-run setup screen —
 # not something you set here.
 #config_path = "./data/auth.json"
-# Whether the session cookie gets the Secure attribute (HTTPS-only). MUST be
-# true once real TLS termination sits in front of this backend — until then,
-# false is correct: a Secure cookie sent over plain HTTP is silently dropped
-# by the browser, breaking login outright. See ../nonraid/REQUIREMENTS.md's
-# Security section — TLS is a documented, currently unmet requirement.
+# Whether the session cookie gets the Secure attribute (HTTPS-only). Flipped to true
+# automatically at boot when this app's own built-in TLS (see [tls] below) is enabled — only set
+# this by hand for a non-default setup, e.g. TLS terminated by a reverse proxy in front of this
+# app instead of this app's own built-in TLS.
 #cookie_secure = false
 #session_ttl_ms = 2592000000
 #login_rate_limit_window_ms = 900000
@@ -52,6 +51,19 @@ frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
 # HTTP only works for the literal "localhost" origin, not a LAN hostname/IP.
 #webauthn_rp_id = "nonraid.lan"
 #webauthn_origin = "https://nonraid.lan"
+
+[tls]
+# HTTPS termination built into this backend — see backend/src/tls/ and the TLS section in
+# Settings > Security. A generated/imported certificate's metadata lives at config_path; the
+# actual cert/key PEM files live under cert_dir.
+#config_path = "./data/tls.json"
+#cert_dir = "./data/tls"
+# Self-signed certs never chain to a public trust store, so the shrinking lifetime caps public
+# CAs must follow (825 days and falling) don't apply — long-lived by default so this doesn't need
+# periodic renewal on a headless box.
+#self_signed_days = 3650
+#openssl_bin = "openssl"
+#use_sudo = false
 
 [nmd]
 #bin = "nmdctl"

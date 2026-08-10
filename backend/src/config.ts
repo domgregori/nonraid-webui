@@ -104,8 +104,12 @@ export const config = {
   authConfigPath: str('AUTH_CONFIG_PATH', t('auth', 'config_path'), path.join(process.cwd(), 'data', 'auth.json')),
   // MUST be true once real TLS termination exists in front of this backend —
   // see ../nonraid/REQUIREMENTS.md's Security section. false is only correct
-  // for the current non-TLS dev/test setup; a Secure cookie sent over plain
-  // HTTP is simply dropped by the browser, silently breaking login.
+  // for a non-TLS dev/test setup; a Secure cookie sent over plain HTTP is
+  // simply dropped by the browser, silently breaking login. index.ts flips
+  // this to true automatically at boot when this app's own built-in TLS
+  // (backend/src/tls/) is enabled — this manual default only still matters
+  // for a non-default setup, e.g. TLS terminated by a reverse proxy in front
+  // of this app instead.
   cookieSecure: bool('COOKIE_SECURE', t('auth', 'cookie_secure'), false),
   sessionTtlMs: num('SESSION_TTL_MS', t('auth', 'session_ttl_ms'), 30 * 24 * 60 * 60 * 1000),
   loginRateLimitWindowMs: num('LOGIN_RATE_LIMIT_WINDOW_MS', t('auth', 'login_rate_limit_window_ms'), 15 * 60 * 1000),
@@ -121,6 +125,16 @@ export const config = {
   // silently break a feature, it risks accepting assertions bound to the wrong origin.
   webauthnRpId: optStr('WEBAUTHN_RP_ID', t('auth', 'webauthn_rp_id')),
   webauthnOrigin: optStr('WEBAUTHN_ORIGIN', t('auth', 'webauthn_origin')),
+  // HTTPS termination — see backend/src/tls/. Metadata lives in tlsConfigPath, the actual PEM
+  // material under tlsCertDir (never embedded in the JSON record).
+  tlsConfigPath: str('TLS_CONFIG_PATH', t('tls', 'config_path'), path.join(process.cwd(), 'data', 'tls.json')),
+  tlsCertDir: str('TLS_CERT_DIR', t('tls', 'cert_dir'), path.join(process.cwd(), 'data', 'tls')),
+  // Self-signed certs never chain to a public trust store, so the shrinking lifetime caps public
+  // CAs must follow (825 days and falling) don't apply — long-lived by default so a headless NAS
+  // admin isn't nagged to regenerate one every year.
+  tlsSelfSignedDays: num('TLS_SELF_SIGNED_DAYS', t('tls', 'self_signed_days'), 3650),
+  opensslBin: str('OPENSSL_BIN', t('tls', 'openssl_bin'), 'openssl'),
+  tlsUseSudo: bool('TLS_USE_SUDO', t('tls', 'use_sudo'), false),
   nmdBin: str('NMD_BIN', t('nmd', 'bin'), 'nmdctl'),
   nmdSuperblock: optStr('NMD_SUPERBLOCK', t('nmd', 'superblock')), // optional -s override, undefined = nmdctl default
   nmdUseSudo: bool('NMD_USE_SUDO', t('nmd', 'use_sudo'), false),

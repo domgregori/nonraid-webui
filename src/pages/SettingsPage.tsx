@@ -12,6 +12,7 @@ import { PasskeySection } from '../components/settings/PasskeySection';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ServicesSection } from '../components/settings/ServicesSection';
 import { StorageLocationField } from '../components/settings/StorageLocationField';
+import { TlsSection } from '../components/settings/TlsSection';
 import { TwoFactorSection } from '../components/settings/TwoFactorSection';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
 import { useSettings } from '../hooks/useSettings';
@@ -1013,6 +1014,7 @@ export function SettingsPage() {
 
       <div className={`settings-card${activeSection === 'security' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Security</div>
+        <TlsSection />
         <div className="settings-field">
           <div className="toggle-row__title">Change admin password</div>
           <div className="toggle-row__desc">

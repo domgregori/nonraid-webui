@@ -1,6 +1,9 @@
 import cors from 'cors';
 import express from 'express';
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import http from 'node:http';
+import https from 'node:https';
 import path from 'node:path';
 import { ActivityStore, ActivityWatcher } from './activity/index.js';
 import { AppsService, CaFeedStore } from './apps/index.js';
@@ -35,12 +38,14 @@ import { sharesRouter } from './routes/shares.js';
 import { smartRouter } from './routes/smart.js';
 import { statusRouter } from './routes/status.js';
 import { systemRouter } from './routes/system.js';
+import { tlsRouter } from './routes/tls.js';
 import { usersRouter } from './routes/users.js';
 import { SettingsStore } from './settings/index.js';
 import { createShareApplier, ShareAccessStore, ShareService, ShareStore } from './shares/index.js';
 import { createSmartClient, SmartService } from './smart/index.js';
 import { BackupScheduler } from './system/backupScheduler.js';
 import { SystemStatsService } from './system/service.js';
+import { TlsStore } from './tls/index.js';
 import { createUsersClient, UsersService } from './users/index.js';
 
 async function main() {
@@ -57,6 +62,8 @@ async function main() {
   const authStore = new AuthStore();
   const authService = new AuthService(authStore);
   await authStore.get(); // fail fast at boot on a corrupt auth.json
+  const tlsStore = new TlsStore();
+  const tlsRecord = await tlsStore.get(); // fail fast at boot on a corrupt tls.json
   if (config.serveFrontend && !existsSync(path.join(config.frontendDistPath, 'index.html'))) {
     throw new Error(`serveFrontend is true but no index.html at ${config.frontendDistPath} — did the frontend build run?`);
   }
@@ -170,9 +177,34 @@ async function main() {
   app.use('/api', usersRouter(users));
   app.use('/api', appsRouter(apps));
   app.use('/api', activityRouter(activity));
+  app.use('/api', tlsRouter(tlsStore, activity));
 
-  app.listen(config.port, () => {
-    console.log(`nonraid-webui backend listening on http://localhost:${config.port}`);
+  // Protocol is chosen once at boot from the persisted TLS config, same "config changes need a
+  // restart" model as everything else in this app — see backend/src/tls/. Falls open to plain
+  // HTTP if the configured cert/key can't be read, rather than crashing: a bad cert combined with
+  // a crash-on-boot would brick the admin's only path back into Settings to fix it (systemd would
+  // just crash-loop into the same broken tls.json forever). cookieSecure/WebAuthn config is only
+  // flipped inside the success branch below — flipping it unconditionally on tlsRecord.enabled
+  // would force Secure cookies even on the HTTP fallback, silently breaking login (see
+  // config.ts's cookieSecure doc comment).
+  let server: http.Server | https.Server = http.createServer(app);
+  if (tlsRecord?.enabled) {
+    try {
+      const [cert, key] = await Promise.all([readFile(tlsRecord.certPath, 'utf8'), readFile(tlsRecord.keyPath, 'utf8')]);
+      server = https.createServer({ cert, key }, app);
+      config.cookieSecure = true;
+      if (!config.webauthnRpId) config.webauthnRpId = tlsRecord.commonName;
+      if (!config.webauthnOrigin) config.webauthnOrigin = `https://${tlsRecord.commonName}${config.port === 443 ? '' : `:${config.port}`}`;
+    } catch (err) {
+      console.error(
+        `TLS is enabled but the cert/key at ${tlsRecord.certPath}/${tlsRecord.keyPath} could not be read (${(err as Error).message}) — falling back to plain HTTP. Fix or regenerate the certificate in Settings.`,
+      );
+      activity.log('TLS is enabled but the cert/key could not be read — falling back to plain HTTP', 'red').catch(() => {});
+    }
+  }
+
+  server.listen(config.port, () => {
+    console.log(`nonraid-webui backend listening on ${server instanceof https.Server ? 'https' : 'http'}://localhost:${config.port}`);
   });
 }
 
