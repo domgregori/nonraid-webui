@@ -4,6 +4,7 @@ import { HttpError } from '../httpError.js';
 import { DEFAULT_ARCH } from '../lxc/distros.js';
 import type { CreateLxcContainerOptions, LxcClient } from '../lxc/index.js';
 import { getCurrentLxcStorage, migrateLxcStorage } from '../lxc/storagePath.js';
+import { pruneTemplateCache } from '../lxc/templateCache.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
 import type { StorageLocation } from '../settings/types.js';
@@ -72,6 +73,17 @@ export function lxcRouter(lxc: LxcClient, activity: ActivityStore, nmd: NmdClien
       send({ type: 'error', message });
     } finally {
       res.end();
+    }
+  });
+
+  router.post('/lxc/template-cache/prune', async (_req, res) => {
+    try {
+      const result = await pruneTemplateCache();
+      const mb = (result.spaceReclaimedBytes / 1024 / 1024).toFixed(0);
+      activity.log(`Cleared LXC template cache, reclaimed ${mb} MB`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
     }
   });
 

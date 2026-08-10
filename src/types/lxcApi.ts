@@ -59,3 +59,7 @@ export interface LxcDistrosResponse {
   distros: LxcDistroOption[];
   defaultArch: string;
 }
+
+export interface PruneTemplateCacheResult {
+  spaceReclaimedBytes: number;
+}

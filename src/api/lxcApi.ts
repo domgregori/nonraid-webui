@@ -7,6 +7,7 @@ import type {
   LxcContainerDetail,
   LxcContainerSummary,
   LxcDistrosResponse,
+  PruneTemplateCacheResult,
 } from '../types/lxcApi';
 import type { LxcStorageInfo, StorageLocation, StoragePathProgress, StoragePathResult } from '../types/storagePath';
 
@@ -41,6 +42,7 @@ export const lxcApi = {
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
       onProgress,
     ),
+  pruneTemplateCache: () => request<PruneTemplateCacheResult>('/api/lxc/template-cache/prune', { method: 'POST' }),
   getStorage: () => request<LxcStorageInfo>('/api/lxc/storage'),
   moveStorage: (target: StorageLocation, onProgress: (p: StoragePathProgress) => void) =>
     streamNdjson<StoragePathProgress, StoragePathResult>(
