@@ -9,6 +9,7 @@ import { systemApi } from '../api/systemApi';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
 import { NotificationEventToggles } from '../components/settings/NotificationEventToggles';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
+import { ServicesSection } from '../components/settings/ServicesSection';
 import { StorageLocationField } from '../components/settings/StorageLocationField';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
 import { useSettings } from '../hooks/useSettings';
@@ -26,6 +27,7 @@ const SECTIONS = [
   { id: 'array', label: 'Array' },
   { id: 'cache', label: 'Cache' },
   { id: 'docker-lxc', label: 'Docker & LXC Storage' },
+  { id: 'services', label: 'Services' },
   { id: 'parity', label: 'Parity' },
   { id: 'import', label: 'Import from Unraid' },
   { id: 'shares', label: 'Shares' },
@@ -774,6 +776,11 @@ export function SettingsPage() {
           {lxcPruneResult && <div className="status-note">{lxcPruneResult}</div>}
           {lxcPruneError && <div className="status-note status-note--error">{lxcPruneError}</div>}
         </div>
+      </div>
+
+      <div className={`settings-card${activeSection === 'services' ? '' : ' settings-hidden'}`}>
+        <div className="settings-card__title">Services</div>
+        <ServicesSection />
       </div>
 
       <div className={`settings-card${activeSection === 'parity' ? '' : ' settings-hidden'}`}>

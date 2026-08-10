@@ -29,6 +29,7 @@ import { emptyDiskRouter } from './routes/emptyDisk.js';
 import { lxcRouter } from './routes/lxc.js';
 import { metricsRouter } from './routes/metrics.js';
 import { parityRouter } from './routes/parity.js';
+import { servicesRouter } from './routes/services.js';
 import { settingsRouter } from './routes/settings.js';
 import { sharesRouter } from './routes/shares.js';
 import { smartRouter } from './routes/smart.js';
@@ -165,6 +166,7 @@ async function main() {
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
   app.use('/api', systemRouter(system, nmd, activity));
+  app.use('/api', servicesRouter(activity));
   app.use('/api', usersRouter(users));
   app.use('/api', appsRouter(apps));
   app.use('/api', activityRouter(activity));
