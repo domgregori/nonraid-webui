@@ -153,7 +153,7 @@ async function main() {
   app.use('/api', arrayRouter(nmd, settingsStore, activity, shares, lxc));
   app.use('/api', parityRouter(nmd, activity, settingsStore));
   app.use('/api', settingsRouter(settingsStore, nmd, activity, shares));
-  app.use('/api', disksRouter(nmd, smart, activity, settingsStore));
+  app.use('/api', disksRouter(nmd, smart, activity, settingsStore, cache));
   app.use('/api', emptyDiskRouter(emptyDisk, activity));
   app.use('/api', cacheRouter(cache, cacheMover, settingsStore, activity, shares));
   app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity, nmd));

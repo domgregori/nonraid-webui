@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
+import type { CacheService } from '../cache/service.js';
 import type { NmdClient } from '../nmd/index.js';
 import { notifyEvent } from '../settings/notify.js';
 import type { SettingsStore } from '../settings/store.js';
@@ -14,13 +15,21 @@ function parseSlot(param: string): number | null {
   return Number.isInteger(slot) && slot >= 0 && slot <= 29 ? slot : null;
 }
 
-export function disksRouter(nmd: NmdClient, smart: SmartService, activity: ActivityStore, settingsStore: SettingsStore): Router {
+export function disksRouter(nmd: NmdClient, smart: SmartService, activity: ActivityStore, settingsStore: SettingsStore, cache: CacheService): Router {
   const router = Router();
 
   router.get('/disks/available', async (_req, res) => {
     try {
       const devices = await nmd.listAvailableDevices();
-      res.json(devices);
+      // A cache mirror member is claimed by btrfs, not nmdctl — nmd.listAvailableDevices() has no
+      // way to know about it (cache is a higher-level feature built on top of nmd, not the other
+      // way around), so it still lists these as free. The device-level exclusive-open check already
+      // marks them `locked` (btrfs holds them at the kernel level), which stops Add/Replace Disk
+      // from actually succeeding against one — but leaving them in this list at all is misleading,
+      // confirmed live: both mirror members still showed up in Unassigned Devices as if addable.
+      const cacheStatus = await cache.getStatus().catch(() => null);
+      const cacheDevicePaths = new Set((cacheStatus?.devices ?? []).map((d) => d.path).filter((p): p is string => p !== null));
+      res.json(devices.filter((d) => !cacheDevicePaths.has(d.device)));
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

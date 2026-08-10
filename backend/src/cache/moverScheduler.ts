@@ -4,7 +4,6 @@ import type { NmdClient } from '../nmd/index.js';
 import { scheduleMatchesHour } from '../settings/scheduleMatch.js';
 import type { SettingsStore } from '../settings/store.js';
 import { notifyEvent } from '../settings/notify.js';
-import type { FileMoveJobStatus } from '../fileMove/types.js';
 import type { CacheMoverService } from './mover.js';
 
 /**
@@ -19,9 +18,14 @@ import type { CacheMoverService } from './mover.js';
 export class CacheMoverScheduler {
   private timer: NodeJS.Timeout;
   private lastFiredDateKey: string | null = null;
-  // null means "not observed yet" — seeded silently on the first tick so a backend restart mid-run
-  // (or right after one finished) never produces a false completion notification.
-  private lastJobStatus: FileMoveJobStatus | 'idle' | null = null;
+  // undefined means "not observed yet" — seeded silently on the first tick so a backend restart
+  // mid-run (or right after one finished) never produces a false completion notification. Tracking
+  // finishedAt itself, not just status, matters: a move that completes in well under one tick
+  // interval (confirmed live — a small single-file move finished in under a second) can go
+  // idle -> running -> done between two polls with neither ever observing "running", so a plain
+  // status-transition diff silently misses it. finishedAt changes exactly once per run regardless
+  // of how fast that run was, so diffing it catches every completion, not just slow ones.
+  private lastFinishedAt: number | null | undefined = undefined;
 
   constructor(
     private mover: CacheMoverService,
@@ -36,15 +40,16 @@ export class CacheMoverScheduler {
 
   private checkJobCompletion(): void {
     const job = this.mover.status();
-    const prev = this.lastJobStatus;
-    this.lastJobStatus = job.status;
-    if (prev === null || prev === job.status) return;
+    const prevFinishedAt = this.lastFinishedAt;
+    this.lastFinishedAt = job.finishedAt;
+    if (prevFinishedAt === undefined) return; // first tick ever — seed silently
+    if (job.finishedAt === null || job.finishedAt === prevFinishedAt) return; // still running/idle, or already reported
 
-    if (prev === 'running' && job.status === 'done') {
+    if (job.status === 'done') {
       const text = job.error ? `Cache mover finished with errors: ${job.error}` : 'Cache mover finished moving everything off cache';
       this.activity.log(text, job.error ? 'amber' : 'green').catch(() => {});
       notifyEvent(this.settings, 'cacheMoverCompleted', 'NonRAID: cache mover finished', text);
-    } else if (prev === 'running' && job.status === 'failed') {
+    } else if (job.status === 'failed') {
       const text = `Cache mover failed: ${job.error ?? 'unknown error'}`;
       this.activity.log(text, 'red').catch(() => {});
       notifyEvent(this.settings, 'cacheMoverFailed', 'NonRAID: cache mover failed', text);
