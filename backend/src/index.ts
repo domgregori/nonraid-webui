@@ -6,6 +6,7 @@ import { ActivityStore, ActivityWatcher } from './activity/index.js';
 import { AppsService, CaFeedStore } from './apps/index.js';
 import { AuthService, AuthStore, requireAuth } from './auth/index.js';
 import { BrowseService } from './browse/service.js';
+import { CacheService } from './cache/service.js';
 import { config } from './config.js';
 import { createDockerClient } from './docker/index.js';
 import { EmptyDiskService } from './emptyDisk/index.js';
@@ -19,6 +20,7 @@ import { appsRouter } from './routes/apps.js';
 import { arrayRouter } from './routes/array.js';
 import { authRouter } from './routes/auth.js';
 import { browseRouter } from './routes/browse.js';
+import { cacheRouter } from './routes/cache.js';
 import { disksRouter } from './routes/disks.js';
 import { dockerRouter } from './routes/docker.js';
 import { emptyDiskRouter } from './routes/emptyDisk.js';
@@ -60,6 +62,7 @@ async function main() {
   const shares = new ShareService(shareStore, shareApplier, nmd, shareAccessStore, activity, settingsStore);
   const browse = new BrowseService(shares);
   const emptyDisk = new EmptyDiskService(nmd, shareStore);
+  const cache = new CacheService(nmd, smart, settingsStore);
   const system = new SystemStatsService(smart);
   const usersClient = createUsersClient();
   const users = new UsersService(usersClient, shareAccessStore, shareStore, shares, activity);
@@ -86,6 +89,13 @@ async function main() {
   if (persistedSettings.lxcStorage.mode === 'array') {
     config.lxcDefaultPath = resolveLxcPath(persistedSettings.lxcStorage);
   }
+
+  // Same "nothing survives a backend restart on its own" reasoning as the
+  // share remount below — mount the cache mirror (if one's been set up)
+  // before shares come back up, so a cache-aware share mount (once
+  // realApplier.ts's branchPaths() knows about cache — see the cache pool
+  // plan) sees it already mounted rather than racing it.
+  await cache.remountIfConfigured();
 
   // Share mounts live in the OS mount table, not shares.json, so they don't
   // survive a backend restart/reboot on their own — reapply them now so
@@ -141,6 +151,7 @@ async function main() {
   app.use('/api', settingsRouter(settingsStore, nmd, activity, shares));
   app.use('/api', disksRouter(nmd, smart, activity, settingsStore));
   app.use('/api', emptyDiskRouter(emptyDisk, activity));
+  app.use('/api', cacheRouter(cache, settingsStore, activity, shares));
   app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity, nmd));
   app.use('/api', lxcRouter(lxc, activity, nmd, settingsStore));
   app.use('/api', metricsRouter(metrics));
