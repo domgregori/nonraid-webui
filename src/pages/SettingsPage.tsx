@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { authApi } from '../api/authApi';
+import { cacheApi } from '../api/cacheApi';
 import { dockerApi } from '../api/dockerApi';
 import { lxcApi } from '../api/lxcApi';
 import { nmdApi } from '../api/nmdApi';
@@ -23,6 +24,7 @@ const SECTIONS = [
   { id: 'network', label: 'Network' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'array', label: 'Array' },
+  { id: 'cache', label: 'Cache' },
   { id: 'docker-lxc', label: 'Docker & LXC Storage' },
   { id: 'parity', label: 'Parity' },
   { id: 'import', label: 'Import from Unraid' },
@@ -103,6 +105,16 @@ export function SettingsPage() {
   const [tempAlertsSaving, setTempAlertsSaving] = useState(false);
   const [tempAlertsError, setTempAlertsError] = useState<string | null>(null);
 
+  const [cacheEnabled, setCacheEnabled] = useState(false);
+  const [cacheEnabledSaving, setCacheEnabledSaving] = useState(false);
+  const [cacheEnabledError, setCacheEnabledError] = useState<string | null>(null);
+  const [cacheSchedEnabled, setCacheSchedEnabled] = useState(false);
+  const [cacheSchedFrequency, setCacheSchedFrequency] = useState<'weekly' | 'monthly'>('weekly');
+  const [cacheSchedDay, setCacheSchedDay] = useState(0);
+  const [cacheSchedDayOfMonth, setCacheSchedDayOfMonth] = useState(1);
+  const [cacheSchedHour, setCacheSchedHour] = useState(3);
+  const [cacheSchedSaving, setCacheSchedSaving] = useState(false);
+
   const [backupSchedEnabled, setBackupSchedEnabled] = useState(false);
   const [backupSchedFrequency, setBackupSchedFrequency] = useState<'weekly' | 'monthly'>('weekly');
   const [backupSchedDay, setBackupSchedDay] = useState(0);
@@ -143,6 +155,7 @@ export function SettingsPage() {
   const paritySchedInitialized = useRef(false);
   const tempAlertsInitialized = useRef(false);
   const backupSchedInitialized = useRef(false);
+  const cacheInitialized = useRef(false);
   const hostnameInitialized = useRef(false);
   const timezoneInitialized = useRef(false);
 
@@ -218,7 +231,47 @@ export function SettingsPage() {
     }
   }, [settings]);
 
+  useEffect(() => {
+    if (settings && !cacheInitialized.current) {
+      setCacheEnabled(settings.cache.enabled);
+      setCacheSchedEnabled(settings.cacheSchedule.enabled);
+      setCacheSchedFrequency(settings.cacheSchedule.frequency);
+      setCacheSchedDay(settings.cacheSchedule.dayOfWeek);
+      setCacheSchedDayOfMonth(settings.cacheSchedule.dayOfMonth);
+      setCacheSchedHour(settings.cacheSchedule.hour);
+      cacheInitialized.current = true;
+    }
+  }, [settings]);
+
   const arrayStarted = status?.array.state === 'STARTED';
+
+  const toggleCacheEnabled = async () => {
+    const next = !cacheEnabled;
+    setCacheEnabledSaving(true);
+    setCacheEnabledError(null);
+    try {
+      await cacheApi.setEnabled(next);
+      setCacheEnabled(next);
+    } catch (err) {
+      setCacheEnabledError((err as Error).message);
+    } finally {
+      setCacheEnabledSaving(false);
+    }
+  };
+
+  const saveCacheSchedule = async () => {
+    setCacheSchedSaving(true);
+    await update({
+      cacheSchedule: {
+        enabled: cacheSchedEnabled,
+        frequency: cacheSchedFrequency,
+        dayOfWeek: cacheSchedDay,
+        dayOfMonth: cacheSchedDayOfMonth,
+        hour: cacheSchedHour,
+      },
+    });
+    setCacheSchedSaving(false);
+  };
 
   const saveHostname = async () => {
     setHostnameSaving(true);
@@ -534,6 +587,50 @@ export function SettingsPage() {
           <div>
             <div className="toggle-row__title">Superblock path</div>
             <div className="toggle-row__desc toggle-row__desc--mono">{status?.array.superblock ?? '—'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className={`settings-card${activeSection === 'cache' ? '' : ' settings-hidden'}`}>
+        <div className="settings-card__title">Cache</div>
+        <div className="toggle-row">
+          <div>
+            <div className="toggle-row__title">Use cache for shares</div>
+            <div className="toggle-row__desc">
+              While on, every share not pinned to a single disk writes to the cache mirror first — set up the mirror
+              on the Disks page before enabling this. A scheduled mover then drains cache onto the array below.
+            </div>
+          </div>
+          <ToggleSwitch on={cacheEnabled} onToggle={toggleCacheEnabled} label="Use cache for shares" disabled={!settings || cacheEnabledSaving} />
+        </div>
+        {cacheEnabledError && <div className="status-note status-note--error">{cacheEnabledError}</div>}
+
+        <div className="toggle-row toggle-row--bordered">
+          <div>
+            <div className="toggle-row__title">Automatic mover</div>
+            <div className="toggle-row__desc">
+              Moves everything currently on cache onto the array, per each share's own allocation settings, on the
+              schedule below.
+            </div>
+          </div>
+          <ToggleSwitch on={cacheSchedEnabled} onToggle={() => setCacheSchedEnabled((v) => !v)} label="Automatic mover" disabled={!settings} />
+        </div>
+        <div className="settings-field toggle-row--bordered">
+          <ScheduleFields
+            frequency={cacheSchedFrequency}
+            onFrequencyChange={setCacheSchedFrequency}
+            dayOfWeek={cacheSchedDay}
+            onDayOfWeekChange={setCacheSchedDay}
+            dayOfMonth={cacheSchedDayOfMonth}
+            onDayOfMonthChange={setCacheSchedDayOfMonth}
+            hour={cacheSchedHour}
+            onHourChange={setCacheSchedHour}
+            disabled={!settings}
+          />
+          <div className="settings-field__row">
+            <button type="button" className="btn" disabled={cacheSchedSaving || !settings} onClick={saveCacheSchedule}>
+              {cacheSchedSaving ? 'Saving…' : 'Save'}
+            </button>
           </div>
         </div>
       </div>

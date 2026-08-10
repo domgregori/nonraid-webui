@@ -60,6 +60,9 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
       if (patch.paritySchedule) {
         validateSchedulePatch('paritySchedule', patch.paritySchedule);
       }
+      if (patch.cacheSchedule) {
+        validateSchedulePatch('cacheSchedule', patch.cacheSchedule);
+      }
       if (patch.backupSchedule) {
         validateSchedulePatch('backupSchedule', patch.backupSchedule);
         const { destDir, retain } = patch.backupSchedule;

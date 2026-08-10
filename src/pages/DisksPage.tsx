@@ -4,6 +4,7 @@ import { BootDiskCard } from '../components/dashboard/BootDiskCard';
 import { EmptyDiskProgressCard } from '../components/dashboard/EmptyDiskProgressCard';
 import { ParityCheckCard } from '../components/dashboard/ParityCheckCard';
 import { BootDiskDetailPanel } from '../components/disk-detail/BootDiskDetailPanel';
+import { CacheSection } from '../components/disk-detail/CacheSection';
 import { UnassignedDevicesCard } from '../components/disk-detail/UnassignedDevicesCard';
 import { useArrayStatus } from '../state/useArrayStatus';
 
@@ -35,6 +36,8 @@ export function DisksPage() {
               <BootDiskCard onClick={() => setShowBootDisk(true)} />
             </div>
           </div>
+
+          <CacheSection />
 
           <UnassignedDevicesCard />
         </div>
