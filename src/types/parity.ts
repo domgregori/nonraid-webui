@@ -11,6 +11,9 @@ export interface ParityViewModel {
   progressLabel: string;
   speedText: string;
   etaText: string;
+  /** Same eta as etaText, worded for a small disk-card row ("35m remain") rather than the fuller
+   *  Parity Check card ("35 min remaining") — see DataDiskCard's clearing view. */
+  etaCompact: string;
   pauseLabel: string;
   startHandler: () => void;
   pauseHandler: () => void;

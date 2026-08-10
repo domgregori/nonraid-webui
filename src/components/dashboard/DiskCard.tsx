@@ -69,8 +69,11 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
           <div className="progress-track__fill" style={{ width: `${clearing.progressPct}%`, background: clearing.barColor }} />
         </div>
         <div className="disk-card__row--sub">
-          <span>{clearing.progressLabel}</span>
+          <span>Clearing: {clearing.progressPct}%</span>
           <span>{clearing.speedText}</span>
+        </div>
+        <div className="disk-card__row--sub">
+          <span>{clearing.etaCompact}</span>
         </div>
       </div>
     );

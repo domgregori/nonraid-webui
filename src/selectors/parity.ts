@@ -10,6 +10,13 @@ function formatEta(seconds: number): string {
   return `${Math.floor(mins / 60)}h ${mins % 60}m remaining`;
 }
 
+function formatEtaCompact(seconds: number): string {
+  if (!seconds || seconds <= 0) return '—';
+  const mins = Math.round(seconds / 60);
+  if (mins < 60) return `${mins}m remain`;
+  return `${Math.floor(mins / 60)}h ${mins % 60}m remain`;
+}
+
 /** resync is a single shared field — a new-disk clear or a parity rebuild uses the same progress data as a parity check, just a different `action` value. */
 function progressVerb(action: string): string {
   if (action.startsWith('clear')) return 'Clearing new disk';
@@ -41,6 +48,7 @@ export function deriveParityViewModel(
         : 'Last check: completed, 0 errors',
     speedText: resync.active && !resync.paused ? `${Math.round(resync.rate_mb_s)} MB/s` : '—',
     etaText: resync.active ? (resync.paused ? 'Paused' : formatEta(resync.eta_seconds)) : '—',
+    etaCompact: resync.active ? (resync.paused ? 'Paused' : formatEtaCompact(resync.eta_seconds)) : '—',
     pauseLabel: resync.paused ? 'Resume' : 'Pause',
     startHandler: () => onAction('CORRECT'),
     pauseHandler: () => onAction(resync.paused ? 'RESUME' : 'PAUSE'),
