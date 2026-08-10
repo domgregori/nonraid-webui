@@ -18,7 +18,22 @@ import { useArrayStatus } from '../state/useArrayStatus';
 import type { NotificationEventType } from '../types/settingsApi';
 import { formatMemLabel, formatUptime } from '../utils/format';
 
+const SECTIONS = [
+  { id: 'about', label: 'About' },
+  { id: 'network', label: 'Network' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'array', label: 'Array' },
+  { id: 'docker-lxc', label: 'Docker & LXC Storage' },
+  { id: 'parity', label: 'Parity' },
+  { id: 'import', label: 'Import from Unraid' },
+  { id: 'shares', label: 'Shares' },
+  { id: 'backups', label: 'Backups' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'security', label: 'Security' },
+] as const;
+
 export function SettingsPage() {
+  const [activeSection, setActiveSection] = useState<(typeof SECTIONS)[number]['id']>('about');
   const { settings, loadState, error, saving, saveError, update } = useSettings();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const stats = useSystemStats();
@@ -354,12 +369,27 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="page page--narrow">
+    <div className="page">
       <div className="page-title">Settings</div>
 
       {loadState === 'error' && <div className="status-note status-note--error">{error}</div>}
 
-      <div className="settings-card">
+      <div className="settings-layout">
+        <aside className="settings-sidebar">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`category-item${activeSection === s.id ? ' category-item--active' : ''}`}
+              onClick={() => setActiveSection(s.id)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </aside>
+
+        <div className="settings-main">
+      <div className={`settings-card${activeSection === 'about' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">About</div>
         <div className="settings-info-grid">
           <InfoRow label="Hostname" value={stats?.hostname ?? '—'} />
@@ -419,7 +449,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="settings-card">
+      <div className={`settings-card${activeSection === 'network' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Network</div>
         <div className="toggle-row__desc" style={{ marginBottom: 10 }}>
           Live interface addresses, read-only — this app doesn't manage network configuration.
@@ -443,7 +473,7 @@ export function SettingsPage() {
         )}
       </div>
 
-      <div className="settings-card">
+      <div className={`settings-card${activeSection === 'appearance' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Appearance</div>
         <div className="settings-field">
           <div className="toggle-row__title">Theme</div>
@@ -458,7 +488,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="settings-card">
+      <div className={`settings-card${activeSection === 'array' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Array</div>
         <div className="toggle-row">
           <div>
@@ -508,7 +538,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="settings-card">
+      <div className={`settings-card${activeSection === 'docker-lxc' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Docker &amp; LXC Storage</div>
         <StorageLocationField
           title="Docker"
@@ -553,7 +583,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="settings-card">
+      <div className={`settings-card${activeSection === 'parity' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Parity</div>
         <div className="toggle-row">
           <div>
@@ -590,7 +620,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="settings-card">
+      <div className={`settings-card${activeSection === 'import' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Import from Unraid</div>
         <div className="toggle-row__desc">
           Migrating an existing Unraid array? This walks through picking the original superblock file, checking it
@@ -605,7 +635,7 @@ export function SettingsPage() {
 
       {showImportWizard && <ImportArrayWizard onClose={() => setShowImportWizard(false)} />}
 
-      <div className="settings-card">
+      <div className={`settings-card${activeSection === 'shares' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Shares</div>
         <div className="settings-field">
           <div className="toggle-row__title">Minimum free space (MB)</div>
@@ -632,7 +662,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="settings-card">
+      <div className={`settings-card${activeSection === 'backups' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Backups</div>
         <div className="toggle-row">
           <div>
@@ -694,7 +724,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="settings-card">
+      <div className={`settings-card${activeSection === 'notifications' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Notifications</div>
         <div className="toggle-row">
           <div>
@@ -779,7 +809,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="settings-card">
+      <div className={`settings-card${activeSection === 'security' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Security</div>
         <div className="settings-field">
           <div className="toggle-row__title">Change admin password</div>
@@ -821,6 +851,8 @@ export function SettingsPage() {
           </div>
           {passwordResult && <div className="status-note">{passwordResult}</div>}
           {passwordError && <div className="status-note status-note--error">{passwordError}</div>}
+        </div>
+      </div>
         </div>
       </div>
     </div>
