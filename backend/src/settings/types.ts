@@ -12,26 +12,26 @@ export interface NotificationSettings {
   eventTypes: Record<NotificationEventType, boolean>;
 }
 
-export interface WeeklyOrMonthlySchedule {
+export interface RecurringSchedule {
   enabled: boolean;
-  frequency: 'weekly' | 'monthly';
+  frequency: 'daily' | 'weekly' | 'monthly';
   dayOfWeek: number; // 0 (Sun) – 6 (Sat), server local time — used when frequency is 'weekly'
   // 1–28 rather than 1–31: every month has at least 28 days, so this sidesteps
   // "the 30th doesn't exist in February" without needing month-length logic.
   dayOfMonth: number; // 1–28, server local time — used when frequency is 'monthly'
-  hour: number; // 0–23, server local time
+  hour: number; // 0–23, server local time — the only field that matters when frequency is 'daily'
 }
 
-export type ParitySchedule = WeeklyOrMonthlySchedule;
+export type ParitySchedule = RecurringSchedule;
 
-export interface BackupSchedule extends WeeklyOrMonthlySchedule {
+export interface BackupSchedule extends RecurringSchedule {
   destDir: string; // absolute path to write backups into — should be on the array, not the boot disk
   retain: number; // how many past backups to keep; older ones are pruned after each successful run
 }
 
 // Mover schedule — no extra fields beyond the shared shape; unlike backups there's no destination
 // to configure, the mover always drains /mnt/cache onto the array per each share's own disks.
-export type CacheSchedule = WeeklyOrMonthlySchedule;
+export type CacheSchedule = RecurringSchedule;
 
 export interface TempAlertSettings {
   enabled: boolean;

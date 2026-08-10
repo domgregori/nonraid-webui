@@ -100,7 +100,7 @@ export function SettingsPage() {
   const [minFreeSpaceError, setMinFreeSpaceError] = useState<string | null>(null);
 
   const [paritySchedEnabled, setParitySchedEnabled] = useState(false);
-  const [paritySchedFrequency, setParitySchedFrequency] = useState<'weekly' | 'monthly'>('weekly');
+  const [paritySchedFrequency, setParitySchedFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [paritySchedDay, setParitySchedDay] = useState(0);
   const [paritySchedDayOfMonth, setParitySchedDayOfMonth] = useState(1);
   const [paritySchedHour, setParitySchedHour] = useState(2);
@@ -115,7 +115,7 @@ export function SettingsPage() {
   const [cacheEnabledSaving, setCacheEnabledSaving] = useState(false);
   const [cacheEnabledError, setCacheEnabledError] = useState<string | null>(null);
   const [cacheSchedEnabled, setCacheSchedEnabled] = useState(false);
-  const [cacheSchedFrequency, setCacheSchedFrequency] = useState<'weekly' | 'monthly'>('weekly');
+  const [cacheSchedFrequency, setCacheSchedFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [cacheSchedDay, setCacheSchedDay] = useState(0);
   const [cacheSchedDayOfMonth, setCacheSchedDayOfMonth] = useState(1);
   const [cacheSchedHour, setCacheSchedHour] = useState(3);
@@ -124,7 +124,7 @@ export function SettingsPage() {
   const [cacheMoverError, setCacheMoverError] = useState<string | null>(null);
 
   const [backupSchedEnabled, setBackupSchedEnabled] = useState(false);
-  const [backupSchedFrequency, setBackupSchedFrequency] = useState<'weekly' | 'monthly'>('weekly');
+  const [backupSchedFrequency, setBackupSchedFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [backupSchedDay, setBackupSchedDay] = useState(0);
   const [backupSchedDayOfMonth, setBackupSchedDayOfMonth] = useState(1);
   const [backupSchedHour, setBackupSchedHour] = useState(3);

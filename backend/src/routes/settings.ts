@@ -6,14 +6,14 @@ import type { ShareService } from '../shares/index.js';
 
 const KNOWN_EVENT_TYPES = new Set<string>(NOTIFICATION_EVENTS.map((e) => e.id));
 
-/** Shared by paritySchedule and backupSchedule — both are WeeklyOrMonthlySchedule patches. */
+/** Shared by paritySchedule, backupSchedule, and cacheSchedule — all three are RecurringSchedule patches. */
 function validateSchedulePatch(fieldName: string, schedule: Record<string, unknown>): void {
   const { enabled, frequency, dayOfWeek, dayOfMonth, hour } = schedule;
   if ('enabled' in schedule && typeof enabled !== 'boolean') {
     throw new Error(`${fieldName}.enabled must be a boolean.`);
   }
-  if ('frequency' in schedule && frequency !== 'weekly' && frequency !== 'monthly') {
-    throw new Error(`${fieldName}.frequency must be "weekly" or "monthly".`);
+  if ('frequency' in schedule && frequency !== 'daily' && frequency !== 'weekly' && frequency !== 'monthly') {
+    throw new Error(`${fieldName}.frequency must be "daily", "weekly", or "monthly".`);
   }
   if ('dayOfWeek' in schedule && (!Number.isInteger(dayOfWeek) || (dayOfWeek as number) < 0 || (dayOfWeek as number) > 6)) {
     throw new Error(`${fieldName}.dayOfWeek must be an integer 0–6 (Sunday–Saturday).`);

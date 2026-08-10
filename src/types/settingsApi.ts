@@ -34,22 +34,22 @@ export interface NotificationSettings {
   eventTypes: Record<NotificationEventType, boolean>;
 }
 
-export interface WeeklyOrMonthlySchedule {
+export interface RecurringSchedule {
   enabled: boolean;
-  frequency: 'weekly' | 'monthly';
+  frequency: 'daily' | 'weekly' | 'monthly';
   dayOfWeek: number; // 0 (Sun) – 6 (Sat), server local time — used when frequency is 'weekly'
   dayOfMonth: number; // 1–28, server local time — used when frequency is 'monthly'
-  hour: number; // 0–23, server local time
+  hour: number; // 0–23, server local time — the only field that matters when frequency is 'daily'
 }
 
-export type ParitySchedule = WeeklyOrMonthlySchedule;
+export type ParitySchedule = RecurringSchedule;
 
-export interface BackupSchedule extends WeeklyOrMonthlySchedule {
+export interface BackupSchedule extends RecurringSchedule {
   destDir: string;
   retain: number;
 }
 
-export type CacheSchedule = WeeklyOrMonthlySchedule;
+export type CacheSchedule = RecurringSchedule;
 
 export interface TempAlertSettings {
   enabled: boolean;

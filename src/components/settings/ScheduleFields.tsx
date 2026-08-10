@@ -9,8 +9,8 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
 const DAY_OF_MONTH_OPTIONS = Array.from({ length: 28 }, (_, i) => i + 1);
 
 interface ScheduleFieldsProps {
-  frequency: 'weekly' | 'monthly';
-  onFrequencyChange: (frequency: 'weekly' | 'monthly') => void;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  onFrequencyChange: (frequency: 'daily' | 'weekly' | 'monthly') => void;
   dayOfWeek: number;
   onDayOfWeekChange: (day: number) => void;
   dayOfMonth: number;
@@ -20,7 +20,8 @@ interface ScheduleFieldsProps {
   disabled?: boolean;
 }
 
-/** Weekly/monthly + day + hour picker shared by the Parity and Backups schedule cards. */
+/** Daily/weekly/monthly + day + hour picker shared by the Parity, Backups, and Cache mover schedule
+ *  cards. Daily has no day picker at all — only the hour matters. */
 export function ScheduleFields({
   frequency,
   onFrequencyChange,
@@ -35,11 +36,17 @@ export function ScheduleFields({
   return (
     <>
       <div className="settings-field__row">
-        <select className="history-input" value={frequency} onChange={(e) => onFrequencyChange(e.target.value as 'weekly' | 'monthly')} disabled={disabled}>
+        <select
+          className="history-input"
+          value={frequency}
+          onChange={(e) => onFrequencyChange(e.target.value as 'daily' | 'weekly' | 'monthly')}
+          disabled={disabled}
+        >
+          <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
           <option value="monthly">Monthly</option>
         </select>
-        {frequency === 'weekly' ? (
+        {frequency === 'weekly' && (
           <select className="history-input" value={dayOfWeek} onChange={(e) => onDayOfWeekChange(Number(e.target.value))} disabled={disabled}>
             {DAY_NAMES.map((day, i) => (
               <option key={day} value={i}>
@@ -47,7 +54,8 @@ export function ScheduleFields({
               </option>
             ))}
           </select>
-        ) : (
+        )}
+        {frequency === 'monthly' && (
           <select className="history-input" value={dayOfMonth} onChange={(e) => onDayOfMonthChange(Number(e.target.value))} disabled={disabled}>
             {DAY_OF_MONTH_OPTIONS.map((day) => (
               <option key={day} value={day}>
