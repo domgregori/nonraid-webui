@@ -70,6 +70,19 @@ export async function getDeviceModel(devicePath: string): Promise<string | null>
   }
 }
 
+/** Raw byte size of a still-mounted mirror member — used by CacheService.replaceDevice() to enforce
+ *  btrfs's own same-size-or-larger requirement for a replacement, up front with a clear message
+ *  rather than letting `btrfs replace start` fail deep into the operation. */
+export async function getDeviceSizeBytes(devicePath: string): Promise<number | null> {
+  try {
+    const { stdout } = await run('lsblk', ['-b', '-n', '-d', '-o', 'SIZE', devicePath], 5_000);
+    const bytes = Number(stdout.trim());
+    return Number.isFinite(bytes) ? bytes : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Idempotent — safe to call at every backend startup regardless of whether
  * the mirror is already mounted (this app has no fstab/systemd .mount unit

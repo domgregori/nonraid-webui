@@ -62,7 +62,13 @@ export function CacheCard() {
         </span>
         <div className="parity-card__actions">
           <span className="toggle-row__desc">{status.enabled ? 'In use by shares' : 'Not in use by shares'}</span>
-          <button type="button" className="btn" disabled={moving} onClick={handleMoveNow}>
+          <button
+            type="button"
+            className="btn"
+            disabled={moving}
+            onClick={handleMoveNow}
+            title="Files currently open (e.g. by a running Docker container) are skipped rather than failing the whole move."
+          >
             {moving ? 'Starting…' : 'Move Now'}
           </button>
         </div>

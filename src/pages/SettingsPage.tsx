@@ -651,7 +651,11 @@ export function SettingsPage() {
         <div className="toggle-row toggle-row--bordered">
           <div>
             <div className="toggle-row__title">Run mover now</div>
-            <div className="toggle-row__desc">Moves everything currently on cache onto the array right away, outside the schedule above.</div>
+            <div className="toggle-row__desc">
+              Moves everything currently on cache onto the array right away, outside the schedule above. A file
+              that's currently open (e.g. by a running Docker container) is skipped rather than failing the whole
+              run — stop anything actively using cache-hosted paths first for a complete move.
+            </div>
           </div>
           <button type="button" className="btn" disabled={cacheMoverSaving} onClick={runCacheMover}>
             {cacheMoverSaving ? 'Starting…' : 'Move Now'}

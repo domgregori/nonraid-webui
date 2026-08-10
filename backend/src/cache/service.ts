@@ -6,7 +6,7 @@ import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
 import type { SmartService } from '../smart/service.js';
 import type { SmartHealth } from '../smart/types.js';
-import { getDeviceModel, isMounted, missingDevid, mountCache, resolveCacheDevicePaths } from './mount.js';
+import { getDeviceModel, getDeviceSizeBytes, isMounted, missingDevid, mountCache, resolveCacheDevicePaths } from './mount.js';
 import type { CacheDeviceStatus, CacheHealth, CacheReplaceStatus, CacheStatus } from './types.js';
 
 const execFileAsync = promisify(execFile);
@@ -162,6 +162,20 @@ export class CacheService {
 
     const missingDevice = status.devices.find((d) => d.missing);
     if (!missingDevice) throw new HttpError(409, 'No missing mirror member found to replace.');
+
+    // btrfs replace requires the new device be at least as large as the one it's replacing — check
+    // up front against the still-present member (same size by construction, both created together
+    // in setup()) rather than letting `btrfs replace start` fail deep into the operation.
+    const survivingDevice = status.devices.find((d) => !d.missing);
+    if (survivingDevice?.path) {
+      const [survivingSize, newSize] = await Promise.all([getDeviceSizeBytes(survivingDevice.path), getDeviceSizeBytes(newDevice)]);
+      if (survivingSize !== null && newSize !== null && newSize < survivingSize) {
+        throw new HttpError(
+          400,
+          `${newDevice} is smaller than the existing mirror member (${(newSize / 1e9).toFixed(1)} GB vs ${(survivingSize / 1e9).toFixed(1)} GB) — btrfs requires the replacement be the same size or larger.`,
+        );
+      }
+    }
 
     const { stdout, stderr } = await run(
       'btrfs',
