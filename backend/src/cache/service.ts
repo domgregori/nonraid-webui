@@ -45,6 +45,19 @@ export class CacheService {
     private settingsStore: SettingsStore,
   ) {}
 
+  /**
+   * Cheap yes/no check for RealShareApplier.branchPaths() — every share (re)mount calls this, so
+   * unlike getStatus() (which also enriches with SMART/model for the UI) this skips everything but
+   * "is the mirror enabled, fully present (both members — never a degraded one), and mounted."
+   */
+  async isActiveForShares(): Promise<boolean> {
+    const settings = await this.settingsStore.get();
+    if (!settings.cache.enabled || !settings.cache.fsUuid) return false;
+    const present = await resolveCacheDevicePaths(settings.cache.fsUuid);
+    if (present.length < 2) return false;
+    return isMounted(config.cacheMountPoint);
+  }
+
   async remountIfConfigured(): Promise<void> {
     const settings = await this.settingsStore.get();
     if (!settings.cache.fsUuid) return;

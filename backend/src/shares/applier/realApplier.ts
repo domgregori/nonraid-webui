@@ -132,11 +132,27 @@ async function replaceManagedBlock(filePath: string, replacementLines: string[])
  */
 export class RealShareApplier implements ShareApplier {
 
+  // single-disk shares are deliberately pinned to one specific array disk (see AllocationMethod's
+  // own doc comment) — cache doesn't apply to those, same as they're excluded from
+  // ShareInput.allDisks growth. Every other share gets the cache branch listed FIRST when it's
+  // available, so mergerfs's `ff` policy (see usesCacheBranch()) writes new files there before
+  // ever touching an array disk directly — see the cache pool plan's scope decisions for why this
+  // only ever triggers off a confirmed-healthy, fully-mounted ctx.cacheMountPoint (set in
+  // ShareService.buildContext(), never a degraded or unmounted mirror).
   private branchPaths(share: Share, ctx: ApplyContext): string[] {
-    return share.disks
+    const arrayBranches = share.disks
       .map((slot) => ctx.diskMountpoints[slot])
       .filter((mp): mp is string => Boolean(mp))
       .map((mp) => `${mp}/${share.name}`);
+
+    if (this.usesCacheBranch(share, ctx)) {
+      return [`${ctx.cacheMountPoint}/${share.name}`, ...arrayBranches];
+    }
+    return arrayBranches;
+  }
+
+  private usesCacheBranch(share: Share, ctx: ApplyContext): boolean {
+    return ctx.cacheMountPoint !== null && share.allocationMethod !== 'single-disk';
   }
 
   async mountShare(share: Share, ctx: ApplyContext): Promise<ShareCommandResult> {
@@ -162,7 +178,12 @@ export class RealShareApplier implements ShareApplier {
       // no pooling needed for a single branch
       await run('mount', ['--bind', branches[0]!, mountPoint]);
     } else {
-      const policy = mergerfsPolicy(share.allocationMethod);
+      // Cache-first writes need `ff` (first branch in order with room) regardless of the share's
+      // own configured method — mergerfs's category.create is one policy for the whole branch
+      // list, so a share can't keep e.g. most-free semantics across the array while also always
+      // preferring the cache branch first. Documented plainly in the cache pool plan rather than
+      // silently changing behavior.
+      const policy = this.usesCacheBranch(share, ctx) ? 'ff' : mergerfsPolicy(share.allocationMethod);
       // mergerfs excludes any branch below `minfreespace` from create-policy consideration —
       // its own default (4G) is a sane safety margin on real multi-TB disks, but it silently
       // makes every branch ineligible (ENOSPC on every write) on small disks. ctx.minFreeSpaceMb

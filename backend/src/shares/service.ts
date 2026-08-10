@@ -1,6 +1,7 @@
 import { rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { ActivityStore } from '../activity/index.js';
+import type { CacheService } from '../cache/service.js';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
@@ -19,10 +20,11 @@ export class ShareService {
     private aclStore: ShareAccessStore,
     private activity: ActivityStore,
     private settingsStore: SettingsStore,
+    private cache: CacheService,
   ) {}
 
   private async buildContext(): Promise<ApplyContext> {
-    const [status, settings] = await Promise.all([this.nmd.getStatus(), this.settingsStore.get()]);
+    const [status, settings, cacheActive] = await Promise.all([this.nmd.getStatus(), this.settingsStore.get(), this.cache.isActiveForShares()]);
     const diskMountpoints: Record<number, string> = {};
 
     for (const d of status.disks) {
@@ -31,7 +33,7 @@ export class ShareService {
       if (mp && mp !== '-') diskMountpoints[d.slot] = mp;
     }
 
-    return { diskMountpoints, minFreeSpaceMb: settings.minFreeSpaceMb };
+    return { diskMountpoints, minFreeSpaceMb: settings.minFreeSpaceMb, cacheMountPoint: cacheActive ? config.cacheMountPoint : null };
   }
 
   /**
