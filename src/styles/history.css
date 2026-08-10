@@ -50,7 +50,10 @@
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  /* min(380px, 100%) lets a track shrink to the container's own width instead of forcing a hard
+   * 380px floor — without it, any viewport narrower than ~380px (plus .page padding) still got a
+   * 380px-wide single column, pushing .metrics-grid and every chart inside it past the viewport. */
+  grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
   gap: var(--space-lg);
 }
 
