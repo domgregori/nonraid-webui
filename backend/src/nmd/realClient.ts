@@ -907,24 +907,34 @@ export class RealNmdClient implements NmdClient {
     return { ok: true, message: `Slot ${slot} restored to its previous disk. Start the array to confirm it's healthy again.` };
   }
 
-  async formatDisk(slot: number): Promise<NmdCommandResult> {
+  async formatDisk(slot: number, force = false): Promise<NmdCommandResult> {
     const status = await this.getStatus();
     const disk = status.disks.find((d) => d.slot === slot);
     if (!disk) throw new Error(`No disk assigned to slot ${slot}.`);
     if (status.resync.active) {
       throw new Error(`A clear/sync operation is still running on slot ${slot} — wait for it to finish first.`);
     }
-    if (disk.filesystem && disk.filesystem.type && disk.filesystem.type !== 'unknown') {
-      throw new Error(`Slot ${slot} already has a filesystem (${disk.filesystem.type}) — refusing to reformat over existing data.`);
+    // Checked ahead of the force branch below and never bypassable by it: force is for wiping a
+    // disk's own foreign, unmounted data, not for reformatting over a live mounted member (which
+    // would be destroying this array's own working data, not a foreign filesystem).
+    if (disk.filesystem?.mountpoint) {
+      throw new Error(`Slot ${slot} is currently mounted at ${disk.filesystem.mountpoint} — unmount it (or unassign the disk) before formatting.`);
+    }
+    if (!force && disk.filesystem && disk.filesystem.type && disk.filesystem.type !== 'unknown') {
+      throw new Error(`Slot ${slot} already has a filesystem (${disk.filesystem.type}) — refusing to reformat over existing data. Pass force to overwrite it.`);
     }
 
     const partition = `/dev/nmd${slot}p1`;
+    const mkfsArgs = force ? ['-f', partition] : [partition];
     const bin = config.nmdUseSudo ? 'sudo' : 'mkfs.xfs';
-    const args = config.nmdUseSudo ? ['mkfs.xfs', partition] : [partition];
+    const args = config.nmdUseSudo ? ['mkfs.xfs', ...mkfsArgs] : mkfsArgs;
     try {
-      // No -f: mkfs.xfs refuses on its own if the partition already carries a
-      // recognized filesystem/RAID signature — a real safety backstop, not
-      // just this app's own check above.
+      // Without force, no -f is passed: mkfs.xfs refuses on its own if the partition already
+      // carries a recognized filesystem/RAID signature — a real safety backstop, not just this
+      // app's own check above. force=true passes -f, deliberately discarding that backstop for a
+      // disk carrying data from outside this array (e.g. reused from another system) that the
+      // caller has already confirmed — via the frontend's own two-step confirmation dialog — is
+      // safe to destroy.
       const { stdout } = await execFileAsync(bin, args, { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 });
       await this.run(['mount']);
       return { ok: true, message: stdout.trim() || `Formatted ${partition} as XFS and mounted it.` };

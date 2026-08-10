@@ -57,10 +57,13 @@ export interface NmdClient {
   restoreUnassignedDisk(slot: number): Promise<NmdCommandResult>;
   // `nmdctl mount` never creates a filesystem — a freshly-cleared disk comes
   // out with FS "unknown" and stays unmounted until this runs. Shells out to
-  // mkfs.xfs with no -f: XFS refuses on its own if the partition already has
-  // a recognized filesystem/RAID signature, the same protection wipefs's
-  // absence would otherwise have to be checked for by hand.
-  formatDisk(slot: number): Promise<NmdCommandResult>;
+  // mkfs.xfs with no -f by default: XFS refuses on its own if the partition
+  // already has a recognized filesystem/RAID signature, the same protection
+  // wipefs's absence would otherwise have to be checked for by hand. `force`
+  // deliberately discards both that and this app's own pre-check, for a disk
+  // that carries a filesystem from outside this array (old data, a foreign
+  // OS) that the caller has confirmed is safe to destroy.
+  formatDisk(slot: number, force?: boolean): Promise<NmdCommandResult>;
   parityCheck(action: ParityCheckAction): Promise<NmdCommandResult>;
   unassignDisk(slot: number): Promise<NmdCommandResult>;
   // Reconfigures the array to drop one or more permanently-disabled slots —

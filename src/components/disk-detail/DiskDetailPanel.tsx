@@ -7,6 +7,7 @@ import { COLORS } from '../../styles/colors';
 import { ProgressBar } from '../shared/ProgressBar';
 import { BenchmarkSection } from './BenchmarkSection';
 import { EmptyDiskDialog } from './EmptyDiskDialog';
+import { ForceFormatDialog } from './ForceFormatDialog';
 import { ReplaceDiskDialog } from './ReplaceDiskDialog';
 import { ShrinkArrayDialog } from './ShrinkArrayDialog';
 import { SmartOverviewRows } from './SmartOverviewRows';
@@ -38,11 +39,17 @@ export function DiskDetailPanel() {
   const [showReplaceDialog, setShowReplaceDialog] = useState(false);
   const [showEmptyDialog, setShowEmptyDialog] = useState(false);
   const [showShrinkDialog, setShowShrinkDialog] = useState(false);
+  const [showForceFormatDialog, setShowForceFormatDialog] = useState(false);
 
   if (!selectedDiskId || !status || !disk) return null;
 
   const needsFormat = disk.role === 'data' && disk.fsType === 'UNKNOWN';
   const needsMount = disk.role === 'data' && !needsFormat && disk.mountpoint === '—';
+  // Same trigger as needsMount — a recognized filesystem that isn't mounted here means either
+  // "Mount Disk" hasn't been tried yet, or it's foreign data (e.g. ext4/ntfs from another system)
+  // that this app's mount step can never bring up. Offered alongside Mount Disk rather than
+  // instead of it, since a real prior array member can land in this same state.
+  const canForceFormat = needsMount;
   const arrayStarted = status.array.state === 'STARTED';
   // Unassigned but not yet committed via a start since — the disk's identity
   // is still intact and restoreUnassignedDisk() can put it back with no
@@ -385,6 +392,11 @@ export function DiskDetailPanel() {
               {mountError && <div className="status-note status-note--error">{mountError}</div>}
             </>
           )}
+          {canForceFormat && (
+            <button type="button" className="btn btn--block btn--danger" onClick={() => setShowForceFormatDialog(true)}>
+              Force Format
+            </button>
+          )}
           {disk.role === 'data' && !needsFormat && (
             <button type="button" className="btn btn--block" onClick={() => setShowEmptyDialog(true)}>
               Empty Disk
@@ -435,6 +447,15 @@ export function DiskDetailPanel() {
             setShowShrinkDialog(false);
             closeDetail();
           }}
+        />
+      )}
+      {showForceFormatDialog && (
+        <ForceFormatDialog
+          slot={disk.slot}
+          label={disk.label}
+          fsType={disk.fsType}
+          onClose={() => setShowForceFormatDialog(false)}
+          onDone={() => {}}
         />
       )}
     </>

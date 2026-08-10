@@ -126,9 +126,15 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
       res.status(400).json({ error: 'Slot must be a number 0-29.' });
       return;
     }
+    const force = req.body?.force === true;
     try {
-      const result = await nmd.formatDisk(slot);
-      activity.log(`Disk in slot ${slot} formatted (XFS)`, 'blue').catch(() => {});
+      const result = await nmd.formatDisk(slot, force);
+      activity
+        .log(
+          force ? `Disk in slot ${slot} force-formatted (XFS), overwriting its existing filesystem` : `Disk in slot ${slot} formatted (XFS)`,
+          force ? 'red' : 'blue',
+        )
+        .catch(() => {});
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
