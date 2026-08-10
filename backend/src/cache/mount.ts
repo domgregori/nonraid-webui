@@ -36,6 +36,10 @@ export async function resolveCacheDevicePaths(fsUuid: string): Promise<ResolvedC
   const { stdout } = await run('btrfs', ['filesystem', 'show', fsUuid]).catch(() => ({ stdout: '' }));
   const devices: ResolvedCacheDevice[] = [];
   for (const line of stdout.split('\n')) {
+    // A missing member still gets a `devid N size 0 used 0 path /dev/sdX MISSING` line — same shape
+    // as a present device's line, just with a trailing MISSING marker and zeroed size/used. Confirmed
+    // live: without this check, a missing device was parsed as present at its last-known path.
+    if (/\bMISSING\b/.test(line)) continue;
     const m = line.match(/devid\s+(\d+)\s+size\s+\S+\s+used\s+\S+\s+path\s+(\S+)/);
     if (m) devices.push({ devid: Number(m[1]), path: m[2]! });
   }
