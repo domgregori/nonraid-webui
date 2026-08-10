@@ -6,6 +6,8 @@ import { ActivityStore, ActivityWatcher } from './activity/index.js';
 import { AppsService, CaFeedStore } from './apps/index.js';
 import { AuthService, AuthStore, requireAuth } from './auth/index.js';
 import { BrowseService } from './browse/service.js';
+import { CacheMoverService } from './cache/mover.js';
+import { CacheMoverScheduler } from './cache/moverScheduler.js';
 import { CacheService } from './cache/service.js';
 import { config } from './config.js';
 import { createDockerClient } from './docker/index.js';
@@ -63,6 +65,8 @@ async function main() {
   const shares = new ShareService(shareStore, shareApplier, nmd, shareAccessStore, activity, settingsStore, cache);
   const browse = new BrowseService(shares);
   const emptyDisk = new EmptyDiskService(nmd, shareStore);
+  const cacheMover = new CacheMoverService(nmd, shareStore, settingsStore);
+  new CacheMoverScheduler(cacheMover, nmd, settingsStore, activity);
   const system = new SystemStatsService(smart);
   const usersClient = createUsersClient();
   const users = new UsersService(usersClient, shareAccessStore, shareStore, shares, activity);
@@ -151,7 +155,7 @@ async function main() {
   app.use('/api', settingsRouter(settingsStore, nmd, activity, shares));
   app.use('/api', disksRouter(nmd, smart, activity, settingsStore));
   app.use('/api', emptyDiskRouter(emptyDisk, activity));
-  app.use('/api', cacheRouter(cache, settingsStore, activity, shares));
+  app.use('/api', cacheRouter(cache, cacheMover, settingsStore, activity, shares));
   app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity, nmd));
   app.use('/api', lxcRouter(lxc, activity, nmd, settingsStore));
   app.use('/api', metricsRouter(metrics));

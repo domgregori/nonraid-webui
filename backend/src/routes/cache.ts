@@ -1,12 +1,18 @@
 import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
+import type { CacheMoverService } from '../cache/mover.js';
 import type { CacheService } from '../cache/service.js';
 import { HttpError } from '../httpError.js';
-import { notifyEvent } from '../settings/notify.js';
 import type { SettingsStore } from '../settings/store.js';
 import type { ShareService } from '../shares/index.js';
 
-export function cacheRouter(cache: CacheService, settingsStore: SettingsStore, activity: ActivityStore, shares: ShareService): Router {
+export function cacheRouter(
+  cache: CacheService,
+  mover: CacheMoverService,
+  settingsStore: SettingsStore,
+  activity: ActivityStore,
+  shares: ShareService,
+): Router {
   const router = Router();
 
   router.get('/cache/status', async (_req, res) => {
@@ -29,7 +35,6 @@ export function cacheRouter(cache: CacheService, settingsStore: SettingsStore, a
       await shares.remountAll();
       const text = `Cache pool set up (${deviceA} + ${deviceB}, mirrored)`;
       activity.log(text, 'green').catch(() => {});
-      notifyEvent(settingsStore, 'cacheMoverCompleted', 'NonRAID: cache pool created', text);
       res.json({ ok: true, message: text });
     } catch (err) {
       const status = err instanceof HttpError ? err.status : 502;
@@ -80,6 +85,26 @@ export function cacheRouter(cache: CacheService, settingsStore: SettingsStore, a
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }
+  });
+
+  router.post('/cache/mover/run', async (_req, res) => {
+    try {
+      await mover.run();
+      activity.log('Cache mover started', 'blue').catch(() => {});
+      res.json({ ok: true, message: 'Cache mover started.' });
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
+  router.get('/cache/mover/status', (_req, res) => {
+    res.json(mover.status());
+  });
+
+  router.post('/cache/mover/cancel', (_req, res) => {
+    mover.cancel();
+    res.json({ ok: true, message: 'Cancelling cache mover.' });
   });
 
   return router;

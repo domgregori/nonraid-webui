@@ -114,6 +114,8 @@ export function SettingsPage() {
   const [cacheSchedDayOfMonth, setCacheSchedDayOfMonth] = useState(1);
   const [cacheSchedHour, setCacheSchedHour] = useState(3);
   const [cacheSchedSaving, setCacheSchedSaving] = useState(false);
+  const [cacheMoverSaving, setCacheMoverSaving] = useState(false);
+  const [cacheMoverError, setCacheMoverError] = useState<string | null>(null);
 
   const [backupSchedEnabled, setBackupSchedEnabled] = useState(false);
   const [backupSchedFrequency, setBackupSchedFrequency] = useState<'weekly' | 'monthly'>('weekly');
@@ -271,6 +273,18 @@ export function SettingsPage() {
       },
     });
     setCacheSchedSaving(false);
+  };
+
+  const runCacheMover = async () => {
+    setCacheMoverSaving(true);
+    setCacheMoverError(null);
+    try {
+      await cacheApi.runMover();
+    } catch (err) {
+      setCacheMoverError((err as Error).message);
+    } finally {
+      setCacheMoverSaving(false);
+    }
   };
 
   const saveHostname = async () => {
@@ -633,6 +647,17 @@ export function SettingsPage() {
             </button>
           </div>
         </div>
+
+        <div className="toggle-row toggle-row--bordered">
+          <div>
+            <div className="toggle-row__title">Run mover now</div>
+            <div className="toggle-row__desc">Moves everything currently on cache onto the array right away, outside the schedule above.</div>
+          </div>
+          <button type="button" className="btn" disabled={cacheMoverSaving} onClick={runCacheMover}>
+            {cacheMoverSaving ? 'Starting…' : 'Move Now'}
+          </button>
+        </div>
+        {cacheMoverError && <div className="status-note status-note--error">{cacheMoverError}</div>}
       </div>
 
       <div className={`settings-card${activeSection === 'docker-lxc' ? '' : ' settings-hidden'}`}>

@@ -28,3 +28,18 @@ export interface CacheCommandResult {
   ok: boolean;
   message: string;
 }
+
+// Mirrors backend/src/fileMove/types.ts's FileMoveJobState (the mover job, sourceId always "cache").
+export type CacheMoverJobStatus = 'idle' | 'planning' | 'planned' | 'running' | 'done' | 'failed' | 'cancelled';
+
+export interface CacheMoverJobState {
+  status: CacheMoverJobStatus;
+  totalBytes: number;
+  movedBytes: number;
+  totalFiles: number;
+  movedFiles: number;
+  currentFile: string | null;
+  error: string | null;
+  startedAt: number | null;
+  finishedAt: number | null;
+}

@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { cacheApi } from '../../api/cacheApi';
 import { useCacheStatus } from '../../hooks/useCacheStatus';
 import { COLORS } from '../../styles/colors';
 import type { CacheHealth } from '../../types/cacheApi';
@@ -24,10 +26,25 @@ function healthColor(health: CacheHealth): string {
 // gives a state that doesn't apply right now, rather than a permanent empty card on every install.
 export function CacheCard() {
   const { status } = useCacheStatus();
+  const [moving, setMoving] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
+
   if (!status || status.health === 'not-configured') return null;
 
   const color = healthColor(status.health);
   const usedPct = status.usedBytes != null && status.totalBytes ? (status.usedBytes / status.totalBytes) * 100 : 0;
+
+  const handleMoveNow = async () => {
+    setMoving(true);
+    setMoveError(null);
+    try {
+      await cacheApi.runMover();
+    } catch (err) {
+      setMoveError((err as Error).message);
+    } finally {
+      setMoving(false);
+    }
+  };
 
   return (
     <Card>
@@ -43,8 +60,14 @@ export function CacheCard() {
           <span className="disk-card__status-dot" style={{ background: color }} />
           {HEALTH_LABEL[status.health]}
         </span>
-        <span className="toggle-row__desc">{status.enabled ? 'In use by shares' : 'Not in use by shares'}</span>
+        <div className="parity-card__actions">
+          <span className="toggle-row__desc">{status.enabled ? 'In use by shares' : 'Not in use by shares'}</span>
+          <button type="button" className="btn" disabled={moving} onClick={handleMoveNow}>
+            {moving ? 'Starting…' : 'Move Now'}
+          </button>
+        </div>
       </div>
+      {moveError && <div className="status-note status-note--error">{moveError}</div>}
 
       {status.usedBytes != null && status.totalBytes != null && (
         <>
