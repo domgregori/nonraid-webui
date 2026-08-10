@@ -137,3 +137,36 @@
   font-size: 12px;
   color: var(--color-text-dim);
 }
+
+/* Below this width, the fixed 100px/160px size/modified columns plus the actions column left too
+ * little room for the 1fr name column — grid shrank it to ~0 (min-width: 0 lets a 1fr track go
+ * that low) and .browse-table's overflow: hidden clipped it entirely, so only the size column's
+ * "—" for directories remained visible where the name used to be. Switching to a wrapping flex
+ * row lets the name take the full row width on its own line instead of fighting fixed-width
+ * siblings for a shrinking share of it. */
+@media (max-width: 640px) {
+  .browse-table__head {
+    display: none;
+  }
+
+  .browse-row {
+    display: flex;
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .browse-row__name {
+    flex: 1 1 100%;
+  }
+
+  .browse-row__size,
+  .browse-row__modified {
+    flex: 0 0 auto;
+  }
+
+  .browse-row__actions {
+    flex: 1 0 auto;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
