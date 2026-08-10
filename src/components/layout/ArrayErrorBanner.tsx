@@ -25,6 +25,7 @@ import { useArrayStatus } from '../../state/useArrayStatus';
 export function ArrayErrorBanner() {
   const { status } = useArrayStatus();
   const [confirming, setConfirming] = useState(false);
+  const [stopContainers, setStopContainers] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +35,7 @@ export function ArrayErrorBanner() {
     setRunning(true);
     setError(null);
     try {
-      await nmdApi.reloadDriver();
+      await nmdApi.reloadDriver(stopContainers);
       setConfirming(false);
     } catch (err) {
       setError((err as Error).message);
@@ -59,6 +60,11 @@ export function ArrayErrorBanner() {
             are in the array, only refreshes its live state. Like any driver reload, it can leave the array briefly
             down if interrupted; let it finish once started.
           </p>
+          <label style={{ display: 'block', marginBottom: 8 }}>
+            <input type="checkbox" checked={stopContainers} onChange={(e) => setStopContainers(e.target.checked)} disabled={running} />{' '}
+            Stop Docker and running LXC containers first, if needed (e.g. a container's storage is on an array
+            disk and blocking the reload) — they're started again automatically right after.
+          </label>
           {error && <div style={{ marginBottom: 8 }}>{error}</div>}
           <button type="button" className="btn" disabled={running} onClick={() => setConfirming(false)}>
             Cancel

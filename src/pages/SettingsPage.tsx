@@ -84,6 +84,7 @@ export function SettingsPage() {
   const [labelSaving, setLabelSaving] = useState(false);
 
   const [reloadConfirming, setReloadConfirming] = useState(false);
+  const [reloadStopContainers, setReloadStopContainers] = useState(false);
   const [reloadRunning, setReloadRunning] = useState(false);
   const [reloadResult, setReloadResult] = useState<string | null>(null);
   const [reloadError, setReloadError] = useState<string | null>(null);
@@ -339,7 +340,7 @@ export function SettingsPage() {
     setReloadError(null);
     setReloadResult(null);
     try {
-      const result = await nmdApi.reloadDriver();
+      const result = await nmdApi.reloadDriver(reloadStopContainers);
       setReloadResult(result.message);
       setReloadConfirming(false);
     } catch (err) {
@@ -641,14 +642,30 @@ export function SettingsPage() {
               </button>
             </div>
           ) : (
-            <div className="settings-field__row">
-              <button type="button" className="btn" disabled={reloadRunning} onClick={() => setReloadConfirming(false)}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn--danger" disabled={reloadRunning} onClick={handleReloadDriver}>
-                {reloadRunning ? 'Reloading…' : 'Confirm Reload'}
-              </button>
-            </div>
+            <>
+              <label className="disk-checkbox" style={{ marginTop: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={reloadStopContainers}
+                  onChange={(e) => setReloadStopContainers(e.target.checked)}
+                  disabled={reloadRunning}
+                />
+                Stop Docker and running LXC containers first, if needed
+              </label>
+              <div className="toggle-row__desc">
+                {reloadStopContainers
+                  ? 'If a disk is busy (e.g. Docker or an LXC container has storage on an array disk), Docker and any running LXC containers are stopped before the reload and started again right after. Leave this off and the reload just fails with a clear error instead — nothing is stopped without your say-so.'
+                  : "Off by default: if a disk turns out to be busy, the reload fails with a clear error instead of stopping anything. Check this to let it stop Docker/LXC containers first when that's actually what's blocking it, then restart them automatically afterward."}
+              </div>
+              <div className="settings-field__row">
+                <button type="button" className="btn" disabled={reloadRunning} onClick={() => setReloadConfirming(false)}>
+                  Cancel
+                </button>
+                <button type="button" className="btn btn--danger" disabled={reloadRunning} onClick={handleReloadDriver}>
+                  {reloadRunning ? 'Reloading…' : 'Confirm Reload'}
+                </button>
+              </div>
+            </>
           )}
           {reloadResult && <div className="status-note">{reloadResult}</div>}
           {reloadError && <div className="status-note status-note--error">{reloadError}</div>}

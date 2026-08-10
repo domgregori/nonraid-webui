@@ -4,12 +4,15 @@ import os from 'node:os';
 import { Router } from 'express';
 import multer from 'multer';
 import type { ActivityStore } from '../activity/index.js';
+import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
+import type { LxcClient } from '../lxc/index.js';
 import type { NmdClient } from '../nmd/index.js';
 import { matchSlotToDisk, parseSuperblock } from '../nmd/superblock.js';
 import type { SettingsStore } from '../settings/index.js';
 import { notifyEvent } from '../settings/notify.js';
 import type { ShareService } from '../shares/index.js';
+import { runSudoMaybe } from '../system/procUtil.js';
 
 // A superblock is always exactly 4096 bytes (see nmd/superblock.ts); this
 // limit is just generous headroom so a wrong/oversized file gets multer's
@@ -39,7 +42,7 @@ function sweepStagedImports(): void {
   }
 }
 
-export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activity: ActivityStore, shares: ShareService): Router {
+export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activity: ActivityStore, shares: ShareService, lxc: LxcClient): Router {
   const router = Router();
 
   router.post('/array/start', async (_req, res) => {
@@ -235,7 +238,16 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
     }
   });
 
-  router.post('/array/reload-driver', async (_req, res) => {
+  router.post('/array/reload-driver', async (req, res) => {
+    // Opt-in — stopping Docker/every running LXC container is a real disruption, so it only
+    // happens if the caller explicitly agreed to it (see the Settings UI's warning) AND it turns
+    // out to actually be necessary (unmountDisks() below only fails this way when something has a
+    // file open on an array disk, e.g. Docker/LXC storage relocated there — see docker/storagePath.ts
+    // and lxc/storagePath.ts for the same class of conflict during a storage move).
+    const stopContainers = req.body?.stopContainers === true;
+    let dockerStopped = false;
+    const stoppedLxcNames: string[] = [];
+
     try {
       // Best-effort here, unlike /array/stop and /array/shrink — this is a
       // recovery action meant to work from an already-broken state (e.g.
@@ -243,7 +255,26 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       // stopped with nothing mounted; failing the whole recovery because
       // there was nothing to unmount would defeat the point.
       await shares.unmountAll().catch(() => {});
-      await nmd.unmountDisks().catch(() => {});
+      try {
+        await nmd.unmountDisks();
+      } catch (err) {
+        if (!stopContainers) throw err;
+
+        activity.log('Stopping Docker and running LXC containers to allow the driver reload', 'amber').catch(() => {});
+        await runSudoMaybe('systemctl', ['stop', 'docker.socket', 'docker.service'], config.systemUseSudo).catch(() => {});
+        dockerStopped = true;
+
+        const containers = await lxc.listContainers().catch(() => []);
+        for (const c of containers) {
+          if (c.state !== 'running') continue;
+          await lxc.stopContainer(c.name).catch(() => {});
+          stoppedLxcNames.push(c.name);
+        }
+
+        await shares.unmountAll().catch(() => {});
+        await nmd.unmountDisks(); // still busy after stopping containers — let this one throw for real
+      }
+
       const result = await nmd.reloadDriver();
       try {
         await nmd.mountDisks();
@@ -255,6 +286,19 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
+    } finally {
+      // Always try to bring back whatever was stopped, regardless of whether the reload itself
+      // ultimately succeeded — leaving Docker/containers down on a failed reload attempt would
+      // turn a recovery action into a second outage.
+      if (dockerStopped) {
+        await runSudoMaybe('systemctl', ['start', 'docker'], config.systemUseSudo).catch(() => {});
+      }
+      for (const name of stoppedLxcNames) {
+        await lxc.startContainer(name).catch(() => {});
+      }
+      if (dockerStopped || stoppedLxcNames.length > 0) {
+        activity.log('Restarted Docker/LXC containers after the driver reload', 'blue').catch(() => {});
+      }
     }
   });
 

@@ -150,7 +150,7 @@ async function main() {
   app.use(requireAuth(authService));
 
   app.use('/api', statusRouter(nmd));
-  app.use('/api', arrayRouter(nmd, settingsStore, activity, shares));
+  app.use('/api', arrayRouter(nmd, settingsStore, activity, shares, lxc));
   app.use('/api', parityRouter(nmd, activity, settingsStore));
   app.use('/api', settingsRouter(settingsStore, nmd, activity, shares));
   app.use('/api', disksRouter(nmd, smart, activity, settingsStore));
