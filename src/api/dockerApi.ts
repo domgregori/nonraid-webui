@@ -7,6 +7,7 @@ import type {
   DockerContainerSummary,
   ManualContainerPlan,
   ManualContainerRequest,
+  PruneImagesResult,
 } from '../types/dockerApi';
 import type { DockerStorageInfo, StorageLocation, StoragePathProgress, StoragePathResult } from '../types/storagePath';
 
@@ -37,6 +38,7 @@ export const dockerApi = {
     ),
   getContainerLogs: (id: string, tail?: number) =>
     request<{ logs: string }>(`/api/docker/containers/${id}/logs${tail ? `?tail=${tail}` : ''}`),
+  pruneImages: () => request<PruneImagesResult>('/api/docker/images/prune', { method: 'POST' }),
   getStorage: () => request<DockerStorageInfo>('/api/docker/storage'),
   moveStorage: (target: StorageLocation, onProgress: (p: StoragePathProgress) => void) =>
     streamNdjson<StoragePathProgress, StoragePathResult>(

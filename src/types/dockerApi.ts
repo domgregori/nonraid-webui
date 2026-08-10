@@ -26,6 +26,11 @@ export interface DockerCommandResult {
   message: string;
 }
 
+export interface PruneImagesResult {
+  imagesDeleted: number;
+  spaceReclaimedBytes: number;
+}
+
 export interface CreateContainerProgress {
   phase: 'pulling' | 'removing' | 'creating' | 'starting';
   message: string;

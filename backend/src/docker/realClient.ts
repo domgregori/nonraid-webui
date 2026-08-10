@@ -240,6 +240,23 @@ export class RealDockerClient implements DockerClient {
     });
   }
 
+  async destroyContainer(id: string): Promise<DockerCommandResult> {
+    return this.guard(async () => {
+      const container = this.docker.getContainer(id);
+      const info = await container.inspect();
+      const imageRef = info.Config.Image; // e.g. "repo:tag" — the reference actually used to create it
+      await container.remove({ force: true });
+      try {
+        await this.docker.getImage(imageRef).remove({ force: false });
+        return { ok: true, message: `Container removed, image "${imageRef}" removed` };
+      } catch {
+        // Still referenced by another container (running or stopped) — not an error, just means
+        // this wasn't the last container using it.
+        return { ok: true, message: `Container removed (image "${imageRef}" kept — still used by another container)` };
+      }
+    });
+  }
+
   async getContainerLogs(id: string, tail = 500): Promise<string> {
     return this.guard(async () => {
       const container = this.docker.getContainer(id);
@@ -253,6 +270,19 @@ export class RealDockerClient implements DockerClient {
     return this.guard(async () => {
       const info = (await this.docker.info()) as { DockerRootDir: string };
       return info.DockerRootDir;
+    });
+  }
+
+  async pruneImages(): Promise<{ imagesDeleted: number; spaceReclaimedBytes: number }> {
+    return this.guard(async () => {
+      // dangling: ['false'] widens this from Docker's own default (untagged/dangling images only)
+      // to every image not referenced by any container — the case an admin actually means by
+      // "prune images" (e.g. a leftover tagged image from a container that was since destroyed).
+      const result = await this.docker.pruneImages({ filters: { dangling: ['false'] } });
+      return {
+        imagesDeleted: (result.ImagesDeleted ?? []).length,
+        spaceReclaimedBytes: result.SpaceReclaimed ?? 0,
+      };
     });
   }
 

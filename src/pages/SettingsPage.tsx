@@ -25,6 +25,24 @@ export function SettingsPage() {
   const { status } = useArrayStatus();
   const dataDisks = (status?.disks ?? []).filter((d) => d.type === 'data').map((d) => ({ slot: d.slot, label: `Disk ${d.slot}` }));
 
+  const [pruneSaving, setPruneSaving] = useState(false);
+  const [pruneResult, setPruneResult] = useState<string | null>(null);
+  const [pruneError, setPruneError] = useState<string | null>(null);
+  const handlePruneImages = async () => {
+    setPruneSaving(true);
+    setPruneResult(null);
+    setPruneError(null);
+    try {
+      const result = await dockerApi.pruneImages();
+      const mb = (result.spaceReclaimedBytes / 1024 / 1024).toFixed(0);
+      setPruneResult(`Removed ${result.imagesDeleted} unused image(s), reclaimed ${mb} MB.`);
+    } catch (err) {
+      setPruneError((err as Error).message);
+    } finally {
+      setPruneSaving(false);
+    }
+  };
+
   const [labelDraft, setLabelDraft] = useState('');
   const [labelResult, setLabelResult] = useState<string | null>(null);
   const [labelError, setLabelError] = useState<string | null>(null);
@@ -481,6 +499,19 @@ export function SettingsPage() {
           getStorage={dockerApi.getStorage}
           moveStorage={dockerApi.moveStorage}
         />
+        <div className="settings-field toggle-row--bordered">
+          <div className="toggle-row__title">Prune unused Docker images</div>
+          <div className="toggle-row__desc">
+            Removes every Docker image not used by any container, running or stopped — not just dangling/untagged
+            ones. Destroying a container already removes its own image if nothing else uses it; this catches
+            anything left over from before that (or images pulled but never run).
+          </div>
+          <button type="button" className="btn" disabled={pruneSaving} onClick={handlePruneImages}>
+            {pruneSaving ? 'Pruning…' : 'Prune Images'}
+          </button>
+          {pruneResult && <div className="status-note">{pruneResult}</div>}
+          {pruneError && <div className="status-note status-note--error">{pruneError}</div>}
+        </div>
         <StorageLocationField
           title="LXC"
           desc="Where LXC container storage lives."
