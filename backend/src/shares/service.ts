@@ -155,6 +155,9 @@ export class ShareService {
       if (!mp) continue; // disk offline — nothing reachable to delete on it
       await rm(`${mp}/${name}`, { recursive: true, force: true });
     }
+    if (share.allocationMethod === 'cache-only' && ctx.cacheMountPoint) {
+      await rm(`${ctx.cacheMountPoint}/${name}`, { recursive: true, force: true });
+    }
     // Now just a plain empty directory (unmounted), so this won't hit the
     // EBUSY that stopped a direct delete in the first place. Best-effort:
     // the share is already fully gone by this point either way.
@@ -272,9 +275,27 @@ export class ShareService {
    * strand that disk's data under the old name, unreachable through the
    * renamed share, until someone happens to notice and fix it up by hand.
    * A disk with no old-named directory (nothing was ever written there) is
-   * a normal no-op, not an error.
+   * a normal no-op, not an error. A cache-only share has no array disks at
+   * all — its data lives solely under the cache mountpoint, moved there
+   * instead, refusing the rename the same way if cache isn't currently
+   * mounted (the exact same "don't strand data under the old name" reasoning
+   * as an offline array disk).
    */
   private async moveShareData(oldShare: Share, newName: string, ctx: ApplyContext): Promise<void> {
+    if (oldShare.allocationMethod === 'cache-only') {
+      if (!ctx.cacheMountPoint) {
+        throw new HttpError(
+          409,
+          `The cache pool isn't currently active — "${oldShare.name}"'s data can't be moved right now. Bring cache back online before renaming, or the data would be stranded under the old name.`,
+        );
+      }
+      const oldPath = `${ctx.cacheMountPoint}/${oldShare.name}`;
+      const newPath = `${ctx.cacheMountPoint}/${newName}`;
+      const exists = await stat(oldPath).then(() => true, () => false);
+      if (exists) await rename(oldPath, newPath);
+      return;
+    }
+
     const skipped: number[] = [];
     for (const slot of oldShare.disks) {
       const mountpoint = ctx.diskMountpoints[slot];

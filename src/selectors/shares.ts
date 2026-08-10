@@ -6,6 +6,7 @@ const ALLOCATION_LABELS: Record<AllocationMethod, string> = {
   'fill-up': 'Fill-up',
   'high-water': 'High-water',
   'single-disk': 'Single disk',
+  'cache-only': 'Cache only',
 };
 
 export interface ShareViewModel {
@@ -49,7 +50,12 @@ export function deriveShareViewModel(share: ShareWithStats): ShareViewModel {
       share.allocationMethod === 'single-disk'
         ? `Single disk (Disk ${share.disks[0]})`
         : ALLOCATION_LABELS[share.allocationMethod],
-    disksLabel: share.disks.length === 1 ? `Disk ${share.disks[0]}` : `Disk ${share.disks.join(', ')}`,
+    disksLabel:
+      share.allocationMethod === 'cache-only'
+        ? 'Cache'
+        : share.disks.length === 1
+          ? `Disk ${share.disks[0]}`
+          : `Disk ${share.disks.join(', ')}`,
     usedLabel: usedBytes !== null ? formatBytesHuman(usedBytes) : '—',
     totalLabel: totalBytes !== null ? formatBytesHuman(totalBytes) : '—',
     pct,

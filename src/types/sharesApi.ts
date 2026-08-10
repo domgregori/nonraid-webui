@@ -1,7 +1,7 @@
 // Mirrors backend/src/shares/types.ts. Keep in sync.
 import type { SharePermission } from './usersApi';
 
-export type AllocationMethod = 'most-free' | 'fill-up' | 'high-water' | 'single-disk';
+export type AllocationMethod = 'most-free' | 'fill-up' | 'high-water' | 'single-disk' | 'cache-only';
 export type ShareProtocol = 'smb' | 'nfs';
 
 export interface ShareAccess {

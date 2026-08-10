@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useCacheStatus } from '../../hooks/useCacheStatus';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import type { AllocationMethod, Share, ShareInput } from '../../types/sharesApi';
 import { ToggleSwitch } from '../shared/ToggleSwitch';
@@ -15,10 +16,16 @@ const ALLOCATION_OPTIONS: { value: AllocationMethod; label: string }[] = [
   { value: 'fill-up', label: 'Fill-up' },
   { value: 'high-water', label: 'High-water' },
   { value: 'single-disk', label: 'Single disk' },
+  { value: 'cache-only', label: 'Cache only' },
 ];
 
 export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: ShareFormModalProps) {
   const { status } = useArrayStatus();
+  // A cache pool must actually be set up (fsUuid persisted, even if currently degraded) before
+  // "Cache only" can be picked at all — configuring a share that can never mount is worse than
+  // just not offering the option yet. Mirrors the /cache/enabled route's own fsUuid gate.
+  const { status: cacheStatus } = useCacheStatus();
+  const cacheConfigured = cacheStatus !== null && cacheStatus.health !== 'not-configured';
   const dataDisks = (status?.disks ?? []).filter((d) => d.type === 'data').sort((a, b) => a.slot - b.slot);
 
   const allDiskSlots = dataDisks.map((d) => d.slot);
@@ -69,14 +76,22 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
       // "All drives" doesn't apply to a single-disk share — fall back to manual selection.
       setUseAllDisks(false);
       if (disks.length > 1) setDisks(disks.slice(0, 1));
+    } else if (value === 'cache-only') {
+      // A cache-only share has no array disks at all — the picker is hidden entirely below.
+      setUseAllDisks(false);
+      setDisks([]);
     }
   };
 
   const validate = (): string | null => {
     if (!/^[a-zA-Z0-9_-]{1,32}$/.test(name)) return 'Name must be 1-32 characters: letters, numbers, dash, underscore.';
     if (!isEdit && existingNames.includes(name)) return `Share "${name}" already exists.`;
-    if (disks.length === 0) return 'Select at least one disk.';
-    if (allocationMethod === 'single-disk' && disks.length !== 1) return 'Single-disk allocation requires exactly one disk.';
+    if (allocationMethod === 'cache-only') {
+      if (!cacheConfigured) return 'Set up a cache pool on the Disks page before creating a cache-only share.';
+    } else {
+      if (disks.length === 0) return 'Select at least one disk.';
+      if (allocationMethod === 'single-disk' && disks.length !== 1) return 'Single-disk allocation requires exactly one disk.';
+    }
     if (!smbEnabled && !nfsEnabled) return 'Enable at least one protocol.';
     return null;
   };
@@ -138,40 +153,44 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
             />
           </label>
 
-          <div className="form-field">
-            <div className="toggle-row" style={{ padding: 0 }}>
-              <div>
-                <div className="toggle-row__title">Use all drives</div>
-                <div className="toggle-row__desc">
-                  {useAllDisks
-                    ? `Using all ${allDiskSlots.length} data disk(s) — new disks are added automatically`
-                    : 'Choose specific disks below'}
+          {allocationMethod === 'cache-only' ? (
+            <div className="status-note">This share lives entirely on the cache pool — no array disk is used, and the mover never touches it.</div>
+          ) : (
+            <div className="form-field">
+              <div className="toggle-row" style={{ padding: 0 }}>
+                <div>
+                  <div className="toggle-row__title">Use all drives</div>
+                  <div className="toggle-row__desc">
+                    {useAllDisks
+                      ? `Using all ${allDiskSlots.length} data disk(s) — new disks are added automatically`
+                      : 'Choose specific disks below'}
+                  </div>
                 </div>
+                <ToggleSwitch
+                  on={useAllDisks}
+                  onToggle={() => setUseAllDisks((prev) => !prev)}
+                  label="Use all drives"
+                  disabled={allocationMethod === 'single-disk'}
+                />
               </div>
-              <ToggleSwitch
-                on={useAllDisks}
-                onToggle={() => setUseAllDisks((prev) => !prev)}
-                label="Use all drives"
-                disabled={allocationMethod === 'single-disk'}
-              />
-            </div>
 
-            {!useAllDisks && (
-              <div className="disk-checkbox-grid" style={{ marginTop: 8 }}>
-                {dataDisks.map((d) => (
-                  <label key={d.slot} className="disk-checkbox">
-                    <input
-                      type={allocationMethod === 'single-disk' ? 'radio' : 'checkbox'}
-                      checked={disks.includes(d.slot)}
-                      onChange={() => toggleDisk(d.slot)}
-                    />
-                    Disk {d.slot}
-                  </label>
-                ))}
-                {dataDisks.length === 0 && <span className="status-note">No data disks reported by the array right now.</span>}
-              </div>
-            )}
-          </div>
+              {!useAllDisks && (
+                <div className="disk-checkbox-grid" style={{ marginTop: 8 }}>
+                  {dataDisks.map((d) => (
+                    <label key={d.slot} className="disk-checkbox">
+                      <input
+                        type={allocationMethod === 'single-disk' ? 'radio' : 'checkbox'}
+                        checked={disks.includes(d.slot)}
+                        onChange={() => toggleDisk(d.slot)}
+                      />
+                      Disk {d.slot}
+                    </label>
+                  ))}
+                  {dataDisks.length === 0 && <span className="status-note">No data disks reported by the array right now.</span>}
+                </div>
+              )}
+            </div>
+          )}
 
           <label className="form-field">
             <span className="form-field__label">Allocation method</span>
@@ -182,8 +201,8 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
               onChange={(e) => handleAllocationChange(e.target.value as AllocationMethod)}
             >
               {ALLOCATION_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
+                <option key={opt.value} value={opt.value} disabled={opt.value === 'cache-only' && !cacheConfigured}>
+                  {opt.value === 'cache-only' && !cacheConfigured ? `${opt.label} (set up a cache pool first)` : opt.label}
                 </option>
               ))}
             </select>

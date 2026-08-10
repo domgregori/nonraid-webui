@@ -27,6 +27,8 @@ function mergerfsPolicy(method: AllocationMethod): string {
       return 'mspmfs';
     case 'single-disk':
       return 'ff'; // irrelevant — single-disk shares are bind-mounted, not pooled
+    case 'cache-only':
+      return 'ff'; // irrelevant — cache-only shares are bind-mounted to the cache branch alone
   }
 }
 
@@ -140,6 +142,15 @@ export class RealShareApplier implements ShareApplier {
   // only ever triggers off a confirmed-healthy, fully-mounted ctx.cacheMountPoint (set in
   // ShareService.buildContext(), never a degraded or unmounted mirror).
   private branchPaths(share: Share, ctx: ApplyContext): string[] {
+    // Cache-only shares have zero array disks by construction (see validateShareInput) — they
+    // mount as a single bind-mount branch on the cache pool alone, never blended with array
+    // branches the way usesCacheBranch()'s cache-first-then-array spillover works for other
+    // shares. No cache mounted means no branch at all — mountShare() below turns that into a
+    // clear "cache pool isn't currently active" error rather than silently mounting nothing.
+    if (share.allocationMethod === 'cache-only') {
+      return ctx.cacheMountPoint ? [`${ctx.cacheMountPoint}/${share.name}`] : [];
+    }
+
     const arrayBranches = share.disks
       .map((slot) => ctx.diskMountpoints[slot])
       .filter((mp): mp is string => Boolean(mp))
@@ -152,13 +163,14 @@ export class RealShareApplier implements ShareApplier {
   }
 
   private usesCacheBranch(share: Share, ctx: ApplyContext): boolean {
-    return ctx.cacheMountPoint !== null && share.allocationMethod !== 'single-disk';
+    return ctx.cacheMountPoint !== null && share.allocationMethod !== 'single-disk' && share.allocationMethod !== 'cache-only';
   }
 
   async mountShare(share: Share, ctx: ApplyContext): Promise<ShareCommandResult> {
     const branches = this.branchPaths(share, ctx);
     if (branches.length === 0) {
-      throw new HttpError(409, `No mounted disks available for share "${share.name}" — its assigned disks are all offline.`);
+      const reason = share.allocationMethod === 'cache-only' ? 'the cache pool is not currently active' : 'its assigned disks are all offline';
+      throw new HttpError(409, `No mounted disks available for share "${share.name}" — ${reason}.`);
     }
 
     for (const branch of branches) {

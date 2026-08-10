@@ -44,8 +44,10 @@ export class CacheMoverService {
 
     const [mounts, shares] = await Promise.all([this.dataDiskMountpoints(), this.shareStore.list()]);
     // Mirrors RealShareApplier.usesCacheBranch()'s own single-disk exclusion — those shares never
-    // write to cache in the first place, so there's nothing of theirs to drain.
-    const relevantShares = shares.filter((s) => s.allocationMethod !== 'single-disk');
+    // write to cache in the first place, so there's nothing of theirs to drain. cache-only shares
+    // are excluded too, but for the opposite reason: their data belongs on cache permanently and
+    // must never be moved to the array — that's the entire point of the allocation method.
+    const relevantShares = shares.filter((s) => s.allocationMethod !== 'single-disk' && s.allocationMethod !== 'cache-only');
 
     const plan = await this.engine.plan({
       sourceId: SOURCE_ID,

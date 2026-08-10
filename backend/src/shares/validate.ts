@@ -2,7 +2,7 @@ import { HttpError } from '../httpError.js';
 import type { AllocationMethod, ShareInput, ShareProtocol } from './types.js';
 
 const NAME_RE = /^[a-zA-Z0-9_-]{1,32}$/;
-const ALLOCATION_METHODS: AllocationMethod[] = ['most-free', 'fill-up', 'high-water', 'single-disk'];
+const ALLOCATION_METHODS: AllocationMethod[] = ['most-free', 'fill-up', 'high-water', 'single-disk', 'cache-only'];
 const PROTOCOLS: ShareProtocol[] = ['smb', 'nfs'];
 
 export function validateShareInput(input: unknown): ShareInput {
@@ -14,20 +14,30 @@ export function validateShareInput(input: unknown): ShareInput {
   if (typeof i.name !== 'string' || !NAME_RE.test(i.name)) {
     throw new HttpError(400, 'Share name must be 1-32 characters: letters, numbers, dash, underscore.');
   }
-  if (!Array.isArray(i.disks) || i.disks.length === 0 || !i.disks.every((d) => Number.isInteger(d) && d >= 1 && d <= 28)) {
-    throw new HttpError(400, 'A share needs at least one data disk slot (1-28).');
-  }
   if (typeof i.allocationMethod !== 'string' || !ALLOCATION_METHODS.includes(i.allocationMethod as AllocationMethod)) {
     throw new HttpError(400, `allocationMethod must be one of: ${ALLOCATION_METHODS.join(', ')}`);
   }
-  if (i.allocationMethod === 'single-disk' && i.disks.length !== 1) {
-    throw new HttpError(400, 'Single-disk allocation requires exactly one disk.');
+  const allocationMethod = i.allocationMethod as AllocationMethod;
+
+  // cache-only shares live entirely on the cache pool — the opposite of every other method,
+  // which needs at least one array disk slot.
+  if (allocationMethod === 'cache-only') {
+    if (!Array.isArray(i.disks) || i.disks.length !== 0) {
+      throw new HttpError(400, 'Cache-only allocation requires zero data disks — the share lives entirely on the cache pool.');
+    }
+  } else {
+    if (!Array.isArray(i.disks) || i.disks.length === 0 || !i.disks.every((d) => Number.isInteger(d) && d >= 1 && d <= 28)) {
+      throw new HttpError(400, 'A share needs at least one data disk slot (1-28).');
+    }
+    if (allocationMethod === 'single-disk' && i.disks.length !== 1) {
+      throw new HttpError(400, 'Single-disk allocation requires exactly one disk.');
+    }
   }
   if (i.allDisks !== undefined && typeof i.allDisks !== 'boolean') {
     throw new HttpError(400, 'allDisks must be a boolean.');
   }
-  if (i.allDisks === true && i.allocationMethod === 'single-disk') {
-    throw new HttpError(400, 'allDisks cannot be combined with single-disk allocation.');
+  if (i.allDisks === true && (allocationMethod === 'single-disk' || allocationMethod === 'cache-only')) {
+    throw new HttpError(400, 'allDisks cannot be combined with single-disk or cache-only allocation.');
   }
   if (
     !Array.isArray(i.protocols) ||

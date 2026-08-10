@@ -1,4 +1,4 @@
-export type AllocationMethod = 'most-free' | 'fill-up' | 'high-water' | 'single-disk';
+export type AllocationMethod = 'most-free' | 'fill-up' | 'high-water' | 'single-disk' | 'cache-only';
 export type ShareProtocol = 'smb' | 'nfs';
 
 // Per-user/per-group SMB access level for a share. NFS exports stay host-based
@@ -16,7 +16,8 @@ export interface ShareInput {
   disks: number[]; // data disk slots
   // When true, ShareService.remountAll() grows `disks` to cover any data disk
   // that becomes live and isn't already included — new disk, never a removal,
-  // see remountAll()'s doc comment. Meaningless (and rejected) for single-disk.
+  // see remountAll()'s doc comment. Meaningless (and rejected) for single-disk
+  // and cache-only.
   allDisks?: boolean;
   allocationMethod: AllocationMethod;
   protocols: ShareProtocol[];
