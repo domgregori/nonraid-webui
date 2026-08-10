@@ -8,6 +8,7 @@ import { settingsApi } from '../api/settingsApi';
 import { systemApi } from '../api/systemApi';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
 import { NotificationEventToggles } from '../components/settings/NotificationEventToggles';
+import { PasskeySection } from '../components/settings/PasskeySection';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ServicesSection } from '../components/settings/ServicesSection';
 import { StorageLocationField } from '../components/settings/StorageLocationField';
@@ -1055,6 +1056,7 @@ export function SettingsPage() {
         </div>
 
         <TwoFactorSection />
+        <PasskeySection />
       </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { Router, type Response } from 'express';
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import type { ActivityStore } from '../activity/index.js';
 import type { AuthService } from '../auth/index.js';
 import { loginRateLimiter, totpVerifyRateLimiter } from '../auth/index.js';
@@ -6,6 +7,7 @@ import { serializeClearTwoFactorPendingCookie } from '../auth/cookies.js';
 import {
   validateCurrentPasswordInput,
   validateLoginInput,
+  validatePasskeyNameInput,
   validatePasswordChangeInput,
   validateSetupInput,
   validateTwoFactorCodeInput,
@@ -18,6 +20,17 @@ function handleError(err: unknown, res: Response) {
   } else {
     res.status(502).json({ error: (err as Error).message });
   }
+}
+
+// The WebAuthn ceremony response objects from @simplewebauthn/browser are large, nested, and
+// entirely re-validated by @simplewebauthn/server's own verify functions — this just guards
+// against a missing/wrong-shaped body reaching those functions as something they'd choke on
+// unhelpfully, not a full schema check.
+function requireResponseField(input: unknown): unknown {
+  if (typeof input !== 'object' || input === null || typeof (input as Record<string, unknown>).response !== 'object') {
+    throw new HttpError(400, 'response is required.');
+  }
+  return (input as Record<string, unknown>).response;
 }
 
 export function authRouter(authService: AuthService, activity: ActivityStore): Router {
@@ -132,6 +145,58 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
   router.get('/auth/2fa/status', async (req, res) => {
     try {
       res.json(await authService.twoFactorStatus(req.headers.cookie));
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // --- Two-factor: passkeys ---
+
+  router.post('/auth/2fa/passkey/auth-options', async (req, res) => {
+    try {
+      res.json(await authService.passkeyAuthOptions(req.headers.cookie));
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  router.post('/auth/2fa/passkey/auth-verify', async (req, res) => {
+    try {
+      const response = requireResponseField(req.body) as AuthenticationResponseJSON;
+      const { cookie, body } = await authService.passkeyAuthVerify(req.headers.cookie, response);
+      res.append('Set-Cookie', cookie);
+      res.append('Set-Cookie', serializeClearTwoFactorPendingCookie());
+      res.json(body);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  router.post('/auth/2fa/passkey/register-options', async (req, res) => {
+    try {
+      res.json(await authService.passkeyRegisterOptions(req.headers.cookie));
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  router.post('/auth/2fa/passkey/register-verify', async (req, res) => {
+    try {
+      const response = requireResponseField(req.body) as RegistrationResponseJSON;
+      const name = validatePasskeyNameInput(req.body);
+      await authService.passkeyRegisterVerify(req.headers.cookie, response, name);
+      activity.log(`Passkey "${name}" added`, 'green').catch(() => {});
+      res.json({ ok: true });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  router.delete('/auth/2fa/passkey/:id', async (req, res) => {
+    try {
+      await authService.removePasskey(req.headers.cookie, req.params.id);
+      activity.log('Passkey removed', 'amber').catch(() => {});
+      res.json({ ok: true });
     } catch (err) {
       handleError(err, res);
     }

@@ -88,3 +88,19 @@ export function validateTwoFactorCodeInput(input: unknown): string {
   }
   return code;
 }
+
+// Same style as USERNAME_RE above — a user-facing label ("YubiKey", "MacBook Touch ID"), not an
+// OS identifier of any kind.
+const PASSKEY_NAME_RE = /^[\x20-\x7e]{1,64}$/;
+
+export function validatePasskeyNameInput(input: unknown): string {
+  if (typeof input !== 'object' || input === null) {
+    throw new HttpError(400, 'Request body must be a JSON object.');
+  }
+  const i = input as Record<string, unknown>;
+  const name = typeof i.name === 'string' ? i.name.trim() : '';
+  if (!PASSKEY_NAME_RE.test(name)) {
+    throw new HttpError(400, 'name must be 1-64 printable characters.');
+  }
+  return name;
+}

@@ -1,3 +1,4 @@
+import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from '@simplewebauthn/browser';
 import { request } from './request';
 import type {
   AuthStatusResponse,
@@ -54,4 +55,19 @@ export const authApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ currentPassword }),
     }),
+  passkeyAuthOptions: () => request<PublicKeyCredentialRequestOptionsJSON>('/api/auth/2fa/passkey/auth-options', { method: 'POST' }),
+  passkeyAuthVerify: (response: AuthenticationResponseJSON) =>
+    request<AuthStatusResponse>('/api/auth/2fa/passkey/auth-verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ response }),
+    }),
+  passkeyRegisterOptions: () => request<PublicKeyCredentialCreationOptionsJSON>('/api/auth/2fa/passkey/register-options', { method: 'POST' }),
+  passkeyRegisterVerify: (response: RegistrationResponseJSON, name: string) =>
+    request<{ ok: true }>('/api/auth/2fa/passkey/register-verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ response, name }),
+    }),
+  removePasskey: (id: string) => request<{ ok: true }>(`/api/auth/2fa/passkey/${id}`, { method: 'DELETE' }),
 };

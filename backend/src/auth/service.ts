@@ -1,3 +1,4 @@
+import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { AuthStore } from './store.js';
@@ -12,6 +13,7 @@ import {
 import { hashPassword, verifyPassword, signSession, verifySession, signTwoFactorPending, verifyTwoFactorPending, hashSecret, generateBackupCode } from './crypto.js';
 import { generateTotpSecret, totpProvisioningUri, totpQrDataUri, verifyTotpCode } from './totp.js';
 import type { AuthRecord, AuthStatus, TotpBackupCode, TwoFactorMethod } from './types.js';
+import { passkeyAuthenticationOptions, passkeyRegistrationOptions, verifyPasskeyAuthentication, verifyPasskeyRegistration } from './webauthn.js';
 
 const BACKUP_CODE_COUNT = 10;
 
@@ -173,6 +175,38 @@ export class AuthService {
       throw new HttpError(401, 'Incorrect code.');
     }
     return this.issueSession(record.sessionSecret);
+  }
+
+  // --- Two-factor: passkeys ---
+
+  async passkeyRegisterOptions(cookieHeader: string | undefined): Promise<PublicKeyCredentialCreationOptionsJSON> {
+    const record = await this.requireSession(cookieHeader);
+    return passkeyRegistrationOptions(record);
+  }
+
+  async passkeyRegisterVerify(cookieHeader: string | undefined, response: RegistrationResponseJSON, name: string): Promise<void> {
+    const record = await this.requireSession(cookieHeader);
+    const credential = await verifyPasskeyRegistration(record, response);
+    await this.store.addPasskey({ ...credential, name });
+  }
+
+  async passkeyAuthOptions(cookieHeader: string | undefined): Promise<PublicKeyCredentialRequestOptionsJSON> {
+    const record = await this.requirePendingTwoFactor(cookieHeader);
+    return passkeyAuthenticationOptions(record);
+  }
+
+  // Pending-cookie gated, mirrors verifyTwoFactor above — issues the real session on success via
+  // the same path every other login method uses.
+  async passkeyAuthVerify(cookieHeader: string | undefined, response: AuthenticationResponseJSON): Promise<AuthResult> {
+    const record = await this.requirePendingTwoFactor(cookieHeader);
+    const { credentialId, newCounter } = await verifyPasskeyAuthentication(record, response);
+    await this.store.updatePasskeyCounter(credentialId, newCounter);
+    return this.issueSession(record.sessionSecret);
+  }
+
+  async removePasskey(cookieHeader: string | undefined, id: string): Promise<void> {
+    await this.requireSession(cookieHeader);
+    await this.store.removePasskey(id);
   }
 
   private enrolledMethods(record: AuthRecord): TwoFactorMethod[] {

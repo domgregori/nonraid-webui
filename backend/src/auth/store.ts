@@ -3,7 +3,7 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import { generateSecret, verifySecret } from './crypto.js';
-import type { AuthRecord, TotpBackupCode } from './types.js';
+import type { AuthRecord, PasskeyCredential, TotpBackupCode } from './types.js';
 
 /**
  * Owns auth.json — same pattern as settings/store.ts (in-memory cache,
@@ -155,6 +155,57 @@ export class AuthStore {
       const record: AuthRecord = { ...current, totp: { ...current.totp, backupCodes } };
       await this.persistAtomic(record);
       return true;
+    });
+    this.writeQueue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+
+  addPasskey(credential: PasskeyCredential): Promise<AuthRecord> {
+    const result = this.writeQueue.then(async () => {
+      const current = await this.load();
+      if (!current) throw new HttpError(409, 'No admin account is configured yet.');
+      const record: AuthRecord = { ...current, passkeys: [...(current.passkeys ?? []), credential] };
+      await this.persistAtomic(record);
+      return record;
+    });
+    this.writeQueue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+
+  removePasskey(id: string): Promise<AuthRecord> {
+    const result = this.writeQueue.then(async () => {
+      const current = await this.load();
+      if (!current) throw new HttpError(409, 'No admin account is configured yet.');
+      const existing = current.passkeys ?? [];
+      if (!existing.some((p) => p.id === id)) {
+        throw new HttpError(404, 'No passkey with that ID.');
+      }
+      const record: AuthRecord = { ...current, passkeys: existing.filter((p) => p.id !== id) };
+      await this.persistAtomic(record);
+      return record;
+    });
+    this.writeQueue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+
+  // Bumped after every successful authentication — WebAuthn's own clone-detection mechanism.
+  updatePasskeyCounter(id: string, counter: number): Promise<AuthRecord> {
+    const result = this.writeQueue.then(async () => {
+      const current = await this.load();
+      if (!current) throw new HttpError(409, 'No admin account is configured yet.');
+      const existing = current.passkeys ?? [];
+      const record: AuthRecord = { ...current, passkeys: existing.map((p) => (p.id === id ? { ...p, counter } : p)) };
+      await this.persistAtomic(record);
+      return record;
     });
     this.writeQueue = result.then(
       () => {},
