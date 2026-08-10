@@ -218,4 +218,14 @@ export const config = {
   metricsDbPath: str('METRICS_DB_PATH', t('metrics', 'db_path'), path.join(process.cwd(), 'data', 'metrics.db')),
   metricsSampleIntervalMs: num('METRICS_SAMPLE_INTERVAL_MS', t('metrics', 'sample_interval_ms'), 60_000),
   metricsRetentionDays: num('METRICS_RETENTION_DAYS', t('metrics', 'retention_days'), 30),
+  // Mirrored cache pool (btrfs RAID1) — see backend/src/cache/. A single fixed
+  // mountpoint, unlike shareMountRoot/browseRoot which are roots for many
+  // per-name paths underneath them.
+  cacheMountPoint: str('CACHE_MOUNT_POINT', t('cache', 'mount_point'), '/mnt/cache'),
+  cacheUseSudo: bool('CACHE_USE_SUDO', t('cache', 'use_sudo'), false),
+  cacheTimeoutMs: num('CACHE_TIMEOUT_MS', t('cache', 'timeout_ms'), 15_000),
+  // mkfs.btrfs against a real multi-TB disk pair can take a while — longer
+  // than every other privileged command in this app, none of which format a
+  // filesystem from scratch.
+  cacheMkfsTimeoutMs: num('CACHE_MKFS_TIMEOUT_MS', t('cache', 'mkfs_timeout_ms'), 5 * 60 * 1000),
 };
