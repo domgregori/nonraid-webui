@@ -37,7 +37,7 @@ function DeviceRow({ device: d, onOpen, onAdd }: { device: AvailableDevice; onOp
 
   return (
     <div className="unassigned-device-row" style={{ borderTopColor: healthColor }} onClick={onOpen} title={`SMART: ${health ?? 'unknown'}`}>
-      <div>
+      <div className="unassigned-device-row__info">
         <div className="unassigned-device-row__name">{d.model ?? 'Unknown drive'}</div>
         <div className="unassigned-device-row__meta">
           {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : 'unknown size'}
@@ -49,7 +49,7 @@ function DeviceRow({ device: d, onOpen, onAdd }: { device: AvailableDevice; onOp
       </div>
       <button
         type="button"
-        className="btn"
+        className="btn btn--primary-sm"
         onClick={(e) => {
           e.stopPropagation();
           onAdd();

@@ -153,6 +153,7 @@
 .unassigned-device-row {
   cursor: pointer;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
@@ -165,16 +166,26 @@
   background: var(--color-surface-elevated);
 }
 
+/* Lets the info block shrink/wrap instead of forcing the row wider than its container — without
+ * min-width: 0 a flex item won't shrink below its own content's intrinsic width, so a long model
+ * name or disk ID pushed the "Add to Array" button past the row (and the whole page) on mobile. */
+.unassigned-device-row__info {
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
 .unassigned-device-row__name {
   font-size: 13px;
   font-weight: 700;
   font-family: var(--font-mono);
+  overflow-wrap: anywhere;
 }
 
 .unassigned-device-row__meta {
   margin-top: 2px;
   font-size: 11px;
   color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .disk-row {
