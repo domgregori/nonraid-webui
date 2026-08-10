@@ -50,7 +50,9 @@ export interface PasswordChange {
   newPassword: string;
 }
 
-export function validatePasswordChangeInput(input: unknown): PasswordChange {
+// Shared by validatePasswordChangeInput below and the 2FA disable/regenerate-backup-codes
+// endpoints, which both require current-password re-entry before a security-relevant action.
+export function validateCurrentPasswordInput(input: unknown): string {
   if (typeof input !== 'object' || input === null) {
     throw new HttpError(400, 'Request body must be a JSON object.');
   }
@@ -58,8 +60,31 @@ export function validatePasswordChangeInput(input: unknown): PasswordChange {
   if (typeof i.currentPassword !== 'string' || !i.currentPassword) {
     throw new HttpError(400, 'currentPassword is required.');
   }
+  return i.currentPassword;
+}
+
+export function validatePasswordChangeInput(input: unknown): PasswordChange {
+  const currentPassword = validateCurrentPasswordInput(input);
+  const i = input as Record<string, unknown>;
   if (typeof i.newPassword !== 'string' || i.newPassword.length < MIN_PASSWORD_LENGTH || i.newPassword.length > MAX_PASSWORD_LENGTH) {
     throw new HttpError(400, `newPassword must be ${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH} characters.`);
   }
-  return { currentPassword: i.currentPassword, newPassword: i.newPassword };
+  return { currentPassword, newPassword: i.newPassword };
+}
+
+// Loose on purpose — the verify endpoint tries the input as a TOTP code, then falls back to
+// treating it as a backup code, rather than the client declaring which kind it's sending. Covers
+// both a bare 6-digit code and a dash-grouped backup code (e.g. "A3F9-K2M8-XQ7Z").
+const TWO_FACTOR_CODE_RE = /^[A-Za-z0-9-]{6,24}$/;
+
+export function validateTwoFactorCodeInput(input: unknown): string {
+  if (typeof input !== 'object' || input === null) {
+    throw new HttpError(400, 'Request body must be a JSON object.');
+  }
+  const i = input as Record<string, unknown>;
+  const code = typeof i.code === 'string' ? i.code.trim() : '';
+  if (!TWO_FACTOR_CODE_RE.test(code)) {
+    throw new HttpError(400, 'code is required.');
+  }
+  return code;
 }

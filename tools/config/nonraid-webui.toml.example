@@ -42,6 +42,16 @@ frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
 #session_ttl_ms = 2592000000
 #login_rate_limit_window_ms = 900000
 #login_rate_limit_max = 10
+# Two-factor authentication (TOTP + WebAuthn passkeys) — see backend/src/auth/.
+#two_factor_pending_ttl_ms = 300000
+#totp_rate_limit_window_ms = 900000
+#totp_rate_limit_max = 10
+# Passkeys are disabled (routes return 400) until both of these are set. rp_id is the bare
+# domain (e.g. "nonraid.lan"); origin is the full scheme+host+port the browser sees (e.g.
+# "https://nonraid.lan"). Browsers refuse the WebAuthn ceremony outside a secure context — plain
+# HTTP only works for the literal "localhost" origin, not a LAN hostname/IP.
+#webauthn_rp_id = "nonraid.lan"
+#webauthn_origin = "https://nonraid.lan"
 
 [nmd]
 #bin = "nmdctl"

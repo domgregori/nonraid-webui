@@ -122,7 +122,7 @@ async function main() {
   // Auth routes handle their own access rules (setup/login/status/logout are
   // public by design, password-change checks the session itself) — mounted
   // before the gate below so none of them get blocked by it.
-  app.use('/api', authRouter(authService));
+  app.use('/api', authRouter(authService, activity));
 
   // Production deployment shape (see tools/systemd/nonraid-webui.service):
   // this backend also serves the frontend's built static bundle and falls

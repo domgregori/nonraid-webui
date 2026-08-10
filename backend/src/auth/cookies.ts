@@ -1,6 +1,11 @@
 import { config } from '../config.js';
 
 export const COOKIE_NAME = 'nonraid_session';
+// Separate cookie name from the real session, purely for request-routing convenience (so a route
+// handler can read just the one it cares about without inspecting payload shape first) — the
+// purpose discriminator in crypto.ts's signed payload is what actually prevents this from being
+// usable as a real session, not the distinct name by itself.
+export const TWO_FACTOR_PENDING_COOKIE_NAME = 'nonraid_2fa_pending';
 
 export function parseCookies(header: string | undefined): Record<string, string> {
   const cookies: Record<string, string> = {};
@@ -34,4 +39,12 @@ export function serializeSessionCookie(token: string, maxAgeSec: number): string
 
 export function serializeClearCookie(): string {
   return `${COOKIE_NAME}=; ${attributes(0)}`;
+}
+
+export function serializeTwoFactorPendingCookie(token: string, maxAgeSec: number): string {
+  return `${TWO_FACTOR_PENDING_COOKIE_NAME}=${encodeURIComponent(token)}; ${attributes(maxAgeSec)}`;
+}
+
+export function serializeClearTwoFactorPendingCookie(): string {
+  return `${TWO_FACTOR_PENDING_COOKIE_NAME}=; ${attributes(0)}`;
 }

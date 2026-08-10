@@ -1,5 +1,6 @@
 import { randomBytes, createHmac, timingSafeEqual, scrypt } from 'node:crypto';
 import { promisify } from 'node:util';
+import type { SessionPayload, TwoFactorPendingPayload } from './types.js';
 
 const scryptAsync = promisify(scrypt);
 const KEY_LEN = 64;
@@ -28,24 +29,49 @@ export function generateSecret(): string {
   return randomBytes(32).toString('hex');
 }
 
+// Backup codes are hashed with the exact same scrypt format as passwordHash — these are just
+// readability aliases at call sites that hash/verify a backup code rather than a login password.
+export const hashSecret = hashPassword;
+export const verifySecret = verifyPassword;
+
+// 12 random chars from a base32-ish alphabet (Crockford, no ambiguous 0/O/1/I/L), dash-grouped for
+// readability — e.g. "A3F9-K2M8-XQ7Z". 256 % 32 === 0, so `byte % alphabet.length` is unbiased.
+// Generated 10 at a time at TOTP confirmation/regeneration.
+const BACKUP_CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+export function generateBackupCode(): string {
+  const bytes = randomBytes(12);
+  let code = '';
+  for (const byte of bytes) {
+    code += BACKUP_CODE_ALPHABET[byte % BACKUP_CODE_ALPHABET.length];
+  }
+  return `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8, 12)}`;
+}
+
 /**
- * Session cookie = signed {issuedAt, expiresAt}, no server-side session
- * table — see store.ts's AuthRecord.sessionSecret doc comment for why. The
- * token is "<base64url payload>.<base64url HMAC-SHA256 signature>".
+ * Shared signing/verification core for every cookie this app issues — session and 2FA-pending
+ * cookies alike are both "signed {purpose, issuedAt, expiresAt}", just with a different `purpose`.
+ * Token format: "<base64url payload>.<base64url HMAC-SHA256 signature>". Not exported directly —
+ * signSession/verifySession/signTwoFactorPending/verifyTwoFactorPending below are the real public
+ * surface, each fixing `purpose` so a caller can never accidentally sign or accept the wrong kind.
  */
-export function signSession(secret: string, ttlMs: number): string {
-  const now = Date.now();
-  const payload: { issuedAt: number; expiresAt: number } = { issuedAt: now, expiresAt: now + ttlMs };
+function signPayload<T extends { purpose: string }>(secret: string, payload: T): string {
   const payloadPart = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const signature = createHmac('sha256', secret).update(payloadPart).digest('base64url');
   return `${payloadPart}.${signature}`;
 }
 
 /**
- * Never throws — a malformed, unsigned, or expired token is just an
- * unauthenticated request, not a server error. requireAuth() relies on this.
+ * Never throws — a malformed, unsigned, expired, or wrong-purpose token is just an unauthenticated
+ * request, not a server error. requireAuth() and every 2FA-pending check rely on this.
+ *
+ * The `purpose` check is not incidental: session and 2FA-pending tokens are both signed with the
+ * same account sessionSecret (deliberately — see TwoFactorPendingPayload's doc comment), so without
+ * a discriminator baked into the signed payload itself, a pending-2FA token would carry a valid
+ * signature under the exact same key a real session cookie does. Pasting one into the other
+ * cookie's name would then verify as a fully authenticated session, skipping the second factor
+ * entirely. The discriminator, not the cookie name, is what actually prevents that.
  */
-export function verifySession(secret: string, token: string | undefined): { issuedAt: number; expiresAt: number } | null {
+function verifyPayload<T extends { purpose: string }>(secret: string, token: string | undefined, purpose: T['purpose']): T | null {
   if (!token) return null;
   const dotIndex = token.indexOf('.');
   if (dotIndex < 0) return null;
@@ -58,10 +84,34 @@ export function verifySession(secret: string, token: string | undefined): { issu
     if (actualSignature.length !== expectedSignature.length) return null;
     if (!timingSafeEqual(actualSignature, expectedSignature)) return null;
 
-    const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString('utf8')) as { issuedAt: number; expiresAt: number };
-    if (typeof payload.expiresAt !== 'number' || payload.expiresAt < Date.now()) return null;
+    const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString('utf8')) as T;
+    if (payload.purpose !== purpose) return null;
+    if (typeof (payload as unknown as { expiresAt?: unknown }).expiresAt !== 'number' || (payload as unknown as { expiresAt: number }).expiresAt < Date.now()) {
+      return null;
+    }
     return payload;
   } catch {
     return null;
   }
+}
+
+export function signSession(secret: string, ttlMs: number): string {
+  const now = Date.now();
+  return signPayload<SessionPayload>(secret, { purpose: 'session', issuedAt: now, expiresAt: now + ttlMs });
+}
+
+export function verifySession(secret: string, token: string | undefined): SessionPayload | null {
+  return verifyPayload<SessionPayload>(secret, token, 'session');
+}
+
+// Issued after a correct password, before the second factor is verified — see
+// TwoFactorPendingPayload's doc comment for why this is safe to sign with the same account secret
+// a real session uses.
+export function signTwoFactorPending(secret: string, ttlMs: number): string {
+  const now = Date.now();
+  return signPayload<TwoFactorPendingPayload>(secret, { purpose: 'twofactor_pending', issuedAt: now, expiresAt: now + ttlMs });
+}
+
+export function verifyTwoFactorPending(secret: string, token: string | undefined): TwoFactorPendingPayload | null {
+  return verifyPayload<TwoFactorPendingPayload>(secret, token, 'twofactor_pending');
 }

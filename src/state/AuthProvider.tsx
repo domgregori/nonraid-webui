@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { authApi } from '../api/authApi';
 import { setUnauthorizedHandler } from '../api/request';
-import { AuthContext, type AuthLoadState } from './AuthContext';
+import { AuthContext, type AuthLoadState, type LoginOutcome } from './AuthContext';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [configured, setConfigured] = useState(false);
@@ -51,10 +51,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthenticated(s.authenticated);
   }, []);
 
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string): Promise<LoginOutcome> => {
     const s = await authApi.login(username, password);
     setConfigured(s.configured);
     setAuthenticated(s.authenticated);
+    if (s.twoFactorRequired) {
+      return { ok: false, twoFactorRequired: true, methods: s.twoFactorMethods ?? [] };
+    }
+    return { ok: true };
   }, []);
 
   const logout = useCallback(async () => {
@@ -64,7 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ configured, authenticated, loadState, error, setup, login, logout }}>
+    <AuthContext.Provider
+      value={{ configured, authenticated, loadState, error, setup, login, logout, completeTwoFactor: refreshStatus }}
+    >
       {children}
     </AuthContext.Provider>
   );

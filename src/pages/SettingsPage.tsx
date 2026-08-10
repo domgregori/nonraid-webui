@@ -11,6 +11,7 @@ import { NotificationEventToggles } from '../components/settings/NotificationEve
 import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ServicesSection } from '../components/settings/ServicesSection';
 import { StorageLocationField } from '../components/settings/StorageLocationField';
+import { TwoFactorSection } from '../components/settings/TwoFactorSection';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
 import { useSettings } from '../hooks/useSettings';
 import { useSystemStats } from '../hooks/useSystemStats';
@@ -1052,6 +1053,8 @@ export function SettingsPage() {
           {passwordResult && <div className="status-note">{passwordResult}</div>}
           {passwordError && <div className="status-note status-note--error">{passwordError}</div>}
         </div>
+
+        <TwoFactorSection />
       </div>
         </div>
       </div>

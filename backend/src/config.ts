@@ -110,6 +110,17 @@ export const config = {
   sessionTtlMs: num('SESSION_TTL_MS', t('auth', 'session_ttl_ms'), 30 * 24 * 60 * 60 * 1000),
   loginRateLimitWindowMs: num('LOGIN_RATE_LIMIT_WINDOW_MS', t('auth', 'login_rate_limit_window_ms'), 15 * 60 * 1000),
   loginRateLimitMax: num('LOGIN_RATE_LIMIT_MAX', t('auth', 'login_rate_limit_max'), 10),
+  // How long a "password verified, second factor pending" cookie stays valid — short on purpose,
+  // this is a narrower window than a real session and doesn't need session-length TTLs.
+  twoFactorPendingTtlMs: num('TWO_FACTOR_PENDING_TTL_MS', t('auth', 'two_factor_pending_ttl_ms'), 5 * 60 * 1000),
+  totpRateLimitWindowMs: num('TOTP_RATE_LIMIT_WINDOW_MS', t('auth', 'totp_rate_limit_window_ms'), 15 * 60 * 1000),
+  totpRateLimitMax: num('TOTP_RATE_LIMIT_MAX', t('auth', 'totp_rate_limit_max'), 10),
+  // Unset by default — passkey routes 400 with a clear message until both are set. Unlike
+  // cookieSecure, there's no safe default to guess here: RP ID/origin are inherently
+  // per-deployment (bare domain vs full scheme+host+port), and guessing wrong doesn't just
+  // silently break a feature, it risks accepting assertions bound to the wrong origin.
+  webauthnRpId: optStr('WEBAUTHN_RP_ID', t('auth', 'webauthn_rp_id')),
+  webauthnOrigin: optStr('WEBAUTHN_ORIGIN', t('auth', 'webauthn_origin')),
   nmdBin: str('NMD_BIN', t('nmd', 'bin'), 'nmdctl'),
   nmdSuperblock: optStr('NMD_SUPERBLOCK', t('nmd', 'superblock')), // optional -s override, undefined = nmdctl default
   nmdUseSudo: bool('NMD_USE_SUDO', t('nmd', 'use_sudo'), false),

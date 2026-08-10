@@ -2,8 +2,8 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
-import { generateSecret } from './crypto.js';
-import type { AuthRecord } from './types.js';
+import { generateSecret, verifySecret } from './crypto.js';
+import type { AuthRecord, TotpBackupCode } from './types.js';
 
 /**
  * Owns auth.json — same pattern as settings/store.ts (in-memory cache,
@@ -60,6 +60,101 @@ export class AuthStore {
       const record: AuthRecord = { ...current, passwordHash, sessionSecret: generateSecret() };
       await this.persistAtomic(record);
       return record;
+    });
+    this.writeQueue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+
+  setPendingTotp(secret: string): Promise<AuthRecord> {
+    const result = this.writeQueue.then(async () => {
+      const current = await this.load();
+      if (!current) throw new HttpError(409, 'No admin account is configured yet.');
+      const record: AuthRecord = { ...current, pendingTotp: { secret, createdAt: Date.now() } };
+      await this.persistAtomic(record);
+      return record;
+    });
+    this.writeQueue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+
+  confirmTotp(backupCodes: TotpBackupCode[]): Promise<AuthRecord> {
+    const result = this.writeQueue.then(async () => {
+      const current = await this.load();
+      if (!current) throw new HttpError(409, 'No admin account is configured yet.');
+      if (!current.pendingTotp) throw new HttpError(409, 'No pending two-factor enrollment to confirm.');
+      const { pendingTotp, ...rest } = current;
+      const record: AuthRecord = { ...rest, totp: { secret: pendingTotp.secret, confirmedAt: Date.now(), backupCodes } };
+      await this.persistAtomic(record);
+      return record;
+    });
+    this.writeQueue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+
+  disableTotp(): Promise<AuthRecord> {
+    const result = this.writeQueue.then(async () => {
+      const current = await this.load();
+      if (!current) throw new HttpError(409, 'No admin account is configured yet.');
+      const { totp: _totp, ...rest } = current;
+      const record: AuthRecord = { ...rest };
+      await this.persistAtomic(record);
+      return record;
+    });
+    this.writeQueue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+
+  regenerateBackupCodes(codes: TotpBackupCode[]): Promise<AuthRecord> {
+    const result = this.writeQueue.then(async () => {
+      const current = await this.load();
+      if (!current) throw new HttpError(409, 'No admin account is configured yet.');
+      if (!current.totp) throw new HttpError(409, 'Two-factor authentication is not enabled.');
+      const record: AuthRecord = { ...current, totp: { ...current.totp, backupCodes: codes } };
+      await this.persistAtomic(record);
+      return record;
+    });
+    this.writeQueue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+
+  // Verify-and-mark-used happen inside this one queued closure, not as a separate read-then-write
+  // from the service layer — doing it in two steps would let two concurrent requests both pass
+  // verification against the same still-unused code before either write lands, double-spending a
+  // single-use code. Serializing through writeQueue (the same mechanism every other mutation here
+  // already uses) closes that race for free.
+  consumeBackupCodeIfValid(plainCode: string): Promise<boolean> {
+    const result = this.writeQueue.then(async () => {
+      const current = await this.load();
+      if (!current?.totp) return false;
+      let consumed = false;
+      const backupCodes: TotpBackupCode[] = [];
+      for (const entry of current.totp.backupCodes) {
+        if (!consumed && entry.usedAt === null && (await verifySecret(plainCode, entry.hash))) {
+          backupCodes.push({ ...entry, usedAt: Date.now() });
+          consumed = true;
+        } else {
+          backupCodes.push(entry);
+        }
+      }
+      if (!consumed) return false;
+      const record: AuthRecord = { ...current, totp: { ...current.totp, backupCodes } };
+      await this.persistAtomic(record);
+      return true;
     });
     this.writeQueue = result.then(
       () => {},
