@@ -83,6 +83,11 @@ export function SettingsPage() {
   const [labelError, setLabelError] = useState<string | null>(null);
   const [labelSaving, setLabelSaving] = useState(false);
 
+  const [reloadConfirming, setReloadConfirming] = useState(false);
+  const [reloadRunning, setReloadRunning] = useState(false);
+  const [reloadResult, setReloadResult] = useState<string | null>(null);
+  const [reloadError, setReloadError] = useState<string | null>(null);
+
   const [appriseDraft, setAppriseDraft] = useState('');
   const [eventTypesDraft, setEventTypesDraft] = useState<Record<NotificationEventType, boolean>>({} as Record<NotificationEventType, boolean>);
   const [testResult, setTestResult] = useState<string | null>(null);
@@ -326,6 +331,21 @@ export function SettingsPage() {
       setLabelError((err as Error).message);
     } finally {
       setLabelSaving(false);
+    }
+  };
+
+  const handleReloadDriver = async () => {
+    setReloadRunning(true);
+    setReloadError(null);
+    setReloadResult(null);
+    try {
+      const result = await nmdApi.reloadDriver();
+      setReloadResult(result.message);
+      setReloadConfirming(false);
+    } catch (err) {
+      setReloadError((err as Error).message);
+    } finally {
+      setReloadRunning(false);
     }
   };
 
@@ -602,6 +622,36 @@ export function SettingsPage() {
             <div className="toggle-row__title">Superblock path</div>
             <div className="toggle-row__desc toggle-row__desc--mono">{status?.array.superblock ?? '—'}</div>
           </div>
+        </div>
+
+        <div className="settings-field toggle-row--bordered">
+          <div className="toggle-row__title">Reload driver</div>
+          <div className="toggle-row__desc">
+            Reloads the storage driver against the current superblock and re-imports every disk's already-known
+            identity — doesn't change which disks are in the array or touch any data, only refreshes stale
+            internal state. A routine sequence of unassign/replace operations can leave driver-side counters out
+            of sync with reality even when the array otherwise looks healthy; this clears that without waiting
+            for it to surface as a real array error. Like any driver reload, the array is briefly unavailable
+            while it runs.
+          </div>
+          {!reloadConfirming ? (
+            <div className="settings-field__row">
+              <button type="button" className="btn" onClick={() => setReloadConfirming(true)}>
+                Reload Driver
+              </button>
+            </div>
+          ) : (
+            <div className="settings-field__row">
+              <button type="button" className="btn" disabled={reloadRunning} onClick={() => setReloadConfirming(false)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn--danger" disabled={reloadRunning} onClick={handleReloadDriver}>
+                {reloadRunning ? 'Reloading…' : 'Confirm Reload'}
+              </button>
+            </div>
+          )}
+          {reloadResult && <div className="status-note">{reloadResult}</div>}
+          {reloadError && <div className="status-note status-note--error">{reloadError}</div>}
         </div>
       </div>
 
