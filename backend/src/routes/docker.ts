@@ -139,6 +139,17 @@ export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: Ap
     }
   });
 
+  router.delete('/docker/containers/:id', async (req, res) => {
+    try {
+      const name = await containerName(req.params.id);
+      const result = await docker.removeContainer(req.params.id, { force: true });
+      activity.log(`Container "${name}" destroyed`, 'red').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   router.post('/docker/containers/plan', async (req, res) => {
     try {
       res.json(await buildManualPlan(req.body, bindRoots));

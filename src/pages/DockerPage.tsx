@@ -11,8 +11,18 @@ type DialogState =
   | null;
 
 export function DockerPage() {
-  const { containers, status, error, pendingIds, start, stop, restart, refresh } = useDockerContainers();
+  const { containers, status, error, pendingIds, start, stop, restart, destroy, refresh } = useDockerContainers();
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [confirmingDestroy, setConfirmingDestroy] = useState<string | null>(null);
+
+  const handleDestroyClick = (id: string) => {
+    if (confirmingDestroy === id) {
+      destroy(id);
+      setConfirmingDestroy(null);
+    } else {
+      setConfirmingDestroy(id);
+    }
+  };
 
   const views = containers.map((c) =>
     deriveContainerViewModel(c, {
@@ -21,6 +31,7 @@ export function DockerPage() {
       onRestart: () => restart(c.id),
       onEdit: () => setDialog({ mode: 'edit', containerId: c.id }),
       onViewLogs: () => setDialog({ mode: 'logs', containerId: c.id, containerName: c.name }),
+      onDestroy: () => handleDestroyClick(c.id),
     }),
   );
 
@@ -84,6 +95,11 @@ export function DockerPage() {
               </button>
               <button type="button" className="btn" disabled={c.isPending} onClick={c.onEdit}>
                 Edit
+              </button>
+            </div>
+            <div className="docker-card__actions">
+              <button type="button" className="btn btn--danger" disabled={c.isPending} onClick={c.onDestroy}>
+                {confirmingDestroy === c.id ? 'Confirm?' : 'Destroy'}
               </button>
             </div>
           </div>

@@ -16,6 +16,7 @@ export const dockerApi = {
   startContainer: (id: string) => request<DockerCommandResult>(`/api/docker/containers/${id}/start`, { method: 'POST' }),
   stopContainer: (id: string) => request<DockerCommandResult>(`/api/docker/containers/${id}/stop`, { method: 'POST' }),
   restartContainer: (id: string) => request<DockerCommandResult>(`/api/docker/containers/${id}/restart`, { method: 'POST' }),
+  removeContainer: (id: string) => request<DockerCommandResult>(`/api/docker/containers/${id}`, { method: 'DELETE' }),
   planContainer: (body: ManualContainerRequest) =>
     request<ManualContainerPlan>('/api/docker/containers/plan', {
       method: 'POST',

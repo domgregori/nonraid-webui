@@ -5,7 +5,14 @@ import { Card } from '../shared/Card';
 import { IconTile } from './IconTile';
 
 // Read-only tile — no action buttons rendered, so these are inert.
-const NOOP_ACTIONS = { isPending: false, onToggle: () => {}, onRestart: () => {}, onEdit: () => {}, onViewLogs: () => {} };
+const NOOP_ACTIONS = {
+  isPending: false,
+  onToggle: () => {},
+  onRestart: () => {},
+  onEdit: () => {},
+  onViewLogs: () => {},
+  onDestroy: () => {},
+};
 
 export function DockerWidgetCard() {
   const { containers } = useDockerContainers();

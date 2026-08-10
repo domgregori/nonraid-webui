@@ -18,4 +18,5 @@ export interface ContainerViewModel {
   onRestart: () => void;
   onEdit: () => void;
   onViewLogs: () => void;
+  onDestroy: () => void;
 }

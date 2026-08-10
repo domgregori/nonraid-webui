@@ -14,6 +14,7 @@ export interface UseDockerContainers {
   start: (id: string) => Promise<void>;
   stop: (id: string) => Promise<void>;
   restart: (id: string) => Promise<void>;
+  destroy: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -80,6 +81,7 @@ export function useDockerContainers(): UseDockerContainers {
     start: (id) => runAction(id, dockerApi.startContainer),
     stop: (id) => runAction(id, dockerApi.stopContainer),
     restart: (id) => runAction(id, dockerApi.restartContainer),
+    destroy: (id) => runAction(id, dockerApi.removeContainer),
     refresh,
   };
 }

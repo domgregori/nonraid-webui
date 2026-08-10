@@ -9,6 +9,7 @@ export interface ContainerActions {
   onRestart: () => void;
   onEdit: () => void;
   onViewLogs: () => void;
+  onDestroy: () => void;
 }
 
 /**
@@ -61,5 +62,6 @@ export function deriveContainerViewModel(container: DockerContainerSummary, acti
     onRestart: actions.onRestart,
     onEdit: actions.onEdit,
     onViewLogs: actions.onViewLogs,
+    onDestroy: actions.onDestroy,
   };
 }
