@@ -46,7 +46,7 @@ export interface TempAlertSettings {
 // survive an app restart. Docker's equivalent isn't persisted here at all — its real storage root
 // lives in /etc/docker/daemon.json, so that file is read live instead (see docker/storagePath.ts).
 export interface StorageLocation {
-  mode: 'boot' | 'array';
+  mode: 'boot' | 'array' | 'cache';
   diskSlot: number | null; // meaningful only when mode === 'array'
 }
 

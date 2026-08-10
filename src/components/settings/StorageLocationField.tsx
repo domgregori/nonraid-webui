@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { useCacheStatus } from '../../hooks/useCacheStatus';
 import { COLORS } from '../../styles/colors';
 import type { StorageLocation, StoragePathProgress } from '../../types/storagePath';
 import { ProgressBar } from '../shared/ProgressBar';
 
 interface CurrentLocation {
-  mode: 'boot' | 'array' | 'custom';
+  mode: 'boot' | 'array' | 'cache' | 'custom';
   diskSlot: number | null;
   path: string;
 }
@@ -22,6 +23,7 @@ type Phase = 'idle' | 'moving';
 function currentLabel(current: CurrentLocation | null): string {
   if (!current) return '…';
   if (current.mode === 'boot') return 'Boot Disk';
+  if (current.mode === 'cache') return 'Cache';
   if (current.mode === 'array') return `Disk ${current.diskSlot}`;
   return current.path; // 'custom' — a data-root this app didn't set
 }
@@ -31,19 +33,24 @@ function currentLabel(current: CurrentLocation | null): string {
 export function StorageLocationField({ title, desc, dataDisks, getStorage, moveStorage }: StorageLocationFieldProps) {
   const [current, setCurrent] = useState<CurrentLocation | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [targetMode, setTargetMode] = useState<'boot' | 'array'>('boot');
+  const [targetMode, setTargetMode] = useState<'boot' | 'array' | 'cache'>('boot');
   const [targetSlot, setTargetSlot] = useState<number | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [messages, setMessages] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const seeded = useRef(false);
+  // A cache pool must actually be set up before "Cache" can be picked as a target — moving storage
+  // onto a mirror that can never mount is worse than just not offering the option yet. Mirrors the
+  // same gate ShareFormModal uses for its "Cache only" allocation option.
+  const { status: cacheStatus } = useCacheStatus();
+  const cacheConfigured = cacheStatus !== null && cacheStatus.health !== 'not-configured';
 
   useEffect(() => {
     getStorage()
       .then((info) => {
         setCurrent(info);
         if (!seeded.current) {
-          setTargetMode(info.mode === 'array' ? 'array' : 'boot');
+          setTargetMode(info.mode === 'array' ? 'array' : info.mode === 'cache' ? 'cache' : 'boot');
           setTargetSlot(info.diskSlot);
           seeded.current = true;
         }
@@ -83,10 +90,10 @@ export function StorageLocationField({ title, desc, dataDisks, getStorage, moveS
         <select
           className="history-input"
           disabled={phase === 'moving'}
-          value={targetMode === 'boot' ? 'boot' : `disk-${targetSlot}`}
+          value={targetMode === 'array' ? `disk-${targetSlot}` : targetMode}
           onChange={(e) => {
-            if (e.target.value === 'boot') {
-              setTargetMode('boot');
+            if (e.target.value === 'boot' || e.target.value === 'cache') {
+              setTargetMode(e.target.value);
               setTargetSlot(null);
             } else {
               setTargetMode('array');
@@ -95,6 +102,9 @@ export function StorageLocationField({ title, desc, dataDisks, getStorage, moveS
           }}
         >
           <option value="boot">Boot Disk</option>
+          <option value="cache" disabled={!cacheConfigured}>
+            {cacheConfigured ? 'Cache' : 'Cache (set up a cache pool first)'}
+          </option>
           {dataDisks.map((d) => (
             <option key={d.slot} value={`disk-${d.slot}`}>
               {d.label}

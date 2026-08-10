@@ -1,6 +1,6 @@
 // Mirrors backend/src/settings/types.ts's StorageLocation. Keep in sync.
 export interface StorageLocation {
-  mode: 'boot' | 'array';
+  mode: 'boot' | 'array' | 'cache';
   diskSlot: number | null;
 }
 
@@ -21,9 +21,9 @@ export interface LxcStorageInfo extends StorageLocation {
 }
 
 // Mirrors backend/src/docker/storagePath.ts's DockerStorageInfo — 'custom' covers a data-root this
-// app didn't set (e.g. hand-edited outside the boot/array convention).
+// app didn't set (e.g. hand-edited outside the boot/array/cache convention).
 export interface DockerStorageInfo {
-  mode: 'boot' | 'array' | 'custom';
+  mode: 'boot' | 'array' | 'cache' | 'custom';
   diskSlot: number | null;
   path: string;
 }

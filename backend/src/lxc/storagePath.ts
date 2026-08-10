@@ -1,7 +1,9 @@
 import { execFile } from 'node:child_process';
 import { stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
+import type { CacheService } from '../cache/service.js';
 import { config } from '../config.js';
+import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
 import type { StorageLocation } from '../settings/types.js';
@@ -15,12 +17,21 @@ export interface StoragePathProgress {
   message: string;
 }
 
-/** Boot → today's real default; array disk N → a fixed subfolder, same convention as the Docker
- *  side (docker/storagePath.ts) so the two are easy to reason about together. */
+/** Boot → today's real default; array disk N / the cache pool → a fixed subfolder, same convention
+ *  as the Docker side (docker/storagePath.ts) so the two are easy to reason about together. */
 export function resolveLxcPath(location: StorageLocation): string {
   if (location.mode === 'boot') return '/var/lib/lxc';
+  if (location.mode === 'cache') return `${config.cacheMountPoint}/system/lxc`;
   if (location.diskSlot === null) throw new Error('diskSlot is required when mode is "array".');
   return `/mnt/disk${location.diskSlot}/system/lxc`;
+}
+
+/** Same "don't move onto a mirror that can't actually serve the data" gate as the Docker side. */
+async function requireCacheUsable(cache: CacheService): Promise<void> {
+  const status = await cache.getStatus();
+  if (status.health === 'not-configured' || status.health === 'unavailable') {
+    throw new HttpError(400, `Cache pool isn't available (${status.health}) — set it up on the Disks page first.`);
+  }
 }
 
 // One storage move at a time, system-wide — concurrent moves (or a move racing a benchmark's own
@@ -72,7 +83,7 @@ export async function getCurrentLxcStorage(settingsStore: SettingsStore): Promis
  */
 export async function migrateLxcStorage(
   target: StorageLocation,
-  deps: { nmd: NmdClient; lxc: LxcClient; settingsStore: SettingsStore },
+  deps: { nmd: NmdClient; lxc: LxcClient; settingsStore: SettingsStore; cache: CacheService },
   onProgress: (p: StoragePathProgress) => void,
 ): Promise<{ path: string }> {
   return withLock(async () => {
@@ -92,10 +103,13 @@ export async function migrateLxcStorage(
         throw new Error(`Disk ${target.diskSlot} isn't a mounted data disk.`);
       }
     }
+    if (target.mode === 'cache') {
+      await requireCacheUsable(deps.cache);
+    }
 
     onProgress({ phase: 'checking', message: 'Checking available space…' });
     const sourceSize = await dirSizeBytes(currentPath);
-    const targetMount = target.mode === 'array' ? `/mnt/disk${target.diskSlot}` : '/';
+    const targetMount = target.mode === 'array' ? `/mnt/disk${target.diskSlot}` : target.mode === 'cache' ? config.cacheMountPoint : '/';
     const available = await freeSpaceBytes(targetMount);
     if (sourceSize > 0 && available < sourceSize * 1.1) {
       throw new Error(`Not enough free space at the target — needs about ${Math.ceil((sourceSize * 1.1) / 1024 / 1024)} MB.`);

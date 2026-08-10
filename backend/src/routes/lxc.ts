@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
+import type { CacheService } from '../cache/service.js';
 import { HttpError } from '../httpError.js';
 import { DEFAULT_ARCH } from '../lxc/distros.js';
 import type { CreateLxcContainerOptions, LxcClient } from '../lxc/index.js';
@@ -36,10 +37,10 @@ function requireNoLineBreaks(field: string, value: string): string {
 
 function parseStorageLocation(body: unknown): StorageLocation {
   const mode = (body as { mode?: unknown })?.mode;
-  if (mode !== 'boot' && mode !== 'array') {
-    throw new HttpError(400, 'mode must be "boot" or "array".');
+  if (mode !== 'boot' && mode !== 'array' && mode !== 'cache') {
+    throw new HttpError(400, 'mode must be "boot", "array", or "cache".');
   }
-  if (mode === 'boot') return { mode, diskSlot: null };
+  if (mode !== 'array') return { mode, diskSlot: null };
   const diskSlot = (body as { diskSlot?: unknown })?.diskSlot;
   if (typeof diskSlot !== 'number' || !Number.isInteger(diskSlot) || diskSlot < 0) {
     throw new HttpError(400, 'diskSlot is required and must be a non-negative integer when mode is "array".');
@@ -47,7 +48,7 @@ function parseStorageLocation(body: unknown): StorageLocation {
   return { mode, diskSlot };
 }
 
-export function lxcRouter(lxc: LxcClient, activity: ActivityStore, nmd: NmdClient, settingsStore: SettingsStore): Router {
+export function lxcRouter(lxc: LxcClient, activity: ActivityStore, nmd: NmdClient, settingsStore: SettingsStore, cache: CacheService): Router {
   const router = Router();
 
   router.get('/lxc/storage', async (_req, res) => {
@@ -65,7 +66,7 @@ export function lxcRouter(lxc: LxcClient, activity: ActivityStore, nmd: NmdClien
     const send = (event: object) => res.write(`${JSON.stringify(event)}\n`);
     try {
       const target = parseStorageLocation(req.body);
-      const result = await migrateLxcStorage(target, { nmd, lxc, settingsStore }, (progress) => send({ type: 'progress', ...progress }));
+      const result = await migrateLxcStorage(target, { nmd, lxc, settingsStore, cache }, (progress) => send({ type: 'progress', ...progress }));
       activity.log(`LXC storage moved to ${result.path}`, 'blue').catch(() => {});
       send({ type: 'done', result });
     } catch (err) {

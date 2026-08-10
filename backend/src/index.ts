@@ -89,8 +89,10 @@ async function main() {
 
   // config.lxcDefaultPath (the -P flag every lxc-* call gets) has no other source of truth, unlike
   // Docker's own daemon.json — reapply a persisted relocation now, before anything handles a
-  // request, so it survives this app's own restart (see lxc/storagePath.ts).
-  if (persistedSettings.lxcStorage.mode === 'array') {
+  // request, so it survives this app's own restart (see lxc/storagePath.ts). Safe to set even
+  // when mode is 'cache' before cache.remountIfConfigured() below actually mounts it — this only
+  // becomes a real path once an lxc-* call runs, well after startup finishes.
+  if (persistedSettings.lxcStorage.mode !== 'boot') {
     config.lxcDefaultPath = resolveLxcPath(persistedSettings.lxcStorage);
   }
 
@@ -156,8 +158,8 @@ async function main() {
   app.use('/api', disksRouter(nmd, smart, activity, settingsStore, cache));
   app.use('/api', emptyDiskRouter(emptyDisk, activity));
   app.use('/api', cacheRouter(cache, cacheMover, settingsStore, activity, shares));
-  app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity, nmd));
-  app.use('/api', lxcRouter(lxc, activity, nmd, settingsStore));
+  app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity, nmd, cache));
+  app.use('/api', lxcRouter(lxc, activity, nmd, settingsStore, cache));
   app.use('/api', metricsRouter(metrics));
   app.use('/api', smartRouter(nmd, smart, system));
   app.use('/api', sharesRouter(shares));

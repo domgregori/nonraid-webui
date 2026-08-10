@@ -3,7 +3,9 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import type { CacheService } from '../cache/service.js';
 import { config } from '../config.js';
+import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { StorageLocation } from '../settings/types.js';
 import { runSudoMaybe } from '../system/procUtil.js';
@@ -18,17 +20,18 @@ export interface StoragePathProgress {
 }
 
 export interface DockerStorageInfo {
-  // 'custom' covers a data-root this app didn't set (e.g. hand-edited outside boot/array convention)
-  // — there's nothing to migrate *from* cleanly in that case beyond just picking a new target.
-  mode: 'boot' | 'array' | 'custom';
+  // 'custom' covers a data-root this app didn't set (e.g. hand-edited outside boot/array/cache
+  // convention) — there's nothing to migrate *from* cleanly in that case beyond just picking a new target.
+  mode: 'boot' | 'array' | 'cache' | 'custom';
   diskSlot: number | null;
   path: string;
 }
 
-/** Boot → today's real default; array disk N → a fixed subfolder, same convention as the LXC side
- *  (lxc/storagePath.ts) so the two are easy to reason about together. */
+/** Boot → today's real default; array disk N / the cache pool → a fixed subfolder, same convention
+ *  as the LXC side (lxc/storagePath.ts) so the two are easy to reason about together. */
 export function resolveDockerPath(location: StorageLocation): string {
   if (location.mode === 'boot') return '/var/lib/docker';
+  if (location.mode === 'cache') return `${config.cacheMountPoint}/system/docker`;
   if (location.diskSlot === null) throw new Error('diskSlot is required when mode is "array".');
   return `/mnt/disk${location.diskSlot}/system/docker`;
 }
@@ -36,9 +39,21 @@ export function resolveDockerPath(location: StorageLocation): string {
 export async function getCurrentDockerStorage(docker: DockerClient): Promise<DockerStorageInfo> {
   const currentPath = await docker.getDataRoot();
   if (currentPath === '/var/lib/docker') return { mode: 'boot', diskSlot: null, path: currentPath };
+  if (currentPath === `${config.cacheMountPoint}/system/docker`) return { mode: 'cache', diskSlot: null, path: currentPath };
   const match = currentPath.match(/^\/mnt\/disk(\d+)\/system\/docker$/);
   if (match) return { mode: 'array', diskSlot: Number(match[1]), path: currentPath };
   return { mode: 'custom', diskSlot: null, path: currentPath };
+}
+
+/** Same "don't move onto a mirror that can't actually serve the data" gate for both cache
+ *  consumers (Docker here, LXC in lxc/storagePath.ts) — not-configured or fully unavailable
+ *  refuses outright; degraded (single-disk, no redundancy but still fully readable/writable) is
+ *  allowed, matching how the cache pool itself stays usable in that state. */
+async function requireCacheUsable(cache: CacheService): Promise<void> {
+  const status = await cache.getStatus();
+  if (status.health === 'not-configured' || status.health === 'unavailable') {
+    throw new HttpError(400, `Cache pool isn't available (${status.health}) — set it up on the Disks page first.`);
+  }
 }
 
 // One storage move at a time, system-wide — see lxc/storagePath.ts's identical lock for why.
@@ -88,7 +103,7 @@ function sleep(ms: number): Promise<void> {
  */
 export async function migrateDockerStorage(
   target: StorageLocation,
-  deps: { nmd: NmdClient; docker: DockerClient },
+  deps: { nmd: NmdClient; docker: DockerClient; cache: CacheService },
   onProgress: (p: StoragePathProgress) => void,
 ): Promise<{ path: string }> {
   return withLock(async () => {
@@ -108,10 +123,13 @@ export async function migrateDockerStorage(
         throw new Error(`Disk ${target.diskSlot} isn't a mounted data disk.`);
       }
     }
+    if (target.mode === 'cache') {
+      await requireCacheUsable(deps.cache);
+    }
 
     onProgress({ phase: 'checking', message: 'Checking available space…' });
     const sourceSize = await dirSizeBytes(currentPath);
-    const targetMount = target.mode === 'array' ? `/mnt/disk${target.diskSlot}` : '/';
+    const targetMount = target.mode === 'array' ? `/mnt/disk${target.diskSlot}` : target.mode === 'cache' ? config.cacheMountPoint : '/';
     const available = await freeSpaceBytes(targetMount);
     if (sourceSize > 0 && available < sourceSize * 1.1) {
       throw new Error(`Not enough free space at the target — needs about ${Math.ceil((sourceSize * 1.1) / 1024 / 1024)} MB.`);

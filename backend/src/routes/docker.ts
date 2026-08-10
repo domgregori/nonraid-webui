@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { APP_NAME_LABEL, APP_REPOSITORY_LABEL, type AppsService } from '../apps/index.js';
 import { resolveWebUiTemplate } from '../apps/webUi.js';
 import type { ActivityStore } from '../activity/index.js';
+import type { CacheService } from '../cache/service.js';
 import type { DockerClient, DockerContainerSummary } from '../docker/index.js';
 import { buildManualPlan } from '../docker/manualPlan.js';
 import { getCurrentDockerStorage, migrateDockerStorage } from '../docker/storagePath.js';
@@ -11,10 +12,10 @@ import type { StorageLocation } from '../settings/types.js';
 
 function parseStorageLocation(body: unknown): StorageLocation {
   const mode = (body as { mode?: unknown })?.mode;
-  if (mode !== 'boot' && mode !== 'array') {
-    throw new HttpError(400, 'mode must be "boot" or "array".');
+  if (mode !== 'boot' && mode !== 'array' && mode !== 'cache') {
+    throw new HttpError(400, 'mode must be "boot", "array", or "cache".');
   }
-  if (mode === 'boot') return { mode, diskSlot: null };
+  if (mode !== 'array') return { mode, diskSlot: null };
   const diskSlot = (body as { diskSlot?: unknown })?.diskSlot;
   if (typeof diskSlot !== 'number' || !Number.isInteger(diskSlot) || diskSlot < 0) {
     throw new HttpError(400, 'diskSlot is required and must be a non-negative integer when mode is "array".');
@@ -22,7 +23,14 @@ function parseStorageLocation(body: unknown): StorageLocation {
   return { mode, diskSlot };
 }
 
-export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: AppsService, activity: ActivityStore, nmd: NmdClient): Router {
+export function dockerRouter(
+  docker: DockerClient,
+  bindRoots: string[],
+  apps: AppsService,
+  activity: ActivityStore,
+  nmd: NmdClient,
+  cache: CacheService,
+): Router {
   const router = Router();
 
   router.get('/docker/storage', async (_req, res) => {
@@ -40,7 +48,7 @@ export function dockerRouter(docker: DockerClient, bindRoots: string[], apps: Ap
     const send = (event: object) => res.write(`${JSON.stringify(event)}\n`);
     try {
       const target = parseStorageLocation(req.body);
-      const result = await migrateDockerStorage(target, { nmd, docker }, (progress) => send({ type: 'progress', ...progress }));
+      const result = await migrateDockerStorage(target, { nmd, docker, cache }, (progress) => send({ type: 'progress', ...progress }));
       activity.log(`Docker storage moved to ${result.path}`, 'blue').catch(() => {});
       send({ type: 'done', result });
     } catch (err) {
