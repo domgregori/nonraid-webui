@@ -32,6 +32,10 @@ const PAD_RIGHT = 8;
 const PAD_TOP = 18;
 const PAD_BOTTOM = 24;
 const FALLBACK_WIDTH = 600; // used only for the first render, before ResizeObserver reports the real width
+// Gap between the crosshair and the tooltip's near edge — centering the tooltip on the crosshair
+// (the old behavior) put it directly over the data point it was meant to show. Flipping which side
+// it renders on based on which half of the chart the cursor is in keeps the crosshair clear.
+const TOOLTIP_GAP = 10;
 
 function defaultFormatValue(v: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
@@ -170,8 +174,15 @@ export function TimeSeriesChart({ series, height = 180, formatValue = defaultFor
             {hoverX !== null && <line x1={hoverX} x2={hoverX} y1={PAD_TOP} y2={height - PAD_BOTTOM} className="ts-chart__crosshair" />}
           </svg>
 
-          {hoverTs !== null && (
-            <div className="ts-chart__tooltip" style={{ left: `${(hoverX! / width) * 100}%` }}>
+          {hoverTs !== null && hoverX !== null && (
+            <div
+              className="ts-chart__tooltip"
+              style={
+                hoverX > width / 2
+                  ? { left: hoverX - TOOLTIP_GAP, transform: 'translateX(-100%)' }
+                  : { left: hoverX + TOOLTIP_GAP, transform: 'none' }
+              }
+            >
               <div className="ts-chart__tooltip-time">{formatTs(hoverTs)}</div>
               {series.map((s) => {
                 const p = nearestPoint(s.points, hoverTs);
