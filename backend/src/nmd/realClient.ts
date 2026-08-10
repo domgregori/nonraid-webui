@@ -917,7 +917,13 @@ export class RealNmdClient implements NmdClient {
     // Checked ahead of the force branch below and never bypassable by it: force is for wiping a
     // disk's own foreign, unmounted data, not for reformatting over a live mounted member (which
     // would be destroying this array's own working data, not a foreign filesystem).
-    if (disk.filesystem?.mountpoint) {
+    // nmdctl's own JSON status reports an unmounted filesystem's mountpoint as the literal word
+    // "unmounted", not empty/null — confirmed against tools/nmdctl's get_mountpoint() default
+    // (docker/storagePath.ts and lxc/storagePath.ts already check for this same sentinel). A bare
+    // truthiness check treats that word as a real path and refuses every genuinely-unmounted disk,
+    // confirmed live: force-format on a freshly-cleared, never-mounted disk failed with "currently
+    // mounted at unmounted" until this was excluded.
+    if (disk.filesystem?.mountpoint && disk.filesystem.mountpoint !== 'unmounted') {
       throw new Error(`Slot ${slot} is currently mounted at ${disk.filesystem.mountpoint} — unmount it (or unassign the disk) before formatting.`);
     }
     if (!force && disk.filesystem && disk.filesystem.type && disk.filesystem.type !== 'unknown') {

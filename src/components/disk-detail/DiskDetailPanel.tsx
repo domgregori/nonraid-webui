@@ -44,7 +44,13 @@ export function DiskDetailPanel() {
   if (!selectedDiskId || !status || !disk) return null;
 
   const needsFormat = disk.role === 'data' && disk.fsType === 'UNKNOWN';
-  const needsMount = disk.role === 'data' && !needsFormat && disk.mountpoint === '—';
+  // nmdctl's own JSON status reports an unmounted filesystem's mountpoint as the literal word
+  // "unmounted", not "-" — confirmed against tools/nmdctl's get_mountpoint()/DISK_STATUS_DATA
+  // default. selectors/disks.ts's normalize() only collapses "-"/empty to "—", so "unmounted"
+  // passes through unchanged and needs its own check here too, or a disk with a real but
+  // never-mounted-by-this-app filesystem (e.g. reused from another system) never shows Mount
+  // Disk or Force Format at all — confirmed live, this exact state was unreachable before this fix.
+  const needsMount = disk.role === 'data' && !needsFormat && (disk.mountpoint === '—' || disk.mountpoint === 'unmounted');
   // Same trigger as needsMount — a recognized filesystem that isn't mounted here means either
   // "Mount Disk" hasn't been tried yet, or it's foreign data (e.g. ext4/ntfs from another system)
   // that this app's mount step can never bring up. Offered alongside Mount Disk rather than
