@@ -29,6 +29,10 @@ export interface BackupSchedule extends WeeklyOrMonthlySchedule {
   retain: number; // how many past backups to keep; older ones are pruned after each successful run
 }
 
+// Mover schedule — no extra fields beyond the shared shape; unlike backups there's no destination
+// to configure, the mover always drains /mnt/cache onto the array per each share's own disks.
+export type CacheSchedule = WeeklyOrMonthlySchedule;
+
 export interface TempAlertSettings {
   enabled: boolean;
   // Single shared threshold for both CPU package temp and disk SMART temps —
@@ -44,6 +48,17 @@ export interface TempAlertSettings {
 export interface StorageLocation {
   mode: 'boot' | 'array';
   diskSlot: number | null; // meaningful only when mode === 'array'
+}
+
+// The cache mirror's persisted identity — deliberately not raw /dev/sdX paths, which aren't stable
+// across reboots (see cache/mount.ts, which resolves current device paths from this UUID fresh each
+// time). `enabled` is separate from "is the mirror set up": setup (cache/service.ts's setup())
+// mounts the filesystem permanently once done; this flag only controls whether shares actually
+// write to it (see shares/applier/realApplier.ts's branchPaths()), so it can be toggled off without
+// tearing the mirror down.
+export interface CacheSettings {
+  enabled: boolean;
+  fsUuid: string | null;
 }
 
 export interface AppSettings {
@@ -62,6 +77,8 @@ export interface AppSettings {
   backupSchedule: BackupSchedule;
   tempAlerts: TempAlertSettings;
   lxcStorage: StorageLocation;
+  cache: CacheSettings;
+  cacheSchedule: CacheSchedule;
 }
 
 export type AppSettingsUpdate = Partial<{
@@ -74,4 +91,6 @@ export type AppSettingsUpdate = Partial<{
   backupSchedule: Partial<BackupSchedule>;
   tempAlerts: Partial<TempAlertSettings>;
   lxcStorage: Partial<StorageLocation>;
+  cache: Partial<CacheSettings>;
+  cacheSchedule: Partial<CacheSchedule>;
 }>;

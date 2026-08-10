@@ -1,4 +1,5 @@
 // Mirrors backend/src/settings/types.ts. Keep in sync.
+import type { StorageLocation } from './storagePath';
 
 export type NotificationEventType =
   | 'diskFailed'
@@ -13,7 +14,10 @@ export type NotificationEventType =
   | 'parityCompleted'
   | 'backupCompleted'
   | 'arrayStarted'
-  | 'arrayStopped';
+  | 'arrayStopped'
+  | 'cacheMirrorDegraded'
+  | 'cacheMoverFailed'
+  | 'cacheMoverCompleted';
 
 export type NotificationSeverity = 'high' | 'medium' | 'low';
 
@@ -45,9 +49,16 @@ export interface BackupSchedule extends WeeklyOrMonthlySchedule {
   retain: number;
 }
 
+export type CacheSchedule = WeeklyOrMonthlySchedule;
+
 export interface TempAlertSettings {
   enabled: boolean;
   warnAboveCelsius: number;
+}
+
+export interface CacheSettings {
+  enabled: boolean;
+  fsUuid: string | null;
 }
 
 export interface AppSettings {
@@ -57,6 +68,9 @@ export interface AppSettings {
   paritySchedule: ParitySchedule;
   backupSchedule: BackupSchedule;
   tempAlerts: TempAlertSettings;
+  lxcStorage: StorageLocation;
+  cache: CacheSettings;
+  cacheSchedule: CacheSchedule;
 }
 
 export type AppSettingsUpdate = Partial<{
@@ -68,6 +82,9 @@ export type AppSettingsUpdate = Partial<{
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<BackupSchedule>;
   tempAlerts: Partial<TempAlertSettings>;
+  lxcStorage: Partial<StorageLocation>;
+  cache: Partial<CacheSettings>;
+  cacheSchedule: Partial<CacheSchedule>;
 }>;
 
 export interface CommandResult {

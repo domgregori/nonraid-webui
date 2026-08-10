@@ -11,7 +11,10 @@ export type NotificationEventType =
   | 'parityCompleted'
   | 'backupCompleted'
   | 'arrayStarted'
-  | 'arrayStopped';
+  | 'arrayStopped'
+  | 'cacheMirrorDegraded'
+  | 'cacheMoverFailed'
+  | 'cacheMoverCompleted';
 
 export type NotificationSeverity = 'high' | 'medium' | 'low';
 
@@ -35,6 +38,8 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { id: 'smartFailed', label: 'SMART health check failed', severity: 'high', defaultEnabled: true },
   { id: 'parityErrors', label: 'Parity check finished with errors', severity: 'high', defaultEnabled: true },
   { id: 'backupFailed', label: 'Scheduled backup failed', severity: 'high', defaultEnabled: true },
+  { id: 'cacheMirrorDegraded', label: 'Cache mirror degraded', severity: 'high', defaultEnabled: true },
+  { id: 'cacheMoverFailed', label: 'Cache mover failed', severity: 'high', defaultEnabled: true },
   { id: 'tempAlert', label: 'Temperature alert', severity: 'medium', defaultEnabled: true },
   { id: 'diskAdded', label: 'Disk added or replaced', severity: 'medium', defaultEnabled: true },
   { id: 'arrayReconfigured', label: 'Array reconfigured (disk dropped)', severity: 'medium', defaultEnabled: true },
@@ -43,6 +48,7 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { id: 'backupCompleted', label: 'Scheduled backup completed', severity: 'low', defaultEnabled: false },
   { id: 'arrayStarted', label: 'Array started', severity: 'low', defaultEnabled: false },
   { id: 'arrayStopped', label: 'Array stopped', severity: 'low', defaultEnabled: false },
+  { id: 'cacheMoverCompleted', label: 'Cache mover completed', severity: 'low', defaultEnabled: false },
 ];
 
 export const DEFAULT_EVENT_TYPES: Record<NotificationEventType, boolean> = Object.fromEntries(

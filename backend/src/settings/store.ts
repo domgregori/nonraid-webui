@@ -12,6 +12,8 @@ const DEFAULTS: AppSettings = {
   backupSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3, destDir: '', retain: 7 },
   tempAlerts: { enabled: false, warnAboveCelsius: 55 },
   lxcStorage: { mode: 'boot', diskSlot: null },
+  cache: { enabled: false, fsUuid: null },
+  cacheSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3 },
 };
 
 /**
@@ -35,6 +37,8 @@ export class SettingsStore {
       backupSchedule: { ...settings.backupSchedule },
       tempAlerts: { ...settings.tempAlerts },
       lxcStorage: { ...settings.lxcStorage },
+      cache: { ...settings.cache },
+      cacheSchedule: { ...settings.cacheSchedule },
     };
   }
 
@@ -53,6 +57,8 @@ export class SettingsStore {
         backupSchedule: { ...current.backupSchedule, ...patch.backupSchedule },
         tempAlerts: { ...current.tempAlerts, ...patch.tempAlerts },
         lxcStorage: { ...current.lxcStorage, ...patch.lxcStorage },
+        cache: { ...current.cache, ...patch.cache },
+        cacheSchedule: { ...current.cacheSchedule, ...patch.cacheSchedule },
       };
       await this.persistAtomic(next);
     });
@@ -76,6 +82,8 @@ export class SettingsStore {
         backupSchedule: { ...DEFAULTS.backupSchedule, ...parsed.backupSchedule },
         tempAlerts: { ...DEFAULTS.tempAlerts, ...parsed.tempAlerts },
         lxcStorage: { ...DEFAULTS.lxcStorage, ...parsed.lxcStorage },
+        cache: { ...DEFAULTS.cache, ...parsed.cache },
+        cacheSchedule: { ...DEFAULTS.cacheSchedule, ...parsed.cacheSchedule },
       };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
