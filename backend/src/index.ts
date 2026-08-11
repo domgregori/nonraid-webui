@@ -177,7 +177,7 @@ async function main() {
   app.use('/api', usersRouter(users));
   app.use('/api', appsRouter(apps));
   app.use('/api', activityRouter(activity));
-  app.use('/api', tlsRouter(tlsStore, activity));
+  app.use('/api', tlsRouter(tlsStore, activity, authService));
 
   // Protocol is chosen once at boot from the persisted TLS config, same "config changes need a
   // restart" model as everything else in this app — see backend/src/tls/. Falls open to plain

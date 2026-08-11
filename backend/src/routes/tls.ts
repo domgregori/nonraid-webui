@@ -5,6 +5,7 @@ import path from 'node:path';
 import { Router, type Response } from 'express';
 import multer from 'multer';
 import type { ActivityStore } from '../activity/index.js';
+import type { AuthService } from '../auth/index.js';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import { generateSelfSigned, suggestCommonName, suggestSans } from '../tls/certGen.js';
@@ -86,7 +87,7 @@ function scheduleSelfRestart(res: Response): void {
   });
 }
 
-export function tlsRouter(tlsStore: TlsStore, activity: ActivityStore): Router {
+export function tlsRouter(tlsStore: TlsStore, activity: ActivityStore, authService: AuthService): Router {
   const router = Router();
 
   router.get('/tls/status', async (_req, res) => {
@@ -223,10 +224,21 @@ export function tlsRouter(tlsStore: TlsStore, activity: ActivityStore): Router {
     }
   });
 
-  router.post('/tls/disable', async (_req, res) => {
+  router.post('/tls/disable', async (req, res) => {
     try {
-      const record = await tlsStore.setEnabled(false);
-      const newOrigin = originFor('http', record.commonName);
+      await tlsStore.setEnabled(false);
+      // Flip before reissuing below so the fresh cookie is built non-Secure. Without this, the
+      // browser keeps carrying the old Secure cookie — which it silently withholds on the
+      // plain-HTTP page redirected to next — with no in-app way back in, since passkey login also
+      // needs a secure context. Live-reproduced this exact lockout before adding the fix.
+      config.cookieSecure = false;
+      const { cookie } = await authService.reissueSession(req.headers.cookie);
+      res.append('Set-Cookie', cookie);
+      // req.hostname (not record.commonName) so the redirect target's host matches the cookie
+      // above, which is host-only and bound to whatever host this request actually came in on —
+      // relevant if the admin reached the site via something other than the cert's CN (a LAN IP,
+      // a different DNS alias, ...).
+      const newOrigin = originFor('http', req.hostname);
       activity.log('Disabling HTTPS — nonraid-webui is restarting', 'amber').catch(() => {});
       res.json({ ok: true, message: 'Restarting with HTTPS disabled — you will be redirected shortly.', newOrigin });
       scheduleSelfRestart(res);

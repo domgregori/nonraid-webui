@@ -209,6 +209,16 @@ export class AuthService {
     await this.store.removePasskey(id);
   }
 
+  // Re-verifies the current session and issues a fresh cookie for it — used when something about
+  // cookie *policy* changes mid-session (currently: disabling TLS, which must flip cookieSecure to
+  // false so the browser doesn't carry a now-unusable Secure cookie into the plain-HTTP page it's
+  // about to be redirected to). Deliberately re-verifies rather than trusting the caller already
+  // ran requireAuth, matching every other mutator here.
+  async reissueSession(cookieHeader: string | undefined): Promise<AuthResult> {
+    const record = await this.requireSession(cookieHeader);
+    return this.issueSession(record.sessionSecret);
+  }
+
   private enrolledMethods(record: AuthRecord): TwoFactorMethod[] {
     const methods: TwoFactorMethod[] = [];
     if (record.totp) methods.push('totp');
