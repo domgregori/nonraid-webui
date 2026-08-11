@@ -56,6 +56,16 @@ export function browseRouter(browse: BrowseService): Router {
     }
   });
 
+  // On-demand only (not part of list()) — a full `du` on every directory in a listing would make
+  // browsing large shares painfully slow.
+  router.get('/browse/size', async (req, res) => {
+    try {
+      res.json({ bytes: await browse.size(queryPath(req)) });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   router.get('/browse/download', async (req, res) => {
     try {
       const { absPath, name } = await browse.resolveDownload(queryPath(req));
@@ -83,20 +93,55 @@ export function browseRouter(browse: BrowseService): Router {
     }
   });
 
-  router.post('/browse/move', async (req, res) => {
-    try {
-      const { path: relPath, destPath } = req.body ?? {};
-      res.json(await browse.move(relPath ?? '', destPath ?? ''));
-    } catch (err) {
-      handleError(err, res);
-    }
-  });
+  // Streamed NDJSON, same protocol as /docker/containers etc. (see progressStream.ts on the
+  // frontend) — copy/move/delete over one or more paths, reporting progress per item so a large
+  // transfer doesn't read as a hung request. Cancel works by the client aborting its fetch; that
+  // closes the connection, which req.on('close') below turns into a checked flag rather than
+  // needing a separate cancel endpoint or a background job registry (this request stays open for
+  // the operation's whole lifetime, unlike FileMoveService's detached background job).
+  router.post('/browse/bulk', async (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' });
+    const send = (event: object) => res.write(`${JSON.stringify(event)}\n`);
 
-  router.delete('/browse', async (req, res) => {
+    let cancelled = false;
+    req.on('close', () => {
+      cancelled = true;
+    });
+
     try {
-      res.json(await browse.remove(queryPath(req)));
+      const { paths, op, destPath } = req.body as { paths?: unknown; op?: unknown; destPath?: unknown };
+      if (!Array.isArray(paths) || paths.some((p) => typeof p !== 'string') || paths.length === 0) {
+        throw new HttpError(400, 'paths must be a non-empty array of strings.');
+      }
+      if (op !== 'copy' && op !== 'move' && op !== 'delete') {
+        throw new HttpError(400, 'op must be "copy", "move", or "delete".');
+      }
+      if ((op === 'copy' || op === 'move') && typeof destPath !== 'string') {
+        throw new HttpError(400, 'destPath is required for copy and move.');
+      }
+
+      const succeeded: string[] = [];
+      const failed: { path: string; error: string }[] = [];
+
+      for (let i = 0; i < paths.length; i++) {
+        if (cancelled) break;
+        const p = paths[i] as string;
+        send({ type: 'progress', index: i, total: paths.length, name: p.split('/').pop() ?? p });
+        try {
+          if (op === 'delete') await browse.remove(p);
+          else if (op === 'copy') await browse.copy(p, destPath as string);
+          else await browse.move(p, destPath as string);
+          succeeded.push(p);
+        } catch (err) {
+          failed.push({ path: p, error: (err as Error).message });
+        }
+      }
+
+      send({ type: 'done', result: { succeeded, failed, cancelled } });
     } catch (err) {
-      handleError(err, res);
+      send({ type: 'error', message: err instanceof HttpError ? err.message : (err as Error).message });
+    } finally {
+      res.end();
     }
   });
 

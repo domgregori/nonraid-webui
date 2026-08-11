@@ -2,25 +2,27 @@ import { useState } from 'react';
 import { PathAutocomplete } from '../shared/PathAutocomplete';
 import type { BrowseEntry } from '../../types/browseApi';
 
-interface MoveModalProps {
-  entry: BrowseEntry;
+interface TransferModalProps {
+  op: 'copy' | 'move';
+  /** Length 1 for a single-row action, N for a multi-select bulk action. */
+  entries: BrowseEntry[];
   currentPath: string;
   onCancel: () => void;
-  onSubmit: (destPath: string) => Promise<boolean>;
+  // Just collects the destination and hands off — the actual transfer is async, tracked by
+  // bulkJob/BulkProgressDialog rather than this modal's own submitting/error state.
+  onStart: (destPath: string) => void;
 }
 
-export function MoveModal({ entry, currentPath, onCancel, onSubmit }: MoveModalProps) {
-  const [destPath, setDestPath] = useState(currentPath);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+const VERB: Record<'copy' | 'move', string> = { copy: 'Copy', move: 'Move' };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+export function TransferModal({ op, entries, currentPath, onCancel, onStart }: TransferModalProps) {
+  const [destPath, setDestPath] = useState(currentPath);
+  const verb = VERB[op];
+  const label = entries.length === 1 ? entries[0]!.name : `${entries.length} items`;
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    const ok = await onSubmit(destPath.trim().replace(/\/+$/, ''));
-    setSubmitting(false);
-    if (!ok) setError('Move failed — see the page error banner for details.');
+    onStart(destPath.trim().replace(/\/+$/, ''));
   };
 
   return (
@@ -28,7 +30,9 @@ export function MoveModal({ entry, currentPath, onCancel, onSubmit }: MoveModalP
       <div className="detail-overlay" onClick={onCancel} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Move {entry.name}</div>
+          <div className="dialog__title">
+            {verb} {label}
+          </div>
           <button type="button" className="detail-panel__close" onClick={onCancel} aria-label="Close">
             &#10005;
           </button>
@@ -46,14 +50,12 @@ export function MoveModal({ entry, currentPath, onCancel, onSubmit }: MoveModalP
             />
           </label>
 
-          {error && <div className="status-note status-note--error">{error}</div>}
-
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onCancel}>
               Cancel
             </button>
-            <button type="submit" className="btn--primary" disabled={submitting}>
-              {submitting ? 'Moving…' : 'Move'}
+            <button type="submit" className="btn--primary">
+              {verb}
             </button>
           </div>
         </form>

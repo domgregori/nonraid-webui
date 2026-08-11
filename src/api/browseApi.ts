@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './config';
+import { streamNdjson } from './progressStream';
 import { request } from './request';
-import type { BrowseCommandResult, BrowseListing, PathSuggestions } from '../types/browseApi';
+import type { BrowseCommandResult, BrowseListing, BulkOp, BulkOpProgress, BulkOpResult, PathSuggestions } from '../types/browseApi';
 
 export type PathSuggestScope = 'browse' | 'binds';
 
@@ -24,9 +25,16 @@ export const browseApi = {
 
   rename: (path: string, newName: string) => request<BrowseCommandResult>('/api/browse/rename', jsonInit({ path, newName })),
 
-  move: (path: string, destPath: string) => request<BrowseCommandResult>('/api/browse/move', jsonInit({ path, destPath })),
+  calculateSize: (path: string) => request<{ bytes: number }>(withPath('/api/browse/size', path)),
 
-  remove: (path: string) => request<BrowseCommandResult>(withPath('/api/browse', path), { method: 'DELETE' }),
+  // Copy/Move/Delete over one or more paths — used for both single-row actions and multi-select,
+  // always through the streamed/cancelable path (see progressStream.ts).
+  bulk: (paths: string[], op: BulkOp, destPath: string | undefined, onProgress: (p: BulkOpProgress) => void, signal: AbortSignal) =>
+    streamNdjson<BulkOpProgress, BulkOpResult>(
+      '/api/browse/bulk',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paths, op, destPath }), signal },
+      onProgress,
+    ),
 
   suggest: (path: string, scope: PathSuggestScope) =>
     request<PathSuggestions>(`/api/browse/suggest?path=${encodeURIComponent(path)}&scope=${scope}`),

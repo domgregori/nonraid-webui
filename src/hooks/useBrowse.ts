@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browseApi } from '../api/browseApi';
-import type { BrowseEntry, BrowseListing } from '../types/browseApi';
+import type { BrowseEntry, BrowseListing, BulkOp, BulkOpProgress, BulkOpResult } from '../types/browseApi';
 
 export type BrowseLoadStatus = 'loading' | 'ready' | 'error';
 
@@ -17,6 +17,22 @@ function parentOf(absPath: string): string {
   return idx <= 0 ? '/' : absPath.slice(0, idx);
 }
 
+export interface BulkJobState {
+  op: BulkOp;
+  total: number;
+  progress: BulkOpProgress | null;
+  /** Set once the server reports a clean completion — including a server-observed cancel (the
+   *  request stayed connected long enough for req.on('close') to report back what had actually
+   *  succeeded before stopping). */
+  result: BulkOpResult | null;
+  /** Set when the client itself severed the connection before any server response arrived — the
+   *  exact succeeded/failed split in that case is unknowable client-side, so this is tracked
+   *  separately rather than faking an empty BulkOpResult. */
+  aborted: boolean;
+  error: string | null;
+  controller: AbortController;
+}
+
 export interface UseBrowse {
   path: string;
   listing: BrowseListing | null;
@@ -25,6 +41,9 @@ export interface UseBrowse {
   actionError: string | null;
   busy: boolean;
   canGoUp: boolean;
+  selected: Set<string>;
+  sizes: Record<string, number>;
+  bulkJob: BulkJobState | null;
   navigate: (path: string) => void;
   open: (entry: BrowseEntry) => void;
   up: () => void;
@@ -32,9 +51,14 @@ export interface UseBrowse {
   downloadUrl: (entry: BrowseEntry) => string;
   mkdir: (name: string) => Promise<boolean>;
   rename: (entry: BrowseEntry, newName: string) => Promise<boolean>;
-  remove: (entry: BrowseEntry) => Promise<boolean>;
-  move: (entry: BrowseEntry, destPath: string) => Promise<boolean>;
   upload: (files: FileList | File[]) => Promise<boolean>;
+  toggleSelect: (name: string) => void;
+  selectAll: () => void;
+  clearSelection: () => void;
+  calculateSize: (entry: BrowseEntry) => Promise<number>;
+  startBulk: (op: BulkOp, entries: BrowseEntry[], destPath?: string) => void;
+  cancelBulk: () => void;
+  dismissBulk: () => void;
 }
 
 /** Drives the file browser: navigation, listing, and file ops over the whole
@@ -47,6 +71,9 @@ export function useBrowse(): UseBrowse {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sizes, setSizes] = useState<Record<string, number>>({});
+  const [bulkJob, setBulkJob] = useState<BulkJobState | null>(null);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -56,6 +83,12 @@ export function useBrowse(): UseBrowse {
     };
   }, []);
 
+  // Calculated sizes are keyed by absolute path, which already encodes the directory — they only
+  // go stale on a real navigation, not on a same-directory refresh (e.g. after New Folder).
+  useEffect(() => {
+    setSizes({});
+  }, [path]);
+
   const refresh = useCallback(async () => {
     setStatus('loading');
     try {
@@ -64,6 +97,7 @@ export function useBrowse(): UseBrowse {
       setListing(result);
       setStatus('ready');
       setError(null);
+      setSelected(new Set());
     } catch (err) {
       if (!mounted.current) return;
       setStatus('error');
@@ -113,20 +147,104 @@ export function useBrowse(): UseBrowse {
     [path, withAction],
   );
 
-  const remove = useCallback(
-    (entry: BrowseEntry) => withAction(async () => { await browseApi.remove(joinPath(path, entry.name)); }),
-    [path, withAction],
-  );
-
-  const move = useCallback(
-    (entry: BrowseEntry, destPath: string) => withAction(async () => { await browseApi.move(joinPath(path, entry.name), destPath); }),
-    [path, withAction],
-  );
-
   const upload = useCallback(
     (files: FileList | File[]) => withAction(async () => { await browseApi.upload(path, files); }),
     [path, withAction],
   );
 
-  return { path, listing, status, error, actionError, busy, canGoUp, navigate, open, up, refresh, downloadUrl, mkdir, rename, remove, move, upload };
+  const toggleSelect = useCallback((name: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    setSelected(new Set((listing?.entries ?? []).map((e) => e.name)));
+  }, [listing]);
+
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+
+  const calculateSize = useCallback(
+    async (entry: BrowseEntry): Promise<number> => {
+      const absPath = joinPath(path, entry.name);
+      const { bytes } = await browseApi.calculateSize(absPath);
+      if (mounted.current) setSizes((prev) => ({ ...prev, [absPath]: bytes }));
+      return bytes;
+    },
+    [path],
+  );
+
+  const startBulk = useCallback(
+    (op: BulkOp, entries: BrowseEntry[], destPath?: string) => {
+      const controller = new AbortController();
+      const paths = entries.map((e) => joinPath(path, e.name));
+      setBulkJob({ op, total: paths.length, progress: null, result: null, aborted: false, error: null, controller });
+
+      browseApi
+        .bulk(
+          paths,
+          op,
+          destPath,
+          (p) => {
+            if (mounted.current) setBulkJob((prev) => (prev ? { ...prev, progress: p } : prev));
+          },
+          controller.signal,
+        )
+        .then((result) => {
+          if (!mounted.current) return;
+          setBulkJob((prev) => (prev ? { ...prev, result } : prev));
+          refresh();
+        })
+        .catch((err) => {
+          if (!mounted.current) return;
+          if ((err as Error).name === 'AbortError') {
+            setBulkJob((prev) => (prev ? { ...prev, aborted: true } : prev));
+            refresh(); // some items likely completed before the abort landed — worth reloading
+          } else {
+            setBulkJob((prev) => (prev ? { ...prev, error: (err as Error).message } : prev));
+          }
+        });
+    },
+    [path, refresh],
+  );
+
+  const cancelBulk = useCallback(() => {
+    setBulkJob((prev) => {
+      prev?.controller.abort();
+      return prev;
+    });
+  }, []);
+
+  const dismissBulk = useCallback(() => setBulkJob(null), []);
+
+  return {
+    path,
+    listing,
+    status,
+    error,
+    actionError,
+    busy,
+    canGoUp,
+    selected,
+    sizes,
+    bulkJob,
+    navigate,
+    open,
+    up,
+    refresh,
+    downloadUrl,
+    mkdir,
+    rename,
+    upload,
+    toggleSelect,
+    selectAll,
+    clearSelection,
+    calculateSize,
+    startBulk,
+    cancelBulk,
+    dismissBulk,
+  };
 }

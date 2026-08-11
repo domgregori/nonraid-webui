@@ -1,4 +1,4 @@
-import { rename, rm, stat } from 'node:fs/promises';
+import { readdir, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { ActivityStore } from '../activity/index.js';
 import type { CacheService } from '../cache/service.js';
@@ -168,6 +168,45 @@ export class ShareService {
     await this.resyncExports();
     this.activity.log(`Share "${name}" deleted, including its data`, 'red').catch(() => {});
     return name;
+  }
+
+  /**
+   * For a directory inside a user share (config.shareMountRoot/<name>/<relDir>), returns which
+   * physical branch(es) contain each entry name in that directory — used by Browse's Location
+   * column. A plain readdir per branch, not a stat per file, so cost is O(branches), not
+   * O(branches × entries): a directory can legitimately span more than one disk simultaneously
+   * under mergerfs. Null if `shareName` isn't a real configured share.
+   */
+  async locateShareEntries(shareName: string, relDir: string): Promise<Record<string, string[]> | null> {
+    const share = await this.store.get(shareName);
+    if (!share) return null;
+
+    const ctx = await this.buildContext();
+    const branches: { label: string; mountpoint: string }[] = [];
+    if (share.allocationMethod === 'cache-only') {
+      if (ctx.cacheMountPoint) branches.push({ label: 'Cache', mountpoint: ctx.cacheMountPoint });
+    } else {
+      for (const slot of share.disks) {
+        const mp = ctx.diskMountpoints[slot];
+        if (mp) branches.push({ label: `Disk ${slot}`, mountpoint: mp });
+      }
+      // Same predicate as RealShareApplier's own private usesCacheBranch() (realApplier.ts) —
+      // duplicated here rather than exported, since it's a one-line boolean not worth a
+      // cross-layer export for.
+      if (ctx.cacheMountPoint !== null && share.allocationMethod !== 'single-disk') {
+        branches.push({ label: 'Cache', mountpoint: ctx.cacheMountPoint });
+      }
+    }
+
+    const locations: Record<string, string[]> = {};
+    for (const branch of branches) {
+      const dir = relDir ? `${branch.mountpoint}/${shareName}/${relDir}` : `${branch.mountpoint}/${shareName}`;
+      const dirents = await readdir(dir, { withFileTypes: true }).catch(() => []);
+      for (const d of dirents) {
+        (locations[d.name] ??= []).push(branch.label);
+      }
+    }
+    return locations;
   }
 
   async list(): Promise<ShareWithStats[]> {

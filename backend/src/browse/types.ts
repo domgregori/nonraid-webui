@@ -5,6 +5,9 @@ export interface BrowseEntry {
   type: BrowseEntryType;
   size: number;
   modifiedAt: string;
+  /** Physical disk branch(es) backing this entry — present only when the listing is inside a
+   *  user share (config.shareMountRoot), where mergerfs can blend more than one disk together. */
+  locations?: string[];
 }
 
 export interface BrowseListing {
@@ -18,4 +21,18 @@ export interface BrowseListing {
 export interface BrowseCommandResult {
   ok: boolean;
   message: string;
+}
+
+export type BulkOp = 'copy' | 'move' | 'delete';
+
+export interface BulkOpProgress {
+  index: number;
+  total: number;
+  name: string;
+}
+
+export interface BulkOpResult {
+  succeeded: string[];
+  failed: { path: string; error: string }[];
+  cancelled: boolean;
 }

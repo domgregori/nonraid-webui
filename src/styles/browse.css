@@ -61,7 +61,7 @@
 .browse-table__head,
 .browse-row {
   display: grid;
-  grid-template-columns: 1fr 100px 160px auto;
+  grid-template-columns: 24px 1fr 100px 160px 140px auto;
   gap: var(--space-md);
   align-items: center;
   padding: 10px var(--space-lg);
@@ -93,6 +93,11 @@
   background: var(--color-surface-elevated);
 }
 
+.browse-row__checkbox {
+  display: flex;
+  align-items: center;
+}
+
 .browse-row__name {
   display: flex;
   align-items: center;
@@ -118,17 +123,62 @@
 }
 
 .browse-row__size,
-.browse-row__modified {
+.browse-row__modified,
+.browse-row__location {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--color-text-secondary);
   white-space: nowrap;
 }
 
+.browse-calculate-btn {
+  font-family: inherit;
+  font-size: 11px;
+  background: none;
+  border: none;
+  color: var(--color-blue);
+  cursor: pointer;
+  padding: 0;
+}
+
+.browse-calculate-btn:disabled {
+  color: var(--color-text-dim);
+  cursor: default;
+}
+
 .browse-row__actions {
   display: flex;
   gap: 6px;
   justify-content: flex-end;
+}
+
+/* Selection mode's toolbar row — reads as "you're in a mode," not just another static row. */
+.browse-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  border-radius: var(--radius-btn);
+  background: var(--color-blue-tint-soft);
+  border: 1px solid var(--color-blue);
+}
+
+.browse-bulk-bar__count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-blue);
+  margin-right: auto;
+}
+
+.browse-bulk-failures {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  max-height: 160px;
+  overflow-y: auto;
 }
 
 .browse-dropzone-hint {
@@ -155,12 +205,18 @@
     row-gap: 6px;
   }
 
+  .browse-row__checkbox {
+    flex: 0 0 auto;
+    order: -1;
+  }
+
   .browse-row__name {
     flex: 1 1 100%;
   }
 
   .browse-row__size,
-  .browse-row__modified {
+  .browse-row__modified,
+  .browse-row__location {
     flex: 0 0 auto;
   }
 

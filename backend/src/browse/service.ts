@@ -1,9 +1,14 @@
-import { copyFile, mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { copyFile, cp, mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
+import { promisify } from 'node:util';
+import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { ShareService } from '../shares/index.js';
 import { isMountPoint, resolveExisting, resolveForCreate } from './paths.js';
 import type { BrowseCommandResult, BrowseEntry, BrowseListing } from './types.js';
+
+const execFileAsync = promisify(execFile);
 
 /** Browses the whole /mnt tree (config.browseRoot), not a single share — see
  * paths.ts for the traversal-ceiling enforcement every method here relies on. */
@@ -32,7 +37,34 @@ export class BrowseService {
       return a.name.localeCompare(b.name);
     });
 
+    // Inside a user share, mergerfs can blend more than one physical disk into this one
+    // directory listing — annotate each entry with which disk(s) it's really on. Left
+    // undefined outside a share (e.g. /mnt root, or a raw /mnt/diskN) since the question
+    // doesn't apply there.
+    const shareMountPrefix = `${config.shareMountRoot}/`;
+    if (absPath.startsWith(shareMountPrefix)) {
+      const rel = absPath.slice(shareMountPrefix.length);
+      const slash = rel.indexOf('/');
+      const shareName = slash === -1 ? rel : rel.slice(0, slash);
+      const relDir = slash === -1 ? '' : rel.slice(slash + 1);
+      const locations = await this.shares.locateShareEntries(shareName, relDir);
+      if (locations) {
+        for (const entry of entries) entry.locations = locations[entry.name] ?? [];
+      }
+    }
+
     return { root, path: absPath, entries };
+  }
+
+  /** Recursive directory size, computed on demand — not part of list() since a full `du` on every
+   *  directory in a listing would make browsing large shares painfully slow. Same technique as
+   *  fileMove/service.ts's private duBytes(). */
+  async size(requestPath: string): Promise<number> {
+    const { absPath } = await resolveExisting(requestPath);
+    const st = await stat(absPath);
+    if (!st.isDirectory()) return st.size;
+    const { stdout } = await execFileAsync('du', ['-sb', absPath], { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 });
+    return Number(stdout.split('\t')[0]) || 0;
   }
 
   async resolveDownload(requestPath: string): Promise<{ absPath: string; name: string }> {
@@ -86,8 +118,34 @@ export class BrowseService {
     const destExists = await stat(destAbs).then(() => true).catch(() => false);
     if (destExists) throw new HttpError(409, `"${name}" already exists at the destination.`);
 
-    await rename(absPath, destAbs);
+    try {
+      await rename(absPath, destAbs);
+    } catch {
+      // Cross-device rename normally fails with EXDEV, but FUSE-backed mounts like mergerfs
+      // return ENOTCONN instead when source and destination land on different physical
+      // branches — same reason saveUpload() below falls back to copy+remove. cp's recursive
+      // option handles both files and directories in one call.
+      await cp(absPath, destAbs, { recursive: true });
+      await rm(absPath, { recursive: true });
+    }
     return { ok: true, message: `Moved "${name}"` };
+  }
+
+  async copy(requestPath: string, destParentPath: string): Promise<BrowseCommandResult> {
+    const { root, absPath } = await resolveExisting(requestPath);
+    if (absPath === root) throw new HttpError(400, 'Cannot copy the browse root.');
+
+    const name = path.basename(absPath);
+    const { absPath: destAbs } = await resolveForCreate(destParentPath, name);
+    const destParentStat = await stat(path.dirname(destAbs));
+    if (!destParentStat.isDirectory()) throw new HttpError(400, 'Destination is not a directory.');
+    if (destAbs === absPath) throw new HttpError(400, `Source and destination are the same.`);
+
+    const destExists = await stat(destAbs).then(() => true).catch(() => false);
+    if (destExists) throw new HttpError(409, `"${name}" already exists at the destination.`);
+
+    await cp(absPath, destAbs, { recursive: true });
+    return { ok: true, message: `Copied "${name}"` };
   }
 
   async remove(requestPath: string): Promise<BrowseCommandResult> {
