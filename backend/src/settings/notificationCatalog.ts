@@ -24,6 +24,9 @@ export interface NotificationEventDef {
   label: string;
   severity: NotificationSeverity;
   defaultEnabled: boolean;
+  // Consecutive events sharing the same group render together inside one bordered box in the
+  // frontend's toggle list, instead of as flat, unrelated-looking rows — e.g. CPU/Disk temperature.
+  group?: string;
 }
 
 /**
@@ -41,8 +44,8 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { id: 'backupFailed', label: 'Scheduled backup failed', severity: 'high', defaultEnabled: true },
   { id: 'cacheMirrorDegraded', label: 'Cache mirror degraded', severity: 'high', defaultEnabled: true },
   { id: 'cacheMoverFailed', label: 'Cache mover failed', severity: 'high', defaultEnabled: true },
-  { id: 'tempAlertCpu', label: 'CPU temperature alert', severity: 'medium', defaultEnabled: true },
-  { id: 'tempAlertDisk', label: 'Disk temperature alert', severity: 'medium', defaultEnabled: true },
+  { id: 'tempAlertCpu', label: 'CPU temperature alert', severity: 'medium', defaultEnabled: true, group: 'Temperature' },
+  { id: 'tempAlertDisk', label: 'Disk temperature alert', severity: 'medium', defaultEnabled: true, group: 'Temperature' },
   { id: 'diskAdded', label: 'Disk added or replaced', severity: 'medium', defaultEnabled: true },
   { id: 'arrayReconfigured', label: 'Array reconfigured (disk dropped)', severity: 'medium', defaultEnabled: true },
   { id: 'parityStarted', label: 'Parity check started', severity: 'low', defaultEnabled: false },

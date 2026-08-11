@@ -27,6 +27,9 @@ export interface NotificationEventDef {
   label: string;
   severity: NotificationSeverity;
   defaultEnabled: boolean;
+  // Consecutive events sharing the same group render together inside one bordered box — see
+  // NotificationEventToggles.
+  group?: string;
 }
 
 export interface NotificationSettings {

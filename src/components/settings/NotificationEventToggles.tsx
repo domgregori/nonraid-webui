@@ -28,6 +28,21 @@ export function NotificationEventToggles({ eventTypes, onChange, disabled, rende
 
   if (!events) return <div className="status-note">Loading event types…</div>;
 
+  const renderRow = (event: NotificationEventDef) => (
+    <div key={event.id}>
+      <div className="toggle-row" style={{ padding: '6px 0' }}>
+        <div className="toggle-row__title">{event.label}</div>
+        <ToggleSwitch
+          on={eventTypes[event.id] ?? event.defaultEnabled}
+          onToggle={() => onChange(event.id, !(eventTypes[event.id] ?? event.defaultEnabled))}
+          label={event.label}
+          disabled={disabled}
+        />
+      </div>
+      {renderExtra?.(event.id)}
+    </div>
+  );
+
   return (
     <div>
       {SEVERITY_ORDER.map((severity) => {
@@ -38,23 +53,35 @@ export function NotificationEventToggles({ eventTypes, onChange, disabled, rende
             <div className="settings-info-row__label" style={{ marginBottom: 4 }}>
               {SEVERITY_LABELS[severity]}
             </div>
-            {group.map((event) => (
-              <div key={event.id}>
-                <div className="toggle-row" style={{ padding: '6px 0' }}>
-                  <div className="toggle-row__title">{event.label}</div>
-                  <ToggleSwitch
-                    on={eventTypes[event.id] ?? event.defaultEnabled}
-                    onToggle={() => onChange(event.id, !(eventTypes[event.id] ?? event.defaultEnabled))}
-                    label={event.label}
-                    disabled={disabled}
-                  />
+            {segmentByGroup(group).map((segment, i) =>
+              segment.group ? (
+                <div key={`${severity}-${segment.group}-${i}`} className="toggle-group-box">
+                  <div className="toggle-group-box__title">{segment.group}</div>
+                  {segment.events.map(renderRow)}
                 </div>
-                {renderExtra?.(event.id)}
-              </div>
-            ))}
+              ) : (
+                segment.events.map(renderRow)
+              ),
+            )}
           </div>
         );
       })}
     </div>
   );
+}
+
+/** Chunks a severity's events into runs of consecutive items sharing the same `group`, so those
+ *  runs can render inside one bordered box instead of as flat, unrelated-looking rows. Items
+ *  without a group (or a group that doesn't match their neighbor) get their own singleton run. */
+function segmentByGroup(events: NotificationEventDef[]): { group?: string; events: NotificationEventDef[] }[] {
+  const segments: { group?: string; events: NotificationEventDef[] }[] = [];
+  for (const event of events) {
+    const last = segments[segments.length - 1];
+    if (event.group && last?.group === event.group) {
+      last.events.push(event);
+    } else {
+      segments.push({ group: event.group, events: [event] });
+    }
+  }
+  return segments;
 }
