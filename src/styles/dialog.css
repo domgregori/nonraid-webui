@@ -52,6 +52,14 @@
   color: var(--color-text-secondary);
 }
 
+/* Extra emphasis over the base label — full-bright text instead of the dim
+   secondary color, a size step up. Used sparingly (TLS cert/key file
+   labels), not a blanket replacement for .form-field__label. */
+.form-field__label--strong {
+  color: var(--color-text);
+  font-size: 13px;
+}
+
 /* Read-only stand-in for a form-field's <input> once its value is locked in
    (e.g. mid-install) — same box metrics as .history-input so the layout
    doesn't jump, but visually inert. */

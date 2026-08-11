@@ -196,7 +196,7 @@ export function TlsSection() {
       </div>
       <div className="toggle-row__desc">A real CA-issued certificate, or one produced by an ACME client run elsewhere.</div>
       <div className="settings-field__row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-        <label className="form-field__label" style={{ display: 'block' }}>
+        <label className="form-field__label form-field__label--strong" style={{ display: 'block' }}>
           Certificate file (.pem, .crt, .cer)
           <input
             type="file"
@@ -209,7 +209,7 @@ export function TlsSection() {
             disabled={!!reconnecting}
           />
         </label>
-        <label className="form-field__label" style={{ display: 'block' }}>
+        <label className="form-field__label form-field__label--strong" style={{ display: 'block' }}>
           Private key file (.pem, .key)
           <input
             type="file"
