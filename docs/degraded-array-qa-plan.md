@@ -363,4 +363,31 @@ apart.
   background afterward (a real, wanted repair, not test-only state) rather
   than waiting out its ~1h15m ETA — Scenario 1 already covers the
   rebuild-completes-cleanly tail end.
-- **Scenario 4**: not yet run.
+- **Scenario 4 — I/O errors on an otherwise-healthy disk**: PASS, via the
+  fixture-check method the plan names as the default option (not induced
+  live — out of proportion to trigger honestly, per the plan's own
+  reasoning). Used `tsx` to run `deriveDegradedReasons()`/`isDegraded()`
+  directly against a hand-built `NmdStatusResponse` with one `DISK_OK` disk
+  carrying `errors: 3`.
+  **Found a real, pre-existing gap while doing this** (not introduced by
+  this session's earlier `isPhantomDegradedGlitch` generalization — the
+  original `isPhantomSecondParityGlitch` it replaced had the identical
+  blind spot, confirmed by re-running the fixture against the pre-session
+  version via `git show`): `deriveDegradedReasons()` has always correctly
+  produced `"Disk 1: 3 I/O errors logged"` for this case, but `isDegraded()`
+  returned **false** — every disk was `DISK_OK` and `sync_errors` was 0, so
+  the phantom-glitch check swallowed a real problem, meaning the pill would
+  never turn DEGRADED and the dialog would never open, even though its own
+  reason-derivation logic already knew exactly what to say.
+  **Fixed in code same session**: `isPhantomDegradedGlitch()` now also
+  requires `d.errors === 0` on every disk, not just `d.status === 'DISK_OK'`
+  — a disk with logged I/O errors always has `errors > 0` even while
+  otherwise healthy, so this can't mask a real fault either.
+  **Verified** with a 6-case regression fixture
+  (`tsx` run, not committed — thrown away after use) covering every prior
+  live scenario from this pass plus this new one together: healthy baseline
+  (phantom Invalid/Disabled noise), stale missing counter, I/O errors,
+  genuinely missing disk, settled sync errors, and mid-rebuild — all 6
+  produced the correct `isDegraded()` result and (where degraded) the
+  correct single reason. Typechecked, linted, built, deployed to the rig,
+  confirmed clean boot.

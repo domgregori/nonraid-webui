@@ -121,14 +121,22 @@ export function deriveDegradedReasons(status: NmdStatusResponse): DegradedReason
  * output even warns "Driver internal state is inconsistent ... but all individual disks are
  * DISK_OK status"), and separately, a plain Unassign-then-Restore-before-Start cycle (2026-08-11)
  * left counters.missing stuck at 1 with every disk genuinely DISK_OK afterward — no Add Disk or
- * repeat-slot involved, just stale internal state Reload Driver clears. Per-disk status and
+ * repeat-slot involved, just stale internal state Reload Driver clears. Per-disk status/errors and
  * sync_errors are what the rest of deriveDegradedReasons() below keys off, so trust those instead:
- * if every disk is DISK_OK and there are no recorded parity mismatches, there's no real problem,
- * regardless of what the aggregate counters claim. A disk that's genuinely missing, wrong, invalid,
- * etc. always reports a non-DISK_OK status of its own, so this can't mask a real fault.
+ * if every disk is DISK_OK with zero logged errors and there are no recorded parity mismatches,
+ * there's no real problem, regardless of what the aggregate counters claim. A disk that's genuinely
+ * missing, wrong, invalid, etc. always reports a non-DISK_OK status of its own, and a disk with
+ * logged I/O errors always has `errors > 0` even while still DISK_OK, so neither can be masked here
+ * — confirmed via a fixture check, 2026-08-11 (an inherited gap from this function's predecessor,
+ * not introduced by the generalization above: a `DISK_OK` disk with `errors > 0` was already being
+ * swallowed as a phantom glitch even though deriveDegradedReasons() below has always had a correct,
+ * separate branch for exactly this case — it just never got a chance to run).
  */
 function isPhantomDegradedGlitch(status: NmdStatusResponse): boolean {
-  return status.array.counters.sync_errors === 0 && status.disks.every((d) => d.status === 'DISK_OK');
+  return (
+    status.array.counters.sync_errors === 0 &&
+    status.disks.every((d) => d.status === 'DISK_OK' && d.errors === 0)
+  );
 }
 
 export function isDegraded(status: NmdStatusResponse): boolean {
