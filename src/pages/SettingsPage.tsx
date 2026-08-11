@@ -21,6 +21,7 @@ import { useSettings } from '../hooks/useSettings';
 import { useSystemStats } from '../hooks/useSystemStats';
 import { type ThemePreference, useTheme } from '../hooks/useTheme';
 import { deriveProtection } from '../selectors/status';
+import { useOnboarding } from '../state/OnboardingContext';
 import { useArrayStatus } from '../state/useArrayStatus';
 import type { NotificationEventType } from '../types/settingsApi';
 import { formatMemLabel, formatUptime } from '../utils/format';
@@ -48,6 +49,7 @@ export function SettingsPage() {
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const stats = useSystemStats();
   const { status } = useArrayStatus();
+  const { replay } = useOnboarding();
   const dataDisks = (status?.disks ?? []).filter((d) => d.type === 'data').map((d) => ({ slot: d.slot, label: `Disk ${d.slot}` }));
 
   const [dockerPruneSaving, setDockerPruneSaving] = useState(false);
@@ -556,6 +558,14 @@ export function SettingsPage() {
           </div>
           {timezoneResult && <div className="status-note">{timezoneResult}</div>}
           {timezoneError && <div className="status-note status-note--error">{timezoneError}</div>}
+        </div>
+
+        <div className="settings-field toggle-row--bordered">
+          <div className="toggle-row__title">Setup tour</div>
+          <div className="toggle-row__desc">Walk back through array setup, cache, and the Apps/Docker/LXC/Notifications tour.</div>
+          <button type="button" className="btn" style={{ marginTop: 6 }} onClick={replay}>
+            Replay setup tour
+          </button>
         </div>
       </div>
 

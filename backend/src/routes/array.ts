@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { readFile, unlink } from 'node:fs/promises';
+import { copyFile, readdir, readFile, realpath, stat, unlink } from 'node:fs/promises';
 import os from 'node:os';
+import path from 'node:path';
 import { Router } from 'express';
 import multer from 'multer';
 import type { ActivityStore } from '../activity/index.js';
@@ -61,6 +62,89 @@ function sweepStagedImports(): void {
       stagedImports.delete(token);
       unlink(staged.filePath).catch(() => {});
     }
+  }
+}
+
+/**
+ * Shared by /array/import/preview (browser upload) and /array/import/preview-from-path (locate
+ * an existing .dat already on this host's own root filesystem) — both end up with identical raw
+ * bytes on disk at this point, so from here the preview response is built identically regardless
+ * of how the file got there. Stages the bytes under `stagedImports` so /array/import/commit (also
+ * shared) can re-validate against live disk state right before doing anything real.
+ */
+async function buildImportPreview(nmd: NmdClient, buf: Buffer, stagedPath: string) {
+  const parsed = parseSuperblock(buf); // throws HttpError(400) on bad magic/length
+  const disks = await nmd.scanAllDisks();
+
+  const slots = parsed.slots.map((slot) => {
+    const match = matchSlotToDisk(slot, disks);
+    return {
+      slot: slot.slot,
+      role: slot.role,
+      sizeKb: slot.sizeKb,
+      id: slot.id,
+      status: match.status,
+      matchedDevice: match.disk
+        ? { device: match.disk.device, partition: match.disk.partition, model: match.disk.model, sizeKb: match.disk.sizeKb }
+        : null,
+    };
+  });
+
+  // Cheaply predicts the kernel's own ERROR:PARITY_NOT_BIGGEST (confirmed from md_unraid.c)
+  // directly from the superblock's own recorded sizes — no physical disk needed for this one.
+  const dataSlots = parsed.slots.filter((s) => s.role === 'data');
+  const paritySlots = parsed.slots.filter((s) => s.role !== 'data');
+  const largestDataKb = dataSlots.length > 0 ? Math.max(...dataSlots.map((s) => s.sizeKb)) : 0;
+  const parityTooSmall = paritySlots.some((s) => s.sizeKb < largestDataKb);
+
+  let currentArrayActive = false;
+  try {
+    currentArrayActive = (await nmd.getStatus()).array.state === 'STARTED';
+  } catch {
+    currentArrayActive = false; // nothing configured yet — nothing to warn about
+  }
+
+  const token = randomUUID();
+  stagedImports.set(token, { filePath: stagedPath, uploadedAt: Date.now() });
+
+  return {
+    token,
+    label: parsed.label,
+    slots,
+    parityTooSmall,
+    currentArrayActive,
+    hasSizeMismatch: slots.some((s) => s.status === 'size-mismatch'),
+    hasMissing: slots.some((s) => s.status === 'missing'),
+  };
+}
+
+// Directories that are pointless to offer when locating a superblock backup — pseudo-filesystems
+// with huge or synthetic content, never a real place to keep a .dat file. Not a security boundary
+// (browse-root's whole point is "the same filesystem the backend already trusts and reads
+// /nonraid.dat from" — see the route below), just keeping the listing usable.
+const SKIP_LISTING_ENTRIES = new Set(['proc', 'sys', 'dev', 'run']);
+
+interface BrowseEntry {
+  name: string;
+  path: string;
+  type: 'dir' | 'file';
+}
+
+/**
+ * Resolves an untrusted path against the real filesystem root ("/") for the import-locate
+ * picker. Unlike browse/paths.ts (deliberately scoped to config.shareMountRoot for the
+ * user-facing file browser), this one is allowed to see the whole root filesystem on purpose —
+ * the backend already reads /nonraid.dat straight off this same filesystem for every status
+ * poll, so there's no new trust boundary crossed by letting an authenticated admin browse it
+ * read-only to find a backup copy. realpath() still collapses any ".."/symlink games down to a
+ * concrete path before use.
+ */
+async function resolveRootPath(requested: string): Promise<string> {
+  const resolved = path.resolve('/', requested || '/');
+  try {
+    return await realpath(resolved);
+  } catch {
+    throw new HttpError(400, `"${requested}" doesn't exist or isn't readable.`);
   }
 }
 
@@ -131,56 +215,100 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
     }
     try {
       const buf = await readFile(file.path);
-      const parsed = parseSuperblock(buf); // throws HttpError(400) on bad magic/length
-      const disks = await nmd.scanAllDisks();
-
-      const slots = parsed.slots.map((slot) => {
-        const match = matchSlotToDisk(slot, disks);
-        return {
-          slot: slot.slot,
-          role: slot.role,
-          sizeKb: slot.sizeKb,
-          id: slot.id,
-          status: match.status,
-          matchedDevice: match.disk
-            ? { device: match.disk.device, partition: match.disk.partition, model: match.disk.model, sizeKb: match.disk.sizeKb }
-            : null,
-        };
-      });
-
-      // Cheaply predicts the kernel's own ERROR:PARITY_NOT_BIGGEST (confirmed
-      // from md_unraid.c) directly from the superblock's own recorded sizes —
-      // no physical disk needed for this one.
-      const dataSlots = parsed.slots.filter((s) => s.role === 'data');
-      const paritySlots = parsed.slots.filter((s) => s.role !== 'data');
-      const largestDataKb = dataSlots.length > 0 ? Math.max(...dataSlots.map((s) => s.sizeKb)) : 0;
-      const parityTooSmall = paritySlots.some((s) => s.sizeKb < largestDataKb);
-
-      let currentArrayActive = false;
-      try {
-        currentArrayActive = (await nmd.getStatus()).array.state === 'STARTED';
-      } catch {
-        currentArrayActive = false; // nothing configured yet — nothing to warn about
-      }
-
-      const token = randomUUID();
-      stagedImports.set(token, { filePath: file.path, uploadedAt: Date.now() });
-
-      res.json({
-        token,
-        label: parsed.label,
-        slots,
-        parityTooSmall,
-        currentArrayActive,
-        hasSizeMismatch: slots.some((s) => s.status === 'size-mismatch'),
-        hasMissing: slots.some((s) => s.status === 'missing'),
-      });
+      const preview = await buildImportPreview(nmd, buf, file.path);
+      res.json(preview);
     } catch (err) {
       await unlink(file.path).catch(() => {});
       if (err instanceof HttpError) {
         res.status(err.status).json({ error: err.message });
       } else {
         res.status(502).json({ error: (err as Error).message });
+      }
+    }
+  });
+
+  // Where nmdctl itself looks for a superblock by default — checked directly so the wizard can
+  // offer it as a one-click option before falling back to browsing or uploading.
+  router.get('/array/import/default-path', async (_req, res) => {
+    try {
+      const importPath = await nmd.getSuperblockPath();
+      const exists = await stat(importPath)
+        .then(() => true)
+        .catch(() => false);
+      res.json({ path: importPath, exists });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  // Lists real subdirectories and .dat files under an absolute path on this host's own root
+  // filesystem — the "locate on disk" half of the import wizard's file picker, for hosts (like
+  // this one) where the boot/OS disk is the same filesystem the backend itself runs on, not a
+  // separate flash drive the way Unraid uses. Read-only; see resolveRootPath() above for scope.
+  router.get('/array/import/browse-root', async (req, res) => {
+    const requested = typeof req.query.path === 'string' ? req.query.path : '/';
+    try {
+      const real = await resolveRootPath(requested);
+      const st = await stat(real);
+      if (!st.isDirectory()) {
+        res.status(400).json({ error: `"${real}" is not a directory.` });
+        return;
+      }
+      const dirents = await readdir(real, { withFileTypes: true });
+      const entries: BrowseEntry[] = [];
+      for (const d of dirents) {
+        if (real === '/' && SKIP_LISTING_ENTRIES.has(d.name)) continue;
+        if (d.isDirectory()) {
+          entries.push({ name: d.name, path: path.join(real, d.name), type: 'dir' });
+        } else if (d.isFile() && d.name.toLowerCase().endsWith('.dat')) {
+          entries.push({ name: d.name, path: path.join(real, d.name), type: 'file' });
+        }
+      }
+      entries.sort((a, b) => (a.type !== b.type ? (a.type === 'dir' ? -1 : 1) : a.name.localeCompare(b.name)));
+      res.json({ path: real, parent: real === '/' ? null : path.dirname(real), entries });
+    } catch (err) {
+      if (err instanceof HttpError) {
+        res.status(err.status).json({ error: err.message });
+      } else {
+        res.status(400).json({ error: `Can't read "${requested}": ${(err as Error).message}` });
+      }
+    }
+  });
+
+  // Same preview as the upload flow, but sourced from a path already on this host rather than a
+  // browser upload — the file is copied into a private tmp location first (never referenced by
+  // its original path past this point), so /array/import/commit's cleanup can never delete the
+  // user's own original copy.
+  router.post('/array/import/preview-from-path', async (req, res) => {
+    sweepStagedImports();
+    const requested = typeof req.body?.path === 'string' ? req.body.path : '';
+    if (!requested) {
+      res.status(400).json({ error: 'path is required.' });
+      return;
+    }
+    if (!requested.toLowerCase().endsWith('.dat')) {
+      res.status(400).json({ error: 'Only .dat files can be imported.' });
+      return;
+    }
+    let tmpPath: string | null = null;
+    try {
+      const real = await resolveRootPath(requested);
+      const st = await stat(real);
+      if (!st.isFile()) {
+        res.status(400).json({ error: `"${real}" is not a file.` });
+        return;
+      }
+      tmpPath = path.join(os.tmpdir(), `nmd-import-${randomUUID()}.dat`);
+      await copyFile(real, tmpPath);
+      const buf = await readFile(tmpPath);
+      const preview = await buildImportPreview(nmd, buf, tmpPath);
+      res.json({ ...preview, sourcePath: real });
+    } catch (err) {
+      if (tmpPath) await unlink(tmpPath).catch(() => {});
+      if (err instanceof HttpError) {
+        res.status(err.status).json({ error: err.message });
+      } else {
+        res.status(400).json({ error: `Can't read "${requested}": ${(err as Error).message}` });
       }
     }
   });

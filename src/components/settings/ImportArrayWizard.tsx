@@ -1,13 +1,23 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { nmdApi } from '../../api/nmdApi';
-import type { DiskMatchStatus, ImportCommitResponse, ImportPreview } from '../../types/nmdApi';
+import type { DiskMatchStatus, ImportBrowseResult, ImportCommitResponse, ImportDefaultPath, ImportPreview } from '../../types/nmdApi';
 import { formatBytesHuman } from '../../utils/format';
 
 interface ImportArrayWizardProps {
   onClose: () => void;
+  // Fires once, right when a commit succeeds — before the result screen renders and before
+  // onClose. The onboarding wizard uses this to know its "Import" step actually finished (vs.
+  // the dialog being cancelled or backdrop-closed before ever committing), without changing
+  // what onClose itself means for this component's original standalone use in Settings.
+  onImported?: () => void;
 }
 
 type Step = 'upload' | 'review' | 'confirm' | 'result';
+// Where the .dat came from: a browser upload, or a path located directly on this host's own
+// root filesystem (see backend/src/routes/array.ts's /array/import/browse-root — this rig, like
+// most nonraid installs, has no separate boot flash drive the way Unraid does; the boot/OS disk
+// is the same filesystem the backend itself runs on and already reads /nonraid.dat from).
+type Source = 'upload' | 'locate';
 
 const STATUS_LABEL: Record<DiskMatchStatus, string> = {
   ok: 'OK',
@@ -27,12 +37,19 @@ const ROLE_LABEL = { parity: 'Parity (P)', parity2: 'Parity 2 (Q)', data: 'Data'
  * array with one can corrupt filesystems and lose data (see the migration
  * guide linked below), so this app doesn't offer a way around it.
  */
-export function ImportArrayWizard({ onClose }: ImportArrayWizardProps) {
+export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProps) {
   const [step, setStep] = useState<Step>('upload');
+  const [source, setSource] = useState<Source>('upload');
   const [fileName, setFileName] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+
+  const [defaultPath, setDefaultPath] = useState<ImportDefaultPath | null>(null);
+  const [browsing, setBrowsing] = useState(false);
+  const [browseResult, setBrowseResult] = useState<ImportBrowseResult | null>(null);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [browseError, setBrowseError] = useState<string | null>(null);
 
   const [acknowledged, setAcknowledged] = useState(false);
   const [committing, setCommitting] = useState(false);
@@ -40,6 +57,16 @@ export function ImportArrayWizard({ onClose }: ImportArrayWizardProps) {
   const [commitError, setCommitError] = useState<string | null>(null);
   const [showRawOutput, setShowRawOutput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Checked once up front so the default path can be offered as a one-click option before the
+  // user even looks at upload vs. browse — best-effort, a failure here just means that shortcut
+  // doesn't show and the user falls back to upload/browse normally.
+  useEffect(() => {
+    nmdApi
+      .getImportDefaultPath()
+      .then(setDefaultPath)
+      .catch(() => {});
+  }, []);
 
   const handleFileSelected = async (file: File) => {
     setFileName(file.name);
@@ -57,6 +84,38 @@ export function ImportArrayWizard({ onClose }: ImportArrayWizardProps) {
     }
   };
 
+  const handlePathSelected = async (path: string) => {
+    setFileName(path);
+    setPreviewing(true);
+    setPreviewError(null);
+    try {
+      const result = await nmdApi.previewImportFromPath(path);
+      setPreview(result);
+      setStep('review');
+    } catch (err) {
+      setPreviewError((err as Error).message);
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const openBrowser = (startPath?: string) => {
+    setBrowsing(true);
+    loadBrowsePath(startPath ?? (defaultPath?.path ? defaultPath.path.split('/').slice(0, -1).join('/') || '/' : '/'));
+  };
+
+  const loadBrowsePath = async (path: string) => {
+    setBrowseLoading(true);
+    setBrowseError(null);
+    try {
+      setBrowseResult(await nmdApi.browseImportRoot(path));
+    } catch (err) {
+      setBrowseError((err as Error).message);
+    } finally {
+      setBrowseLoading(false);
+    }
+  };
+
   const handleCommit = async () => {
     if (!preview) return;
     setCommitting(true);
@@ -65,6 +124,7 @@ export function ImportArrayWizard({ onClose }: ImportArrayWizardProps) {
       const result = await nmdApi.commitImport(preview.token);
       setCommitResult(result);
       setStep('result');
+      onImported?.();
     } catch (err) {
       setCommitError((err as Error).message);
     } finally {
@@ -80,6 +140,8 @@ export function ImportArrayWizard({ onClose }: ImportArrayWizardProps) {
     setCommitError(null);
     setShowRawOutput(false);
     setFileName(null);
+    setSource('upload');
+    setBrowsing(false);
     setStep('upload');
   };
 
@@ -88,7 +150,7 @@ export function ImportArrayWizard({ onClose }: ImportArrayWizardProps) {
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog import-array-wizard">
         <div className="dialog__head">
-          <div className="dialog__title">Import Unraid array</div>
+          <div className="dialog__title">Import array</div>
           <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
             &#10005;
           </button>
@@ -98,24 +160,103 @@ export function ImportArrayWizard({ onClose }: ImportArrayWizardProps) {
           {step === 'upload' && (
             <>
               <div className="toggle-row__desc">
-                Migrating an existing Unraid array? Follow{' '}
+                Migrating from Unraid, or bringing back a previous nonraid array? Both save the same superblock
+                format — follow{' '}
                 <a href="https://github.com/qvr/nonraid#migrating-an-existing-unraid-array" target="_blank" rel="noreferrer">
                   the migration guide
                 </a>{' '}
-                first — move the disks over, then pick the original superblock file (usually{' '}
-                <code>config/super.dat</code> on the Unraid flash drive) below. This only reads the file to show what
-                it expects; nothing on this host changes until you confirm on the last step.
+                if you're coming from Unraid (move the disks over first), then pick the original file below — usually
+                named <code>super.dat</code> on an Unraid flash drive, or <code>nonraid.dat</code> from a previous
+                install. This only reads the file to show what it expects; nothing on this host changes until you
+                confirm on the last step.
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="file-input"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileSelected(file);
-                }}
-                disabled={previewing}
-              />
+
+              {defaultPath?.exists && source === 'upload' && !browsing && (
+                <button type="button" className="import-source-pick" onClick={() => handlePathSelected(defaultPath.path)} disabled={previewing}>
+                  <span className="import-source-pick__body">
+                    <span className="import-source-pick__title">Use {defaultPath.path}</span>
+                    <span className="import-source-pick__desc">Found on this system's own boot disk — the array's current superblock file.</span>
+                  </span>
+                  <span className="import-source-pick__action">Use this file</span>
+                </button>
+              )}
+
+              <div className="import-source-tabs">
+                <button
+                  type="button"
+                  className={`import-source-tab${source === 'upload' ? ' import-source-tab--active' : ''}`}
+                  onClick={() => {
+                    setSource('upload');
+                    setBrowsing(false);
+                  }}
+                >
+                  Upload a file
+                </button>
+                <button
+                  type="button"
+                  className={`import-source-tab${source === 'locate' ? ' import-source-tab--active' : ''}`}
+                  onClick={() => {
+                    setSource('locate');
+                    if (!browsing) openBrowser();
+                  }}
+                >
+                  Locate on this system
+                </button>
+              </div>
+
+              {source === 'upload' && (
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="file-input"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileSelected(file);
+                  }}
+                  disabled={previewing}
+                />
+              )}
+
+              {source === 'locate' && (
+                <div className="import-browser">
+                  <div className="toggle-row__desc">
+                    Browsing this host's own root filesystem, read-only — useful if a <code>.dat</code> backup is
+                    already sitting somewhere on this same boot disk.
+                  </div>
+                  {browseLoading && <div className="status-note">Reading directory…</div>}
+                  {browseError && <div className="status-note status-note--error">{browseError}</div>}
+                  {browseResult && !browseLoading && (
+                    <>
+                      <div className="import-browser__path">{browseResult.path}</div>
+                      <div className="import-browser__list">
+                        {browseResult.parent !== null && (
+                          <button type="button" className="import-browser__row" onClick={() => loadBrowsePath(browseResult.parent!)}>
+                            <span>..</span>
+                          </button>
+                        )}
+                        {browseResult.entries.length === 0 && browseResult.parent === null && (
+                          <div className="status-note">No subdirectories or .dat files here.</div>
+                        )}
+                        {browseResult.entries.map((entry) => (
+                          <button
+                            type="button"
+                            key={entry.path}
+                            className="import-browser__row"
+                            onClick={() => (entry.type === 'dir' ? loadBrowsePath(entry.path) : handlePathSelected(entry.path))}
+                            disabled={previewing}
+                          >
+                            <span>
+                              {entry.name}
+                              {entry.type === 'dir' ? '/' : ''}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
               {previewing && <div className="status-note">Reading {fileName}…</div>}
               {previewError && <div className="status-note status-note--error">{previewError}</div>}
               <div className="dialog__actions">
@@ -130,7 +271,7 @@ export function ImportArrayWizard({ onClose }: ImportArrayWizardProps) {
             <>
               <div className="toggle-row__desc">
                 <strong>{preview.label || 'Unlabeled array'}</strong> — {preview.slots.length} disk(s) recorded in this
-                superblock.
+                superblock{preview.sourcePath ? <> (from {preview.sourcePath})</> : null}.
               </div>
 
               {preview.currentArrayActive && (

@@ -67,6 +67,16 @@ export interface CacheSettings {
   fsUuid: string | null;
 }
 
+// Tracks whether the first-run setup wizard (src/components/onboarding) has been dismissed or
+// completed — a single flag rather than a per-step record, since resume position is always
+// derived live from the array's actual state (see OnboardingWizard's deriveStartStep()), not
+// stored here. Server-side rather than localStorage: this is a single-admin-account app, so
+// "has this install been onboarded" is a property of the install, not the browser — it should
+// stay resolved the same way from any device that logs in.
+export interface OnboardingSettings {
+  dismissed: boolean;
+}
+
 export interface AppSettings {
   // Desired state for the array's write method (nmdctl's md_write_method /
   // "turbo write") — see nmd/client.ts's setWriteMethod doc comment for why
@@ -85,6 +95,7 @@ export interface AppSettings {
   lxcStorage: StorageLocation;
   cache: CacheSettings;
   cacheSchedule: CacheSchedule;
+  onboarding: OnboardingSettings;
 }
 
 export type AppSettingsUpdate = Partial<{
@@ -99,4 +110,5 @@ export type AppSettingsUpdate = Partial<{
   lxcStorage: Partial<StorageLocation>;
   cache: Partial<CacheSettings>;
   cacheSchedule: Partial<CacheSchedule>;
+  onboarding: Partial<OnboardingSettings>;
 }>;

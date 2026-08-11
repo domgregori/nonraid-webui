@@ -65,6 +65,11 @@ export interface CacheSettings {
   fsUuid: string | null;
 }
 
+// Whether the first-run setup wizard has been dismissed/completed — see OnboardingGate.
+export interface OnboardingSettings {
+  dismissed: boolean;
+}
+
 export interface AppSettings {
   turboWrite: boolean;
   notifications: NotificationSettings;
@@ -75,6 +80,7 @@ export interface AppSettings {
   lxcStorage: StorageLocation;
   cache: CacheSettings;
   cacheSchedule: CacheSchedule;
+  onboarding: OnboardingSettings;
 }
 
 export type AppSettingsUpdate = Partial<{
@@ -89,6 +95,7 @@ export type AppSettingsUpdate = Partial<{
   lxcStorage: Partial<StorageLocation>;
   cache: Partial<CacheSettings>;
   cacheSchedule: Partial<CacheSchedule>;
+  onboarding: Partial<OnboardingSettings>;
 }>;
 
 export interface CommandResult {

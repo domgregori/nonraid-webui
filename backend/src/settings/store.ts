@@ -14,6 +14,7 @@ const DEFAULTS: AppSettings = {
   lxcStorage: { mode: 'boot', diskSlot: null },
   cache: { enabled: false, fsUuid: null },
   cacheSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3 },
+  onboarding: { dismissed: false },
 };
 
 /**
@@ -39,6 +40,7 @@ export class SettingsStore {
       lxcStorage: { ...settings.lxcStorage },
       cache: { ...settings.cache },
       cacheSchedule: { ...settings.cacheSchedule },
+      onboarding: { ...settings.onboarding },
     };
   }
 
@@ -59,6 +61,7 @@ export class SettingsStore {
         lxcStorage: { ...current.lxcStorage, ...patch.lxcStorage },
         cache: { ...current.cache, ...patch.cache },
         cacheSchedule: { ...current.cacheSchedule, ...patch.cacheSchedule },
+        onboarding: { ...current.onboarding, ...patch.onboarding },
       };
       await this.persistAtomic(next);
     });
@@ -101,6 +104,7 @@ export class SettingsStore {
         lxcStorage: { ...DEFAULTS.lxcStorage, ...parsed.lxcStorage },
         cache: { ...DEFAULTS.cache, ...parsed.cache },
         cacheSchedule: { ...DEFAULTS.cacheSchedule, ...parsed.cacheSchedule },
+        onboarding: { ...DEFAULTS.onboarding, ...parsed.onboarding },
       };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {

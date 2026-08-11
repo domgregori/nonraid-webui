@@ -160,6 +160,26 @@ export interface ImportPreview {
   currentArrayActive: boolean;
   hasSizeMismatch: boolean;
   hasMissing: boolean;
+  // Only set when the preview came from /array/import/preview-from-path (the "locate on this
+  // system" picker) rather than a browser upload — the absolute path it was read from.
+  sourcePath?: string;
+}
+
+export interface ImportDefaultPath {
+  path: string;
+  exists: boolean;
+}
+
+export interface ImportBrowseEntry {
+  name: string;
+  path: string;
+  type: 'dir' | 'file';
+}
+
+export interface ImportBrowseResult {
+  path: string;
+  parent: string | null;
+  entries: ImportBrowseEntry[];
 }
 
 export interface ImportCommitResponse {

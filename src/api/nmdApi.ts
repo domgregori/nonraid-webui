@@ -3,7 +3,9 @@ import type { BenchmarkResult } from '../types/benchmark';
 import type {
   AddDiskResult,
   AvailableDevice,
+  ImportBrowseResult,
   ImportCommitResponse,
+  ImportDefaultPath,
   ImportPreview,
   NmdCommandResult,
   NmdStatusResponse,
@@ -24,6 +26,14 @@ export const nmdApi = {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ token }),
+    }),
+  getImportDefaultPath: () => request<ImportDefaultPath>('/api/array/import/default-path'),
+  browseImportRoot: (path = '/') => request<ImportBrowseResult>(`/api/array/import/browse-root?path=${encodeURIComponent(path)}`),
+  previewImportFromPath: (path: string) =>
+    request<ImportPreview>('/api/array/import/preview-from-path', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path }),
     }),
   parityCheck: (action: ParityCheckAction) => request<NmdCommandResult>(`/api/parity/${action}`, { method: 'POST' }),
   unassignDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/unassign`, { method: 'POST' }),

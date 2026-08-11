@@ -165,6 +165,129 @@
   width: 640px;
 }
 
+/* One-click shortcut for the default superblock path, shown above the upload/locate tabs when
+   it's present on disk — see ImportArrayWizard's default-path check. */
+.import-source-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--color-blue);
+  background: var(--color-blue-tint-soft);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.import-source-pick:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.import-source-pick__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.import-source-pick__title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.import-source-pick__desc {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.import-source-pick__action {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-blue);
+}
+
+.import-source-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.import-source-tab {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 4px 8px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+}
+
+.import-source-tab--active {
+  color: var(--color-text);
+  border-bottom-color: var(--color-blue);
+}
+
+.import-browser {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.import-browser__path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-dim);
+  overflow-wrap: anywhere;
+}
+
+.import-browser__list {
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+}
+
+.import-browser__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.import-browser__row:last-child {
+  border-bottom: none;
+}
+
+.import-browser__row:hover:not(:disabled) {
+  background: var(--color-surface-elevated);
+}
+
+.import-browser__row:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .import-status-pill {
   flex-shrink: 0;
   padding: 3px 8px;
