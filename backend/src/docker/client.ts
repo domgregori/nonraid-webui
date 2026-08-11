@@ -20,7 +20,10 @@ export interface DockerClient {
   // result message, not thrown.
   destroyContainer(id: string): Promise<DockerCommandResult>;
   createContainer(options: CreateContainerOptions, onProgress?: CreateContainerProgressCallback): Promise<DockerCommandResult>;
-  getContainerLogs(id: string, tail?: number): Promise<string>;
+  // `since` (unix seconds, fractional for sub-second precision) fetches only log lines newer than
+  // that cursor — used for the live-tail poll loop instead of `tail`. `nextSince` in the result is
+  // the cursor to pass on the next poll (null when nothing came back to derive it from).
+  getContainerLogs(id: string, tail?: number, since?: number): Promise<{ logs: string; nextSince: number | null }>;
   // The daemon's actual configured storage root (Docker Engine API's `DockerRootDir`) — the one
   // source of truth for "where does Docker actually keep its data", since this app doesn't manage
   // that path itself (see docker/storagePath.ts).

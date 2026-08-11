@@ -121,7 +121,11 @@ export function dockerRouter(
   router.get('/docker/containers/:id/logs', async (req, res) => {
     try {
       const tail = Number(req.query.tail);
-      res.json({ logs: await docker.getContainerLogs(req.params.id, Number.isInteger(tail) && tail > 0 ? tail : undefined) });
+      const since = req.query.since !== undefined ? Number(req.query.since) : undefined;
+      if (since !== undefined && !Number.isFinite(since)) {
+        throw new Error('since must be a number.');
+      }
+      res.json(await docker.getContainerLogs(req.params.id, Number.isInteger(tail) && tail > 0 ? tail : undefined, since));
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

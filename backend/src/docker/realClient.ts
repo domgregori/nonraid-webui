@@ -84,6 +84,20 @@ function parsePortBindings(bindings: DockerPortBindings | undefined): { containe
  * are raw text with no framing at all. `container.logs()` doesn't tell you
  * which you got, so the caller has to check `Tty` from inspect first.
  */
+// Docker's `timestamps: true` prefixes each returned line with an RFC3339Nano timestamp
+// ("2024-01-15T10:23:45.123456789Z log line"), space-separated from the payload. Used to derive the
+// `since` cursor for the next live-tail poll — deliberately not nudged forward by an epsilon here
+// (JS Date only has millisecond resolution, so a flat nudge risks skipping a same-millisecond line);
+// LogsDialog instead de-dupes on the client by comparing the last line already shown.
+function nextSinceFromLogText(text: string): number | null {
+  const lines = text.split('\n').filter((l) => l.length > 0);
+  const last = lines.at(-1);
+  const match = last?.match(/^(\S+)\s/);
+  if (!match) return null;
+  const ms = Date.parse(match[1] ?? '');
+  return Number.isNaN(ms) ? null : ms / 1000;
+}
+
 function demuxLogBuffer(buffer: Buffer): string {
   const chunks: string[] = [];
   let offset = 0;
@@ -257,12 +271,20 @@ export class RealDockerClient implements DockerClient {
     });
   }
 
-  async getContainerLogs(id: string, tail = 500): Promise<string> {
+  async getContainerLogs(id: string, tail = 500, since?: number): Promise<{ logs: string; nextSince: number | null }> {
     return this.guard(async () => {
       const container = this.docker.getContainer(id);
       const info = await container.inspect();
-      const buffer = (await container.logs({ stdout: true, stderr: true, tail, timestamps: true, follow: false })) as unknown as Buffer;
-      return info.Config.Tty ? buffer.toString('utf8') : demuxLogBuffer(buffer);
+      // `since` supersedes `tail` — a live-tail poll wants everything new since the last poll, not
+      // just the last N lines (which could silently drop output if more than N lines landed between
+      // polls).
+      const logOptions: { stdout: true; stderr: true; timestamps: true; follow: false; tail?: number; since?: number } =
+        since !== undefined
+          ? { stdout: true, stderr: true, timestamps: true, follow: false, since }
+          : { stdout: true, stderr: true, timestamps: true, follow: false, tail };
+      const buffer = (await container.logs(logOptions)) as unknown as Buffer;
+      const text = info.Config.Tty ? buffer.toString('utf8') : demuxLogBuffer(buffer);
+      return { logs: text, nextSince: nextSinceFromLogText(text) };
     });
   }
 

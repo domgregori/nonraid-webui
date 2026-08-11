@@ -37,8 +37,13 @@ export const dockerApi = {
       { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
       onProgress,
     ),
-  getContainerLogs: (id: string, tail?: number) =>
-    request<{ logs: string }>(`/api/docker/containers/${id}/logs${tail ? `?tail=${tail}` : ''}`),
+  getContainerLogs: (id: string, tail?: number, since?: number) => {
+    const params = new URLSearchParams();
+    if (tail) params.set('tail', String(tail));
+    if (since !== undefined) params.set('since', String(since));
+    const qs = params.toString();
+    return request<{ logs: string; nextSince: number | null }>(`/api/docker/containers/${id}/logs${qs ? `?${qs}` : ''}`);
+  },
   pruneImages: () => request<PruneImagesResult>('/api/docker/images/prune', { method: 'POST' }),
   listDevices: () => request<HostDevice[]>('/api/docker/devices'),
   getStorage: () => request<DockerStorageInfo>('/api/docker/storage'),
