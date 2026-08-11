@@ -32,6 +32,28 @@ interface StagedImport {
 const stagedImports = new Map<string, StagedImport>();
 const STAGING_TTL_MS = 30 * 60 * 1000;
 
+/**
+ * After mountDisks() reports success, nmdctl's own mount step can still silently skip a disk
+ * whose filesystem it didn't mount as expected — a skip, unlike a real per-disk mount error,
+ * doesn't affect nmdctl's exit code, so the try/catch around mountDisks() at each call site below
+ * never sees it. Re-checks live status and logs a warning naming any data disk that has a
+ * detected filesystem but still isn't mounted, so it doesn't go unnoticed — this exact situation
+ * left three disks DISK_OK/"unmounted" through several array starts, each reporting clean
+ * success. Disks with no filesystem at all are skipped — that's the normal state for a genuinely
+ * blank new disk awaiting Format, not a problem worth flagging.
+ */
+async function warnUnmountedDataDisks(nmd: NmdClient, activity: ActivityStore): Promise<void> {
+  try {
+    const status = await nmd.getStatus();
+    const stuck = status.disks.filter((d) => d.type === 'data' && d.filesystem?.type && d.filesystem.mountpoint === 'unmounted');
+    if (stuck.length === 0) return;
+    const names = stuck.map((d) => `Disk ${d.slot} (${d.filesystem!.type})`).join(', ');
+    activity.log(`${names} still not mounted after mounting disks — try Mount Disk from the Disks page.`, 'amber').catch(() => {});
+  } catch {
+    // best-effort — a status-fetch failure here shouldn't compound whatever's already happening
+  }
+}
+
 function sweepStagedImports(): void {
   const cutoff = Date.now() - STAGING_TTL_MS;
   for (const [token, staged] of stagedImports) {
@@ -62,6 +84,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       // Best-effort: the array itself did start even if a disk fails to mount.
       try {
         await nmd.mountDisks();
+        await warnUnmountedDataDisks(nmd, activity);
         await shares.remountAll();
       } catch (err) {
         activity.log(`Array started, but mounting disks failed: ${(err as Error).message}`, 'amber').catch(() => {});
@@ -225,6 +248,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       const result = await nmd.shrinkArray(dropSlots);
       try {
         await nmd.mountDisks();
+        await warnUnmountedDataDisks(nmd, activity);
         await shares.remountAll();
       } catch (err) {
         activity.log(`Array reconfigured, but remounting disks failed: ${(err as Error).message}`, 'amber').catch(() => {});
@@ -278,6 +302,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       const result = await nmd.reloadDriver();
       try {
         await nmd.mountDisks();
+        await warnUnmountedDataDisks(nmd, activity);
         await shares.remountAll();
       } catch (err) {
         activity.log(`Driver reloaded, but remounting disks failed: ${(err as Error).message}`, 'amber').catch(() => {});

@@ -30,7 +30,13 @@ export class ShareService {
     for (const d of status.disks) {
       if (d.type !== 'data') continue;
       const mp = d.filesystem?.mountpoint;
-      if (mp && mp !== '-') diskMountpoints[d.slot] = mp;
+      // Must be a real absolute mountpoint — nmdctl reports non-path sentinels like "-" (never
+      // mounted) or the literal string "unmounted" (driver-level DISK_OK but the filesystem isn't
+      // actually OS-mounted) for a disk with no live mountpoint. Requiring a leading "/" rejects
+      // every such sentinel in one check, rather than excluding them by name one at a time — a
+      // relative value slipping through here would otherwise get treated as a real mergerfs branch
+      // path and silently resolve against the backend process's own cwd instead of failing.
+      if (mp && mp.startsWith('/')) diskMountpoints[d.slot] = mp;
     }
 
     return { diskMountpoints, minFreeSpaceMb: settings.minFreeSpaceMb, cacheMountPoint: cacheActive ? config.cacheMountPoint : null };
