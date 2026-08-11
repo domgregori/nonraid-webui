@@ -989,10 +989,7 @@ export function SettingsPage() {
               every check while it stays high.
             </div>
           </div>
-          <ToggleSwitch on={tempAlertsEnabled} onToggle={() => setTempAlertsEnabled((v) => !v)} label="Temperature alerts" disabled={!settings} />
-        </div>
-        <div className="settings-field">
-          <div className="settings-field__row">
+          <div className="settings-field__row" style={{ flexShrink: 0 }}>
             <input
               className="history-input"
               type="number"
@@ -1002,14 +999,16 @@ export function SettingsPage() {
               value={tempAlertsThresholdDraft}
               onChange={(e) => setTempAlertsThresholdDraft(e.target.value)}
               disabled={!settings}
+              style={{ width: 70 }}
             />
             <span className="toggle-row__desc">°C</span>
             <button type="button" className="btn" disabled={tempAlertsSaving || !settings} onClick={saveTempAlerts}>
               {tempAlertsSaving ? 'Saving…' : 'Save'}
             </button>
           </div>
-          {tempAlertsError && <div className="status-note status-note--error">{tempAlertsError}</div>}
+          <ToggleSwitch on={tempAlertsEnabled} onToggle={() => setTempAlertsEnabled((v) => !v)} label="Temperature alerts" disabled={!settings} />
         </div>
+        {tempAlertsError && <div className="status-note status-note--error">{tempAlertsError}</div>}
       </div>
 
       <div className={`settings-card${activeSection === 'security' ? '' : ' settings-hidden'}`}>
