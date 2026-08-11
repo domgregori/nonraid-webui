@@ -297,4 +297,36 @@ apart.
   `DISK_OK`), but the pill now correctly read STARTED, not DEGRADED.
   Cleaned up with Reload Driver afterward to clear the stale counter for
   real before continuing.
-- **Scenarios 2–4**: not yet run.
+- **Scenario 2 — Parity out of sync**: PASS. Setup deviated from the plan's
+  exact recipe in two ways, both noted: (1) the UI's "Start Parity Check"
+  only ever starts a correcting check — there's no NOCORRECT option exposed
+  — confirmed live rather than assumed; (2) the first `dd` target (400GB
+  into a 466GB disk) was too close to the far end for a practical test —
+  the default correcting check has a ~2h ETA for the full array, so a
+  mismatch that deep wouldn't be reached for ~1h45m. Cancelled that run,
+  rewrote the same 4MiB garbage at a 50GB offset instead (still far past
+  the 9GB actually used on Disk 1), and restarted — reached the corrupted
+  region in ~8 minutes at this rig's ~120MB/s check speed.
+  Confirmed `sync_errors: 1024` (4MiB / 4KB-block size = 1024, exactly as
+  expected) the moment the check crossed the corrupted offset, both via
+  `GET /api/status`/`nmdctl status -o json` and live in the dialog:
+  *"Parity out of sync — 1024 errors found" / "The last parity check found
+  data that doesn't match parity. Run a correcting check to fix it."* — with
+  *"A parity check is already running"* shown in place of a button while
+  that check was still active, exactly as the plan expected.
+  Cancelled that check to observe the settled (non-running) state: pill
+  stayed DEGRADED, `Last check: completed, 1024 errors`, and the dialog now
+  showed the **Start Correcting Parity Check** button. Clicked it — button
+  relabeled to "Starting…" in place with no need to reopen the dialog, then
+  updated a beat later to *"Good news — the array is no longer degraded"* as
+  `resync.active` flipped true (a fresh check zeroes the running
+  `sync_errors` counter until it re-finds a mismatch, so this reads slightly
+  different from the plan's guess of the same reason card persisting with
+  swapped text — same underlying live-update behavior, better UX than
+  expected, not a bug).
+  Let the fresh correcting check reach the same 50GB offset again: confirmed
+  `sync_errors` stayed **0** all the way through and past that point,
+  proving the correction genuinely took (not just a counter reset) — cancelled
+  the check afterward rather than waiting out the remaining ~2h. Pill
+  returned to STARTED, `Last check: completed, 0 errors`.
+- **Scenarios 3–4**: not yet run.
