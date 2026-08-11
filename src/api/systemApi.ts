@@ -2,10 +2,11 @@ import { API_BASE_URL } from './config';
 import { request } from './request';
 import type { BenchmarkResult } from '../types/benchmark';
 import type { CommandResult } from '../types/settingsApi';
-import type { SystemStats } from '../types/systemApi';
+import type { NetLiveRate, SystemStats } from '../types/systemApi';
 
 export const systemApi = {
   getStats: () => request<SystemStats>('/api/system'),
+  getNetLive: () => request<NetLiveRate>('/api/system/net-live'),
 
   bootDiskImageBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/image`,
   bootDiskConfigBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/config`,

@@ -29,3 +29,10 @@ export interface SystemStats {
   bootDisk: BootDiskInfo | null;
   networkInterfaces: NetworkInterfaceInfo[];
 }
+
+// null on the first poll of a run (nothing to diff against yet) or a counter reset — see
+// backend/src/metrics/net.ts's NetRateTracker.
+export interface NetLiveRate {
+  rxKbS: number | null;
+  txKbS: number | null;
+}

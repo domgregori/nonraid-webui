@@ -1,8 +1,8 @@
-import { readFile } from 'node:fs/promises';
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SmartService } from '../smart/index.js';
 import type { SystemStatsService } from '../system/service.js';
+import { NetRateTracker } from './net.js';
 import { MetricsService } from './service.js';
 import type { MetricName } from './types.js';
 
@@ -24,42 +24,10 @@ interface DiskIoPrev {
   ts: number;
 }
 
-interface NetTotals {
-  rxBytes: number;
-  txBytes: number;
-}
-
-/**
- * Sums bytes across all non-virtual interfaces from /proc/net/dev — Linux-only,
- * which matches this project's deployment target (the NAS host itself, or the
- * dev VM), same caveat SystemStatsService documents for os.cpus()/totalmem().
- * Excludes loopback and container-bridge/veth interfaces so container traffic
- * isn't double-counted against the host's own network usage.
- */
-async function readNetTotals(): Promise<NetTotals | null> {
-  try {
-    const text = await readFile('/proc/net/dev', 'utf8');
-    let rxBytes = 0;
-    let txBytes = 0;
-    for (const line of text.split('\n').slice(2)) {
-      const [ifacePart, statsPart] = line.split(':');
-      if (!ifacePart || !statsPart) continue;
-      const iface = ifacePart.trim();
-      if (iface === 'lo' || iface.startsWith('veth') || iface.startsWith('docker') || iface.startsWith('br-')) continue;
-      const fields = statsPart.trim().split(/\s+/).map(Number);
-      rxBytes += fields[0] ?? 0;
-      txBytes += fields[8] ?? 0;
-    }
-    return { rxBytes, txBytes };
-  } catch {
-    return null; // not on Linux, or /proc unavailable — best-effort, cpu/mem/disk metrics still work
-  }
-}
-
 export class MetricsSampler {
   private timer: NodeJS.Timeout | null = null;
   private diskIoPrev = new Map<number, DiskIoPrev>();
-  private netPrev: (NetTotals & { ts: number }) | null = null;
+  private netRate = new NetRateTracker();
   private tickCount = 0;
 
   constructor(
@@ -90,17 +58,10 @@ export class MetricsSampler {
     samples.push({ metric: 'cpu_percent', key: 'total', value: stats.cpuPercent });
     samples.push({ metric: 'mem_used_bytes', key: 'total', value: stats.memUsedBytes });
 
-    const net = await readNetTotals();
-    if (net) {
-      if (this.netPrev) {
-        const dtSec = (now - this.netPrev.ts) / 1000;
-        const dRx = net.rxBytes - this.netPrev.rxBytes;
-        const dTx = net.txBytes - this.netPrev.txBytes;
-        // Negative delta means the counter reset (interface reset/replaced) — skip this tick rather than record a bogus negative rate.
-        if (dtSec > 0 && dRx >= 0) samples.push({ metric: 'net_rx_kb_s', key: 'total', value: dRx / 1024 / dtSec });
-        if (dtSec > 0 && dTx >= 0) samples.push({ metric: 'net_tx_kb_s', key: 'total', value: dTx / 1024 / dtSec });
-      }
-      this.netPrev = { ...net, ts: now };
+    const netRate = await this.netRate.sample();
+    if (netRate) {
+      samples.push({ metric: 'net_rx_kb_s', key: 'total', value: netRate.rxKbS });
+      samples.push({ metric: 'net_tx_kb_s', key: 'total', value: netRate.txKbS });
     }
 
     try {

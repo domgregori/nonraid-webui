@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { ActivityStore } from '../activity/store.js';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
+import { NetRateTracker } from '../metrics/net.js';
 import type { NmdClient } from '../nmd/client.js';
 import { benchmarkRead, benchmarkWrite, resolveDurationMs } from '../system/benchmark.js';
 import { resolveConfigBackupPaths, streamBootDiskImage, streamConfigBackup } from '../system/backupStream.js';
@@ -13,6 +14,16 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
 
   router.get('/system', (_req, res) => {
     res.json(system.getStats());
+  });
+
+  // Own NetRateTracker instance, independent of the 60s history sampler's (see metrics/sampler.ts)
+  // — the History page's Live mode polls this every 3s while open, so it needs its own delta
+  // cadence rather than sharing/perturbing the sampler's. Stateless per request otherwise: no DB
+  // writes, just a read of /proc/net/dev and a diff against the last call.
+  const liveNetRate = new NetRateTracker();
+  router.get('/system/net-live', async (_req, res) => {
+    const rate = await liveNetRate.sample();
+    res.json(rate ?? { rxKbS: null, txKbS: null });
   });
 
   router.get('/system/boot-disk/backup/image', (_req, res) => {

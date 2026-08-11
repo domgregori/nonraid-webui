@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TimeSeriesChart, type TimeSeriesChartSeries } from '../components/shared/TimeSeriesChart';
+import { useLiveMetrics } from '../hooks/useLiveMetrics';
 import { useMetrics } from '../hooks/useMetrics';
 import { ChartHoverProvider } from '../state/ChartHoverProvider';
 import { useArrayStatus } from '../state/useArrayStatus';
@@ -7,11 +8,14 @@ import { COLORS } from '../styles/colors';
 import type { MetricName, MetricRange } from '../types/metricsApi';
 import { formatBytesHuman } from '../utils/format';
 
-const RANGES: { value: MetricRange; label: string }[] = [
+type ViewMode = MetricRange | 'live';
+
+const RANGES: { value: ViewMode; label: string }[] = [
   { value: '1h', label: '1H' },
   { value: '24h', label: '24H' },
   { value: '7d', label: '7D' },
   { value: '30d', label: '30D' },
+  { value: 'live', label: 'LIVE' },
 ];
 
 const ALL_METRICS: MetricName[] = [
@@ -48,8 +52,11 @@ function formatKbs(v: number): string {
 }
 
 export function HistoryPage() {
-  const [range, setRange] = useState<MetricRange>('24h');
-  const { seriesByMetric, status, error } = useMetrics(ALL_METRICS, range);
+  const [view, setView] = useState<ViewMode>('24h');
+  const isLive = view === 'live';
+  const dbMetrics = useMetrics(ALL_METRICS, isLive ? '1h' : view, !isLive);
+  const liveMetrics = useLiveMetrics(isLive);
+  const { seriesByMetric, status, error } = isLive ? liveMetrics : dbMetrics;
   const { status: arrayStatus } = useArrayStatus();
 
   const diskLabel = (slot: string): string => {
@@ -73,23 +80,28 @@ export function HistoryPage() {
       <div className="history-header">
         <div>
           <div className="page-title">History</div>
-          <div className="history-header__desc">CPU, memory, network, and per-disk temperature/read-write/usage over time</div>
+          <div className="history-header__desc">
+            {isLive
+              ? 'Live — updating as new data arrives, last 10 minutes'
+              : 'CPU, memory, network, and per-disk temperature/read-write/usage over time'}
+          </div>
         </div>
         <div className="history-header__controls">
           {RANGES.map((r) => (
             <button
               key={r.value}
               type="button"
-              className={`history-range-btn${range === r.value ? ' history-range-btn--active' : ''}`}
-              onClick={() => setRange(r.value)}
+              className={`history-range-btn${view === r.value ? ' history-range-btn--active' : ''}${r.value === 'live' ? ' history-range-btn--live' : ''}`}
+              onClick={() => setView(r.value)}
             >
+              {r.value === 'live' && view === 'live' && <span className="status-dot" style={{ background: COLORS.green }} />}
               {r.label}
             </button>
           ))}
         </div>
       </div>
 
-      {status === 'loading' && <div className="status-note">Loading history…</div>}
+      {status === 'loading' && <div className="status-note">{isLive ? 'Waiting for the first live sample…' : 'Loading history…'}</div>}
       {error && <div className="status-note status-note--error">{error}</div>}
 
       <ChartHoverProvider>

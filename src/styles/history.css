@@ -48,6 +48,17 @@
   color: var(--color-blue);
 }
 
+.history-range-btn--live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-range-btn--live.history-range-btn--active {
+  border-color: var(--color-green);
+  color: var(--color-green);
+}
+
 .metrics-grid {
   display: grid;
   /* min(380px, 100%) lets a track shrink to the container's own width instead of forcing a hard

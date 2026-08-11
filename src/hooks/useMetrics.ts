@@ -14,8 +14,13 @@ export interface UseMetrics {
   error: string | null;
 }
 
-/** `metrics` should be a stable array reference (module-level constant) — it's a dependency via its joined string, not by identity. */
-export function useMetrics(metrics: MetricName[], range: MetricRange): UseMetrics {
+/**
+ * `metrics` should be a stable array reference (module-level constant) — it's a dependency via
+ * its joined string, not by identity. `enabled` (default true) skips fetching/polling entirely —
+ * for HistoryPage's Live mode, which sources its data from useLiveMetrics() instead and has no
+ * use for this hook's normal 60s DB-backed poll running in the background at the same time.
+ */
+export function useMetrics(metrics: MetricName[], range: MetricRange, enabled: boolean = true): UseMetrics {
   const [seriesByMetric, setSeriesByMetric] = useState<Partial<Record<MetricName, MetricSeries[]>>>({});
   const [status, setStatus] = useState<MetricsLoadStatus>('loading');
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +45,7 @@ export function useMetrics(metrics: MetricName[], range: MetricRange): UseMetric
   }, [metrics, range]);
 
   useEffect(() => {
+    if (!enabled) return;
     mounted.current = true;
     setStatus('loading');
     refresh();
@@ -48,7 +54,7 @@ export function useMetrics(metrics: MetricName[], range: MetricRange): UseMetric
       mounted.current = false;
       clearInterval(id);
     };
-  }, [refresh]);
+  }, [refresh, enabled]);
 
   return { seriesByMetric, status, error };
 }
