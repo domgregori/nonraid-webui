@@ -205,11 +205,11 @@
   cursor: pointer;
   border-radius: 10px;
   padding: var(--space-md);
+  /* Color set inline per-card (borderColor) — reflects the array driver's own connection status
+     (active/missing/standby) only. SMART health used to double up on this same border (as a
+     colored top strip) but that read as one ambiguous signal instead of two — health now gets its
+     own explicit dot+label row (.disk-card__health) below, same treatment as .disk-card__status. */
   border: 1px solid var(--color-border);
-  /* SMART health color, set inline per-card (borderTopColor) — a dot proved too easy to miss, so
-     health now reads as the card's own top border instead, distinct from the full border which
-     still reflects the array driver's own status (borderColor). */
-  border-top-width: 3px;
   background: var(--color-surface);
 }
 
@@ -249,9 +249,19 @@
   border-radius: var(--radius-pill);
 }
 
-.disk-card--data .disk-card__status-dot {
-  width: 7px;
-  height: 7px;
+/* SMART health gets the same dot+label chip treatment as .disk-card__status, one row below it —
+   two distinct, explicitly-labeled signals instead of overloading a single border. */
+.disk-card__health {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.disk-card__health-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
 }
 
 .disk-card__device {

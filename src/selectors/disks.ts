@@ -83,6 +83,7 @@ export function deriveDisk(
     borderColor: status === 'missing' ? COLORS.red : status === 'standby' ? COLORS.border : COLORS.borderLit,
     health: health ?? null,
     healthColor: health === 'failed' ? COLORS.red : health === 'passed' ? COLORS.green : COLORS.textDim,
+    healthLabel: health === 'failed' ? 'SMART Failing' : health === 'passed' ? 'SMART OK' : 'SMART —',
     isSSD: isSSD ?? null,
     typeLabel: isSSD === true ? 'SSD' : isSSD === false ? 'HDD' : '—',
   };

@@ -22,12 +22,7 @@ function stopPropagation<T>(handler: () => T): (e: MouseEvent) => void {
 
 export function ParityDiskCard({ disk, onClick }: DiskCardProps) {
   return (
-    <div
-      className="disk-card disk-card--parity"
-      style={{ borderColor: disk.borderColor, borderTopColor: disk.healthColor }}
-      onClick={onClick}
-      title={`SMART: ${disk.health ?? 'unknown'}`}
-    >
+    <div className="disk-card disk-card--parity" style={{ borderColor: disk.borderColor }} onClick={onClick}>
       <div className="disk-card__head">
         <span className="disk-card__label">{disk.label}</span>
         <span className="disk-card__status" style={{ color: disk.statusColor }}>
@@ -40,6 +35,12 @@ export function ParityDiskCard({ disk, onClick }: DiskCardProps) {
         <span>{disk.sizeLabel}</span>
         <span>{disk.tempLabel}</span>
       </div>
+      <div className="disk-card__row--sub">
+        <span className="disk-card__health" style={{ color: disk.healthColor }}>
+          <span className="disk-card__health-dot" style={{ background: disk.healthColor }} />
+          {disk.healthLabel}
+        </span>
+      </div>
     </div>
   );
 }
@@ -47,12 +48,7 @@ export function ParityDiskCard({ disk, onClick }: DiskCardProps) {
 export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
   if (clearing) {
     return (
-      <div
-        className="disk-card disk-card--data"
-        style={{ borderColor: disk.borderColor, borderTopColor: disk.healthColor }}
-        onClick={onClick}
-        title={`SMART: ${disk.health ?? 'unknown'}`}
-      >
+      <div className="disk-card disk-card--data" style={{ borderColor: disk.borderColor }} onClick={onClick}>
         <div className="disk-card__head">
           <span className="disk-card__label">{disk.label}</span>
         </div>
@@ -80,15 +76,13 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
   }
 
   return (
-    <div
-      className="disk-card disk-card--data"
-      style={{ borderColor: disk.borderColor, borderTopColor: disk.healthColor }}
-      onClick={onClick}
-      title={`SMART: ${disk.health ?? 'unknown'}`}
-    >
+    <div className="disk-card disk-card--data" style={{ borderColor: disk.borderColor }} onClick={onClick}>
       <div className="disk-card__head">
         <span className="disk-card__label">{disk.label}</span>
-        <span className="disk-card__status-dot" style={{ background: disk.statusColor }} />
+        <span className="disk-card__status" style={{ color: disk.statusColor }}>
+          <span className="disk-card__status-dot" style={{ background: disk.statusColor }} />
+          {disk.statusLabel}
+        </span>
       </div>
       <div className="disk-card__device">{disk.device}</div>
       <div className="progress-track">
@@ -101,6 +95,12 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
       <div className="disk-card__row--sub">
         <span>{disk.typeLabel}</span>
         <span style={{ color: disk.tempColor }}>{disk.tempLabel}</span>
+      </div>
+      <div className="disk-card__row--sub">
+        <span className="disk-card__health" style={{ color: disk.healthColor }}>
+          <span className="disk-card__health-dot" style={{ background: disk.healthColor }} />
+          {disk.healthLabel}
+        </span>
       </div>
     </div>
   );

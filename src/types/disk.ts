@@ -31,6 +31,7 @@ export interface DiskViewModel extends DiskBase {
    *  view. A disk can be DISK_OK while SMART already reports failing. */
   health: 'passed' | 'failed' | null;
   healthColor: string;
+  healthLabel: string;
   isSSD: boolean | null;
   typeLabel: string;
 }
