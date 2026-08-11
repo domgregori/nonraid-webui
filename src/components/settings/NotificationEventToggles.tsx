@@ -10,9 +10,9 @@ interface NotificationEventTogglesProps {
   eventTypes: Record<NotificationEventType, boolean>;
   onChange: (eventType: NotificationEventType, enabled: boolean) => void;
   disabled?: boolean;
-  // Slot for event-specific extra controls rendered inline in that event's own row (between the
-  // label and the toggle) — e.g. the temperature threshold next to "Temperature alert". Keeps this
-  // component's own catalog-driven genericness intact rather than hardcoding one event's UI here.
+  // Slot for an event-specific subsection rendered below that event's own row — e.g. the CPU/disk
+  // temperature thresholds under "Temperature alert". Keeps this component's own catalog-driven
+  // genericness intact rather than hardcoding one event's UI here.
   renderExtra?: (eventId: NotificationEventType) => ReactNode;
 }
 
@@ -39,15 +39,17 @@ export function NotificationEventToggles({ eventTypes, onChange, disabled, rende
               {SEVERITY_LABELS[severity]}
             </div>
             {group.map((event) => (
-              <div key={event.id} className="toggle-row" style={{ padding: '6px 0' }}>
-                <div className="toggle-row__title">{event.label}</div>
+              <div key={event.id}>
+                <div className="toggle-row" style={{ padding: '6px 0' }}>
+                  <div className="toggle-row__title">{event.label}</div>
+                  <ToggleSwitch
+                    on={eventTypes[event.id] ?? event.defaultEnabled}
+                    onToggle={() => onChange(event.id, !(eventTypes[event.id] ?? event.defaultEnabled))}
+                    label={event.label}
+                    disabled={disabled}
+                  />
+                </div>
                 {renderExtra?.(event.id)}
-                <ToggleSwitch
-                  on={eventTypes[event.id] ?? event.defaultEnabled}
-                  onToggle={() => onChange(event.id, !(eventTypes[event.id] ?? event.defaultEnabled))}
-                  label={event.label}
-                  disabled={disabled}
-                />
               </div>
             ))}
           </div>

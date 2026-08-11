@@ -84,12 +84,13 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
         }
       }
       if (patch.tempAlerts) {
-        const { warnAboveCelsius } = patch.tempAlerts;
-        if (
-          'warnAboveCelsius' in patch.tempAlerts &&
-          (typeof warnAboveCelsius !== 'number' || !Number.isFinite(warnAboveCelsius) || warnAboveCelsius < 0 || warnAboveCelsius > 100)
-        ) {
-          throw new Error('tempAlerts.warnAboveCelsius must be a number 0–100.');
+        const { cpuWarnAboveCelsius, diskWarnAboveCelsius } = patch.tempAlerts;
+        const isValidThreshold = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100;
+        if ('cpuWarnAboveCelsius' in patch.tempAlerts && !isValidThreshold(cpuWarnAboveCelsius)) {
+          throw new Error('tempAlerts.cpuWarnAboveCelsius must be a number 0–100.');
+        }
+        if ('diskWarnAboveCelsius' in patch.tempAlerts && !isValidThreshold(diskWarnAboveCelsius)) {
+          throw new Error('tempAlerts.diskWarnAboveCelsius must be a number 0–100.');
         }
       }
       const updated = await store.update(patch);

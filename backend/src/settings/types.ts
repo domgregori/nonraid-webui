@@ -34,14 +34,17 @@ export interface BackupSchedule extends RecurringSchedule {
 export type CacheSchedule = RecurringSchedule;
 
 export interface TempAlertSettings {
-  // Single shared threshold for both CPU package temp and disk SMART temps —
-  // simpler than per-device tuning, and this project has no per-device UI
-  // for it elsewhere either. Whether this actually notifies is controlled
-  // by notifications.eventTypes.tempAlert (see notificationCatalog.ts) —
-  // deliberately no separate enabled flag here anymore: temperature
-  // watching itself always runs, same as every other monitored condition
-  // in this app, and the catalog toggle is the one on/off switch users see.
-  warnAboveCelsius: number;
+  // Separate CPU/disk thresholds — disks and CPU packages run at genuinely different normal
+  // temperatures, so one shared number meant either nuisance-tripping on the CPU or never
+  // catching a hot disk. No RAM threshold: this host has no memory temperature sensor at all
+  // (only CPU hwmon drivers and per-disk SMART are read anywhere in this app — see cpuTemp.ts
+  // and smart/service.ts), so there's nothing to compare a RAM threshold against.
+  cpuWarnAboveCelsius: number;
+  diskWarnAboveCelsius: number;
+  // Whether this actually notifies is controlled by notifications.eventTypes.tempAlert (see
+  // notificationCatalog.ts) — deliberately no separate enabled flag here: temperature watching
+  // itself always runs, same as every other monitored condition in this app, and the catalog
+  // toggle is the one on/off switch users see.
 }
 
 // Where LXC container storage lives — the one thing this app needs to remember about it, since

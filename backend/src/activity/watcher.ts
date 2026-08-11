@@ -190,9 +190,9 @@ export class ActivityWatcher {
     // Deliberately no separate "is temp watching on" gate — this always evaluates, same as every
     // other monitored condition here (parity, SMART, etc). notifyEvent's own eventTypes.tempAlert
     // check is the one on/off switch, matching how every other event in the catalog works.
-    const threshold = settings.tempAlerts.warnAboveCelsius;
+    const { cpuWarnAboveCelsius, diskWarnAboveCelsius } = settings.tempAlerts;
 
-    this.checkOneTemp('cpu', 'CPU', readCpuTempCelsius(), threshold);
+    this.checkOneTemp('cpu', 'CPU', readCpuTempCelsius(), cpuWarnAboveCelsius);
 
     const devices = disks.filter((d) => d.device && d.device !== 'none').map((d) => d.device);
     if (devices.length === 0) return;
@@ -204,7 +204,7 @@ export class ActivityWatcher {
     }
     for (const disk of disks) {
       if (!disk.device || disk.device === 'none') continue;
-      this.checkOneTemp(disk.device, `Disk ${disk.slot} (${diskLabel(disk)})`, temps[disk.device] ?? null, threshold);
+      this.checkOneTemp(disk.device, `Disk ${disk.slot} (${diskLabel(disk)})`, temps[disk.device] ?? null, diskWarnAboveCelsius);
     }
   }
 }

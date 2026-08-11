@@ -10,7 +10,7 @@ const DEFAULTS: AppSettings = {
   minFreeSpaceMb: 100,
   paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2 },
   backupSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3, destDir: '', retain: 7 },
-  tempAlerts: { warnAboveCelsius: 55 },
+  tempAlerts: { cpuWarnAboveCelsius: 55, diskWarnAboveCelsius: 55 },
   lxcStorage: { mode: 'boot', diskSlot: null },
   cache: { enabled: false, fsUuid: null },
   cacheSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3 },
@@ -70,6 +70,14 @@ export class SettingsStore {
     try {
       const raw = await readFile(this.filePath, 'utf8');
       const parsed = JSON.parse(raw) as Partial<AppSettings>;
+      // One-time migration from the pre-split shape ({ warnAboveCelsius, enabled }) — seed both
+      // new thresholds from whatever single value was already configured, rather than silently
+      // resetting an existing deployment back to the 55°C default.
+      const legacyTempAlerts = parsed.tempAlerts as { warnAboveCelsius?: number } | undefined;
+      const migratedTempAlerts =
+        legacyTempAlerts && typeof legacyTempAlerts.warnAboveCelsius === 'number'
+          ? { cpuWarnAboveCelsius: legacyTempAlerts.warnAboveCelsius, diskWarnAboveCelsius: legacyTempAlerts.warnAboveCelsius }
+          : undefined;
       this.cache = {
         ...DEFAULTS,
         ...parsed,
@@ -80,7 +88,7 @@ export class SettingsStore {
         },
         paritySchedule: { ...DEFAULTS.paritySchedule, ...parsed.paritySchedule },
         backupSchedule: { ...DEFAULTS.backupSchedule, ...parsed.backupSchedule },
-        tempAlerts: { ...DEFAULTS.tempAlerts, ...parsed.tempAlerts },
+        tempAlerts: { ...DEFAULTS.tempAlerts, ...migratedTempAlerts, ...parsed.tempAlerts },
         lxcStorage: { ...DEFAULTS.lxcStorage, ...parsed.lxcStorage },
         cache: { ...DEFAULTS.cache, ...parsed.cache },
         cacheSchedule: { ...DEFAULTS.cacheSchedule, ...parsed.cacheSchedule },
