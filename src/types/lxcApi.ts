@@ -18,6 +18,12 @@ export interface LxcCommandResult {
   message: string;
 }
 
+export interface LxcSnapshot {
+  name: string;
+  timestamp: string;
+  comment: string | null;
+}
+
 export interface LxcContainerDetail {
   name: string;
   state: LxcRuntimeState;

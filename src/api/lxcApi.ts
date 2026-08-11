@@ -7,6 +7,7 @@ import type {
   LxcContainerDetail,
   LxcContainerSummary,
   LxcDistrosResponse,
+  LxcSnapshot,
   PruneTemplateCacheResult,
 } from '../types/lxcApi';
 import type { LxcStorageInfo, StorageLocation, StoragePathProgress, StoragePathResult } from '../types/storagePath';
@@ -43,6 +44,23 @@ export const lxcApi = {
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
       onProgress,
     ),
+  listSnapshots: (name: string) => request<LxcSnapshot[]>(`/api/lxc/containers/${encodeURIComponent(name)}/snapshots`),
+  createSnapshot: (name: string, comment: string) =>
+    request<LxcCommandResult>(`/api/lxc/containers/${encodeURIComponent(name)}/snapshots`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ comment }),
+    }),
+  restoreSnapshot: (name: string, snapshotName: string, newName: string) =>
+    request<LxcCommandResult>(`/api/lxc/containers/${encodeURIComponent(name)}/snapshots/${encodeURIComponent(snapshotName)}/restore`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ newName }),
+    }),
+  deleteSnapshot: (name: string, snapshotName: string) =>
+    request<LxcCommandResult>(`/api/lxc/containers/${encodeURIComponent(name)}/snapshots/${encodeURIComponent(snapshotName)}`, {
+      method: 'DELETE',
+    }),
   pruneTemplateCache: () => request<PruneTemplateCacheResult>('/api/lxc/template-cache/prune', { method: 'POST' }),
   getStorage: () => request<LxcStorageInfo>('/api/lxc/storage'),
   moveStorage: (target: StorageLocation, onProgress: (p: StoragePathProgress) => void) =>

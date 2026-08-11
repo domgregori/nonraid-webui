@@ -9,6 +9,7 @@ export interface LxcContainerActions {
   onRestart: () => void;
   onDestroy: () => void;
   onEdit: () => void;
+  onSnapshots: () => void;
 }
 
 const STATE_LABEL: Record<LxcContainerSummary['state'], string> = {
@@ -56,5 +57,6 @@ export function deriveLxcContainerViewModel(container: LxcContainerSummary, acti
     onRestart: actions.onRestart,
     onDestroy: actions.onDestroy,
     onEdit: actions.onEdit,
+    onSnapshots: actions.onSnapshots,
   };
 }

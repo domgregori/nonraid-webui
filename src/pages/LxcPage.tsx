@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { CreateLxcDialog } from '../components/lxc/CreateLxcDialog';
 import { EditLxcConfigDialog } from '../components/lxc/EditLxcConfigDialog';
+import { SnapshotsDialog } from '../components/lxc/SnapshotsDialog';
 import { useLxcContainers } from '../hooks/useLxcContainers';
 import { deriveLxcContainerViewModel } from '../selectors/lxcContainers';
 
-type DialogState = { mode: 'add' } | { mode: 'edit'; name: string } | null;
+type DialogState = { mode: 'add' } | { mode: 'edit'; name: string } | { mode: 'snapshots'; name: string } | null;
 
 export function LxcPage() {
   const { containers, status, error, pendingNames, start, stop, restart, destroy, refresh } = useLxcContainers();
@@ -27,6 +28,7 @@ export function LxcPage() {
       onRestart: () => restart(c.name),
       onDestroy: () => handleDestroyClick(c.name),
       onEdit: () => setDialog({ mode: 'edit', name: c.name }),
+      onSnapshots: () => setDialog({ mode: 'snapshots', name: c.name }),
     }),
   );
 
@@ -84,6 +86,9 @@ export function LxcPage() {
               <button type="button" className="btn" disabled={c.isPending} onClick={c.onEdit}>
                 Edit
               </button>
+              <button type="button" className="btn" disabled={c.isPending} onClick={c.onSnapshots}>
+                Snapshots
+              </button>
               <button type="button" className="btn btn--danger" disabled={c.isPending} onClick={c.onDestroy}>
                 {confirmingDestroy === c.name ? 'Confirm?' : 'Destroy'}
               </button>
@@ -96,6 +101,15 @@ export function LxcPage() {
       {dialog?.mode === 'add' && <CreateLxcDialog onClose={() => setDialog(null)} onDone={refresh} />}
 
       {dialog?.mode === 'edit' && <EditLxcConfigDialog name={dialog.name} onClose={() => setDialog(null)} onDone={refresh} />}
+
+      {dialog?.mode === 'snapshots' && (
+        <SnapshotsDialog
+          name={dialog.name}
+          containerState={containers.find((c) => c.name === dialog.name)?.state ?? 'unknown'}
+          onClose={() => setDialog(null)}
+          onDone={refresh}
+        />
+      )}
     </div>
   );
 }

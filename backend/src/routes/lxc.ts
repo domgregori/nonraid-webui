@@ -35,6 +35,18 @@ function requireNoLineBreaks(field: string, value: string): string {
   return value;
 }
 
+// Snapshot names are passed as standalone execFile args (never through a shell), so this isn't
+// about injection — it's to stop a value like "-P" or "--help" from being misread as a flag by
+// lxc-snapshot itself, and to keep names sane before they're shown back in the UI.
+const SNAPSHOT_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
+
+function requireValidSnapshotName(name: string): string {
+  if (!SNAPSHOT_NAME_RE.test(name)) {
+    throw new HttpError(400, `Invalid snapshot name "${name}"`);
+  }
+  return name;
+}
+
 function parseStorageLocation(body: unknown): StorageLocation {
   const mode = (body as { mode?: unknown })?.mode;
   if (mode !== 'boot' && mode !== 'array' && mode !== 'cache') {
@@ -194,6 +206,57 @@ export function lxcRouter(lxc: LxcClient, activity: ActivityStore, nmd: NmdClien
       if (typeof req.body?.content !== 'string') throw new HttpError(400, 'content is required');
       const result = await lxc.setConfigText(name, req.body.content);
       activity.log(`LXC container "${name}" config updated`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
+  router.get('/lxc/containers/:name/snapshots', async (req, res) => {
+    try {
+      const name = requireValidName(req.params.name);
+      res.json(await lxc.listSnapshots(name));
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/lxc/containers/:name/snapshots', async (req, res) => {
+    try {
+      const name = requireValidName(req.params.name);
+      const comment = requireNoLineBreaks('comment', String(req.body?.comment ?? ''));
+      const result = await lxc.createSnapshot(name, comment);
+      activity.log(`Snapshot created for LXC container "${name}"`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/lxc/containers/:name/snapshots/:snapshotName/restore', async (req, res) => {
+    try {
+      const name = requireValidName(req.params.name);
+      const snapshotName = requireValidSnapshotName(req.params.snapshotName);
+      const newName = requireValidName(String(req.body?.newName ?? ''));
+      const result = await lxc.restoreSnapshot(name, snapshotName, newName);
+      const verb = newName === name ? 'restored in place' : `restored as new container "${newName}"`;
+      activity.log(`LXC container "${name}" ${verb} from snapshot ${snapshotName}`, newName === name ? 'amber' : 'green').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
+  router.delete('/lxc/containers/:name/snapshots/:snapshotName', async (req, res) => {
+    try {
+      const name = requireValidName(req.params.name);
+      const snapshotName = requireValidSnapshotName(req.params.snapshotName);
+      const result = await lxc.deleteSnapshot(name, snapshotName);
+      activity.log(`Snapshot ${snapshotName} deleted from LXC container "${name}"`, 'blue').catch(() => {});
       res.json(result);
     } catch (err) {
       const status = err instanceof HttpError ? err.status : 502;

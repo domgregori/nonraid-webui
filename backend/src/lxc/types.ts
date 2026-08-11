@@ -6,6 +6,12 @@
  */
 export type LxcRuntimeState = 'running' | 'stopped' | 'frozen' | 'unknown';
 
+export interface LxcSnapshot {
+  name: string; // e.g. "snap0" — lxc-snapshot's own auto-generated name, not user-editable
+  timestamp: string; // raw "YYYY:MM:DD HH:MM:SS" as lxc-snapshot -L prints it
+  comment: string | null;
+}
+
 export interface LxcContainerSummary {
   name: string;
   state: LxcRuntimeState;

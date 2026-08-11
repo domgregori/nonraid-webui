@@ -5,7 +5,7 @@ import { Card } from '../shared/Card';
 import { IconTile } from './IconTile';
 
 // Read-only tile — no action buttons rendered, so these are inert.
-const NOOP_ACTIONS = { isPending: false, onToggle: () => {}, onRestart: () => {}, onDestroy: () => {}, onEdit: () => {} };
+const NOOP_ACTIONS = { isPending: false, onToggle: () => {}, onRestart: () => {}, onDestroy: () => {}, onEdit: () => {}, onSnapshots: () => {} };
 
 export function LxcWidgetCard() {
   const { containers } = useLxcContainers();

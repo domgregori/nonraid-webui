@@ -17,6 +17,7 @@ import type {
   LxcContainerSummary,
   LxcDistroOption,
   LxcRuntimeState,
+  LxcSnapshot,
 } from './types.js';
 
 const execFileAsync = promisify(execFile);
@@ -197,8 +198,81 @@ export class RealLxcClient implements LxcClient {
 
   async destroyContainer(name: string): Promise<LxcCommandResult> {
     await this.run('lxc-stop', ['-P', config.lxcDefaultPath, '-n', name, '--kill']).catch(() => {});
-    await this.run('lxc-destroy', ['-P', config.lxcDefaultPath, '-n', name]);
+    // -s: also destroy any snapshots — without it, lxc-destroy refuses outright ("container has
+    // snapshots") the moment a container has ever been snapshotted, confirmed live. A snapshot is
+    // this app's own feature now, so cascading its cleanup into the normal Destroy flow is the
+    // right default rather than surfacing that refusal as a dead end.
+    await this.run('lxc-destroy', ['-P', config.lxcDefaultPath, '-n', name, '-s']);
     return { ok: true, message: `Container "${name}" destroyed` };
+  }
+
+  /**
+   * `lxc-snapshot -L -C` output is "No snapshots" (exit 0) when there are none, otherwise one
+   * header line per snapshot — "<name> (<path>) <YYYY:MM:DD HH:MM:SS>" — immediately followed by
+   * a comment line *only* if that snapshot has one (no blank placeholder line when it doesn't;
+   * confirmed live). This app only ever writes single-line comments (see createSnapshot), so a
+   * non-header line is unambiguously the single comment belonging to the header directly above it.
+   */
+  async listSnapshots(name: string): Promise<LxcSnapshot[]> {
+    const { stdout } = await this.run('lxc-snapshot', ['-P', config.lxcDefaultPath, '-n', name, '-L', '-C']);
+    if (stdout.trim() === 'No snapshots') return [];
+    const headerRe = /^(\S+)\s+\([^)]*\)\s+(\d{4}:\d{2}:\d{2}\s+\d{2}:\d{2}:\d{2})$/;
+    const snapshots: LxcSnapshot[] = [];
+    for (const line of stdout.split('\n')) {
+      const match = line.match(headerRe);
+      if (match) {
+        snapshots.push({ name: match[1]!, timestamp: match[2]!, comment: null });
+      } else if (line.trim() && snapshots.length > 0) {
+        snapshots[snapshots.length - 1]!.comment = line.trim();
+      }
+    }
+    return snapshots;
+  }
+
+  // -c takes a *file* to read the comment from, not inline text — write one to a scratch temp
+  // file rather than requiring the caller to manage that.
+  async createSnapshot(name: string, comment: string): Promise<LxcCommandResult> {
+    const args = ['-P', config.lxcDefaultPath, '-n', name];
+    let commentPath: string | null = null;
+    if (comment.trim()) {
+      commentPath = path.join(os.tmpdir(), `nonraid-lxc-snapshot-comment-${randomBytes(8).toString('hex')}`);
+      await fs.writeFile(commentPath, comment.trim(), 'utf8');
+      args.push('-c', commentPath);
+    }
+    try {
+      await this.run('lxc-snapshot', args);
+    } finally {
+      if (commentPath) await fs.unlink(commentPath).catch(() => {});
+    }
+    return { ok: true, message: `Snapshot of "${name}" created` };
+  }
+
+  // newName is always required — see the client.ts interface doc comment for why this app never
+  // lets "restore" silently default to in-place (same name = replace original, confirmed live;
+  // this app's own UI treats that as a distinct, explicitly-confirmed danger action instead).
+  async restoreSnapshot(name: string, snapshotName: string, newName: string): Promise<LxcCommandResult> {
+    await this.run('lxc-snapshot', ['-P', config.lxcDefaultPath, '-n', name, '-r', snapshotName, '-N', newName]);
+    const inPlace = newName === name;
+    return {
+      ok: true,
+      message: inPlace ? `"${name}" restored from ${snapshotName}` : `Restored ${snapshotName} as new container "${newName}"`,
+    };
+  }
+
+  async deleteSnapshot(name: string, snapshotName: string): Promise<LxcCommandResult> {
+    try {
+      await this.run('lxc-snapshot', ['-P', config.lxcDefaultPath, '-n', name, '-d', snapshotName]);
+    } catch (err) {
+      // Confirmed live: overlayfs snapshots that another container was restored *from* can't be
+      // deleted while that derived container still exists (it's a dependent CoW layer, not a free
+      // copy) — surface that plainly instead of the raw "has snapshots on its rootfs" LXC error.
+      const message = (err as { stderr?: string; message: string }).stderr ?? (err as Error).message;
+      if (message.includes('has snapshots on its rootfs')) {
+        throw new Error(`Can't delete "${snapshotName}" — a container restored from it still exists. Destroy that container first.`);
+      }
+      throw err;
+    }
+    return { ok: true, message: `Snapshot "${snapshotName}" deleted` };
   }
 
   async getConfigText(name: string): Promise<string> {
@@ -394,7 +468,11 @@ export class RealLxcClient implements LxcClient {
         config.lxcDefaultPath,
         '--name',
         options.name,
-        '--bdev=dir',
+        // overlayfs, not dir: gives real copy-on-write snapshots (see listSnapshots() etc. below)
+        // regardless of the underlying filesystem (XFS array disk or Btrfs cache pool) — a plain
+        // dir-backed container's "snapshot" is a full rsync copy of the whole rootfs every time,
+        // confirmed live to still nominally work but is neither fast nor space-efficient.
+        '--bdev=overlayfs',
         '--template',
         'download',
         '--',

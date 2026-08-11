@@ -5,6 +5,7 @@ import type {
   LxcContainerDetail,
   LxcContainerSummary,
   LxcDistroOption,
+  LxcSnapshot,
 } from './types.js';
 
 export interface LxcClient {
@@ -31,4 +32,14 @@ export interface LxcClient {
   // Distribution/release combos the create form can offer — fetched live
   // from the image server via the download template's own `--list`.
   listDistros(): Promise<{ distros: LxcDistroOption[]; defaultArch: string }>;
+  // Snapshots — only meaningfully cheap for overlayfs-backed containers (createContainer's
+  // default since this was added), but lxc-snapshot itself works against any backend.
+  listSnapshots(name: string): Promise<LxcSnapshot[]>;
+  createSnapshot(name: string, comment: string): Promise<LxcCommandResult>;
+  // newName must always be provided and is exactly what the resulting container is named — same
+  // name as the original replaces it in place (destroying current state), any other name creates
+  // a new, independent container. This app's own UI treats those as two clearly distinct actions
+  // rather than one field with implicit special-casing — see SnapshotsDialog.tsx.
+  restoreSnapshot(name: string, snapshotName: string, newName: string): Promise<LxcCommandResult>;
+  deleteSnapshot(name: string, snapshotName: string): Promise<LxcCommandResult>;
 }
