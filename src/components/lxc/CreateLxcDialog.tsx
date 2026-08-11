@@ -20,6 +20,7 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [distros, setDistros] = useState<LxcDistroOption[]>([]);
   const [bridges, setBridges] = useState<string[]>([]);
+  const [interfaces, setInterfaces] = useState<string[]>([]);
   const [defaultArch, setDefaultArch] = useState('amd64');
 
   const [selectedDistroKey, setSelectedDistroKey] = useState<string>(CUSTOM_VALUE);
@@ -27,6 +28,7 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
   const [distribution, setDistribution] = useState('');
   const [release, setRelease] = useState('');
   const [arch, setArch] = useState('amd64');
+  const [networkType, setNetworkType] = useState<'bridge' | 'macvlan'>('bridge');
   const [bridge, setBridge] = useState('');
   const [autostart, setAutostart] = useState(false);
   const [description, setDescription] = useState('');
@@ -39,13 +41,14 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([lxcApi.listDistros(), lxcApi.listBridges()])
-      .then(([distrosRes, bridgesRes]) => {
+    Promise.all([lxcApi.listDistros(), lxcApi.listBridges(), lxcApi.listInterfaces()])
+      .then(([distrosRes, bridgesRes, interfacesRes]) => {
         if (!mounted) return;
         setDistros(distrosRes.distros);
         setDefaultArch(distrosRes.defaultArch);
         setArch(distrosRes.defaultArch);
         setBridges(bridgesRes);
+        setInterfaces(interfacesRes);
         if (bridgesRes.length > 0) setBridge(bridgesRes[0]);
         if (distrosRes.distros.length > 0) {
           const first = distrosRes.distros[0];
@@ -75,6 +78,12 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
     }
   };
 
+  const handleNetworkTypeChange = (type: 'bridge' | 'macvlan') => {
+    setNetworkType(type);
+    const list = type === 'macvlan' ? interfaces : bridges;
+    setBridge(list.length > 0 ? list[0] : '');
+  };
+
   const valid = name.trim() && distribution.trim() && release.trim() && arch.trim() && bridge.trim();
 
   const handleSubmit = async () => {
@@ -89,6 +98,7 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
           distribution: distribution.trim(),
           release: release.trim(),
           arch: arch.trim(),
+          networkType,
           bridge,
           autostart,
           description,
@@ -188,10 +198,24 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
             </label>
 
             <label className="form-field">
-              <span className="form-field__label">Bridge</span>
-              {bridges.length > 0 ? (
+              <span className="form-field__label">Network</span>
+              <select
+                className="history-input"
+                style={{ width: '100%' }}
+                disabled={locked}
+                value={networkType}
+                onChange={(e) => handleNetworkTypeChange(e.target.value as 'bridge' | 'macvlan')}
+              >
+                <option value="bridge">Bridge — IP on the bridge's own subnet</option>
+                <option value="macvlan">Direct on a network interface — real IP from your LAN's DHCP</option>
+              </select>
+            </label>
+
+            <label className="form-field">
+              <span className="form-field__label">{networkType === 'macvlan' ? 'Interface' : 'Bridge'}</span>
+              {(networkType === 'macvlan' ? interfaces : bridges).length > 0 ? (
                 <select className="history-input" style={{ width: '100%' }} disabled={locked} value={bridge} onChange={(e) => setBridge(e.target.value)}>
-                  {bridges.map((b) => (
+                  {(networkType === 'macvlan' ? interfaces : bridges).map((b) => (
                     <option key={b} value={b}>
                       {b}
                     </option>
@@ -202,12 +226,16 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
                   className="history-input"
                   style={{ width: '100%' }}
                   disabled={locked}
-                  placeholder="e.g. br0"
+                  placeholder={networkType === 'macvlan' ? 'e.g. eno0' : 'e.g. br0'}
                   value={bridge}
                   onChange={(e) => setBridge(e.target.value)}
                 />
               )}
-              <span className="apps-field__hint">Host bridge the container's veth attaches to</span>
+              <span className="apps-field__hint">
+                {networkType === 'macvlan'
+                  ? "The container's interface rides directly on this NIC and gets its own LAN IP via DHCP. The host itself can't reach the container over this interface — that's a macvlan limitation, not a bug."
+                  : "Host bridge the container's veth attaches to"}
+              </span>
             </label>
 
             <label className="form-field">

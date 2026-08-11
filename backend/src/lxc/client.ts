@@ -25,6 +25,9 @@ export interface LxcClient {
   // Host bridge/veth-parent interfaces a new container's network can attach
   // to — see the "Networking note" in the LXC handoff.
   listBridges(): Promise<string[]>;
+  // Physical NICs (e.g. eno0) a new container's network can ride directly on via macvlan, getting
+  // its own DHCP-assigned LAN IP instead of going through a host bridge.
+  listPhysicalInterfaces(): Promise<string[]>;
   // Distribution/release combos the create form can offer — fetched live
   // from the image server via the download template's own `--list`.
   listDistros(): Promise<{ distros: LxcDistroOption[]; defaultArch: string }>;

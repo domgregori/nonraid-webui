@@ -243,6 +243,29 @@ export class RealLxcClient implements LxcClient {
   }
 
   /**
+   * A real physical NIC always exposes a `/sys/class/net/<name>/device` symlink pointing at its
+   * backing PCI/USB device — the kernel's own marker for "this is real hardware", mirroring how
+   * listBridges() above uses the `bridge` subdirectory as the marker for "this is a bridge".
+   * Purely virtual interfaces (bridges, veth pairs, bonds, VLAN sub-interfaces, loopback) have no
+   * such symlink, so they're correctly excluded without needing a name-prefix guess (eno0/enp2s0/
+   * eth0/wlan0 all pass this check equally, unlike guessing from naming convention).
+   */
+  async listPhysicalInterfaces(): Promise<string[]> {
+    const names = await fs.readdir('/sys/class/net').catch(() => []);
+    const interfaces = await Promise.all(
+      names.map(async (name) => {
+        try {
+          await fs.access(`/sys/class/net/${name}/device`);
+          return name;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    return interfaces.filter((n): n is string => n !== null).sort();
+  }
+
+  /**
    * Fetches the live download-template image index via `lxc-create -n
    * <throwaway> -t download -- --list`.
    *
@@ -387,9 +410,27 @@ export class RealLxcClient implements LxcClient {
 
     onProgress?.({ phase: 'configuring', message: 'Writing network and metadata configuration', percent: null });
     const configPath = containerConfigPath(options.name);
+    // 'bridge' (default): a veth pair, one end on the container, the other attached to a host
+    // bridge — the container gets an IP on whatever subnet that bridge serves. 'macvlan': the
+    // container's virtual interface rides directly on a physical NIC (lxc.net.0.link becomes that
+    // NIC's name, e.g. eno0) with mode=bridge, so the container's own DHCP/ARP traffic reaches the
+    // real LAN directly and it gets a real LAN IP — indistinguishable from a separate physical
+    // device, except the host itself can't reach the container over this interface (a macvlan
+    // kernel limitation: container-to-LAN and container-to-container both work, host-to-container
+    // doesn't).
+    const netEntries: [key: string, value: string | null][] =
+      options.networkType === 'macvlan'
+        ? [
+            ['lxc.net.0.type', 'macvlan'],
+            ['lxc.net.0.macvlan.mode', 'bridge'],
+            ['lxc.net.0.link', options.bridge],
+          ]
+        : [
+            ['lxc.net.0.type', 'veth'],
+            ['lxc.net.0.link', options.bridge],
+          ];
     await setVariables(configPath, [
-      ['lxc.net.0.type', 'veth'],
-      ['lxc.net.0.link', options.bridge],
+      ...netEntries,
       ['lxc.net.0.flags', 'up'],
       ['lxc.net.0.hwaddr', randomLocallyAdministeredMac()],
       [AUTOSTART_KEY, options.autostart ? '1' : '0'],

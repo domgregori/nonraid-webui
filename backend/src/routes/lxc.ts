@@ -112,6 +112,14 @@ export function lxcRouter(lxc: LxcClient, activity: ActivityStore, nmd: NmdClien
     }
   });
 
+  router.get('/lxc/interfaces', async (_req, res) => {
+    try {
+      res.json(await lxc.listPhysicalInterfaces());
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   router.get('/lxc/containers/:name', async (req, res) => {
     try {
       res.json(await lxc.inspectContainer(requireValidName(req.params.name)));
@@ -206,20 +214,27 @@ export function lxcRouter(lxc: LxcClient, activity: ActivityStore, nmd: NmdClien
       if (!body.distribution || !body.release) {
         throw new HttpError(400, 'distribution and release are required');
       }
+      const networkType = body.networkType === 'macvlan' ? 'macvlan' : 'bridge';
       const options: CreateLxcContainerOptions = {
         name,
         distribution: String(body.distribution),
         release: String(body.release),
         arch: String(body.arch || DEFAULT_ARCH),
+        networkType,
         bridge: String(body.bridge || ''),
         autostart: body.autostart === true,
         description: requireNoLineBreaks('description', String(body.description ?? '')),
         webUiUrl: requireNoLineBreaks('webUiUrl', String(body.webUiUrl ?? '')),
       };
-      if (!options.bridge) throw new HttpError(400, 'bridge is required');
-      const validBridges = await lxc.listBridges();
-      if (!validBridges.includes(options.bridge)) {
-        throw new HttpError(400, `Invalid bridge "${options.bridge}" — must be one of: ${validBridges.join(', ')}`);
+      if (!options.bridge) {
+        throw new HttpError(400, networkType === 'macvlan' ? 'A network interface is required.' : 'bridge is required');
+      }
+      // Re-validated against a fresh list rather than trusting the client, same discipline every
+      // other device-picking flow in this app already uses.
+      const validLinks = networkType === 'macvlan' ? await lxc.listPhysicalInterfaces() : await lxc.listBridges();
+      if (!validLinks.includes(options.bridge)) {
+        const noun = networkType === 'macvlan' ? 'network interface' : 'bridge';
+        throw new HttpError(400, `Invalid ${noun} "${options.bridge}" — must be one of: ${validLinks.join(', ')}`);
       }
 
       const result = await lxc.createContainer(options, (progress) => send({ type: 'progress', ...progress }));

@@ -44,6 +44,13 @@ export interface CreateLxcContainerOptions {
   distribution: string;
   release: string;
   arch: string;
+  // For 'bridge' (default), this is a host bridge the container's veth attaches to — the
+  // container gets an IP on whatever subnet that bridge serves. For 'macvlan', this is a physical
+  // NIC (e.g. eno0) the container's own virtual interface rides directly on — the container gets
+  // its own IP straight from the LAN's DHCP server, indistinguishable from a separate physical
+  // device on the network. Host-to-container traffic doesn't work over a macvlan link (a kernel
+  // limitation, not a bug); container-to-LAN and container-to-container both work fine.
+  networkType: 'bridge' | 'macvlan';
   bridge: string;
   autostart: boolean;
   description: string;

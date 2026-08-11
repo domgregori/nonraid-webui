@@ -16,6 +16,7 @@ export const lxcApi = {
   inspectContainer: (name: string) => request<LxcContainerDetail>(`/api/lxc/containers/${encodeURIComponent(name)}`),
   listDistros: () => request<LxcDistrosResponse>('/api/lxc/distros'),
   listBridges: () => request<string[]>('/api/lxc/bridges'),
+  listInterfaces: () => request<string[]>('/api/lxc/interfaces'),
   startContainer: (name: string) =>
     request<LxcCommandResult>(`/api/lxc/containers/${encodeURIComponent(name)}/start`, { method: 'POST' }),
   stopContainer: (name: string, force = false) =>

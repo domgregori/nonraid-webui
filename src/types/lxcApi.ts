@@ -37,6 +37,7 @@ export interface CreateLxcContainerRequest {
   distribution: string;
   release: string;
   arch: string;
+  networkType: 'bridge' | 'macvlan';
   bridge: string;
   autostart: boolean;
   description: string;
