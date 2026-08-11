@@ -59,3 +59,27 @@ export async function parseCertInfo(certPath: string): Promise<CertInfo> {
     sans,
   };
 }
+
+export interface KeyMatchResult {
+  keyValid: boolean;
+  keyMatchesCert: boolean;
+}
+
+// `openssl pkey` (not `openssl rsa`) so this works uniformly across RSA/EC/Ed25519 keys, and
+// conveniently rejects passphrase-protected keys for free (fails without -passin) — there's
+// nowhere in this app to store a passphrase, so an encrypted key is correctly treated the same
+// as an invalid one. Match is decided by comparing each side's derived public key PEM directly
+// rather than an RSA-modulus-only check, so it works for any key algorithm too.
+export async function checkKeyMatchesCert(certPath: string, keyPath: string): Promise<KeyMatchResult> {
+  try {
+    await runSudoMaybe(config.opensslBin, ['pkey', '-in', keyPath, '-noout', '-check'], config.tlsUseSudo);
+  } catch {
+    return { keyValid: false, keyMatchesCert: false };
+  }
+
+  const [certPub, keyPub] = await Promise.all([
+    runSudoMaybe(config.opensslBin, ['x509', '-in', certPath, '-noout', '-pubkey'], config.tlsUseSudo),
+    runSudoMaybe(config.opensslBin, ['pkey', '-in', keyPath, '-pubout'], config.tlsUseSudo),
+  ]);
+  return { keyValid: true, keyMatchesCert: certPub.stdout.trim() === keyPub.stdout.trim() };
+}

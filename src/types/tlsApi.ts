@@ -19,3 +19,14 @@ export interface TlsApplyResult {
   message: string;
   newOrigin: string;
 }
+
+export interface TlsImportPreview {
+  token: string;
+  subject: string;
+  issuer: string;
+  notBefore: number;
+  notAfter: number;
+  sans: string[];
+  keyMatchesCert: boolean;
+  expiringSoon: boolean;
+}

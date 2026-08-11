@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { tlsApi } from '../../api/tlsApi';
-import type { TlsStatus } from '../../types/tlsApi';
+import type { TlsImportPreview, TlsStatus } from '../../types/tlsApi';
 
 // Giving the backend's Restart=on-failure (RestartSec=5) plus Node's own startup time to actually
 // come back before navigating — same reasoning as ServicesSection's health-poll timeout, but this
@@ -21,6 +21,14 @@ export function TlsSection() {
 
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+
+  const [certFile, setCertFile] = useState<File | null>(null);
+  const [keyFile, setKeyFile] = useState<File | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<TlsImportPreview | null>(null);
+  const [committing, setCommitting] = useState(false);
+  const [commitError, setCommitError] = useState<string | null>(null);
 
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
@@ -54,6 +62,37 @@ export function TlsSection() {
       setGenerateError((err as Error).message);
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const previewImport = async () => {
+    if (!certFile || !keyFile) return;
+    setPreviewing(true);
+    setPreviewError(null);
+    setPreview(null);
+    try {
+      setPreview(await tlsApi.previewImport(certFile, keyFile));
+    } catch (err) {
+      setPreviewError((err as Error).message);
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const commitImport = async () => {
+    if (!preview) return;
+    setCommitting(true);
+    setCommitError(null);
+    try {
+      const result = await tlsApi.commitImport(preview.token);
+      setStatus(result);
+      setPreview(null);
+      setCertFile(null);
+      setKeyFile(null);
+    } catch (err) {
+      setCommitError((err as Error).message);
+    } finally {
+      setCommitting(false);
     }
   };
 
@@ -151,6 +190,66 @@ export function TlsSection() {
         </button>
       </div>
       {generateError && <div className="status-note status-note--error">{generateError}</div>}
+
+      <div className="toggle-row__title" style={{ marginTop: 12 }}>
+        Import a certificate
+      </div>
+      <div className="toggle-row__desc">A real CA-issued certificate, or one produced by an ACME client run elsewhere.</div>
+      <div className="settings-field__row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+        <label className="toggle-row__desc" style={{ display: 'block' }}>
+          Certificate file (.pem, .crt, .cer)
+          <input
+            type="file"
+            accept=".pem,.crt,.cer"
+            style={{ display: 'block', marginTop: 4 }}
+            onChange={(e) => {
+              setCertFile(e.target.files?.[0] ?? null);
+              setPreview(null);
+            }}
+            disabled={!!reconnecting}
+          />
+        </label>
+        <label className="toggle-row__desc" style={{ display: 'block' }}>
+          Private key file (.pem, .key)
+          <input
+            type="file"
+            accept=".pem,.key"
+            style={{ display: 'block', marginTop: 4 }}
+            onChange={(e) => {
+              setKeyFile(e.target.files?.[0] ?? null);
+              setPreview(null);
+            }}
+            disabled={!!reconnecting}
+          />
+        </label>
+      </div>
+      <div className="settings-field__row">
+        <button type="button" className="btn" disabled={previewing || !certFile || !keyFile || !!reconnecting} onClick={previewImport}>
+          {previewing ? 'Checking…' : 'Preview'}
+        </button>
+      </div>
+      {previewError && <div className="status-note status-note--error">{previewError}</div>}
+      {preview && (
+        <div className="status-note">
+          Subject: <strong>{preview.subject}</strong>
+          <br />
+          Issuer: {preview.issuer}
+          <br />
+          Expires: {formatExpiry(preview.notAfter)}
+          {preview.expiringSoon && ' (expiring soon)'}
+          <br />
+          Keys match: <strong>{preview.keyMatchesCert ? 'yes' : 'no'}</strong>
+          {!preview.keyMatchesCert && ' — this certificate and key don\'t belong together, cannot import.'}
+        </div>
+      )}
+      {commitError && <div className="status-note status-note--error">{commitError}</div>}
+      {preview && (
+        <div className="settings-field__row">
+          <button type="button" className="btn" disabled={committing || !preview.keyMatchesCert || !!reconnecting} onClick={commitImport}>
+            {committing ? 'Importing…' : 'Confirm import'}
+          </button>
+        </div>
+      )}
 
       <div className="settings-field__row" style={{ marginTop: 12 }}>
         <button
