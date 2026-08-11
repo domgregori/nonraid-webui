@@ -31,6 +31,11 @@ export interface PruneImagesResult {
   spaceReclaimedBytes: number;
 }
 
+export interface HostDevice {
+  path: string;
+  label: string;
+}
+
 export interface CreateContainerProgress {
   phase: 'pulling' | 'removing' | 'creating' | 'starting';
   message: string;

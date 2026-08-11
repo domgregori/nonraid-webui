@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
 import { appsApi } from '../../api/appsApi';
+import { dockerApi } from '../../api/dockerApi';
 import { InstallProgress } from '../docker/InstallProgress';
 import { installButtonLabel, useInstallProgress } from '../../hooks/useInstallProgress';
 import { PathAutocomplete } from '../shared/PathAutocomplete';
 import type { CaApp, CaConfigEntry, InstallOverrides, InstallPlan } from '../../types/appsApi';
+import type { HostDevice } from '../../types/dockerApi';
+
+// Same sentinel/pattern as ContainerFormDialog's manual-container Device
+// picker — a device outside the curated GPU/audio/serial categories (or a
+// template default that doesn't match any of them) falls back to free text.
+const DEVICE_CUSTOM = '__custom__';
 
 interface InstallDialogProps {
   appName: string;
@@ -56,7 +63,12 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [installError, setInstallError] = useState<string | null>(null);
   const [installMessage, setInstallMessage] = useState<string | null>(null);
+  const [availableDevices, setAvailableDevices] = useState<HostDevice[]>([]);
   const { progress: installProgress, log: pullLog, logRef: pullLogRef, onProgress, reset: resetProgress } = useInstallProgress();
+
+  useEffect(() => {
+    dockerApi.listDevices().then(setAvailableDevices).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -193,6 +205,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
                 onChange={setField}
                 plan={plan}
                 locked={locked}
+                availableDevices={availableDevices}
               />
             ))}
 
@@ -210,6 +223,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
                       onChange={setField}
                       plan={plan}
                       locked={locked}
+                      availableDevices={availableDevices}
                     />
                   ))}
               </div>
@@ -351,9 +365,10 @@ interface ConfigFieldProps {
   onChange: (target: string, value: string) => void;
   plan: InstallPlan | null;
   locked: boolean;
+  availableDevices: HostDevice[];
 }
 
-function ConfigField({ entry, value, onChange, plan, locked }: ConfigFieldProps) {
+function ConfigField({ entry, value, onChange, plan, locked, availableDevices }: ConfigFieldProps) {
   const attrs = entry['@attributes'];
   const masked = attrs.Mask === 'true';
   const required = attrs.Required === 'true';
@@ -367,6 +382,11 @@ function ConfigField({ entry, value, onChange, plan, locked }: ConfigFieldProps)
       : null;
 
   const label = attrs.Type === 'Port' ? `${attrs.Name} (host port)` : attrs.Name;
+
+  // See ContainerFormDialog's identical device picker for why this isn't keyed on "value === ''" —
+  // that would make picking "Custom path…" (which clears value) collapse back to looking unselected.
+  const deviceMatched = availableDevices.some((dev) => dev.path === value);
+  const deviceSelectValue = deviceMatched ? value : DEVICE_CUSTOM;
 
   return (
     <label className="form-field">
@@ -383,6 +403,31 @@ function ConfigField({ entry, value, onChange, plan, locked }: ConfigFieldProps)
           value={value}
           onChange={(v) => onChange(attrs.Target, v)}
         />
+      ) : attrs.Type === 'Device' ? (
+        <>
+          <select
+            className={`history-input${fieldError ? ' apps-field--error' : ''}`}
+            style={{ width: '100%' }}
+            value={deviceSelectValue}
+            onChange={(e) => onChange(attrs.Target, e.target.value === DEVICE_CUSTOM ? '' : e.target.value)}
+          >
+            {availableDevices.map((dev) => (
+              <option key={dev.path} value={dev.path}>
+                {dev.label}
+              </option>
+            ))}
+            <option value={DEVICE_CUSTOM}>Custom path…</option>
+          </select>
+          {deviceSelectValue === DEVICE_CUSTOM && (
+            <input
+              className={`history-input${fieldError ? ' apps-field--error' : ''}`}
+              style={{ width: '100%', marginTop: 6 }}
+              placeholder="/dev/..."
+              value={value}
+              onChange={(e) => onChange(attrs.Target, e.target.value)}
+            />
+          )}
+        </>
       ) : (
         <input
           className={`history-input${fieldError ? ' apps-field--error' : ''}`}

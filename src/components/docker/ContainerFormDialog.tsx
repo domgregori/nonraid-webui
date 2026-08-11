@@ -7,6 +7,7 @@ import type {
   ContainerEnvVar,
   ContainerPortMapping,
   ContainerVolumeMount,
+  HostDevice,
   ManualContainerPlan,
   ManualContainerRequest,
 } from '../../types/dockerApi';
@@ -21,6 +22,12 @@ interface ContainerFormDialogProps {
 }
 
 type Stage = 'loading' | 'editing' | 'reviewed' | 'installing' | 'done' | 'load-error';
+
+// Sentinel for "not one of the curated devices" — same pattern as
+// CreateLxcDialog's distro picker (CUSTOM_VALUE). A device path typed by
+// hand, or loaded from an existing container that used something outside
+// the curated GPU/audio/serial categories, falls back to free text.
+const DEVICE_CUSTOM = '__custom__';
 
 function updateAt<T>(list: T[], index: number, patch: Partial<T>): T[] {
   return list.map((item, i) => (i === index ? { ...item, ...patch } : item));
@@ -44,6 +51,11 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
   const [binds, setBinds] = useState<ContainerVolumeMount[]>([]);
   const [devices, setDevices] = useState<ContainerDeviceMapping[]>([]);
   const [privilegedAck, setPrivilegedAck] = useState(false);
+  const [availableDevices, setAvailableDevices] = useState<HostDevice[]>([]);
+
+  useEffect(() => {
+    dockerApi.listDevices().then(setAvailableDevices).catch(() => {});
+  }, []);
 
   const [plan, setPlan] = useState<ManualContainerPlan | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
@@ -430,37 +442,65 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
               )}
               renderRow={(d, i) => {
                 const issue = plan?.devices[i] && !plan.devices[i].allowed;
+                // Deliberately not keyed on "hostPath === ''" — that would make picking "Custom
+                // path…" (which clears hostPath so there's something to type into) collapse
+                // straight back to looking unselected, since an empty path also fails the match.
+                // Any non-matched value, including empty, means "show the custom field."
+                const matched = availableDevices.some((dev) => dev.path === d.hostPath);
+                const selectValue = matched ? d.hostPath : DEVICE_CUSTOM;
                 return (
-                  <div className="container-form-row" key={i}>
-                    <input
-                      className={`history-input${issue ? ' apps-field--error' : ''}`}
-                      placeholder="Host path (/dev/...)"
-                      value={d.hostPath}
-                      onChange={(e) => {
-                        setDevices(updateAt(devices, i, { hostPath: e.target.value }));
-                        invalidate();
-                      }}
-                    />
-                    <input
-                      className="history-input"
-                      placeholder="Container path"
-                      value={d.containerPath}
-                      onChange={(e) => {
-                        setDevices(updateAt(devices, i, { containerPath: e.target.value }));
-                        invalidate();
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="container-form-row__remove"
-                      onClick={() => {
-                        setDevices(removeAt(devices, i));
-                        invalidate();
-                      }}
-                      aria-label="Remove device"
-                    >
-                      &#10005;
-                    </button>
+                  <div key={i}>
+                    <div className="container-form-row">
+                      <select
+                        className={`history-input${issue ? ' apps-field--error' : ''}`}
+                        value={selectValue}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setDevices(updateAt(devices, i, { hostPath: v === DEVICE_CUSTOM ? '' : v }));
+                          invalidate();
+                        }}
+                      >
+                        {availableDevices.map((dev) => (
+                          <option key={dev.path} value={dev.path}>
+                            {dev.label}
+                          </option>
+                        ))}
+                        <option value={DEVICE_CUSTOM}>Custom path…</option>
+                      </select>
+                      <input
+                        className="history-input"
+                        placeholder="Container path"
+                        value={d.containerPath}
+                        onChange={(e) => {
+                          setDevices(updateAt(devices, i, { containerPath: e.target.value }));
+                          invalidate();
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="container-form-row__remove"
+                        onClick={() => {
+                          setDevices(removeAt(devices, i));
+                          invalidate();
+                        }}
+                        aria-label="Remove device"
+                      >
+                        &#10005;
+                      </button>
+                    </div>
+                    {selectValue === DEVICE_CUSTOM && (
+                      <div className="container-form-row">
+                        <input
+                          className={`history-input${issue ? ' apps-field--error' : ''}`}
+                          placeholder="Host path (/dev/...)"
+                          value={d.hostPath}
+                          onChange={(e) => {
+                            setDevices(updateAt(devices, i, { hostPath: e.target.value }));
+                            invalidate();
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               }}

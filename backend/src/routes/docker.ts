@@ -4,6 +4,7 @@ import { resolveWebUiTemplate } from '../apps/webUi.js';
 import type { ActivityStore } from '../activity/index.js';
 import type { CacheService } from '../cache/service.js';
 import type { DockerClient, DockerContainerSummary } from '../docker/index.js';
+import { listAvailableDevices } from '../docker/devices.js';
 import { buildManualPlan } from '../docker/manualPlan.js';
 import { getCurrentDockerStorage, migrateDockerStorage } from '../docker/storagePath.js';
 import { HttpError } from '../httpError.js';
@@ -92,6 +93,18 @@ export function dockerRouter(
   router.get('/docker/containers', async (_req, res) => {
     try {
       res.json(await Promise.all((await docker.listContainers()).map(withWebUiUrl)));
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  // Curated /dev subdirectories (GPU, audio, stable-named serial) for the
+  // create/edit dialog's Device picker — see docker/devices.ts for why this
+  // isn't a flat dump of all of /dev. Also used by the Apps install dialog
+  // for Config entries of Type="Device".
+  router.get('/docker/devices', async (_req, res) => {
+    try {
+      res.json(await listAvailableDevices());
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }
