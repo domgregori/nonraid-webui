@@ -78,13 +78,22 @@ export class SettingsStore {
         legacyTempAlerts && typeof legacyTempAlerts.warnAboveCelsius === 'number'
           ? { cpuWarnAboveCelsius: legacyTempAlerts.warnAboveCelsius, diskWarnAboveCelsius: legacyTempAlerts.warnAboveCelsius }
           : undefined;
+      // One-time migration from the pre-split single "tempAlert" toggle — seed both new toggles
+      // from whatever was already configured, rather than silently re-enabling notifications an
+      // existing deployment had turned off.
+      const legacyEventTypes = parsed.notifications?.eventTypes as Partial<Record<string, boolean>> | undefined;
+      const legacyTempAlertEnabled = legacyEventTypes?.tempAlert;
+      const migratedEventTypes =
+        typeof legacyTempAlertEnabled === 'boolean'
+          ? { tempAlertCpu: legacyTempAlertEnabled, tempAlertDisk: legacyTempAlertEnabled }
+          : undefined;
       this.cache = {
         ...DEFAULTS,
         ...parsed,
         notifications: {
           ...DEFAULTS.notifications,
           ...parsed.notifications,
-          eventTypes: { ...DEFAULTS.notifications.eventTypes, ...parsed.notifications?.eventTypes },
+          eventTypes: { ...DEFAULTS.notifications.eventTypes, ...migratedEventTypes, ...parsed.notifications?.eventTypes },
         },
         paritySchedule: { ...DEFAULTS.paritySchedule, ...parsed.paritySchedule },
         backupSchedule: { ...DEFAULTS.backupSchedule, ...parsed.backupSchedule },

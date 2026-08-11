@@ -114,8 +114,10 @@ export function SettingsPage() {
 
   const [cpuTempThresholdDraft, setCpuTempThresholdDraft] = useState('');
   const [diskTempThresholdDraft, setDiskTempThresholdDraft] = useState('');
-  const [tempThresholdSaving, setTempThresholdSaving] = useState(false);
-  const [tempThresholdError, setTempThresholdError] = useState<string | null>(null);
+  const [cpuTempThresholdSaving, setCpuTempThresholdSaving] = useState(false);
+  const [diskTempThresholdSaving, setDiskTempThresholdSaving] = useState(false);
+  const [cpuTempThresholdError, setCpuTempThresholdError] = useState<string | null>(null);
+  const [diskTempThresholdError, setDiskTempThresholdError] = useState<string | null>(null);
 
   const [cacheEnabled, setCacheEnabled] = useState(false);
   const [cacheEnabledSaving, setCacheEnabledSaving] = useState(false);
@@ -389,17 +391,28 @@ export function SettingsPage() {
     setParitySchedSaving(false);
   };
 
-  const saveTempThresholds = async () => {
-    const cpuValue = Number(cpuTempThresholdDraft);
-    const diskValue = Number(diskTempThresholdDraft);
-    if (!Number.isFinite(cpuValue) || cpuValue < 0 || cpuValue > 100 || !Number.isFinite(diskValue) || diskValue < 0 || diskValue > 100) {
-      setTempThresholdError('Enter a temperature between 0 and 100°C for both.');
+  const saveCpuTempThreshold = async () => {
+    const value = Number(cpuTempThresholdDraft);
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      setCpuTempThresholdError('Enter a temperature between 0 and 100°C.');
       return;
     }
-    setTempThresholdSaving(true);
-    setTempThresholdError(null);
-    await update({ tempAlerts: { cpuWarnAboveCelsius: cpuValue, diskWarnAboveCelsius: diskValue } });
-    setTempThresholdSaving(false);
+    setCpuTempThresholdSaving(true);
+    setCpuTempThresholdError(null);
+    await update({ tempAlerts: { cpuWarnAboveCelsius: value } });
+    setCpuTempThresholdSaving(false);
+  };
+
+  const saveDiskTempThreshold = async () => {
+    const value = Number(diskTempThresholdDraft);
+    if (!Number.isFinite(value) || value < 0 || value > 100) {
+      setDiskTempThresholdError('Enter a temperature between 0 and 100°C.');
+      return;
+    }
+    setDiskTempThresholdSaving(true);
+    setDiskTempThresholdError(null);
+    await update({ tempAlerts: { diskWarnAboveCelsius: value } });
+    setDiskTempThresholdSaving(false);
   };
 
   const saveBackupSchedule = async () => {
@@ -955,52 +968,57 @@ export function SettingsPage() {
             eventTypes={eventTypesDraft}
             onChange={toggleEventType}
             disabled={!settings}
-            renderExtra={(eventId) =>
-              eventId === 'tempAlert' ? (
-                <div style={{ paddingLeft: 12, paddingBottom: 8 }}>
-                  <div className="settings-field__row">
-                    <span className="toggle-row__desc" style={{ width: 50 }}>
-                      CPU
-                    </span>
-                    <input
-                      className="history-input"
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={cpuTempThresholdDraft}
-                      onChange={(e) => setCpuTempThresholdDraft(e.target.value)}
-                      disabled={!settings}
-                      style={{ width: 70 }}
-                    />
-                    <span className="toggle-row__desc">°C</span>
+            renderExtra={(eventId) => {
+              if (eventId === 'tempAlertCpu') {
+                return (
+                  <div style={{ paddingLeft: 12, paddingBottom: 8 }}>
+                    <div className="settings-field__row">
+                      <input
+                        className="history-input"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={cpuTempThresholdDraft}
+                        onChange={(e) => setCpuTempThresholdDraft(e.target.value)}
+                        disabled={!settings}
+                        style={{ width: 70 }}
+                      />
+                      <span className="toggle-row__desc">°C</span>
+                      <button type="button" className="btn" disabled={cpuTempThresholdSaving || !settings} onClick={saveCpuTempThreshold}>
+                        {cpuTempThresholdSaving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                    {cpuTempThresholdError && <div className="status-note status-note--error">{cpuTempThresholdError}</div>}
                   </div>
-                  <div className="settings-field__row">
-                    <span className="toggle-row__desc" style={{ width: 50 }}>
-                      Disks
-                    </span>
-                    <input
-                      className="history-input"
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={diskTempThresholdDraft}
-                      onChange={(e) => setDiskTempThresholdDraft(e.target.value)}
-                      disabled={!settings}
-                      style={{ width: 70 }}
-                    />
-                    <span className="toggle-row__desc">°C</span>
+                );
+              }
+              if (eventId === 'tempAlertDisk') {
+                return (
+                  <div style={{ paddingLeft: 12, paddingBottom: 8 }}>
+                    <div className="settings-field__row">
+                      <input
+                        className="history-input"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={diskTempThresholdDraft}
+                        onChange={(e) => setDiskTempThresholdDraft(e.target.value)}
+                        disabled={!settings}
+                        style={{ width: 70 }}
+                      />
+                      <span className="toggle-row__desc">°C</span>
+                      <button type="button" className="btn" disabled={diskTempThresholdSaving || !settings} onClick={saveDiskTempThreshold}>
+                        {diskTempThresholdSaving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                    {diskTempThresholdError && <div className="status-note status-note--error">{diskTempThresholdError}</div>}
                   </div>
-                  <div className="settings-field__row">
-                    <button type="button" className="btn" disabled={tempThresholdSaving || !settings} onClick={saveTempThresholds}>
-                      {tempThresholdSaving ? 'Saving…' : 'Save'}
-                    </button>
-                  </div>
-                  {tempThresholdError && <div className="status-note status-note--error">{tempThresholdError}</div>}
-                </div>
-              ) : null
-            }
+                );
+              }
+              return null;
+            }}
           />
         </div>
 

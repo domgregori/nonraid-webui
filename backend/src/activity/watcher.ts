@@ -3,6 +3,7 @@ import type { CacheService } from '../cache/service.js';
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { DiskStatus, NmdDisk } from '../nmd/types.js';
+import type { NotificationEventType } from '../settings/notificationCatalog.js';
 import { notifyEvent } from '../settings/notify.js';
 import type { SettingsStore } from '../settings/store.js';
 import type { SmartHealth, SmartService } from '../smart/index.js';
@@ -173,7 +174,7 @@ export class ActivityWatcher {
     }
   }
 
-  private checkOneTemp(key: string, label: string, celsius: number | null, threshold: number): void {
+  private checkOneTemp(key: string, label: string, celsius: number | null, threshold: number, eventType: NotificationEventType): void {
     if (celsius === null) return;
     const wasOver = this.overTemp.get(key) ?? false;
     const isOver = celsius >= threshold;
@@ -181,18 +182,18 @@ export class ActivityWatcher {
     if (isOver && !wasOver) {
       const text = `${label} temperature is ${Math.round(celsius)}°C, at or above the ${threshold}°C alert threshold`;
       this.activity.log(text, 'amber').catch(() => {});
-      notifyEvent(this.settings, 'tempAlert', 'NonRAID: temperature alert', text);
+      notifyEvent(this.settings, eventType, 'NonRAID: temperature alert', text);
     }
   }
 
   private async checkTemperatures(disks: NmdDisk[]): Promise<void> {
     const settings = await this.settings.get();
     // Deliberately no separate "is temp watching on" gate — this always evaluates, same as every
-    // other monitored condition here (parity, SMART, etc). notifyEvent's own eventTypes.tempAlert
-    // check is the one on/off switch, matching how every other event in the catalog works.
+    // other monitored condition here (parity, SMART, etc). notifyEvent's own eventTypes.tempAlertCpu/
+    // tempAlertDisk checks are the on/off switches, matching how every other event in the catalog works.
     const { cpuWarnAboveCelsius, diskWarnAboveCelsius } = settings.tempAlerts;
 
-    this.checkOneTemp('cpu', 'CPU', readCpuTempCelsius(), cpuWarnAboveCelsius);
+    this.checkOneTemp('cpu', 'CPU', readCpuTempCelsius(), cpuWarnAboveCelsius, 'tempAlertCpu');
 
     const devices = disks.filter((d) => d.device && d.device !== 'none').map((d) => d.device);
     if (devices.length === 0) return;
@@ -204,7 +205,7 @@ export class ActivityWatcher {
     }
     for (const disk of disks) {
       if (!disk.device || disk.device === 'none') continue;
-      this.checkOneTemp(disk.device, `Disk ${disk.slot} (${diskLabel(disk)})`, temps[disk.device] ?? null, diskWarnAboveCelsius);
+      this.checkOneTemp(disk.device, `Disk ${disk.slot} (${diskLabel(disk)})`, temps[disk.device] ?? null, diskWarnAboveCelsius, 'tempAlertDisk');
     }
   }
 }

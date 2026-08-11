@@ -4,7 +4,8 @@ export type NotificationEventType =
   | 'smartFailed'
   | 'parityErrors'
   | 'backupFailed'
-  | 'tempAlert'
+  | 'tempAlertCpu'
+  | 'tempAlertDisk'
   | 'diskAdded'
   | 'arrayReconfigured'
   | 'parityStarted'
@@ -40,7 +41,8 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { id: 'backupFailed', label: 'Scheduled backup failed', severity: 'high', defaultEnabled: true },
   { id: 'cacheMirrorDegraded', label: 'Cache mirror degraded', severity: 'high', defaultEnabled: true },
   { id: 'cacheMoverFailed', label: 'Cache mover failed', severity: 'high', defaultEnabled: true },
-  { id: 'tempAlert', label: 'Temperature alert', severity: 'medium', defaultEnabled: true },
+  { id: 'tempAlertCpu', label: 'CPU temperature alert', severity: 'medium', defaultEnabled: true },
+  { id: 'tempAlertDisk', label: 'Disk temperature alert', severity: 'medium', defaultEnabled: true },
   { id: 'diskAdded', label: 'Disk added or replaced', severity: 'medium', defaultEnabled: true },
   { id: 'arrayReconfigured', label: 'Array reconfigured (disk dropped)', severity: 'medium', defaultEnabled: true },
   { id: 'parityStarted', label: 'Parity check started', severity: 'low', defaultEnabled: false },
