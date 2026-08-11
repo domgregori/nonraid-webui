@@ -1,5 +1,5 @@
 import { COLORS, tint } from '../styles/colors';
-import type { NmdStatusResponse } from '../types/nmdApi';
+import type { NmdDisk, NmdStatusResponse } from '../types/nmdApi';
 
 // Per-slot explanation shown in the "why is the array degraded" dialog — keyed on the driver's own
 // raw disk status string. Deliberately not the same wording as selectors/disks.ts's short
@@ -39,6 +39,20 @@ export interface DegradedReason {
   startParityCheck?: boolean;
 }
 
+// resync.action is a raw driver token like "recon D1" (rebuilding data slot 1), "recon P"/"recon Q"
+// (rebuilding a parity disk), or "clear D1" (zeroing a newly-added disk before it joins) — confirmed
+// against tools/nmdctl's format_resync_action(). Matched here so a disk mid-rebuild, which reports a
+// transient DISK_INVALID/DISK_NEW status until the rebuild finishes, isn't reported as if it were a
+// real problem needing reconnection — confirmed live: adding a fresh disk to fill a missing slot
+// shows exactly this transient DISK_INVALID state for the whole rebuild.
+function isResyncTarget(status: NmdStatusResponse, disk: NmdDisk): boolean {
+  if (!status.resync.active) return false;
+  const match = status.resync.action.trim().match(/^(?:recon|clear)\s+(D(\d+)|P|Q)$/);
+  if (!match) return false;
+  if (match[2]) return disk.type !== 'P' && disk.type !== 'Q' && disk.slot === Number(match[2]);
+  return disk.type === match[1];
+}
+
 /**
  * Explains, per-cause, why isDegraded() is currently true — read directly from per-disk status and
  * array counters rather than the driver's own `health.details` string, since that string bundles in
@@ -47,9 +61,14 @@ export interface DegradedReason {
  */
 export function deriveDegradedReasons(status: NmdStatusResponse): DegradedReason[] {
   const reasons: DegradedReason[] = [];
+  let rebuildingLabel: string | null = null;
 
   for (const disk of status.disks) {
     const label = disk.type === 'P' ? 'Parity 1' : disk.type === 'Q' ? 'Parity 2' : `Disk ${disk.slot}`;
+    if (isResyncTarget(status, disk)) {
+      rebuildingLabel = label;
+      continue;
+    }
     if (disk.status !== 'DISK_OK') {
       const known = DISK_ISSUE_DETAIL[disk.status];
       reasons.push({
@@ -78,10 +97,10 @@ export function deriveDegradedReasons(status: NmdStatusResponse): DegradedReason
     });
   }
 
-  if (status.resync.active && status.array.counters.replaced > 0) {
+  if (rebuildingLabel) {
     reasons.push({
       key: 'rebuilding',
-      title: 'Rebuilding a replaced disk from parity',
+      title: `Rebuilding ${rebuildingLabel} from parity`,
       detail: `In progress — ${Math.round(status.resync.progress_percent)}% complete. The array stays degraded until this finishes.`,
     });
   }
