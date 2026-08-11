@@ -112,10 +112,9 @@ export function SettingsPage() {
   const [paritySchedHour, setParitySchedHour] = useState(2);
   const [paritySchedSaving, setParitySchedSaving] = useState(false);
 
-  const [tempAlertsEnabled, setTempAlertsEnabled] = useState(false);
-  const [tempAlertsThresholdDraft, setTempAlertsThresholdDraft] = useState('');
-  const [tempAlertsSaving, setTempAlertsSaving] = useState(false);
-  const [tempAlertsError, setTempAlertsError] = useState<string | null>(null);
+  const [tempThresholdDraft, setTempThresholdDraft] = useState('');
+  const [tempThresholdSaving, setTempThresholdSaving] = useState(false);
+  const [tempThresholdError, setTempThresholdError] = useState<string | null>(null);
 
   const [cacheEnabled, setCacheEnabled] = useState(false);
   const [cacheEnabledSaving, setCacheEnabledSaving] = useState(false);
@@ -167,7 +166,7 @@ export function SettingsPage() {
   const appriseInitialized = useRef(false);
   const minFreeSpaceInitialized = useRef(false);
   const paritySchedInitialized = useRef(false);
-  const tempAlertsInitialized = useRef(false);
+  const tempThresholdInitialized = useRef(false);
   const backupSchedInitialized = useRef(false);
   const cacheInitialized = useRef(false);
   const hostnameInitialized = useRef(false);
@@ -225,10 +224,9 @@ export function SettingsPage() {
   }, [settings]);
 
   useEffect(() => {
-    if (settings && !tempAlertsInitialized.current) {
-      setTempAlertsEnabled(settings.tempAlerts.enabled);
-      setTempAlertsThresholdDraft(String(settings.tempAlerts.warnAboveCelsius));
-      tempAlertsInitialized.current = true;
+    if (settings && !tempThresholdInitialized.current) {
+      setTempThresholdDraft(String(settings.tempAlerts.warnAboveCelsius));
+      tempThresholdInitialized.current = true;
     }
   }, [settings]);
 
@@ -389,16 +387,16 @@ export function SettingsPage() {
     setParitySchedSaving(false);
   };
 
-  const saveTempAlerts = async () => {
-    const value = Number(tempAlertsThresholdDraft);
+  const saveTempThreshold = async () => {
+    const value = Number(tempThresholdDraft);
     if (!Number.isFinite(value) || value < 0 || value > 100) {
-      setTempAlertsError('Enter a temperature between 0 and 100°C.');
+      setTempThresholdError('Enter a temperature between 0 and 100°C.');
       return;
     }
-    setTempAlertsSaving(true);
-    setTempAlertsError(null);
-    await update({ tempAlerts: { enabled: tempAlertsEnabled, warnAboveCelsius: value } });
-    setTempAlertsSaving(false);
+    setTempThresholdSaving(true);
+    setTempThresholdError(null);
+    await update({ tempAlerts: { warnAboveCelsius: value } });
+    setTempThresholdSaving(false);
   };
 
   const saveBackupSchedule = async () => {
@@ -950,7 +948,33 @@ export function SettingsPage() {
           <div className="toggle-row__desc" style={{ marginBottom: 8 }}>
             Grouped by severity — saves each toggle immediately.
           </div>
-          <NotificationEventToggles eventTypes={eventTypesDraft} onChange={toggleEventType} disabled={!settings} />
+          <NotificationEventToggles
+            eventTypes={eventTypesDraft}
+            onChange={toggleEventType}
+            disabled={!settings}
+            renderExtra={(eventId) =>
+              eventId === 'tempAlert' ? (
+                <div className="settings-field__row" style={{ flexShrink: 0 }}>
+                  <input
+                    className="history-input"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={tempThresholdDraft}
+                    onChange={(e) => setTempThresholdDraft(e.target.value)}
+                    disabled={!settings}
+                    style={{ width: 70 }}
+                  />
+                  <span className="toggle-row__desc">°C</span>
+                  <button type="button" className="btn" disabled={tempThresholdSaving || !settings} onClick={saveTempThreshold}>
+                    {tempThresholdSaving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              ) : null
+            }
+          />
+          {tempThresholdError && <div className="status-note status-note--error">{tempThresholdError}</div>}
         </div>
 
         <div className="settings-field toggle-row--bordered">
@@ -980,35 +1004,6 @@ export function SettingsPage() {
           {testResult && <div className="status-note">{testResult}</div>}
           {testError && <div className="status-note status-note--error">{testError}</div>}
         </div>
-
-        <div className="toggle-row toggle-row--bordered">
-          <div>
-            <div className="toggle-row__title">Temperature alerts</div>
-            <div className="toggle-row__desc">
-              Notify when the CPU or any array disk reaches this temperature. Fires once when it's crossed, not on
-              every check while it stays high.
-            </div>
-          </div>
-          <div className="settings-field__row" style={{ flexShrink: 0 }}>
-            <input
-              className="history-input"
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={tempAlertsThresholdDraft}
-              onChange={(e) => setTempAlertsThresholdDraft(e.target.value)}
-              disabled={!settings}
-              style={{ width: 70 }}
-            />
-            <span className="toggle-row__desc">°C</span>
-            <button type="button" className="btn" disabled={tempAlertsSaving || !settings} onClick={saveTempAlerts}>
-              {tempAlertsSaving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-          <ToggleSwitch on={tempAlertsEnabled} onToggle={() => setTempAlertsEnabled((v) => !v)} label="Temperature alerts" disabled={!settings} />
-        </div>
-        {tempAlertsError && <div className="status-note status-note--error">{tempAlertsError}</div>}
       </div>
 
       <div className={`settings-card${activeSection === 'security' ? '' : ' settings-hidden'}`}>

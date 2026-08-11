@@ -187,7 +187,9 @@ export class ActivityWatcher {
 
   private async checkTemperatures(disks: NmdDisk[]): Promise<void> {
     const settings = await this.settings.get();
-    if (!settings.tempAlerts.enabled) return;
+    // Deliberately no separate "is temp watching on" gate — this always evaluates, same as every
+    // other monitored condition here (parity, SMART, etc). notifyEvent's own eventTypes.tempAlert
+    // check is the one on/off switch, matching how every other event in the catalog works.
     const threshold = settings.tempAlerts.warnAboveCelsius;
 
     this.checkOneTemp('cpu', 'CPU', readCpuTempCelsius(), threshold);

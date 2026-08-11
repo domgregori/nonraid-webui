@@ -34,10 +34,13 @@ export interface BackupSchedule extends RecurringSchedule {
 export type CacheSchedule = RecurringSchedule;
 
 export interface TempAlertSettings {
-  enabled: boolean;
   // Single shared threshold for both CPU package temp and disk SMART temps —
   // simpler than per-device tuning, and this project has no per-device UI
-  // for it elsewhere either.
+  // for it elsewhere either. Whether this actually notifies is controlled
+  // by notifications.eventTypes.tempAlert (see notificationCatalog.ts) —
+  // deliberately no separate enabled flag here anymore: temperature
+  // watching itself always runs, same as every other monitored condition
+  // in this app, and the catalog toggle is the one on/off switch users see.
   warnAboveCelsius: number;
 }
 

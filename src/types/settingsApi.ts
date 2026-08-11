@@ -52,7 +52,6 @@ export interface BackupSchedule extends RecurringSchedule {
 export type CacheSchedule = RecurringSchedule;
 
 export interface TempAlertSettings {
-  enabled: boolean;
   warnAboveCelsius: number;
 }
 

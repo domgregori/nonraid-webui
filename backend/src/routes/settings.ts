@@ -84,10 +84,7 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
         }
       }
       if (patch.tempAlerts) {
-        const { enabled, warnAboveCelsius } = patch.tempAlerts;
-        if ('enabled' in patch.tempAlerts && typeof enabled !== 'boolean') {
-          throw new Error('tempAlerts.enabled must be a boolean.');
-        }
+        const { warnAboveCelsius } = patch.tempAlerts;
         if (
           'warnAboveCelsius' in patch.tempAlerts &&
           (typeof warnAboveCelsius !== 'number' || !Number.isFinite(warnAboveCelsius) || warnAboveCelsius < 0 || warnAboveCelsius > 100)

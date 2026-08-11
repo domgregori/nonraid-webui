@@ -10,7 +10,7 @@ const DEFAULTS: AppSettings = {
   minFreeSpaceMb: 100,
   paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2 },
   backupSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3, destDir: '', retain: 7 },
-  tempAlerts: { enabled: false, warnAboveCelsius: 55 },
+  tempAlerts: { warnAboveCelsius: 55 },
   lxcStorage: { mode: 'boot', diskSlot: null },
   cache: { enabled: false, fsUuid: null },
   cacheSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3 },
