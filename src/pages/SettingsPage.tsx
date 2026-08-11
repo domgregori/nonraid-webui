@@ -581,12 +581,11 @@ export function SettingsPage() {
         ) : (
           stats.networkInterfaces.map((iface, i) => (
             <div key={iface.name} className={`toggle-row${i > 0 ? ' toggle-row--bordered' : ''}`}>
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
                 <div className="toggle-row__title">{iface.name}</div>
-                <div className="toggle-row__desc toggle-row__desc--mono">
-                  {[...iface.ipv4, ...iface.ipv6].join(', ') || '—'}
-                  {iface.mac ? ` · ${iface.mac}` : ''}
-                </div>
+                <InfoRow label="IPv4" value={iface.ipv4.join(', ') || '—'} mono />
+                <InfoRow label="IPv6" value={iface.ipv6.join(', ') || '—'} mono />
+                <InfoRow label="MAC" value={iface.mac ?? '—'} mono />
               </div>
             </div>
           ))
