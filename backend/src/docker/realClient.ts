@@ -375,7 +375,17 @@ export class RealDockerClient implements DockerClient {
       },
     });
     onProgress?.({ phase: 'starting', message: 'Starting container', percent: null });
-    await container.start();
+    try {
+      await container.start();
+    } catch (err) {
+      // dockerode's create() can succeed (e.g. a bad NetworkMode isn't checked until start)
+      // and leave a container object registered but never running — confirmed live with a
+      // nonexistent network name, where retrying Start failed identically forever since the
+      // bad config is baked in at create time. Remove it so the name is free again and the
+      // failure doesn't linger as an unusable, unlabeled "Created" container.
+      await container.remove({ force: true }).catch(() => {});
+      throw err;
+    }
     return { ok: true, message: `Container "${options.name}" created and started` };
   }
 }
