@@ -107,4 +107,4 @@ echo
 systemctl status nonraid-webui --no-pager || true
 echo
 log "Done. Visit http://<this-host>:3001/ — first boot shows the admin account setup screen."
-log "Reminder: [auth] cookie_secure must be set to true in /etc/nonraid/config.toml once real TLS exists in front of this host, or login will break outright once it does."
+log "Reminder: HTTPS can be enabled from Settings -> Security once you're ready — the session cookie's Secure flag auto-flips at boot once this app's own TLS is enabled, no manual config.toml edit needed."
