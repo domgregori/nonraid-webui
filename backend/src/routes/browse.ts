@@ -2,6 +2,8 @@ import { unlink } from 'node:fs/promises';
 import os from 'node:os';
 import { Router, type Response } from 'express';
 import multer from 'multer';
+import { suggestDirectories } from '../browse/suggest.js';
+import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { BrowseService } from '../browse/service.js';
 
@@ -33,6 +35,22 @@ export function browseRouter(browse: BrowseService): Router {
   router.get('/browse', async (req, res) => {
     try {
       res.json(await browse.list(queryPath(req)));
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Directory-name completion for any host-path textbox site-wide. `scope`
+  // picks which root set the caller is actually allowed to write into later —
+  // "binds" (config.appsBindRoots, /mnt/user by default) for Docker/Apps bind
+  // mounts, "browse" (config.browseRoot, /mnt) for anything reachable from
+  // the file browser itself (backup destination, Browse page's move dialog).
+  // Never a client-supplied root — only these two known-safe scopes.
+  router.get('/browse/suggest', async (req, res) => {
+    try {
+      const roots = req.query.scope === 'binds' ? config.appsBindRoots : [config.browseRoot];
+      const suggestions = await suggestDirectories(queryPath(req), roots);
+      res.json({ suggestions });
     } catch (err) {
       handleError(err, res);
     }

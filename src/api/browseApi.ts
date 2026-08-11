@@ -1,6 +1,8 @@
 import { API_BASE_URL } from './config';
 import { request } from './request';
-import type { BrowseCommandResult, BrowseListing } from '../types/browseApi';
+import type { BrowseCommandResult, BrowseListing, PathSuggestions } from '../types/browseApi';
+
+export type PathSuggestScope = 'browse' | 'binds';
 
 function withPath(base: string, path: string): string {
   const qs = path ? `?path=${encodeURIComponent(path)}` : '';
@@ -25,6 +27,9 @@ export const browseApi = {
   move: (path: string, destPath: string) => request<BrowseCommandResult>('/api/browse/move', jsonInit({ path, destPath })),
 
   remove: (path: string) => request<BrowseCommandResult>(withPath('/api/browse', path), { method: 'DELETE' }),
+
+  suggest: (path: string, scope: PathSuggestScope) =>
+    request<PathSuggestions>(`/api/browse/suggest?path=${encodeURIComponent(path)}&scope=${scope}`),
 
   upload: async (path: string, files: FileList | File[]): Promise<{ ok: boolean; results: BrowseCommandResult[] }> => {
     const form = new FormData();

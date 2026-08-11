@@ -18,3 +18,7 @@ export interface BrowseCommandResult {
   ok: boolean;
   message: string;
 }
+
+export interface PathSuggestions {
+  suggestions: string[];
+}

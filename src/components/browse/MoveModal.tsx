@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PathAutocomplete } from '../shared/PathAutocomplete';
 import type { BrowseEntry } from '../../types/browseApi';
 
 interface MoveModalProps {
@@ -36,11 +37,10 @@ export function MoveModal({ entry, currentPath, onCancel, onSubmit }: MoveModalP
         <form onSubmit={handleSubmit} className="dialog__body">
           <label className="form-field">
             <span className="form-field__label">Destination folder (absolute path under /mnt)</span>
-            <input
-              className="history-input"
-              style={{ width: '100%' }}
+            <PathAutocomplete
+              scope="browse"
               value={destPath}
-              onChange={(e) => setDestPath(e.target.value)}
+              onChange={setDestPath}
               placeholder="e.g. /mnt/user/photos/2024"
               autoFocus
             />

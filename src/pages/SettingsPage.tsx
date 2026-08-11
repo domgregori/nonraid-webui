@@ -14,6 +14,7 @@ import { ServicesSection } from '../components/settings/ServicesSection';
 import { StorageLocationField } from '../components/settings/StorageLocationField';
 import { TlsSection } from '../components/settings/TlsSection';
 import { TwoFactorSection } from '../components/settings/TwoFactorSection';
+import { PathAutocomplete } from '../components/shared/PathAutocomplete';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
 import { useSettings } from '../hooks/useSettings';
 import { useSystemStats } from '../hooks/useSystemStats';
@@ -894,11 +895,10 @@ export function SettingsPage() {
             Destination directory
           </div>
           <div className="settings-field__row">
-            <input
-              className="history-input"
-              style={{ width: '100%' }}
+            <PathAutocomplete
+              scope="browse"
               value={backupDestDirDraft}
-              onChange={(e) => setBackupDestDirDraft(e.target.value)}
+              onChange={setBackupDestDirDraft}
               placeholder="/mnt/user/backups"
               disabled={!settings}
             />

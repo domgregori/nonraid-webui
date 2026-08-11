@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { appsApi } from '../../api/appsApi';
 import { InstallProgress } from '../docker/InstallProgress';
 import { installButtonLabel, useInstallProgress } from '../../hooks/useInstallProgress';
+import { PathAutocomplete } from '../shared/PathAutocomplete';
 import type { CaApp, CaConfigEntry, InstallOverrides, InstallPlan } from '../../types/appsApi';
 
 interface InstallDialogProps {
@@ -375,6 +376,13 @@ function ConfigField({ entry, value, onChange, plan, locked }: ConfigFieldProps)
       </span>
       {locked ? (
         <div className="form-field__value">{masked ? '••••••••' : value || '—'}</div>
+      ) : attrs.Type === 'Path' ? (
+        <PathAutocomplete
+          scope="binds"
+          className={`history-input${fieldError ? ' apps-field--error' : ''}`}
+          value={value}
+          onChange={(v) => onChange(attrs.Target, v)}
+        />
       ) : (
         <input
           className={`history-input${fieldError ? ' apps-field--error' : ''}`}

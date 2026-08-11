@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { dockerApi } from '../../api/dockerApi';
 import { installButtonLabel, useInstallProgress } from '../../hooks/useInstallProgress';
+import { PathAutocomplete } from '../shared/PathAutocomplete';
 import type {
   ContainerDeviceMapping,
   ContainerEnvVar,
@@ -371,12 +372,13 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                 const issue = plan?.binds[i] && !plan.binds[i].allowed;
                 return (
                   <div className="container-form-row" key={i}>
-                    <input
+                    <PathAutocomplete
+                      scope="binds"
                       className={`history-input${issue ? ' apps-field--error' : ''}`}
                       placeholder="Host path"
                       value={b.hostPath}
-                      onChange={(e) => {
-                        setBinds(updateAt(binds, i, { hostPath: e.target.value }));
+                      onChange={(v) => {
+                        setBinds(updateAt(binds, i, { hostPath: v }));
                         invalidate();
                       }}
                     />
