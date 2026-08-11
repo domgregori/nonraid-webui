@@ -255,12 +255,20 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                   {p.hostPort} → {p.containerPort}/{p.protocol}
                 </div>
               )}
+              renderHeader={
+                ports.length > 0 ? (
+                  <div className="container-form-row container-form-row--header">
+                    <span className="apps-field__hint">Container port — what the app listens on inside</span>
+                    <span className="apps-field__hint">Host port — what you'll actually browse to</span>
+                  </div>
+                ) : null
+              }
               renderRow={(p, i) => (
                 <div className="container-form-row" key={i}>
                   <input
                     className="history-input"
                     type="number"
-                    placeholder="Container port"
+                    placeholder="e.g. 80"
                     value={p.containerPort || ''}
                     onChange={(e) => {
                       setPorts(updateAt(ports, i, { containerPort: Number(e.target.value) }));
@@ -270,7 +278,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                   <input
                     className="history-input"
                     type="number"
-                    placeholder="Host port"
+                    placeholder="e.g. 8080"
                     value={p.hostPort || ''}
                     onChange={(e) => {
                       setPorts(updateAt(ports, i, { hostPort: Number(e.target.value) }));
@@ -535,9 +543,10 @@ interface ListFieldProps<T> {
   onAdd: () => void;
   renderRow: (item: T, index: number) => ReactNode;
   renderLocked: (item: T, index: number) => ReactNode;
+  renderHeader?: ReactNode;
 }
 
-function ListField<T>({ label, locked, items, onAdd, renderRow, renderLocked }: ListFieldProps<T>) {
+function ListField<T>({ label, locked, items, onAdd, renderRow, renderLocked, renderHeader }: ListFieldProps<T>) {
   return (
     <div className="form-field">
       <span className="form-field__label">{label}</span>
@@ -545,6 +554,7 @@ function ListField<T>({ label, locked, items, onAdd, renderRow, renderLocked }: 
         <div className="form-field__value">{items.length === 0 ? '—' : items.map((item, i) => renderLocked(item, i))}</div>
       ) : (
         <>
+          {renderHeader}
           {items.map((item, i) => renderRow(item, i))}
           <button type="button" className="container-form-list__add" onClick={onAdd}>
             + Add

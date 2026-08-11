@@ -82,6 +82,15 @@
   min-width: 0;
 }
 
+.container-form-row--header {
+  margin-bottom: 4px;
+}
+
+.container-form-row--header .apps-field__hint {
+  flex: 1;
+  min-width: 0;
+}
+
 .container-form-row__checkbox {
   display: flex;
   align-items: center;
