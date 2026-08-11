@@ -29,6 +29,7 @@ import { cacheRouter } from './routes/cache.js';
 import { disksRouter } from './routes/disks.js';
 import { dockerRouter } from './routes/docker.js';
 import { emptyDiskRouter } from './routes/emptyDisk.js';
+import { logsRouter } from './routes/logs.js';
 import { lxcRouter } from './routes/lxc.js';
 import { metricsRouter } from './routes/metrics.js';
 import { parityRouter } from './routes/parity.js';
@@ -168,6 +169,7 @@ async function main() {
   app.use('/api', cacheRouter(cache, cacheMover, settingsStore, activity, shares));
   app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity, nmd, cache));
   app.use('/api', lxcRouter(lxc, activity, nmd, settingsStore, cache));
+  app.use('/api', logsRouter());
   app.use('/api', metricsRouter(metrics));
   app.use('/api', smartRouter(nmd, smart, system));
   app.use('/api', sharesRouter(shares));

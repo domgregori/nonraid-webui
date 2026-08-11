@@ -7,6 +7,7 @@ import { nmdApi } from '../api/nmdApi';
 import { settingsApi } from '../api/settingsApi';
 import { systemApi } from '../api/systemApi';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
+import { LogsSection } from '../components/settings/LogsSection';
 import { NotificationEventToggles } from '../components/settings/NotificationEventToggles';
 import { PasskeySection } from '../components/settings/PasskeySection';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
@@ -32,6 +33,7 @@ const SECTIONS = [
   { id: 'cache', label: 'Cache' },
   { id: 'docker-lxc', label: 'Docker & LXC Storage' },
   { id: 'services', label: 'Services' },
+  { id: 'logs', label: 'System Logs' },
   { id: 'parity', label: 'Parity' },
   { id: 'import', label: 'Import from Unraid' },
   { id: 'shares', label: 'Shares' },
@@ -799,6 +801,11 @@ export function SettingsPage() {
       <div className={`settings-card${activeSection === 'services' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Services</div>
         <ServicesSection />
+      </div>
+
+      <div className={`settings-card${activeSection === 'logs' ? '' : ' settings-hidden'}`}>
+        <div className="settings-card__title">System Logs</div>
+        <LogsSection active={activeSection === 'logs'} />
       </div>
 
       <div className={`settings-card${activeSection === 'parity' ? '' : ' settings-hidden'}`}>
