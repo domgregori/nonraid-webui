@@ -56,8 +56,8 @@ function isResyncTarget(status: NmdStatusResponse, disk: NmdDisk): boolean {
 /**
  * Explains, per-cause, why isDegraded() is currently true — read directly from per-disk status and
  * array counters rather than the driver's own `health.details` string, since that string bundles in
- * the harmless permanent second-parity placeholder noise isPhantomSecondParityGlitch works around
- * (see its own comment) and isn't actionable UI copy anyway.
+ * the harmless stale-counter noise isPhantomDegradedGlitch works around (see its own comment) and
+ * isn't actionable UI copy anyway.
  */
 export function deriveDegradedReasons(status: NmdStatusResponse): DegradedReason[] {
   const reasons: DegradedReason[] = [];
@@ -115,31 +115,25 @@ export function deriveDegradedReasons(status: NmdStatusResponse): DegradedReason
 }
 
 /**
- * A single-parity array's unused second-parity (Q) slot is permanently counted
- * as "invalid" + "disabled" by the driver's internal state (nmdctl's own status
- * output even warns about this: "Driver internal state is inconsistent ... but
- * all individual disks are DISK_OK status"). That makes nmdctl report DEGRADED
- * even when every real disk and parity are fine. Recognize that specific,
- * harmless pattern so the dashboard doesn't cry wolf.
+ * The driver's own health.status/counters aren't trustworthy as ground truth for whether the array
+ * actually has a problem — confirmed two different ways live: a single-parity array's unused
+ * second-parity (Q) slot is permanently counted as "invalid" + "disabled" (nmdctl's own status
+ * output even warns "Driver internal state is inconsistent ... but all individual disks are
+ * DISK_OK status"), and separately, a plain Unassign-then-Restore-before-Start cycle (2026-08-11)
+ * left counters.missing stuck at 1 with every disk genuinely DISK_OK afterward — no Add Disk or
+ * repeat-slot involved, just stale internal state Reload Driver clears. Per-disk status and
+ * sync_errors are what the rest of deriveDegradedReasons() below keys off, so trust those instead:
+ * if every disk is DISK_OK and there are no recorded parity mismatches, there's no real problem,
+ * regardless of what the aggregate counters claim. A disk that's genuinely missing, wrong, invalid,
+ * etc. always reports a non-DISK_OK status of its own, so this can't mask a real fault.
  */
-function isPhantomSecondParityGlitch(status: NmdStatusResponse): boolean {
-  const { counters, size } = status.array;
-  return (
-    !size.has_second_parity &&
-    counters.missing === 0 &&
-    counters.wrong === 0 &&
-    counters.replaced === 0 &&
-    counters.new === 0 &&
-    counters.invalid <= 1 &&
-    counters.disabled <= 1 &&
-    status.disks.every((d) => d.status === 'DISK_OK')
-  );
+function isPhantomDegradedGlitch(status: NmdStatusResponse): boolean {
+  return status.array.counters.sync_errors === 0 && status.disks.every((d) => d.status === 'DISK_OK');
 }
 
 export function isDegraded(status: NmdStatusResponse): boolean {
-  if (status.array.counters.missing > 0) return true;
   if (status.array.health.status !== 'DEGRADED') return false;
-  return !isPhantomSecondParityGlitch(status);
+  return !isPhantomDegradedGlitch(status);
 }
 
 // The kernel driver itself bakes this prefix into the state name for the
