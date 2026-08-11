@@ -109,6 +109,7 @@ export function ImportArrayWizard({ onClose }: ImportArrayWizardProps) {
               <input
                 ref={fileInputRef}
                 type="file"
+                className="file-input"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleFileSelected(file);

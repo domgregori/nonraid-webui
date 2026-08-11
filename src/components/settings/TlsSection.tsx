@@ -200,8 +200,8 @@ export function TlsSection() {
           Certificate file (.pem, .crt, .cer)
           <input
             type="file"
+            className="file-input"
             accept=".pem,.crt,.cer"
-            style={{ display: 'block', marginTop: 4 }}
             onChange={(e) => {
               setCertFile(e.target.files?.[0] ?? null);
               setPreview(null);
@@ -213,8 +213,8 @@ export function TlsSection() {
           Private key file (.pem, .key)
           <input
             type="file"
+            className="file-input"
             accept=".pem,.key"
-            style={{ display: 'block', marginTop: 4 }}
             onChange={(e) => {
               setKeyFile(e.target.files?.[0] ?? null);
               setPreview(null);
