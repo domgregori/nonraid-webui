@@ -329,4 +329,38 @@ apart.
   proving the correction genuinely took (not just a counter reset) — cancelled
   the check afterward rather than waiting out the remaining ~2h. Pill
   returned to STARTED, `Last check: completed, 0 errors`.
-- **Scenarios 3–4**: not yet run.
+- **Scenario 3 — Multiple simultaneous reasons**: PASS, with one honest
+  deviation from the exact resolution order the plan described. Setup: reused
+  Scenario 2's method to get a *settled* (non-running, uncorrected)
+  `sync_errors: 1024` on Disk 1 — corrupt, run a correcting check, cancel it
+  the moment it crosses the corrupted offset (via a direct
+  `POST /api/parity/cancel` call, since the frontend hit its intermittent
+  "Loading array status…" stall on navigate right when timing mattered most;
+  confirmed via `GET /api/status` that this was a pure frontend rendering
+  stall, not a backend issue, unrelated to this session's other fix).
+  Then, separately, stopped the array and unassigned Disk 3 (a different
+  disk than the corrupted one), and started the array with both conditions
+  live.
+  **Dialog showed both reasons as independent cards**, exactly as expected:
+  *"Disk 3: Disabled, unassigned"* (View Disk button) and *"Parity out of
+  sync — 1024 errors found"* (Start Correcting Parity Check button) — not
+  merged, both fully visible and independently actionable.
+  Resolved Disk 3 first via View Disk → (array stopped) → Unassigned Devices
+  → Add to Array → slot 3 → Add Disk, same UI-only path as Scenario 1.
+  Reopening the dialog after the rebuild started showed **only one remaining
+  reason**, *"Rebuilding Disk 3 from parity"* — the sync-errors card was
+  gone too, not because it was hidden or merged with the other reason, but
+  because starting *any* resync (a rebuild here, same as a fresh parity
+  check in Scenario 2) resets the live `sync_errors` counter until it's
+  re-evaluated — the same counter-reset behavior already confirmed in
+  Scenario 2, just triggered by a different action this time. This is a
+  legitimate deviation from the plan's assumed "resolve one, the other still
+  shows on its own" resolution order (that property was still demonstrated —
+  just at the initial-display stage, not after this particular fix), not a
+  bug: the two reasons really were independent and additive when both were
+  live; one repair action happening to reset an unrelated counter is real
+  driver behavior, not a dialog defect. Left the rebuild running in the
+  background afterward (a real, wanted repair, not test-only state) rather
+  than waiting out its ~1h15m ETA — Scenario 1 already covers the
+  rebuild-completes-cleanly tail end.
+- **Scenario 4**: not yet run.
