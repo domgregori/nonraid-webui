@@ -195,7 +195,7 @@ export function TlsSection() {
         Import a certificate
       </div>
       <div className="toggle-row__desc">A real CA-issued certificate, or one produced by an ACME client run elsewhere.</div>
-      <div className="settings-field__row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+      <div className="settings-field__row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4, paddingTop: 10 }}>
         <label className="form-field__label form-field__label--strong" style={{ display: 'block' }}>
           Certificate file (.pem, .crt, .cer)
           <input
@@ -209,7 +209,7 @@ export function TlsSection() {
             disabled={!!reconnecting}
           />
         </label>
-        <label className="form-field__label form-field__label--strong" style={{ display: 'block' }}>
+        <label className="form-field__label form-field__label--strong" style={{ display: 'block', paddingTop: 10 }}>
           Private key file (.pem, .key)
           <input
             type="file"
@@ -224,7 +224,13 @@ export function TlsSection() {
         </label>
       </div>
       <div className="settings-field__row">
-        <button type="button" className="btn" disabled={previewing || !certFile || !keyFile || !!reconnecting} onClick={previewImport}>
+        <button
+          type="button"
+          className="btn"
+          style={{ paddingTop: 10 }}
+          disabled={previewing || !certFile || !keyFile || !!reconnecting}
+          onClick={previewImport}
+        >
           {previewing ? 'Checking…' : 'Preview'}
         </button>
       </div>
