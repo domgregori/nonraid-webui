@@ -170,8 +170,23 @@ export function deriveArrayStatus(status: NmdStatusResponse | null) {
   } else if (isDegraded(status)) {
     text = 'DEGRADED';
     color = COLORS.red;
-  } else if (status.resync.active) {
-    text = 'PARITY CHECK';
+  } else if (status.resync.active || status.resync.pending) {
+    // resync.active/pending both cover a real parity check AND every other resync the driver runs
+    // through the same fields — see isResyncTarget's own comment above for the confirmed grammar:
+    // "recon D<n>" rebuilds a data disk (e.g. after Replace/Restore), "recon P"/"recon Q" (re)builds
+    // parity itself (this is what the very first parity build after adding a disk reports — the
+    // single most common resync this app ever runs), "clear D<n>" zeroes a newly-added disk, and
+    // only "check" is an actual parity check/verify. Confirmed live: the pill showed "PARITY CHECK"
+    // throughout an initial parity build and a disk clear, neither of which is one.
+    //
+    // pending without active means something's queued to run but hasn't actually started yet —
+    // e.g. the moment between startArray() succeeding and parityCheck() kicking it off, or (before
+    // this session's superblock persistence fix) a resync stuck forever unable to run at all.
+    // Falling through to a plain green STARTED here would hide exactly that stuck case behind a
+    // "everything's fine" label.
+    const base = status.resync.action.trim().split(/\s+/)[0]?.toLowerCase();
+    const label = base === 'clear' ? 'CLEARING' : base === 'recon' ? 'REBUILDING' : 'PARITY CHECK';
+    text = status.resync.active ? label : `${label} PENDING`;
     color = COLORS.amber;
   } else {
     text = 'STARTED';
