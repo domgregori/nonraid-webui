@@ -166,6 +166,20 @@ cp "$BACKEND_DIR/package.json" "$BACKEND_DIR/package-lock.json" "$INSTALL_ROOT/b
 
 rsync -a --delete "$REPO_ROOT/dist/" "$INSTALL_ROOT/frontend-dist/"
 
+# This whole script runs as root (see the check at the top), so every file staged above — including
+# rsync -a's ownership, preserved from $BACKEND_DIR/$REPO_ROOT's own build output — ends up
+# root:root. nonraid-webui.service runs as root too (it shells out to nmdctl/docker/mount, which
+# need it) so that's never a problem for the running service itself, but it does mean the actual
+# human who ran this script can't rsync a later update into $INSTALL_ROOT without sudo — confirmed
+# live: a plain non-root rsync deploy after a fresh install failed with a wall of "Permission
+# denied"/"Operation not permitted" errors. Handing the staged tree to whoever actually ran the
+# script (via $SUDO_USER, set by sudo itself) fixes that; skipped when run as a genuine root login
+# with no SUDO_USER, since there's no more-appropriate non-root owner to hand off to in that case.
+if [ -n "${SUDO_USER:-}" ]; then
+  log "Handing $INSTALL_ROOT to $SUDO_USER (so future updates can be rsynced without sudo)"
+  chown -R "$SUDO_USER:$(id -gn "$SUDO_USER")" "$INSTALL_ROOT"
+fi
+
 log "Installing systemd unit"
 install -m 644 "$REPO_ROOT/tools/systemd/nonraid-webui.service" /etc/systemd/system/nonraid-webui.service
 
