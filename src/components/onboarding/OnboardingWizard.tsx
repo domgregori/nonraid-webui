@@ -157,7 +157,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
       <div className="onboarding__chrome">
         <div className="onboarding__brand">
           <img src="/logo.png" alt="" className="onboarding__brand-logo" />
-          <span className="onboarding__brand-title">nonraid setup</span>
+          <span className="onboarding__brand-title">NonRAID setup</span>
         </div>
         {step !== 'done' && (
           <button type="button" className="btn onboarding__skip" onClick={onFinish}>
@@ -252,7 +252,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
                 >
                   <span className="onboarding-choice__title">Import an existing array</span>
                   <span className="onboarding-choice__desc">
-                    From Unraid or a previous nonraid install — both save the same superblock file.
+                    From Unraid or a previous NonRAID install — both save the same superblock file.
                   </span>
                 </button>
                 <button

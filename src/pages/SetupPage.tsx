@@ -31,7 +31,7 @@ export function SetupPage() {
       <div className="auth-card card">
         <div className="auth-card__brand">
           <img src="/logo.png" alt="" className="auth-card__logo" />
-          <div className="auth-card__title">nonraid</div>
+          <div className="auth-card__title">NonRAID</div>
         </div>
         <div className="auth-card__subtitle">Create the admin account to finish setup. This is the only account for this dashboard.</div>
 

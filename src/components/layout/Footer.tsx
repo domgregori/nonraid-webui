@@ -1,7 +1,7 @@
 export function Footer() {
   return (
     <div className="footer">
-      Concept dashboard for nonraid / nmdctl. Unraid is a trademark of Lime Technology, Inc. — not affiliated.
+      NonRAID WebUI. NonRAID Kernel Github <a href='https://github.com/qvr/nonraid'>here</a>
     </div>
   );
 }
