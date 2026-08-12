@@ -1,0 +1,47 @@
+commit 6ccf41e8347174554c4822d426f5acbb1ec67bee
+Author: domgregori <dom.gregori@gmail.com>
+Date:   Wed Aug 12 19:36:27 2026 -0400
+
+    nmdctl: import_disks() can re-import a raw whole-disk slot after a stop/start
+    
+    find_partition() requires a child partition, so a disk assigned as a raw
+    whole device (no partition table -- the normal case for parity/data disks
+    added via add_disk()'s explicit SLOT:DEVICE path, which never partitions
+    anything) could never be automatically re-imported by a plain stop/start
+    cycle: the scan always reported "No partition found" and left the array
+    stuck at PARTIAL, even though the disk was perfectly healthy moments
+    before and still correctly located by serial via /dev/disk/by-id.
+    
+    Found live: restoring an older nonraid-webui config backup onto an array
+    built from raw disks left it unable to start at all after the restore.
+    
+    Falls back to the whole disk itself when find_partition() reports none
+    found (not the locked-by-another-process case, which still skips) --
+    exactly how add_disk() already treats a bare device with no partition, so
+    this isn't new behavior for the array, just extending the same handling to
+    the rescan path.
+
+diff --git a/tools/nmdctl b/tools/nmdctl
+index f3c7e4c..6404d5c 100755
+--- a/tools/nmdctl
++++ b/tools/nmdctl
+@@ -2309,6 +2309,19 @@ import_disks() {
+             if [ "$find_rc" -eq 2 ]; then
+                 echo -e "${YELLOW}Warning: Partition $partition on $found_device is locked by another process, skipping${NC}"
+                 partition=""
++            elif [ "$find_rc" -ne 0 ]; then
++                # No partition table on this disk (not the locked case above, just genuinely none)
++                # — it may be assigned as a raw whole-disk device, exactly like add_disk()'s own
++                # explicit SLOT:DEVICE path already supports (see its
++                # selected_partition="$param_device" assignment, used with no partition-finding at
++                # all — this is the array's own normal, intended way to use a disk with no
++                # partition table, not a sign of corruption). Fall back to the whole disk itself
++                # rather than failing outright, so a disk added raw can be automatically
++                # re-imported after a stop/start cycle instead of needing a manual /proc/nmdcmd
++                # import workaround — confirmed live: a raw parity disk and two raw data disks all
++                # failed this exact "No partition found" rescan after a plain stop/start, despite
++                # being perfectly healthy, already-imported disks moments before.
++                partition="$found_device"
+             fi
+             if [ -n "$partition" ]; then
+                 # Get the partition size

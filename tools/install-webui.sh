@@ -121,26 +121,38 @@ else
   log "NonRAID driver and nmdctl already present"
 fi
 
-# The PPA's nonraid-tools (1.23.0 at time of writing) predates a real upstream fix: on a genuinely
-# fresh install (no array ever created yet), `nmdctl status -o json/prometheus/terse` printed
-# plain colored text instead of valid output for that format, which nonraid-webui's
-# RealNmdClient.getStatus() then JSON.parse()'d and threw on — confirmed live by actually
-# restoring a pre-install snapshot and running an install end to end, not just reading code (the
-# dashboard got stuck showing a raw "Unexpected token" parse error instead of the onboarding
-# wizard). Patches the installed script directly rather than waiting on a new PPA release; skipped
-# once that fix ships upstream and this patch stops finding anything to change (see the grep
-# guard's own comment).
-log "Checking for the nmdctl blank-array status fix"
+# The PPA's nonraid-tools (1.23.0 at time of writing) lags fixes already landed in the nonraid
+# repo's own tools/nmdctl. Patches the installed script directly with each one rather than waiting
+# on a new PPA release. Each row is (patch file, a string only present once patched, short
+# description) — add a row here for each fix that lands ahead of its PPA release, drop the row
+# once that release ships and the row's own marker check starts finding nothing to do.
+log "Checking for nmdctl fixes not yet in the PPA release"
 NMDCTL_BIN="$(command -v nmdctl)"
-NMDCTL_PATCH="$REPO_ROOT/tools/patches/nmdctl-status-json-on-blank-array.patch"
-if grep -q 'no array is configured yet' "$NMDCTL_BIN"; then
-  log "nmdctl already has the blank-array status fix"
-elif patch --dry-run -s -p1 "$NMDCTL_BIN" < "$NMDCTL_PATCH" >/dev/null 2>&1; then
-  patch -p1 "$NMDCTL_BIN" < "$NMDCTL_PATCH"
-  log "Patched $NMDCTL_BIN with the blank-array status fix"
-else
-  log "WARNING: could not apply the nmdctl blank-array status fix — the installed nmdctl differs from what this patch expects. Continuing anyway; this only affects /api/status before an array has ever been created."
-fi
+NMDCTL_FIXES=(
+  # status -o json/prometheus/terse printed plain colored text instead of valid output on a
+  # genuinely fresh install (no array ever created), which nonraid-webui's RealNmdClient.getStatus()
+  # then JSON.parse()'d and threw on — confirmed live by actually restoring a pre-install snapshot
+  # and running an install end to end (the dashboard got stuck on a raw "Unexpected token" parse
+  # error instead of the onboarding wizard).
+  "nmdctl-status-json-on-blank-array.patch|no array is configured yet|status -o json/prometheus/terse returns valid output on a blank array"
+  # import_disks()'s rescan (used by start/import) required a child partition, so a disk assigned
+  # as a raw whole device (add_disk()'s own explicit-device path never partitions anything) could
+  # never be automatically re-imported after a plain stop/start — confirmed live restoring an older
+  # config backup onto an array built from raw disks, which left it stuck unable to start at all.
+  "nmdctl-import-raw-whole-disk.patch|it may be assigned as a raw whole-disk device|import_disks() can re-import a raw whole-disk slot after a stop/start"
+)
+for fix in "${NMDCTL_FIXES[@]}"; do
+  IFS='|' read -r patch_file marker description <<< "$fix"
+  patch_path="$REPO_ROOT/tools/patches/$patch_file"
+  if grep -qF "$marker" "$NMDCTL_BIN"; then
+    log "nmdctl already has: $description"
+  elif patch --dry-run -s -p1 "$NMDCTL_BIN" < "$patch_path" >/dev/null 2>&1; then
+    patch -p1 "$NMDCTL_BIN" < "$patch_path"
+    log "Patched nmdctl: $description"
+  else
+    log "WARNING: could not apply nmdctl fix ($description) — the installed nmdctl differs from what this patch expects. Continuing anyway."
+  fi
+done
 
 log "Checking other required tools"
 for tool in rsync systemctl npm; do
