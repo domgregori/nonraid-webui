@@ -54,6 +54,7 @@ function DeviceRow({ device: d, onOpen, onAdd }: { device: AvailableDevice; onOp
           e.stopPropagation();
           onAdd();
         }}
+        title="Assigns this disk to a slot in the array and starts rebuilding its data from parity."
       >
         Add to Array
       </button>

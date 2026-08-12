@@ -361,7 +361,13 @@ export function DiskDetailPanel() {
             This disk was unassigned but the array hasn't been started since — the change isn't committed yet and
             this disk's identity is still intact.
             <div className="detail-actions">
-              <button type="button" className="btn btn--block" disabled={restorePending} onClick={() => restoreDisk(disk.slot)}>
+              <button
+                type="button"
+                className="btn btn--block"
+                disabled={restorePending}
+                onClick={() => restoreDisk(disk.slot)}
+                title="Cancels the pending unassign and puts this disk back exactly as it was — the array hasn't started since, so nothing was actually committed yet."
+              >
                 {restorePending ? 'Restoring…' : 'Restore This Disk'}
               </button>
             </div>
@@ -374,7 +380,12 @@ export function DiskDetailPanel() {
             toward DEGRADED because this driver keeps removed slots as placeholders rather than shrinking the array
             automatically. Reconfiguring drops it from the topology for good, at the cost of a full parity rebuild.
             <div className="detail-actions">
-              <button type="button" className="btn btn--block btn--danger" onClick={() => setShowShrinkDialog(true)}>
+              <button
+                type="button"
+                className="btn btn--block btn--danger"
+                onClick={() => setShowShrinkDialog(true)}
+                title="Permanently drops this slot from the array topology and rebuilds parity to match — there's no undo."
+              >
                 Reconfigure Array Without This Disk
               </button>
             </div>
@@ -384,7 +395,13 @@ export function DiskDetailPanel() {
         <div className="detail-actions">
           {needsFormat && (
             <>
-              <button type="button" className="btn btn--block" disabled={formatPending} onClick={handleFormat}>
+              <button
+                type="button"
+                className="btn btn--block"
+                disabled={formatPending}
+                onClick={handleFormat}
+                title="Creates a fresh XFS filesystem on this disk so it can join the array."
+              >
                 {formatPending ? 'Formatting…' : 'Format Disk (XFS)'}
               </button>
               {formatError && <div className="status-note status-note--error">{formatError}</div>}
@@ -392,37 +409,70 @@ export function DiskDetailPanel() {
           )}
           {needsMount && (
             <>
-              <button type="button" className="btn btn--block" disabled={mountPending} onClick={handleMount}>
+              <button
+                type="button"
+                className="btn btn--block"
+                disabled={mountPending}
+                onClick={handleMount}
+                title={`Makes this disk's existing filesystem accessible at /mnt/disk${disk.slot}.`}
+              >
                 {mountPending ? 'Mounting…' : 'Mount Disk'}
               </button>
               {mountError && <div className="status-note status-note--error">{mountError}</div>}
             </>
           )}
           {canForceFormat && (
-            <button type="button" className="btn btn--block btn--danger" onClick={() => setShowForceFormatDialog(true)}>
+            <button
+              type="button"
+              className="btn btn--block btn--danger"
+              onClick={() => setShowForceFormatDialog(true)}
+              title="Wipes this disk's existing (non-array) filesystem and formats it as XFS — destroys everything on it, with no undo."
+            >
               Force Format
             </button>
           )}
           {disk.role === 'data' && !needsFormat && (
-            <button type="button" className="btn btn--block" onClick={() => setShowEmptyDialog(true)}>
+            <button
+              type="button"
+              className="btn btn--block"
+              onClick={() => setShowEmptyDialog(true)}
+              title="Moves this disk's share files onto other array disks, then offers to remove it from the array once it's empty."
+            >
               Empty Disk
             </button>
           )}
           {disk.isSSD === false && disk.status === 'active' && (
             <>
               {attributes?.spinState === 'standby' ? (
-                <button type="button" className="btn btn--block" disabled={spinPending} onClick={handleSpinUp}>
+                <button
+                  type="button"
+                  className="btn btn--block"
+                  disabled={spinPending}
+                  onClick={handleSpinUp}
+                  title="Wakes this disk from standby."
+                >
                   {spinPending ? 'Spinning up…' : 'Spin Up'}
                 </button>
               ) : (
-                <button type="button" className="btn btn--block" disabled={spinPending || status.resync.active} onClick={handleSpinDown}>
+                <button
+                  type="button"
+                  className="btn btn--block"
+                  disabled={spinPending || status.resync.active}
+                  onClick={handleSpinDown}
+                  title="Spins this disk down to save power while it's idle."
+                >
                   {spinPending ? 'Spinning down…' : 'Spin Down'}
                 </button>
               )}
               {spinError && <div className="status-note status-note--error">{spinError}</div>}
             </>
           )}
-          <button type="button" className="btn btn--block" onClick={() => setShowReplaceDialog(true)}>
+          <button
+            type="button"
+            className="btn btn--block"
+            onClick={() => setShowReplaceDialog(true)}
+            title="Swaps in a genuinely different physical disk for this slot — the array rebuilds this disk's data from parity onto the new one."
+          >
             Replace Disk
           </button>
           <button
@@ -430,6 +480,7 @@ export function DiskDetailPanel() {
             className="btn btn--block btn--danger"
             disabled={unassignPending || isRestorable}
             onClick={() => unassignDisk(disk.slot)}
+            title="Removes this disk from the array. Its data is emulated from parity until you add a replacement, which then rebuilds it back."
           >
             {unassignPending ? 'Unassigning…' : 'Unassign Disk'}
           </button>
