@@ -103,7 +103,7 @@ export const config = {
   // Single admin account — see backend/src/auth/.
   authConfigPath: str('AUTH_CONFIG_PATH', t('auth', 'config_path'), path.join(process.cwd(), 'data', 'auth.json')),
   // MUST be true once real TLS termination exists in front of this backend —
-  // see ../nonraid/REQUIREMENTS.md's Security section. false is only correct
+  // see REQUIREMENTS.md's Security section. false is only correct
   // for a non-TLS dev/test setup; a Secure cookie sent over plain HTTP is
   // simply dropped by the browser, silently breaking login. index.ts flips
   // this to true automatically at boot when this app's own built-in TLS

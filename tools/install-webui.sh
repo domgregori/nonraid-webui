@@ -29,8 +29,9 @@ log "Updating package lists"
 apt-get update -qq
 
 log "Installing system dependencies"
-# Everything nonraid-webui's own features shell out to at runtime — see ../nonraid/REQUIREMENTS.md
-# for the authoritative list and why each one's needed — plus `patch`, used only by this script
+# Everything nonraid-webui's own features shell out to at runtime — see ../REQUIREMENTS.md (this
+# script runs from tools/) for the authoritative list and why each one's needed — plus `patch`,
+# used only by this script
 # itself (see the nmdctl blank-array status fix below). Installed up front so every feature works
 # immediately after this script finishes, not just whichever ones a fresh install happens to touch
 # first. apt-get install is naturally idempotent — already-installed packages are just skipped.
@@ -95,7 +96,7 @@ if [ "$node_ok" -ne 1 ]; then
   log "Node.js $node_version doesn't satisfy the version floor — reinstalling from NodeSource"
   install_node
   check_node_version
-  [ "$node_ok" -eq 1 ] || fail "$NODE_BIN is still v$node_version after installing from NodeSource — need 20.6+ or 21.7+ (not 18.x, not 21.0-21.6). See ../nonraid/REQUIREMENTS.md."
+  [ "$node_ok" -eq 1 ] || fail "$NODE_BIN is still v$node_version after installing from NodeSource — need 20.6+ or 21.7+ (not 18.x, not 21.0-21.6). See ../REQUIREMENTS.md."
 fi
 log "Node.js v$node_version OK"
 
