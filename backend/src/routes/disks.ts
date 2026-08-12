@@ -65,7 +65,8 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
       // paired with in NmdClient.addDisk itself) is exactly the bug that
       // zeroed this project's own test VM's root filesystem once already.
       const target = match.partition ?? match.device;
-      const result = await nmd.addDisk(slot, target, match.diskId ?? undefined);
+      const autoStart = req.body?.autoStart !== false;
+      const result = await nmd.addDisk(slot, target, match.diskId ?? undefined, { autoStart });
       const text = `Disk ${device} added to slot ${slot}`;
       activity.log(text, 'blue').catch(() => {});
       notifyEvent(settingsStore, 'diskAdded', 'NonRAID: disk added', text);

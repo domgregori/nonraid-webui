@@ -752,7 +752,7 @@ export class RealNmdClient implements NmdClient {
    * after it's cleared the old identity) — the sequence is identical once
    * the slot is actually empty, only how it got that way differs.
    */
-  private async commitNewDisk(slot: number, device: string, diskId: string | undefined, lines: string[]): Promise<void> {
+  private async commitNewDisk(slot: number, device: string, diskId: string | undefined, lines: string[], autoStart = true): Promise<void> {
     const idSuffix = diskId ? `:${diskId}` : '';
     try {
       const { stdout } = await this.run(['add', '-f', `${slot}:${device}${idSuffix}`]);
@@ -771,6 +771,13 @@ export class RealNmdClient implements NmdClient {
       }
     }
 
+    // Assigning several disks in a row (building a new array from scratch)
+    // skips straight past the start/check below for every disk but the
+    // caller's own final, deliberate start — trying to start after each
+    // individual add is both wasted work and, on a still-incomplete array,
+    // a start nmdctl will just refuse (see the parity-only case noted below).
+    if (!autoStart) return;
+
     const afterAdd = await this.getStatus();
     if (afterAdd.array.state !== 'STARTED') {
       try {
@@ -778,10 +785,23 @@ export class RealNmdClient implements NmdClient {
         lines.push(stdout.trim());
       } catch (err) {
         lines.push((err as Error).message);
-        // Plain start refused (an "abnormal" state needs explicit naming in
-        // unattended mode) — retry naming whatever state was just reported.
-        const { stdout } = await this.run(['start', afterAdd.array.state]);
-        lines.push(stdout.trim());
+        try {
+          // Plain start refused (an "abnormal" state needs explicit naming
+          // in unattended mode) — retry naming whatever state was just
+          // reported.
+          const { stdout } = await this.run(['start', afterAdd.array.state]);
+          lines.push(stdout.trim());
+        } catch (err2) {
+          // A parity-only array (parity assigned, no data disks yet — the
+          // first disk added to a blank array can be either) genuinely
+          // can't start in unattended mode: nmdctl refuses with "No disks
+          // imported." That's expected, not a failure of this add — the
+          // `add` above already committed the slot assignment (confirmed
+          // live: the disk shows up in status.disks immediately after,
+          // even though this start attempt fails). Record it and move on
+          // instead of throwing away a successful add.
+          lines.push((err2 as Error).message);
+        }
       }
     }
 
@@ -806,7 +826,7 @@ export class RealNmdClient implements NmdClient {
    * this one). Requires the array already stopped and the slot genuinely
    * empty; both checked fresh here.
    */
-  async addDisk(slot: number, device: string, diskId?: string): Promise<AddDiskResult> {
+  async addDisk(slot: number, device: string, diskId?: string, options?: { autoStart?: boolean }): Promise<AddDiskResult> {
     const status = await this.getStatus();
     if (status.array.state === 'STARTED') {
       throw new Error('Stop the array before adding a disk.');
@@ -828,7 +848,7 @@ export class RealNmdClient implements NmdClient {
     }
 
     const lines: string[] = [];
-    await this.commitNewDisk(slot, device, diskId, lines);
+    await this.commitNewDisk(slot, device, diskId, lines, options?.autoStart ?? true);
     return { slot, message: `Disk assignment to slot ${slot} started.`, output: lines.join('\n\n') };
   }
 

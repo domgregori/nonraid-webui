@@ -3,20 +3,18 @@ import { systemApi } from '../../api/systemApi';
 import { useCacheStatus } from '../../hooks/useCacheStatus';
 import { useSystemStats } from '../../hooks/useSystemStats';
 import { useArrayStatus } from '../../state/useArrayStatus';
-import { CacheSetupDialog } from '../disk-detail/CacheSetupDialog';
-import { UnassignedDevicesCard } from '../disk-detail/UnassignedDevicesCard';
 import { ConfigRestoreWizard } from '../settings/ConfigRestoreWizard';
 import { ImportArrayWizard } from '../settings/ImportArrayWizard';
+import { ArrayBuilder } from './ArrayBuilder';
 
-type Step = 'welcome' | 'start' | 'import' | 'restoreConfig' | 'disks' | 'cache' | 'info' | 'done';
-type Stage = 0 | 1 | 2 | 3;
+type Step = 'welcome' | 'start' | 'import' | 'restoreConfig' | 'disks' | 'info' | 'done';
+type Stage = 0 | 1 | 2;
 
-const STAGE_LABELS = ['Array', 'Cache', 'Tour', 'Done'];
+const STAGE_LABELS = ['Array', 'Tour', 'Done'];
 
 function stageForStep(step: Step): Stage {
-  if (step === 'cache') return 1;
-  if (step === 'info') return 2;
-  if (step === 'done') return 3;
+  if (step === 'info') return 1;
+  if (step === 'done') return 2;
   return 0;
 }
 
@@ -25,12 +23,12 @@ function stageForStep(step: Step): Stage {
  * automatic first-run open and on manual "Replay setup tour" (see OnboardingGate). There's
  * deliberately no persisted "which step was I on" pointer: live array/cache state is always
  * authoritative, so a step is recomputed from it fresh every time rather than trusted from a
- * stale save. Two separate live signals, confirmed empirically against the driver (not just
- * read from source): array.total_slots only counts *data* slots — assigning a parity disk alone
- * doesn't move it off 0 (see md_unraid.c's sb->num_disks update, gated on `!is_parity_idx`) — so
- * "any disk assigned at all" has to be checked separately via each disk's disk_id. NEW_ARRAY
- * isn't used here either: it means "disks assigned, first parity build still pending," which is
- * already past the disks/import step, not a sign of a blank array.
+ * stale save. Both hasAnyDisk and hasDataDisk (see their computation above) read status.disks
+ * directly rather than array.total_slots, which only reflects *committed* data disks and stays 0
+ * for a disk that's been add-ed but not yet start-ed — exactly the state disks sit in for most of
+ * the 'disks' step now that assigning doesn't auto-start after each one. NEW_ARRAY isn't used here
+ * either: it means "disks assigned, first parity build still pending," which is already past the
+ * disks/import step, not a sign of a blank array.
  *
  * 'welcome' (machine name/timezone) only ever appears here, on a genuinely blank array — it's a
  * one-time first-run convenience, not something worth resurfacing on every "Replay setup tour"
@@ -40,7 +38,7 @@ function stageForStep(step: Step): Stage {
 function deriveStartStep(hasAnyDisk: boolean, hasDataDisk: boolean, cacheConfigured: boolean): Step {
   if (!hasAnyDisk) return 'welcome';
   if (!hasDataDisk) return 'disks';
-  return cacheConfigured ? 'info' : 'cache';
+  return cacheConfigured ? 'info' : 'disks';
 }
 
 const INFO_SLIDES = [
@@ -79,14 +77,17 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
   const { status: cacheStatus } = useCacheStatus();
   const stats = useSystemStats();
   const hasAnyDisk = status?.disks.some((d) => d.disk_id) ?? false;
-  const hasDataDisk = (status?.array.total_slots ?? 0) > 0;
+  // Checked against status.disks directly, not array.total_slots — total_slots only reflects
+  // *committed* data disks (see md_unraid.c's sb->num_disks update), staying 0 until a `start`
+  // commits whatever's been add-ed so far, which ArrayBuilder's whole plan-then-build model
+  // deliberately defers until the very end (see its own doc comment).
+  const hasDataDisk = (status?.disks ?? []).some((d) => d.disk_id && d.type === 'data');
   const cacheConfigured = cacheStatus ? cacheStatus.health !== 'not-configured' : false;
 
   const [step, setStep] = useState<Step>(() => deriveStartStep(hasAnyDisk, hasDataDisk, cacheConfigured));
   const [infoIndex, setInfoIndex] = useState(0);
   const [importedJustNow, setImportedJustNow] = useState(false);
   const [restoredJustNow, setRestoredJustNow] = useState(false);
-  const [showCacheSetup, setShowCacheSetup] = useState(false);
 
   const [hostnameDraft, setHostnameDraft] = useState('');
   const [timezoneDraft, setTimezoneDraft] = useState('');
@@ -136,7 +137,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
   const stage = stageForStep(step);
 
   const handleImportClose = () => {
-    setStep(importedJustNow ? (cacheConfigured ? 'info' : 'cache') : 'start');
+    setStep(importedJustNow ? (cacheConfigured ? 'info' : 'disks') : 'start');
   };
 
   // A successful restore can bring back a fully-configured array (superblock included, when the
@@ -278,12 +279,13 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
 
           {step === 'disks' && (
             <>
-              <div className="eyebrow onboarding-hero__eyebrow">Step 1 of 2 &middot; Array</div>
-              <div className="onboarding-hero__title">Assign your disks</div>
+              <div className="eyebrow onboarding-hero__eyebrow">First-time setup &middot; Array</div>
+              <div className="onboarding-hero__title">Build your array</div>
               <div className="onboarding-hero__desc">
-                Add a parity disk first, then your data disks. Parity has to be at least as large as your biggest
-                data disk. This is the same Unassigned Devices list you'll find later on the Disks page — nothing
-                here is wizard-only.
+                Assign a role to each device below — parity (a second one is optional, for extra protection), your
+                first data disk, or an optional cache mirror — then press Build Array to commit the whole plan at
+                once. Nothing happens to any disk until then. Add more data disks afterward from the Disks page,
+                once this one's finished syncing.
               </div>
 
               {status && status.disks.some((d) => d.disk_id) && (
@@ -296,7 +298,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
                     .map((d) => (
                       <div key={d.slot} className="onboarding-summary__row">
                         <span>
-                          Slot {d.slot} &middot; {d.type === 'P' ? 'Parity' : d.type === 'Q' ? 'Parity 2' : 'Data'}
+                          Slot {d.slot} &middot; {d.type === 'P' ? 'Parity 1' : d.type === 'Q' ? 'Parity 2' : 'Data'}
                         </span>
                         <span>{d.status}</span>
                       </div>
@@ -304,57 +306,13 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
                 </div>
               )}
 
-              <UnassignedDevicesCard />
+              <ArrayBuilder onBuilt={() => setStep('info')} />
 
               <div className="onboarding__actions">
                 <button type="button" className="btn" onClick={() => setStep('start')}>
                   Back
                 </button>
-                <div className="onboarding__actions-right">
-                  <button type="button" className="btn btn--primary" onClick={() => setStep(cacheConfigured ? 'info' : 'cache')}>
-                    Continue
-                  </button>
-                </div>
               </div>
-            </>
-          )}
-
-          {step === 'cache' && (
-            <>
-              <div className="eyebrow onboarding-hero__eyebrow">Step 2 of 2 &middot; Array</div>
-              <div className="onboarding-hero__title">Set up a cache mirror?</div>
-              <div className="onboarding-hero__desc">
-                A cache pool is a mirrored pair of disks that new writes land on first — a scheduled mover then
-                drains them onto the parity-protected array. It's optional, and needs exactly two spare disks with no
-                data on them. You can always set this up later from Settings.
-              </div>
-
-              <div className="onboarding-choices">
-                <button type="button" className="onboarding-choice onboarding-choice--primary" onClick={() => setShowCacheSetup(true)}>
-                  <span className="onboarding-choice__title">Set up cache mirror</span>
-                  <span className="onboarding-choice__desc">Pick two unassigned devices for the mirrored pair.</span>
-                </button>
-                <button type="button" className="onboarding-choice" onClick={() => setStep('info')}>
-                  <span className="onboarding-choice__title">Skip for now</span>
-                  <span className="onboarding-choice__desc">Set this up later from Settings &rarr; Cache.</span>
-                </button>
-              </div>
-
-              <div className="onboarding__actions">
-                <button type="button" className="btn" onClick={() => setStep('disks')}>
-                  Back
-                </button>
-              </div>
-
-              {showCacheSetup && (
-                <CacheSetupDialog
-                  onClose={() => setShowCacheSetup(false)}
-                  onDone={() => {
-                    setShowCacheSetup(false);
-                    setStep('info');
-                  }}
-                />
-              )}
             </>
           )}
 

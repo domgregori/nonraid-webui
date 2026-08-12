@@ -38,11 +38,11 @@ export const nmdApi = {
   parityCheck: (action: ParityCheckAction) => request<NmdCommandResult>(`/api/parity/${action}`, { method: 'POST' }),
   unassignDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/unassign`, { method: 'POST' }),
   listAvailableDevices: () => request<AvailableDevice[]>('/api/disks/available'),
-  addDisk: (slot: number, device: string) =>
+  addDisk: (slot: number, device: string, autoStart = true) =>
     request<AddDiskResult>(`/api/disks/${slot}/add`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ device }),
+      body: JSON.stringify({ device, autoStart }),
     }),
   formatDisk: (slot: number, force = false) =>
     request<NmdCommandResult>(`/api/disks/${slot}/format`, {

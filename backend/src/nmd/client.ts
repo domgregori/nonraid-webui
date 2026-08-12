@@ -36,7 +36,12 @@ export interface NmdClient {
   // own `add` treats that as "already assigned" regardless of live status;
   // see replaceDisk() for that case, or restoreUnassignedDisk() if the goal
   // is actually putting the *same* disk back rather than a different one.
-  addDisk(slot: number, device: string, diskId?: string): Promise<AddDiskResult>;
+  // autoStart (default true) skips the post-add start/check entirely when
+  // false — for assigning several disks in a row (e.g. the onboarding
+  // wizard building a new array from scratch) where attempting a start
+  // after every single disk is both wasted work and, for a parity-only or
+  // otherwise still-incomplete array, a start nmdctl will just refuse.
+  addDisk(slot: number, device: string, diskId?: string, options?: { autoStart?: boolean }): Promise<AddDiskResult>;
   // The occupied-slot counterpart to addDisk(): unassigns the slot and
   // commits that via `start` first (this is the step that clears the old
   // disk's recorded identity and makes the driver stop trusting its
