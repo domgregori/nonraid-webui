@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { config } from '../config.js';
 import { getDiskType } from '../system/diskType.js';
 import type { NmdClient } from './client.js';
-import type { AddDiskResult, AvailableDevice, ImportResult, NmdCommandResult, NmdStatusResponse, ParityCheckAction } from './types.js';
+import { ArrayNotConfiguredError, type AddDiskResult, type AvailableDevice, type ImportResult, type NmdCommandResult, type NmdStatusResponse, type ParityCheckAction } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -426,8 +426,10 @@ export class RealNmdClient implements NmdClient {
     // at the source, means every caller's existing try/catch around getStatus() already does the
     // right thing without needing its own defensive shape-check.
     if (!parsed || typeof parsed !== 'object' || !('array' in parsed) || !('disks' in parsed)) {
-      const message = parsed && typeof parsed === 'object' && 'error' in parsed ? String((parsed as { error: unknown }).error) : 'malformed status response';
-      throw new Error(message);
+      if (parsed && typeof parsed === 'object' && 'error' in parsed) {
+        throw new ArrayNotConfiguredError(String((parsed as { error: unknown }).error));
+      }
+      throw new Error('malformed status response');
     }
     return parsed as NmdStatusResponse;
   }

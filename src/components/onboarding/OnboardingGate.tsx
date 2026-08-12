@@ -12,10 +12,14 @@ import { OnboardingWizard } from './OnboardingWizard';
  * more than hiding it, since the dashboard is already there and already reflects live state.
  *
  * Auto-opens at most once per page load, the moment the array status settles and turns out to be
- * genuinely unconfigured (see OnboardingWizard's deriveStartStep — total_slots === 0, not
- * array.state, is the real "nothing assigned yet" signal) and the wizard hasn't been dismissed
- * before. "Replay setup tour" (Settings → About) reopens it manually any time after that via the
- * same OnboardingContext this provides to the rest of the app.
+ * genuinely unconfigured — either `loadState === 'ready'` with total_slots === 0 (see
+ * OnboardingWizard's deriveStartStep — that's the real "nothing assigned yet" signal, not
+ * array.state), or `loadState === 'not-configured'` (a genuinely fresh install: nmdctl reports no
+ * array has ever been created, so getStatus() never even returns a status object to check
+ * total_slots on — confirmed live, restoring a pre-install snapshot and running an install end to
+ * end left the dashboard stuck on this exact state with the wizard never opening) — and the wizard
+ * hasn't been dismissed before. "Replay setup tour" (Settings → About) reopens it manually any
+ * time after that via the same OnboardingContext this provides to the rest of the app.
  */
 export function OnboardingGate() {
   const { status, loadState } = useArrayStatus();
@@ -32,9 +36,11 @@ export function OnboardingGate() {
 
   useEffect(() => {
     if (autoOpenedRef.current) return;
-    if (loadState !== 'ready' || dismissed === null) return;
+    if (dismissed === null) return;
+    const unconfigured = loadState === 'not-configured' || (loadState === 'ready' && status?.array.total_slots === 0);
+    if (loadState !== 'not-configured' && loadState !== 'ready') return;
     autoOpenedRef.current = true;
-    if (status?.array.total_slots === 0 && !dismissed) setOpen(true);
+    if (unconfigured && !dismissed) setOpen(true);
   }, [loadState, status, dismissed]);
 
   const finish = useCallback(() => {

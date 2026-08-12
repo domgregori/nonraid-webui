@@ -1,7 +1,10 @@
 import { createContext } from 'react';
 import type { NmdStatusResponse, ParityCheckAction } from '../types/nmdApi';
 
-export type LoadState = 'loading' | 'ready' | 'error';
+/** 'not-configured' means a genuinely fresh install — nmdctl reports no array has ever been
+ *  created yet. Distinct from 'error' (a real failure) so OnboardingGate can route into setup
+ *  instead of the dashboard showing a scary error banner. */
+export type LoadState = 'loading' | 'ready' | 'error' | 'not-configured';
 
 export interface ArrayStatusContextValue {
   status: NmdStatusResponse | null;

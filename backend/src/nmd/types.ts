@@ -5,6 +5,15 @@
  * temperature (that's SMART/hddtemp data, a separate future integration).
  */
 
+/**
+ * Thrown by RealNmdClient.getStatus() specifically for nmdctl's `{"error": "..."}` blank-array
+ * response — no superblock file yet, i.e. a genuinely fresh install before any array has ever
+ * been created. Distinct from a plain Error so routes/status.ts can tell this well-known, expected
+ * state apart from a real failure and give the frontend a reliable signal (rather than string-
+ * matching the message) to route into onboarding instead of showing a scary error banner.
+ */
+export class ArrayNotConfiguredError extends Error {}
+
 export type ArrayHealthStatus = 'ERROR' | 'NEW' | 'NEW_DISK' | 'OFFLINE' | 'PARTIAL' | 'DEGRADED' | 'WARNING' | 'READY' | 'HEALTHY';
 
 export type ArrayMdState =

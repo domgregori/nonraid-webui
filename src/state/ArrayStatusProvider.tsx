@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { nmdApi } from '../api/nmdApi';
+import { CodedError } from '../api/request';
 import { smartApi } from '../api/smartApi';
 import type { NmdStatusResponse, ParityCheckAction } from '../types/nmdApi';
 import { ArrayStatusContext, type LoadState } from './ArrayStatusContext';
@@ -34,7 +35,8 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
       setError(null);
     } catch (err) {
       if (!mounted.current) return;
-      setLoadState('error');
+      const notConfigured = err instanceof CodedError && err.code === 'ARRAY_NOT_CONFIGURED';
+      setLoadState(notConfigured ? 'not-configured' : 'error');
       setError((err as Error).message);
     }
   }, []);
