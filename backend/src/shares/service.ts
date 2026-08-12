@@ -58,7 +58,21 @@ export class ShareService {
    * rather than hooked directly off Add/Replace Disk.
    */
   async remountAll(): Promise<void> {
-    const [shares, ctx] = await Promise.all([this.store.list(), this.buildContext()]);
+    const shares = await this.store.list();
+    let ctx: ApplyContext;
+    try {
+      ctx = await this.buildContext();
+    } catch (err) {
+      // buildContext() needs live array status (this.nmd.getStatus()) — on a genuinely
+      // unconfigured array (confirmed live: a fresh install, before an array has ever been
+      // created, so there's no superblock for nmdctl to report on) that throws instead of
+      // returning, which used to crash the whole backend at startup since this call was outside
+      // any try/catch despite this function's own "best-effort, never block startup" doc comment
+      // above. There's nothing to remount when there's no array to build a context from anyway,
+      // so this is a real no-op, not a degraded state.
+      console.error('Skipping remountAll — could not read live array status (probably no array configured yet):', (err as Error).message);
+      return;
+    }
     const grown = await this.growAllDisksShares(shares, ctx);
     for (const share of grown) {
       try {
