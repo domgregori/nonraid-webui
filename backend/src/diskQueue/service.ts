@@ -7,6 +7,13 @@ import type { DiskQueueItem, DiskQueueItemType, DiskQueueState } from './types.j
 
 const RESYNC_POLL_MS = 5_000;
 const MAX_CONSECUTIVE_POLL_FAILURES = 5;
+// nmdctl's CANCEL never re-arms a resync on its own — a cancelled clear/rebuild leaves
+// resync.pending stuck true forever (confirmed live: cancelling a queue-driven disk clear via the
+// Parity Check card's Cancel button left pending=true/active=false indefinitely). The normal
+// pending-without-active window (the moment between startArray() and parityCheck() kicking in) is
+// a single poll at most, so several in a row this long is a reliable signal of exactly that
+// external-cancel case, not a slow-but-legitimate transition.
+const MAX_CONSECUTIVE_PENDING_ONLY_POLLS = 6;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -245,6 +252,18 @@ export class DiskQueueService {
 
     item.phase = 'awaiting-resync';
     await this.waitForResyncIdle();
+
+    // waitForResyncIdle() only proves the driver stopped resyncing, not that this item's disk
+    // actually made it in — confirmed live: manually unassigning the disk out from under a
+    // running item also makes resync go idle, and without this check the item was recorded as a
+    // false "done". Re-check the specific slot landed on DISK_OK before calling it a success.
+    const finalStatus = await this.nmd.getStatus();
+    const disk = finalStatus.disks.find((d) => d.slot === input.slot);
+    if (!disk || disk.status !== 'DISK_OK') {
+      throw new Error(
+        `The resync stopped but slot ${input.slot} never reached a healthy state (status: ${disk?.status ?? 'unassigned'}) — it was likely cancelled or removed outside the queue.`,
+      );
+    }
   }
 
   /**
@@ -253,9 +272,12 @@ export class DiskQueueService {
    * setInterval) so one slow getStatus() call can't overlap the next, per-call timeout aside.
    * Throws after several consecutive failed status reads in a row rather than polling forever —
    * a transient blip shouldn't fail the item, but a genuinely broken status endpoint should.
+   * Also throws if resync gets stuck pending-without-active for too long — see
+   * MAX_CONSECUTIVE_PENDING_ONLY_POLLS's own comment for why that means an external cancel.
    */
   private async waitForResyncIdle(): Promise<void> {
     let consecutiveFailures = 0;
+    let consecutivePendingOnly = 0;
     for (;;) {
       await sleep(RESYNC_POLL_MS);
       let status: NmdStatusResponse;
@@ -272,6 +294,17 @@ export class DiskQueueService {
       }
       consecutiveFailures = 0;
       if (!status.resync.active && !status.resync.pending) return;
+
+      if (!status.resync.active && status.resync.pending) {
+        consecutivePendingOnly++;
+        if (consecutivePendingOnly >= MAX_CONSECUTIVE_PENDING_ONLY_POLLS) {
+          throw new Error(
+            'The resync stopped running but never fully cleared — it was likely cancelled outside the queue (e.g. via the Parity Check card\'s Cancel button). Check the array and disk status before retrying.',
+          );
+        }
+      } else {
+        consecutivePendingOnly = 0;
+      }
     }
   }
 
