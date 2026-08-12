@@ -168,20 +168,124 @@ rsync -a --delete "$REPO_ROOT/dist/" "$INSTALL_ROOT/frontend-dist/"
 
 # This whole script runs as root (see the check at the top), so every file staged above — including
 # rsync -a's ownership, preserved from $BACKEND_DIR/$REPO_ROOT's own build output — ends up
-# root:root. nonraid-webui.service runs as root too (it shells out to nmdctl/docker/mount, which
-# need it) so that's never a problem for the running service itself, but it does mean the actual
-# human who ran this script can't rsync a later update into $INSTALL_ROOT without sudo — confirmed
-# live: a plain non-root rsync deploy after a fresh install failed with a wall of "Permission
-# denied"/"Operation not permitted" errors. Handing the staged tree to whoever actually ran the
-# script (via $SUDO_USER, set by sudo itself) fixes that; skipped when run as a genuine root login
-# with no SUDO_USER, since there's no more-appropriate non-root owner to hand off to in that case.
+# root:root. Handing the staged tree to whoever actually ran the script (via $SUDO_USER, set by
+# sudo itself) means a later update can be rsynced into place directly — confirmed live: a plain
+# non-root rsync deploy after a fresh install failed with a wall of "Permission denied"/"Operation
+# not permitted" errors. Skipped when run as a genuine root login with no SUDO_USER, since there's
+# no more-appropriate non-root owner to hand off to in that case (the service falls back to
+# running as root itself below, too, in that same case).
 if [ -n "${SUDO_USER:-}" ]; then
   log "Handing $INSTALL_ROOT to $SUDO_USER (so future updates can be rsynced without sudo)"
   chown -R "$SUDO_USER:$(id -gn "$SUDO_USER")" "$INSTALL_ROOT"
+  # StateDirectory=nonraid-webui (see the systemd unit) makes systemd create+chown
+  # /var/lib/nonraid-webui to the service's User/Group automatically — but only the first time it's
+  # created. An already-existing one (e.g. from before this script started running the service
+  # non-root) is left as-is by systemd, so it needs the same explicit fix-up as $INSTALL_ROOT above
+  # — confirmed live, restoring a pre-install snapshot and re-running an already-once-root install.
+  [ -d /var/lib/nonraid-webui ] && chown -R "$SUDO_USER:$(id -gn "$SUDO_USER")" /var/lib/nonraid-webui
 fi
 
 log "Installing systemd unit"
 install -m 644 "$REPO_ROOT/tools/systemd/nonraid-webui.service" /etc/systemd/system/nonraid-webui.service
+
+# nonraid-webui shells out to nmdctl/docker/mount/useradd/and more as root — the base unit above
+# has no User=, so with nothing else it'd run the whole Node process (and by extension, every HTTP
+# request it ever handles) as root. Instead, run it as the same $SUDO_USER the deployed tree above
+# now belongs to, and let it reach root only through a sudoers rule scoped to exactly the commands
+# it actually needs (installed below) — so a bug or vulnerability in this backend can't act as root
+# outside that narrow allowlist. A drop-in override (not editing the unit file itself) keeps the
+# checked-in unit portable across whichever user ends up running the script. Skipped, same as
+# above, when there's no SUDO_USER to hand off to — the service then keeps running as root, exactly
+# like it always has, and none of the *_USE_SUDO env vars below take effect (config.ts's flags
+# default to false, matching "this process already is root, no sudo needed").
+if [ -n "${SUDO_USER:-}" ]; then
+  log "Configuring nonraid-webui.service to run as $SUDO_USER instead of root"
+  mkdir -p /etc/systemd/system/nonraid-webui.service.d
+  {
+    echo "[Service]"
+    echo "User=$SUDO_USER"
+    echo "Group=$(id -gn "$SUDO_USER")"
+    # One per backend/src/config.ts *_use_sudo flag — see the sudoers generation right below for
+    # exactly which commands each of these actually unlocks.
+    for flag in NMD SMART HDPARM TLS SHARES SYSTEM USERS LXC CACHE; do
+      echo "Environment=${flag}_USE_SUDO=true"
+    done
+  } > /etc/systemd/system/nonraid-webui.service.d/override.conf
+
+  log "Restricting $SUDO_USER's sudo to exactly what nonraid-webui shells out to as root"
+  # Every plain binary the backend can sudo to (see every *_use_sudo call site in backend/src) —
+  # resolved to an absolute path here since sudoers requires one and won't fall back to a PATH
+  # lookup. No argument restriction on these: each one's arguments are either inherently dynamic
+  # app data (usernames, hostnames, container names, disk/device paths) that can't be pinned down
+  # ahead of time, or just not dangerous enough as a bare grant to be worth the added fragility.
+  # tee/modprobe/systemctl are the exception — bare, those would themselves be generic
+  # arbitrary-file-write / arbitrary-kernel-module-load / arbitrary-service-control primitives, so
+  # they're pinned below to the exact invocations nmd/realClient.ts, system/services.ts, and
+  # routes/array.ts actually make instead of granted as plain binaries.
+  SUDO_BINS=(
+    nmdctl mv cp test mkfs.xfs
+    smartctl
+    hdparm dd
+    mount umount mergerfs exportfs smbstatus smbcontrol smbd
+    tar hostnamectl timedatectl journalctl
+    getent useradd usermod userdel groupadd groupdel chpasswd smbpasswd
+    lxc-ls lxc-info lxc-start lxc-stop lxc-destroy lxc-snapshot lxc-create
+    btrfs mkfs.btrfs mkdir mountpoint lsblk blkid udevadm
+    openssl
+  )
+  SUDOERS_TMP="$(mktemp)"
+  {
+    echo "# Managed by nonraid-webui's tools/install-webui.sh — re-run the script to update this"
+    echo "# rather than hand-editing it. Scopes $SUDO_USER's sudo to exactly what nonraid-webui's"
+    echo "# backend shells out to as root (see every *_use_sudo flag in backend/src/config.ts) and"
+    echo "# nothing else."
+    for bin in "${SUDO_BINS[@]}"; do
+      # type -P, not command -v: `test` (and potentially others) is a shell builtin that shadows
+      # the real /usr/bin binary — command -v reports the builtin (just the bare word, not a path,
+      # which visudo then rejects outright), type -P forces a PATH-only lookup regardless.
+      bin_path="$(type -P "$bin" 2>/dev/null || true)"
+      if [ -z "$bin_path" ]; then
+        echo "WARNING: '$bin' not found on PATH — skipping its sudoers entry (a feature needing it may not work as $SUDO_USER)" >&2
+        continue
+      fi
+      echo "$SUDO_USER ALL=(root) NOPASSWD: $bin_path"
+    done
+
+    tee_path="$(type -P tee 2>/dev/null || true)"
+    modprobe_path="$(type -P modprobe 2>/dev/null || true)"
+    systemctl_path="$(type -P systemctl 2>/dev/null || true)"
+    # nmdctl's own `unassign` has no unattended-mode bypass for its confirm prompt, so unassign
+    # writes this one driver command straight to /proc/nmdcmd instead (see nmd/realClient.ts's
+    # writeNmdCmd) — the only file this backend ever needs `tee` for.
+    [ -n "$tee_path" ] && echo "$SUDO_USER ALL=(root) NOPASSWD: $tee_path /proc/nmdcmd"
+    if [ -n "$modprobe_path" ]; then
+      echo "$SUDO_USER ALL=(root) NOPASSWD: $modprobe_path -r nonraid"
+      echo "$SUDO_USER ALL=(root) NOPASSWD: $modprobe_path nonraid super=*"
+    fi
+    if [ -n "$systemctl_path" ]; then
+      # The complete, closed set from system/services.ts's SERVICE_DEFS (Docker/LXC/SMB/NFS/SSH
+      # start/stop/is-active) plus routes/array.ts's driver-reload Docker stop/start.
+      for args in \
+        "is-active docker.service" "is-active lxc.service" \
+        "is-active smbd.service nmbd.service winbind.service" \
+        "is-active nfs-server.service" "is-active ssh.service" \
+        "stop docker.socket docker.service" "start docker" \
+        "stop lxc" "start lxc" \
+        "stop smbd.service nmbd.service winbind.service" "start smbd.service nmbd.service winbind.service" \
+        "stop nfs-server" "start nfs-server" \
+        "stop ssh" "start ssh"; do
+        echo "$SUDO_USER ALL=(root) NOPASSWD: $systemctl_path $args"
+      done
+    fi
+  } > "$SUDOERS_TMP"
+
+  if visudo -c -f "$SUDOERS_TMP" >/dev/null; then
+    install -m 0440 -o root -g root "$SUDOERS_TMP" /etc/sudoers.d/nonraid-webui
+    rm -f "$SUDOERS_TMP"
+  else
+    fail "Generated sudoers rules failed validation (visudo -c) — not installed, left at $SUDOERS_TMP for inspection."
+  fi
+fi
 
 if [ ! -e /etc/nonraid/config.toml ]; then
   log "Installing default config (/etc/nonraid/config.toml)"
