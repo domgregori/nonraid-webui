@@ -144,6 +144,9 @@ export function SettingsPage() {
   const [backupRetainDraft, setBackupRetainDraft] = useState('7');
   const [backupSchedSaving, setBackupSchedSaving] = useState(false);
   const [backupSchedError, setBackupSchedError] = useState<string | null>(null);
+  const [backupRunning, setBackupRunning] = useState(false);
+  const [backupRunResult, setBackupRunResult] = useState<string | null>(null);
+  const [backupRunError, setBackupRunError] = useState<string | null>(null);
 
   const [hostnameDraft, setHostnameDraft] = useState('');
   const [hostnameSaving, setHostnameSaving] = useState(false);
@@ -443,6 +446,21 @@ export function SettingsPage() {
       },
     });
     setBackupSchedSaving(false);
+  };
+
+  const runBackupNow = async () => {
+    setBackupRunning(true);
+    setBackupRunError(null);
+    setBackupRunResult(null);
+    try {
+      const { bytes } = await systemApi.runBackupNow();
+      const sizeLabel = bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+      setBackupRunResult(`Backup written (${sizeLabel}).`);
+    } catch (err) {
+      setBackupRunError((err as Error).message);
+    } finally {
+      setBackupRunning(false);
+    }
   };
 
   const sendTest = async () => {
@@ -954,6 +972,30 @@ export function SettingsPage() {
             </button>
           </div>
           {backupSchedError && <div className="status-note status-note--error">{backupSchedError}</div>}
+        </div>
+
+        <div className="settings-field toggle-row--bordered">
+          <div className="toggle-row__title">Back up now</div>
+          <div className="toggle-row__desc">
+            Runs the same backup as the schedule above, right now, into the saved destination directory — save it
+            first if you haven't. Or download a one-off copy straight to this device instead, which never touches
+            the array.
+          </div>
+          <div className="settings-field__row">
+            <button type="button" className="btn" disabled={backupRunning || !settings} onClick={runBackupNow} title="Writes a config backup into the destination directory above, right now.">
+              {backupRunning ? 'Backing up…' : 'Back up now'}
+            </button>
+            <a
+              className="btn"
+              href={systemApi.bootDiskConfigBackupUrl()}
+              download
+              title="Downloads a config backup straight to this device's browser downloads — doesn't touch the array or its destination directory."
+            >
+              Download a copy
+            </a>
+          </div>
+          {backupRunResult && <div className="status-note">{backupRunResult}</div>}
+          {backupRunError && <div className="status-note status-note--error">{backupRunError}</div>}
         </div>
       </div>
 

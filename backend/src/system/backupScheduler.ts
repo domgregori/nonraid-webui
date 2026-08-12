@@ -47,34 +47,57 @@ export class BackupScheduler {
     if (this.lastFiredDateKey === dateKey) return;
     this.lastFiredDateKey = dateKey;
 
+    // runNow() already logs/notifies on every failure path — this is only here so a skip/failure
+    // doesn't become an unhandled rejection from the un-awaited setInterval callback in the
+    // constructor above.
+    await this.runNow('Scheduled backup').catch(() => {});
+  }
+
+  /**
+   * The actual backup+prune work, shared by the schedule ticker above and the manual "Back up
+   * now" route (routes/system.ts) — same destDir/retain from saved settings either way, since a
+   * manual run against an unsaved draft destination would back up to a place the next scheduled
+   * run (or a later manual run) wouldn't agree on. `label` only changes the activity-log/
+   * notification wording ("Scheduled backup" vs "Manual backup") so the two are distinguishable
+   * in the log, not the logic.
+   */
+  async runNow(label = 'Manual backup'): Promise<{ bytes: number }> {
+    const settings = await this.settings.get();
+    const schedule = settings.backupSchedule;
+
     if (!schedule.destDir) {
-      this.activity.log('Scheduled backup skipped — no destination directory configured', 'amber').catch(() => {});
-      return;
+      const msg = `${label} skipped — no destination directory configured`;
+      this.activity.log(msg, 'amber').catch(() => {});
+      throw new Error('No destination directory configured — set one below and save first.');
     }
     try {
       await access(schedule.destDir, constants.W_OK);
     } catch {
-      this.activity.log(`Scheduled backup skipped — destination "${schedule.destDir}" doesn't exist or isn't writable`, 'amber').catch(() => {});
-      return;
+      const msg = `${label} skipped — destination "${schedule.destDir}" doesn't exist or isn't writable`;
+      this.activity.log(msg, 'amber').catch(() => {});
+      throw new Error(`Destination "${schedule.destDir}" doesn't exist or isn't writable.`);
     }
 
     try {
       const paths = await resolveConfigBackupPaths(this.nmd);
       if (paths.length === 0) {
-        this.activity.log('Scheduled backup skipped — no config files found to back up', 'amber').catch(() => {});
-        return;
+        const msg = `${label} skipped — no config files found to back up`;
+        this.activity.log(msg, 'amber').catch(() => {});
+        throw new Error('No config files found to back up.');
       }
       const destPath = path.join(schedule.destDir, `${BACKUP_PREFIX}${Date.now()}${BACKUP_SUFFIX}`);
       const bytes = await writeConfigBackupToFile(paths, config.systemUseSudo, destPath);
       const sizeLabel = bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-      const completedText = `Scheduled backup completed (${sizeLabel})`;
+      const completedText = `${label} completed (${sizeLabel})`;
       this.activity.log(completedText, 'blue').catch(() => {});
-      notifyEvent(this.settings, 'backupCompleted', 'NonRAID: scheduled backup completed', completedText);
+      notifyEvent(this.settings, 'backupCompleted', 'NonRAID: backup completed', completedText);
       await this.prune(schedule.destDir, schedule.retain);
+      return { bytes };
     } catch (err) {
-      const failedText = `Scheduled backup failed: ${(err as Error).message}`;
+      const failedText = `${label} failed: ${(err as Error).message}`;
       this.activity.log(failedText, 'red').catch(() => {});
-      notifyEvent(this.settings, 'backupFailed', 'NonRAID: scheduled backup failed', failedText);
+      notifyEvent(this.settings, 'backupFailed', 'NonRAID: backup failed', failedText);
+      throw err;
     }
   }
 

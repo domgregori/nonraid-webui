@@ -59,7 +59,7 @@ async function main() {
   const cache = new CacheService(nmd, smart, settingsStore);
   new ActivityWatcher(nmd, smart, activity, settingsStore, cache);
   new ParityScheduler(nmd, settingsStore, activity);
-  new BackupScheduler(nmd, settingsStore, activity);
+  const backupScheduler = new BackupScheduler(nmd, settingsStore, activity);
   const authStore = new AuthStore();
   const authService = new AuthService(authStore);
   await authStore.get(); // fail fast at boot on a corrupt auth.json
@@ -174,7 +174,7 @@ async function main() {
   app.use('/api', smartRouter(nmd, smart, system));
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
-  app.use('/api', systemRouter(system, nmd, activity));
+  app.use('/api', systemRouter(system, nmd, activity, backupScheduler));
   app.use('/api', servicesRouter(activity));
   app.use('/api', usersRouter(users));
   app.use('/api', appsRouter(apps));

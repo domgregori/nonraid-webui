@@ -7,6 +7,7 @@ import type { NetLiveRate, SystemStats } from '../types/systemApi';
 export const systemApi = {
   getStats: () => request<SystemStats>('/api/system'),
   getNetLive: () => request<NetLiveRate>('/api/system/net-live'),
+  runBackupNow: () => request<{ bytes: number }>('/api/system/backup/run-now', { method: 'POST' }),
 
   bootDiskImageBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/image`,
   bootDiskConfigBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/config`,

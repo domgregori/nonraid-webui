@@ -6,10 +6,11 @@ import { NetRateTracker } from '../metrics/net.js';
 import type { NmdClient } from '../nmd/client.js';
 import { benchmarkRead, benchmarkWrite, resolveDurationMs } from '../system/benchmark.js';
 import { resolveConfigBackupPaths, streamBootDiskImage, streamConfigBackup } from '../system/backupStream.js';
+import type { BackupScheduler } from '../system/backupScheduler.js';
 import { listTimezones, setHostname, setTimezone } from '../system/hostConfig.js';
 import type { SystemStatsService } from '../system/service.js';
 
-export function systemRouter(system: SystemStatsService, nmd: NmdClient, activity: ActivityStore): Router {
+export function systemRouter(system: SystemStatsService, nmd: NmdClient, activity: ActivityStore, backupScheduler: BackupScheduler): Router {
   const router = Router();
 
   router.get('/system', (_req, res) => {
@@ -48,6 +49,20 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
       } else {
         res.status(502).json({ error: (err as Error).message });
       }
+    }
+  });
+
+  // Runs the exact same backup the schedule would, on demand, against the already-saved
+  // destination directory in Settings -> Backups — save the destination there first. Distinct
+  // from /system/boot-disk/backup/config above: that one streams a one-off download straight to
+  // the browser and never touches the array; this one writes to the array like every scheduled
+  // run, so it's covered by the same retention pruning.
+  router.post('/system/backup/run-now', async (_req, res) => {
+    try {
+      const result = await backupScheduler.runNow();
+      res.json(result);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
     }
   });
 
