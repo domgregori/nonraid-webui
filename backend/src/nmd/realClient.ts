@@ -415,7 +415,21 @@ export class RealNmdClient implements NmdClient {
 
   async getStatus(): Promise<NmdStatusResponse> {
     const stdout = await this.runStatusJson(['status', '-o', 'json']);
-    return JSON.parse(stdout) as NmdStatusResponse;
+    const parsed: unknown = JSON.parse(stdout);
+    // nmdctl's -o json prints a valid-but-differently-shaped object on a genuinely blank array
+    // (no array ever created — see nonraid's own tools/nmdctl, show_status()'s non-default-format
+    // branch): `{"error": "..."}`, not the real NmdStatusResponse shape. `JSON.parse(...) as
+    // NmdStatusResponse` alone doesn't check that at runtime, so every caller downstream (many —
+    // confirmed live: this crashed both ShareService.remountAll() and ActivityWatcher.tick() with
+    // two different, confusing "Cannot read properties of undefined" errors, not an obviously
+    // array-related one) got a malformed object instead of a clean rejection. Throwing here once,
+    // at the source, means every caller's existing try/catch around getStatus() already does the
+    // right thing without needing its own defensive shape-check.
+    if (!parsed || typeof parsed !== 'object' || !('array' in parsed) || !('disks' in parsed)) {
+      const message = parsed && typeof parsed === 'object' && 'error' in parsed ? String((parsed as { error: unknown }).error) : 'malformed status response';
+      throw new Error(message);
+    }
+    return parsed as NmdStatusResponse;
   }
 
   /**
