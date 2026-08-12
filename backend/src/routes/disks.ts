@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
 import type { CacheService } from '../cache/service.js';
+import type { DiskQueueService } from '../diskQueue/service.js';
 import type { NmdClient } from '../nmd/index.js';
 import { notifyEvent } from '../settings/notify.js';
 import type { SettingsStore } from '../settings/store.js';
@@ -15,8 +16,17 @@ function parseSlot(param: string): number | null {
   return Number.isInteger(slot) && slot >= 0 && slot <= 29 ? slot : null;
 }
 
-export function disksRouter(nmd: NmdClient, smart: SmartService, activity: ActivityStore, settingsStore: SettingsStore, cache: CacheService): Router {
+export function disksRouter(
+  nmd: NmdClient,
+  smart: SmartService,
+  activity: ActivityStore,
+  settingsStore: SettingsStore,
+  cache: CacheService,
+  diskQueue: DiskQueueService,
+): Router {
   const router = Router();
+
+  const QUEUE_BUSY_MESSAGE = 'A queued disk operation is in progress — wait for it to finish.';
 
   router.get('/disks/available', async (_req, res) => {
     try {
@@ -87,6 +97,10 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
       res.status(400).json({ error: 'device is required.' });
       return;
     }
+    if (diskQueue.isBusy()) {
+      res.status(409).json({ error: QUEUE_BUSY_MESSAGE });
+      return;
+    }
     try {
       // Same fresh-scan validation addDisk uses — see the comment there for why.
       const available = await nmd.listAvailableDevices();
@@ -128,6 +142,10 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
       return;
     }
     const force = req.body?.force === true;
+    if (diskQueue.isBusy()) {
+      res.status(409).json({ error: QUEUE_BUSY_MESSAGE });
+      return;
+    }
     try {
       const result = await nmd.formatDisk(slot, force);
       activity
@@ -173,6 +191,10 @@ export function disksRouter(nmd: NmdClient, smart: SmartService, activity: Activ
     const slot = parseSlot(req.params.slot);
     if (slot === null) {
       res.status(400).json({ error: 'Slot must be a number 0-29.' });
+      return;
+    }
+    if (diskQueue.isBusy()) {
+      res.status(409).json({ error: QUEUE_BUSY_MESSAGE });
       return;
     }
     try {

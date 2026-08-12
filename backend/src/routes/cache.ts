@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
 import type { CacheMoverService } from '../cache/mover.js';
 import type { CacheService } from '../cache/service.js';
+import type { DiskQueueService } from '../diskQueue/service.js';
 import { HttpError } from '../httpError.js';
 import type { SettingsStore } from '../settings/store.js';
 import type { ShareService } from '../shares/index.js';
@@ -12,6 +13,7 @@ export function cacheRouter(
   settingsStore: SettingsStore,
   activity: ActivityStore,
   shares: ShareService,
+  diskQueue: DiskQueueService,
 ): Router {
   const router = Router();
 
@@ -47,6 +49,10 @@ export function cacheRouter(
     const device = req.body?.device;
     if (typeof device !== 'string' || !device) {
       res.status(400).json({ error: 'device is required.' });
+      return;
+    }
+    if (diskQueue.isBusy()) {
+      res.status(409).json({ error: 'A queued disk operation is in progress — wait for it to finish.' });
       return;
     }
     try {

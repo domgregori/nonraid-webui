@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrayDisks } from '../components/dashboard/ArrayDisks';
 import { BootDiskCard } from '../components/dashboard/BootDiskCard';
+import { DiskQueueCard } from '../components/dashboard/DiskQueueCard';
 import { EmptyDiskProgressCard } from '../components/dashboard/EmptyDiskProgressCard';
 import { ParityCheckCard } from '../components/dashboard/ParityCheckCard';
 import { BootDiskDetailPanel } from '../components/disk-detail/BootDiskDetailPanel';
@@ -26,6 +27,7 @@ export function DisksPage() {
         <div className="disks-page">
           <ParityCheckCard />
           <EmptyDiskProgressCard />
+          <DiskQueueCard />
           <ArrayDisks />
 
           <div>

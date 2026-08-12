@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { nmdApi } from '../../api/nmdApi';
+import { diskQueueApi } from '../../api/diskQueueApi';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import type { AvailableDevice } from '../../types/nmdApi';
 import { formatBytesHuman } from '../../utils/format';
@@ -13,7 +13,9 @@ interface AddDiskDialogProps {
 type Role = 'parity' | 'parity2' | 'data';
 
 // nmdctl's own slot numbering (see backend/src/nmd/superblock.ts's MD_SB_P_IDX/MD_SB_Q_IDX):
-// slot 0 is always Parity 1, slot 29 is always Parity 2, 1-28 are data.
+// slot 0 is always Parity 1, slot 29 is always Parity 2, 1-28 are data. The actual slot number is
+// now resolved server-side (see routes/diskQueue.ts) the same way this dialog used to pick it
+// itself — kept here only for the parityTaken/parity2Taken option-disabling checks below.
 const PARITY_SLOT = 0;
 const PARITY2_SLOT = 29;
 
@@ -23,17 +25,14 @@ export function AddDiskDialog({ device, onClose, onDone }: AddDiskDialogProps) {
   // totally blank array (see OnboardingWizard's disk summary, which filters the same way) — only
   // a real disk_id means the slot is actually occupied.
   const usedSlots = new Set((status?.disks ?? []).filter((d) => d.disk_id).map((d) => d.slot));
-  const defaultDataSlot = Array.from({ length: 28 }, (_, i) => i + 1).find((s) => !usedSlots.has(s)) ?? 1;
   const parityTaken = usedSlots.has(PARITY_SLOT);
   const parity2Taken = usedSlots.has(PARITY2_SLOT);
 
   const [role, setRole] = useState<Role>('data');
-  const [dataSlot, setDataSlot] = useState(defaultDataSlot);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ message: string; output: string } | null>(null);
+  const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const slot = role === 'parity' ? PARITY_SLOT : role === 'parity2' ? PARITY2_SLOT : dataSlot;
   const roleAlreadyTaken = (role === 'parity' && parityTaken) || (role === 'parity2' && parity2Taken);
   const arrayStarted = status?.array.state === 'STARTED';
 
@@ -41,8 +40,14 @@ export function AddDiskDialog({ device, onClose, onDone }: AddDiskDialogProps) {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await nmdApi.addDisk(slot, device.device);
-      setResult(res);
+      // parity1/parity2 both map to the same enqueueParity call — the backend resolves slot 0
+      // vs 29 the same way this dialog used to (see routes/diskQueue.ts).
+      const item = role === 'data' ? await diskQueueApi.enqueueData(device.device) : await diskQueueApi.enqueueParity(device.device);
+      setResult(
+        item.status === 'running'
+          ? 'Added to the queue — starting now.'
+          : 'Added to the queue — will start once the current operation finishes.',
+      );
       onDone();
     } catch (err) {
       setError((err as Error).message);
@@ -84,7 +89,9 @@ export function AddDiskDialog({ device, onClose, onDone }: AddDiskDialogProps) {
             </div>
           )}
           {!device.partition && <div className="status-note">No partition detected — it'll be assigned and cleared as a raw disk.</div>}
-          {arrayStarted && <div className="status-note status-note--error">Stop the array before adding a disk.</div>}
+          {arrayStarted && (
+            <div className="status-note">The array is currently running — it'll be stopped automatically when this item's turn comes up.</div>
+          )}
 
           {!result && (
             <div className="settings-field">
@@ -93,12 +100,7 @@ export function AddDiskDialog({ device, onClose, onDone }: AddDiskDialogProps) {
                 Parity has to be at least as large as your biggest data disk. A second parity disk is optional — it
                 protects against two disk failures at once instead of one.
               </div>
-              <select
-                className="history-input"
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-                disabled={submitting || arrayStarted}
-              >
+              <select className="history-input" value={role} onChange={(e) => setRole(e.target.value as Role)} disabled={submitting}>
                 <option value="data">Data disk</option>
                 <option value="parity" disabled={parityTaken}>
                   Parity 1{parityTaken ? ' (already assigned)' : ''}
@@ -107,23 +109,10 @@ export function AddDiskDialog({ device, onClose, onDone }: AddDiskDialogProps) {
                   Parity 2{parity2Taken ? ' (already assigned)' : ''}
                 </option>
               </select>
-
               {role === 'data' && (
-                <>
-                  <div className="toggle-row__title" style={{ marginTop: 10 }}>
-                    Data slot
-                  </div>
-                  <div className="toggle-row__desc">A slot that already has a disk assigned isn't valid here — use Replace Disk for those.</div>
-                  <input
-                    className="history-input"
-                    type="number"
-                    min={1}
-                    max={28}
-                    value={dataSlot}
-                    onChange={(e) => setDataSlot(Number(e.target.value))}
-                    disabled={submitting || arrayStarted}
-                  />
-                </>
+                <div className="toggle-row__desc" style={{ marginTop: 10 }}>
+                  The first free data slot (1-28) is used automatically.
+                </div>
               )}
 
               {roleAlreadyTaken && <div className="status-note status-note--error">That slot already has a disk assigned.</div>}
@@ -133,9 +122,8 @@ export function AddDiskDialog({ device, onClose, onDone }: AddDiskDialogProps) {
           {error && <div className="status-note status-note--error">{error}</div>}
 
           {result && (
-            <div className="import-result">
-              <div className="status-note">{result.message} Watch progress on the Parity Check card.</div>
-              <pre className="import-raw-output">{result.output}</pre>
+            <div className="status-note">
+              {result} Watch progress on the Disk Queue card.
             </div>
           )}
 
@@ -144,7 +132,7 @@ export function AddDiskDialog({ device, onClose, onDone }: AddDiskDialogProps) {
               {result ? 'Close' : 'Cancel'}
             </button>
             {!result && (
-              <button type="button" className="btn--primary" disabled={submitting || arrayStarted || roleAlreadyTaken} onClick={handleAdd}>
+              <button type="button" className="btn--primary" disabled={submitting || roleAlreadyTaken} onClick={handleAdd}>
                 {submitting ? 'Adding…' : 'Add Disk'}
               </button>
             )}

@@ -2,6 +2,7 @@ import { ActivityCard } from '../components/dashboard/ActivityCard';
 import { ArrayDisks } from '../components/dashboard/ArrayDisks';
 import { CacheCard } from '../components/dashboard/CacheCard';
 import { CacheMoverProgressCard } from '../components/dashboard/CacheMoverProgressCard';
+import { DiskQueueCard } from '../components/dashboard/DiskQueueCard';
 import { DockerWidgetCard } from '../components/dashboard/DockerWidgetCard';
 import { LxcWidgetCard } from '../components/dashboard/LxcWidgetCard';
 import { ParityCheckCard } from '../components/dashboard/ParityCheckCard';
@@ -23,6 +24,7 @@ export function DashboardPage() {
           <>
             <StatCards />
             <ParityCheckCard />
+            <DiskQueueCard />
             <CacheCard />
             <CacheMoverProgressCard />
             <ArrayDisks showManageLink />

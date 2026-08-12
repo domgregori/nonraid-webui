@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { cacheApi } from '../../api/cacheApi';
+import { diskQueueApi } from '../../api/diskQueueApi';
 import { useAvailableDevices } from '../../hooks/useAvailableDevices';
 import { formatBytesHuman } from '../../utils/format';
 
@@ -12,6 +12,11 @@ interface CacheSetupDialogProps {
  * Picks two devices for the mirror from the same pool AddDiskDialog draws from — refusing to let
  * both picks be the same device is the only extra rule beyond what a single-device picker needs,
  * since cache setup runs mkfs.btrfs across exactly two devices, never one.
+ *
+ * This dialog's job is just "enqueue and close" — it no longer runs mkfs.btrfs itself. The actual
+ * formatting (including the auto-retry-with-force-on-existing-filesystem behavior this dialog
+ * used to handle inline, see commit dc2248e) now happens in DiskQueueService.runItem, with its
+ * outcome visible on the Disk Queue card / activity log instead of here.
  */
 export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
   const { devices, status: devicesStatus, error: devicesError, refresh } = useAvailableDevices();
@@ -20,7 +25,6 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
 
   const selectedA = devices.find((d) => d.device === deviceA);
   const selectedB = devices.find((d) => d.device === deviceB);
@@ -30,29 +34,16 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
   const handleSetup = async () => {
     setSubmitting(true);
     setError(null);
-    setWarning(null);
     try {
-      const res = await cacheApi.setup(deviceA, deviceB);
-      setResult(res.message);
+      const item = await diskQueueApi.enqueueCacheMirror(deviceA, deviceB);
+      setResult(
+        item.status === 'running'
+          ? 'Added to the queue — starting now.'
+          : 'Added to the queue — will start once the current operation finishes.',
+      );
       onDone();
     } catch (err) {
-      const message = (err as Error).message;
-      // mkfs.btrfs itself refuses without -f the moment it sees a recognized filesystem or
-      // leftover partition table on either device — a real safety backstop, but not something to
-      // block on: retrying once with force and surfacing what happened as a plain note covers it
-      // in one click, same as the disk-format flow (see DiskDetailPanel's handleFormat).
-      if (/use the -f option/i.test(message)) {
-        try {
-          const res = await cacheApi.setup(deviceA, deviceB, true);
-          setWarning('Detected an existing filesystem or partition table on one or both devices — formatted over it anyway.');
-          setResult(res.message);
-          onDone();
-        } catch (err2) {
-          setError((err2 as Error).message);
-        }
-      } else {
-        setError(message);
-      }
+      setError((err as Error).message);
     } finally {
       setSubmitting(false);
     }
@@ -129,8 +120,7 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
             </>
           )}
 
-          {result && <div className="status-note">{result}</div>}
-          {warning && <div className="status-note">{warning}</div>}
+          {result && <div className="status-note">{result} Watch progress on the Disk Queue card.</div>}
 
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onClose}>
