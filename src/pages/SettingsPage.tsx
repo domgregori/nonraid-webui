@@ -6,6 +6,7 @@ import { lxcApi } from '../api/lxcApi';
 import { nmdApi } from '../api/nmdApi';
 import { settingsApi } from '../api/settingsApi';
 import { systemApi } from '../api/systemApi';
+import { ConfigRestoreWizard } from '../components/settings/ConfigRestoreWizard';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
 import { LogsSection } from '../components/settings/LogsSection';
 import { NotificationEventToggles } from '../components/settings/NotificationEventToggles';
@@ -160,6 +161,7 @@ export function SettingsPage() {
   const [timezoneError, setTimezoneError] = useState<string | null>(null);
 
   const [showImportWizard, setShowImportWizard] = useState(false);
+  const [showConfigRestoreWizard, setShowConfigRestoreWizard] = useState(false);
 
   const [currentPasswordDraft, setCurrentPasswordDraft] = useState('');
   const [newPasswordDraft, setNewPasswordDraft] = useState('');
@@ -886,6 +888,7 @@ export function SettingsPage() {
       </div>
 
       {showImportWizard && <ImportArrayWizard onClose={() => setShowImportWizard(false)} />}
+      {showConfigRestoreWizard && <ConfigRestoreWizard onClose={() => setShowConfigRestoreWizard(false)} />}
 
       <div className={`settings-card${activeSection === 'shares' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Shares</div>
@@ -996,6 +999,20 @@ export function SettingsPage() {
           </div>
           {backupRunResult && <div className="status-note">{backupRunResult}</div>}
           {backupRunError && <div className="status-note status-note--error">{backupRunError}</div>}
+        </div>
+
+        <div className="settings-field toggle-row--bordered">
+          <div className="toggle-row__title">Import config</div>
+          <div className="toggle-row__desc">
+            Restores a previously saved config backup — Samba/NFS config, this app's own settings/shares/users, and
+            the activity log. The array is only reconstructed too if it currently has nothing assigned; otherwise
+            use Settings → Import From Unraid for the array itself. Requires the array to be stopped first.
+          </div>
+          <div className="settings-field__row">
+            <button type="button" className="btn" onClick={() => setShowConfigRestoreWizard(true)}>
+              Import config
+            </button>
+          </div>
         </div>
       </div>
 

@@ -36,3 +36,22 @@ export interface NetLiveRate {
   rxKbS: number | null;
   txKbS: number | null;
 }
+
+export interface RestoreArchiveEntry {
+  path: string;
+  isSuperblock: boolean;
+}
+
+export interface RestorePreview {
+  token: string;
+  entries: RestoreArchiveEntry[];
+  // Whether the archive's superblock member (if it has one) will actually be restored — only
+  // true when this array currently has nothing assigned. See backend/src/system/configRestore.ts.
+  arrayIsBlank: boolean;
+  arrayStopped: boolean;
+}
+
+export interface RestoreCommitResult {
+  restoredCount: number;
+  skippedSuperblock: boolean;
+}

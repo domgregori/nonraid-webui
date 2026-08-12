@@ -5,9 +5,10 @@ import { useSystemStats } from '../../hooks/useSystemStats';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { CacheSetupDialog } from '../disk-detail/CacheSetupDialog';
 import { UnassignedDevicesCard } from '../disk-detail/UnassignedDevicesCard';
+import { ConfigRestoreWizard } from '../settings/ConfigRestoreWizard';
 import { ImportArrayWizard } from '../settings/ImportArrayWizard';
 
-type Step = 'welcome' | 'start' | 'import' | 'disks' | 'cache' | 'info' | 'done';
+type Step = 'welcome' | 'start' | 'import' | 'restoreConfig' | 'disks' | 'cache' | 'info' | 'done';
 type Stage = 0 | 1 | 2 | 3;
 
 const STAGE_LABELS = ['Array', 'Cache', 'Tour', 'Done'];
@@ -84,6 +85,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
   const [step, setStep] = useState<Step>(() => deriveStartStep(hasAnyDisk, hasDataDisk, cacheConfigured));
   const [infoIndex, setInfoIndex] = useState(0);
   const [importedJustNow, setImportedJustNow] = useState(false);
+  const [restoredJustNow, setRestoredJustNow] = useState(false);
   const [showCacheSetup, setShowCacheSetup] = useState(false);
 
   const [hostnameDraft, setHostnameDraft] = useState('');
@@ -135,6 +137,19 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
 
   const handleImportClose = () => {
     setStep(importedJustNow ? (cacheConfigured ? 'info' : 'cache') : 'start');
+  };
+
+  // A successful restore can bring back a fully-configured array (superblock included, when the
+  // array was blank) plus shares/users/settings all at once — resolving the same way a successful
+  // array import does covers both that case and the config-only case (superblock skipped, array
+  // still blank) identically, since deriveStartStep would just land back on 'disks' for the latter
+  // on next resolve anyway. Simplest to just re-derive live rather than special-case it here.
+  const handleRestoreClose = () => {
+    if (!restoredJustNow) {
+      setStep('start');
+      return;
+    }
+    setStep(deriveStartStep(hasAnyDisk, hasDataDisk, cacheConfigured));
   };
 
   return (
@@ -240,11 +255,26 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
                     From Unraid or a previous nonraid install — both save the same superblock file.
                   </span>
                 </button>
+                <button
+                  type="button"
+                  className="onboarding-choice"
+                  onClick={() => {
+                    setRestoredJustNow(false);
+                    setStep('restoreConfig');
+                  }}
+                >
+                  <span className="onboarding-choice__title">Restore a full config backup</span>
+                  <span className="onboarding-choice__desc">
+                    Bring back everything from a previous nonraid-webui install at once — array, shares, users, and
+                    settings — from a config backup archive.
+                  </span>
+                </button>
               </div>
             </>
           )}
 
           {step === 'import' && <ImportArrayWizard onClose={handleImportClose} onImported={() => setImportedJustNow(true)} />}
+          {step === 'restoreConfig' && <ConfigRestoreWizard onClose={handleRestoreClose} onRestored={() => setRestoredJustNow(true)} />}
 
           {step === 'disks' && (
             <>

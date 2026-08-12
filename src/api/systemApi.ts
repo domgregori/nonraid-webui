@@ -2,12 +2,23 @@ import { API_BASE_URL } from './config';
 import { request } from './request';
 import type { BenchmarkResult } from '../types/benchmark';
 import type { CommandResult } from '../types/settingsApi';
-import type { NetLiveRate, SystemStats } from '../types/systemApi';
+import type { NetLiveRate, RestoreCommitResult, RestorePreview, SystemStats } from '../types/systemApi';
 
 export const systemApi = {
   getStats: () => request<SystemStats>('/api/system'),
   getNetLive: () => request<NetLiveRate>('/api/system/net-live'),
   runBackupNow: () => request<{ bytes: number }>('/api/system/backup/run-now', { method: 'POST' }),
+  previewConfigRestore: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request<RestorePreview>('/api/system/backup/restore/preview', { method: 'POST', body: form });
+  },
+  commitConfigRestore: (token: string) =>
+    request<RestoreCommitResult>('/api/system/backup/restore/commit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }),
 
   bootDiskImageBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/image`,
   bootDiskConfigBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/config`,
