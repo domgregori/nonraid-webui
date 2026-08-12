@@ -1,0 +1,95 @@
+commit 23277ac75b6cbb3878bb373b77f4d0254f14dcd7
+Author: domgregori <dom.gregori@gmail.com>
+Date:   Tue Aug 11 22:08:33 2026 -0400
+
+    nmdctl: status -o json/prometheus/terse now return valid output on a blank array
+    
+    check_module_loaded() hard-exited the whole process (exit 0, silently
+    "successful") when the module wasn't loaded and no superblock file
+    existed yet, bypassing whatever command was actually running -- every
+    sibling failure branch in that same function already returned instead.
+    That meant `nmdctl status -o json` on a genuinely fresh install (no
+    array ever created) printed plain colored text instead of JSON, with
+    exit code 0 despite being a failure.
+    
+    Found live: nonraid-webui's RealNmdClient.getStatus() JSON.parse()'d
+    that text and threw, crash-looping the whole backend at startup on a
+    clean install -- confirmed by actually restoring a pre-install snapshot
+    and running through a real install end to end, not just reading code.
+    
+    check_module_loaded() now returns instead of exiting. show_status()
+    parses --output before doing anything else, and for non-default formats
+    suppresses the plain-text messages from check_nmdstat_exists()/
+    check_module_loaded() and emits a properly-formatted error (valid JSON
+    object, a prometheus comment line, or a terse key=value line) with a
+    non-zero exit code instead.
+
+diff --git a/tools/nmdctl b/tools/nmdctl
+index 795b6e6..f3c7e4c 100755
+--- a/tools/nmdctl
++++ b/tools/nmdctl
+@@ -180,8 +180,15 @@ check_module_loaded() {
+         echo -e "${RED}Error: nonraid module is not loaded${NC}"
+         echo -e "Superblock file not found: $superblock"
+         echo -e "To create an array with this new superblock, run: ${YELLOW}nmdctl --super $superblock create${NC}"
+-        # exit early, but cleanly
+-        exit 0
++        # Return, don't exit — this is a shared helper called from many commands (status, add,
++        # replace, create, ...), and every one of them needs the chance to report this failure in
++        # its own way (e.g. show_status()'s -o json needing valid JSON out, not this plain text) —
++        # confirmed live: this exit 0 was hard-terminating the whole process before show_status()
++        # ever got a chance to honor its own --output flag, breaking any caller (like
++        # nonraid-webui's RealNmdClient.getStatus()) that assumed `-o json` always means valid
++        # JSON back. Every sibling failure branch in this same function already returns instead of
++        # exiting; this was the only exception.
++        return 1
+     fi
+ }
+ 
+@@ -1832,10 +1839,6 @@ monitor_status_loop() {
+ 
+ # Show current array status
+ show_status() {
+-    if ! check_nmdstat_exists; then
+-        return 1
+-    fi
+-
+     local output_format="default"
+ 
+     # Parse our options
+@@ -1900,6 +1903,35 @@ show_status() {
+         return $?
+     fi
+ 
++    # Confirm the array is actually set up before collecting/formatting anything. For non-default
++    # formats, check_nmdstat_exists()'s own plain-text messages (and check_module_loaded()'s,
++    # underneath it) are redirected away rather than leaking into what's supposed to be a clean
++    # JSON/prometheus/terse response — every --output format needs valid, parseable output even in
++    # this failure case, not just the default one. Confirmed live: this whole path used to be a
++    # hard `exit 0` inside check_module_loaded() that bypassed --output entirely (see its own
++    # comment) — nonraid-webui's RealNmdClient.getStatus() hit exactly this with -o json and choked
++    # on the plain-text output instead of getting valid JSON back.
++    if [ "$output_format" == "default" ]; then
++        if ! check_nmdstat_exists; then
++            return 1
++        fi
++    else
++        if ! check_nmdstat_exists >/dev/null 2>&1; then
++            case "$output_format" in
++                json)
++                    echo '{"error": "nonraid module is not loaded or no array is configured yet"}'
++                    ;;
++                prometheus)
++                    echo "# nonraid module is not loaded or no array is configured yet"
++                    ;;
++                terse)
++                    echo "error=not_configured"
++                    ;;
++            esac
++            return 1
++        fi
++    fi
++
+     # Print default format header early - makes the command feel more snappy
+     if [ "$output_format" == "default" ]; then
+         echo "=== NonRAID Array Status ==="

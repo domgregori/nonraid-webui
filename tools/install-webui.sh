@@ -30,11 +30,12 @@ apt-get update -qq
 
 log "Installing system dependencies"
 # Everything nonraid-webui's own features shell out to at runtime — see ../nonraid/REQUIREMENTS.md
-# for the authoritative list and why each one's needed. Installed up front so every feature works
+# for the authoritative list and why each one's needed — plus `patch`, used only by this script
+# itself (see the nmdctl blank-array status fix below). Installed up front so every feature works
 # immediately after this script finishes, not just whichever ones a fresh install happens to touch
 # first. apt-get install is naturally idempotent — already-installed packages are just skipped.
 apt-get install -y \
-  rsync openssl gpg curl \
+  rsync openssl gpg curl patch \
   smartmontools hdparm \
   xfsprogs e2fsprogs btrfs-progs parted \
   samba nfs-kernel-server \
@@ -118,6 +119,27 @@ if ! modinfo md_nonraid >/dev/null 2>&1 || ! command -v nmdctl >/dev/null 2>&1; 
   systemctl enable --now nonraid.service
 else
   log "NonRAID driver and nmdctl already present"
+fi
+
+# The PPA's nonraid-tools (1.23.0 at time of writing) predates a real upstream fix: on a genuinely
+# fresh install (no array ever created yet), `nmdctl status -o json/prometheus/terse` printed
+# plain colored text instead of valid output for that format, which nonraid-webui's
+# RealNmdClient.getStatus() then JSON.parse()'d and threw on — confirmed live by actually
+# restoring a pre-install snapshot and running an install end to end, not just reading code (the
+# dashboard got stuck showing a raw "Unexpected token" parse error instead of the onboarding
+# wizard). Patches the installed script directly rather than waiting on a new PPA release; skipped
+# once that fix ships upstream and this patch stops finding anything to change (see the grep
+# guard's own comment).
+log "Checking for the nmdctl blank-array status fix"
+NMDCTL_BIN="$(command -v nmdctl)"
+NMDCTL_PATCH="$REPO_ROOT/tools/patches/nmdctl-status-json-on-blank-array.patch"
+if grep -q 'no array is configured yet' "$NMDCTL_BIN"; then
+  log "nmdctl already has the blank-array status fix"
+elif patch --dry-run -s -p1 "$NMDCTL_BIN" < "$NMDCTL_PATCH" >/dev/null 2>&1; then
+  patch -p1 "$NMDCTL_BIN" < "$NMDCTL_PATCH"
+  log "Patched $NMDCTL_BIN with the blank-array status fix"
+else
+  log "WARNING: could not apply the nmdctl blank-array status fix — the installed nmdctl differs from what this patch expects. Continuing anyway; this only affects /api/status before an array has ever been created."
 fi
 
 log "Checking other required tools"
