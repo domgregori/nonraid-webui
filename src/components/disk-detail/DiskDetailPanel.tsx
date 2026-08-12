@@ -7,7 +7,6 @@ import { COLORS } from '../../styles/colors';
 import { ProgressBar } from '../shared/ProgressBar';
 import { BenchmarkSection } from './BenchmarkSection';
 import { EmptyDiskDialog } from './EmptyDiskDialog';
-import { ForceFormatDialog } from './ForceFormatDialog';
 import { ReplaceDiskDialog } from './ReplaceDiskDialog';
 import { ShrinkArrayDialog } from './ShrinkArrayDialog';
 import { SmartOverviewRows } from './SmartOverviewRows';
@@ -32,6 +31,7 @@ export function DiskDetailPanel() {
   const [smartTab, setSmartTab] = useState<SmartTab>('overview');
   const [formatPending, setFormatPending] = useState(false);
   const [formatError, setFormatError] = useState<string | null>(null);
+  const [formatWarning, setFormatWarning] = useState<string | null>(null);
   const [mountPending, setMountPending] = useState(false);
   const [mountError, setMountError] = useState<string | null>(null);
   const [spinPending, setSpinPending] = useState(false);
@@ -39,7 +39,6 @@ export function DiskDetailPanel() {
   const [showReplaceDialog, setShowReplaceDialog] = useState(false);
   const [showEmptyDialog, setShowEmptyDialog] = useState(false);
   const [showShrinkDialog, setShowShrinkDialog] = useState(false);
-  const [showForceFormatDialog, setShowForceFormatDialog] = useState(false);
 
   if (!selectedDiskId || !status || !disk) return null;
 
@@ -68,10 +67,27 @@ export function DiskDetailPanel() {
   const handleFormat = async () => {
     setFormatPending(true);
     setFormatError(null);
+    setFormatWarning(null);
     try {
       await nmdApi.formatDisk(disk.slot);
     } catch (err) {
-      setFormatError((err as Error).message);
+      const message = (err as Error).message;
+      // formatDisk() itself refuses without force the moment it sees a recognized filesystem
+      // already on the disk — a real safety backstop for a disk added by mistake, but not
+      // something to make the user click through a second confirmation dialog for every time
+      // (this is exactly what the danger-styled "Force Format" flow below used to require).
+      // Retrying once with force and surfacing what happened as a plain note instead of an
+      // error covers it in one click.
+      if (/already has a filesystem/i.test(message)) {
+        try {
+          await nmdApi.formatDisk(disk.slot, true);
+          setFormatWarning(`Detected an existing ${disk.fsType} filesystem on this disk — formatted over it anyway.`);
+        } catch (err2) {
+          setFormatError((err2 as Error).message);
+        }
+      } else {
+        setFormatError(message);
+      }
     } finally {
       setFormatPending(false);
     }
@@ -404,7 +420,6 @@ export function DiskDetailPanel() {
               >
                 {formatPending ? 'Formatting…' : 'Format Disk (XFS)'}
               </button>
-              {formatError && <div className="status-note status-note--error">{formatError}</div>}
             </>
           )}
           {needsMount && (
@@ -425,11 +440,15 @@ export function DiskDetailPanel() {
             <button
               type="button"
               className="btn btn--block btn--danger"
-              onClick={() => setShowForceFormatDialog(true)}
+              disabled={formatPending}
+              onClick={handleFormat}
               title="Wipes this disk's existing (non-array) filesystem and formats it as XFS — destroys everything on it, with no undo."
             >
-              Force Format
+              {formatPending ? 'Formatting…' : 'Force Format'}
             </button>
+          )}
+          {(formatError || formatWarning) && (
+            <div className={`status-note${formatError ? ' status-note--error' : ''}`}>{formatError ?? formatWarning}</div>
           )}
           {disk.role === 'data' && !needsFormat && (
             <button
@@ -504,15 +523,6 @@ export function DiskDetailPanel() {
             setShowShrinkDialog(false);
             closeDetail();
           }}
-        />
-      )}
-      {showForceFormatDialog && (
-        <ForceFormatDialog
-          slot={disk.slot}
-          label={disk.label}
-          fsType={disk.fsType}
-          onClose={() => setShowForceFormatDialog(false)}
-          onDone={() => {}}
         />
       )}
     </>

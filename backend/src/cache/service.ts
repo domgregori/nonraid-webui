@@ -118,7 +118,7 @@ export class CacheService {
     };
   }
 
-  async setup(deviceA: string, deviceB: string): Promise<void> {
+  async setup(deviceA: string, deviceB: string, force = false): Promise<void> {
     const current = await this.settingsStore.get();
     if (current.cache.fsUuid) throw new HttpError(409, 'Cache pool is already set up.');
     if (deviceA === deviceB) throw new HttpError(400, 'Pick two different devices for the mirror.');
@@ -133,12 +133,15 @@ export class CacheService {
       if (match.locked) throw new HttpError(409, `${dev} appears to be in use by another process — refusing to touch it.`);
     }
 
-    // No -f: mkfs.btrfs refuses on its own if either device already carries a
-    // recognized filesystem/RAID signature — the same real safety backstop
-    // formatDisk() relies on for array disks, on top of the fresh-scan check
-    // above (listAvailableDevices() already excludes a disk with any mounted
-    // partition, but not one with an unmounted-but-real filesystem on it).
-    await run('mkfs.btrfs', ['-m', 'raid1', '-d', 'raid1', deviceA, deviceB], config.cacheMkfsTimeoutMs);
+    // Without force, no -f: mkfs.btrfs refuses on its own if either device already carries a
+    // recognized filesystem/RAID/partition-table signature — the same real safety backstop
+    // formatDisk() relies on for array disks, on top of the fresh-scan check above
+    // (listAvailableDevices() already excludes a disk with any mounted partition, but not one
+    // with an unmounted-but-real filesystem or leftover partition table on it). force=true passes
+    // -f, deliberately discarding that backstop — the caller (routes/cache.ts) only does that
+    // after a first, unforced attempt already hit this exact refusal.
+    const mkfsArgs = force ? ['-f', '-m', 'raid1', '-d', 'raid1', deviceA, deviceB] : ['-m', 'raid1', '-d', 'raid1', deviceA, deviceB];
+    await run('mkfs.btrfs', mkfsArgs, config.cacheMkfsTimeoutMs);
 
     const { stdout } = await run('blkid', ['-s', 'UUID', '-o', 'value', deviceA], 10_000);
     const fsUuid = stdout.trim();

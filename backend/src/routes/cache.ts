@@ -30,8 +30,9 @@ export function cacheRouter(
       res.status(400).json({ error: 'deviceA and deviceB are required.' });
       return;
     }
+    const force = req.body?.force === true;
     try {
-      await cache.setup(deviceA, deviceB);
+      await cache.setup(deviceA, deviceB, force);
       await shares.remountAll();
       const text = `Cache pool set up (${deviceA} + ${deviceB}, mirrored)`;
       activity.log(text, 'green').catch(() => {});

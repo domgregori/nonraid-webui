@@ -3,11 +3,11 @@ import type { CacheCommandResult, CacheMoverJobState, CacheReplaceStatus, CacheS
 
 export const cacheApi = {
   getStatus: () => request<CacheStatus>('/api/cache/status'),
-  setup: (deviceA: string, deviceB: string) =>
+  setup: (deviceA: string, deviceB: string, force = false) =>
     request<CacheCommandResult>('/api/cache/setup', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ deviceA, deviceB }),
+      body: JSON.stringify({ deviceA, deviceB, force }),
     }),
   replaceDevice: (device: string) =>
     request<CacheCommandResult>('/api/cache/replace', {

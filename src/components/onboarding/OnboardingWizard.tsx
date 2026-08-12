@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { systemApi } from '../../api/systemApi';
-import { useCacheStatus } from '../../hooks/useCacheStatus';
 import { useSystemStats } from '../../hooks/useSystemStats';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { ConfigRestoreWizard } from '../settings/ConfigRestoreWizard';
@@ -33,12 +32,14 @@ function stageForStep(step: Step): Stage {
  * 'welcome' (machine name/timezone) only ever appears here, on a genuinely blank array — it's a
  * one-time first-run convenience, not something worth resurfacing on every "Replay setup tour"
  * once the array's already configured, since Settings → About already covers editing both any
- * time.
+ * time. A second parity disk, more data disks, and a cache mirror are all Disks-page (or Settings
+ * → Cache) actions once the array's up — not something this wizard asks about at all, so reaching
+ * 'info' only ever depends on hasDataDisk, nothing about cache.
  */
-function deriveStartStep(hasAnyDisk: boolean, hasDataDisk: boolean, cacheConfigured: boolean): Step {
+function deriveStartStep(hasAnyDisk: boolean, hasDataDisk: boolean): Step {
   if (!hasAnyDisk) return 'welcome';
   if (!hasDataDisk) return 'disks';
-  return cacheConfigured ? 'info' : 'disks';
+  return 'info';
 }
 
 const INFO_SLIDES = [
@@ -74,7 +75,6 @@ interface OnboardingWizardProps {
 
 export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
   const { status } = useArrayStatus();
-  const { status: cacheStatus } = useCacheStatus();
   const stats = useSystemStats();
   const hasAnyDisk = status?.disks.some((d) => d.disk_id) ?? false;
   // Checked against status.disks directly, not array.total_slots — total_slots only reflects
@@ -82,9 +82,8 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
   // commits whatever's been add-ed so far, which ArrayBuilder's whole plan-then-build model
   // deliberately defers until the very end (see its own doc comment).
   const hasDataDisk = (status?.disks ?? []).some((d) => d.disk_id && d.type === 'data');
-  const cacheConfigured = cacheStatus ? cacheStatus.health !== 'not-configured' : false;
 
-  const [step, setStep] = useState<Step>(() => deriveStartStep(hasAnyDisk, hasDataDisk, cacheConfigured));
+  const [step, setStep] = useState<Step>(() => deriveStartStep(hasAnyDisk, hasDataDisk));
   const [infoIndex, setInfoIndex] = useState(0);
   const [importedJustNow, setImportedJustNow] = useState(false);
   const [restoredJustNow, setRestoredJustNow] = useState(false);
@@ -123,21 +122,21 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
     }
   };
 
-  // status/cacheStatus are still null on the very first render (both poll async); once real data
-  // has arrived, resolve the actual resume step once — covers reopening mid-setup (a reload, or
-  // Replay) landing somewhere other than the very first screen.
+  // status is still null on the very first render (polls async); once real data has arrived,
+  // resolve the actual resume step once — covers reopening mid-setup (a reload, or Replay)
+  // landing somewhere other than the very first screen.
   const resolvedOnce = useRef(false);
   useEffect(() => {
-    if (resolvedOnce.current || status === null || cacheStatus === null) return;
+    if (resolvedOnce.current || status === null) return;
     resolvedOnce.current = true;
-    setStep(deriveStartStep(hasAnyDisk, hasDataDisk, cacheConfigured));
+    setStep(deriveStartStep(hasAnyDisk, hasDataDisk));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, cacheStatus]);
+  }, [status]);
 
   const stage = stageForStep(step);
 
   const handleImportClose = () => {
-    setStep(importedJustNow ? (cacheConfigured ? 'info' : 'disks') : 'start');
+    setStep(importedJustNow ? deriveStartStep(hasAnyDisk, hasDataDisk) : 'start');
   };
 
   // A successful restore can bring back a fully-configured array (superblock included, when the
@@ -150,7 +149,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
       setStep('start');
       return;
     }
-    setStep(deriveStartStep(hasAnyDisk, hasDataDisk, cacheConfigured));
+    setStep(deriveStartStep(hasAnyDisk, hasDataDisk));
   };
 
   return (
@@ -282,10 +281,9 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
               <div className="eyebrow onboarding-hero__eyebrow">First-time setup &middot; Array</div>
               <div className="onboarding-hero__title">Build your array</div>
               <div className="onboarding-hero__desc">
-                Assign a role to each device below — parity (a second one is optional, for extra protection), your
-                first data disk, or an optional cache mirror — then press Build Array to commit the whole plan at
-                once. Nothing happens to any disk until then. Add more data disks afterward from the Disks page,
-                once this one's finished syncing.
+                Pick a parity disk and a data disk, then press Build Array. Initialization — clearing the data disk
+                and building parity — happens in the background, so you don't need to wait here. Once it's running,
+                add more disks, a second parity disk, or a cache mirror any time from the Disks page.
               </div>
 
               {status && status.disks.some((d) => d.disk_id) && (

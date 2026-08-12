@@ -20,6 +20,7 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   const selectedA = devices.find((d) => d.device === deviceA);
   const selectedB = devices.find((d) => d.device === deviceB);
@@ -29,12 +30,29 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
   const handleSetup = async () => {
     setSubmitting(true);
     setError(null);
+    setWarning(null);
     try {
       const res = await cacheApi.setup(deviceA, deviceB);
       setResult(res.message);
       onDone();
     } catch (err) {
-      setError((err as Error).message);
+      const message = (err as Error).message;
+      // mkfs.btrfs itself refuses without -f the moment it sees a recognized filesystem or
+      // leftover partition table on either device — a real safety backstop, but not something to
+      // block on: retrying once with force and surfacing what happened as a plain note covers it
+      // in one click, same as the disk-format flow (see DiskDetailPanel's handleFormat).
+      if (/use the -f option/i.test(message)) {
+        try {
+          const res = await cacheApi.setup(deviceA, deviceB, true);
+          setWarning('Detected an existing filesystem or partition table on one or both devices — formatted over it anyway.');
+          setResult(res.message);
+          onDone();
+        } catch (err2) {
+          setError((err2 as Error).message);
+        }
+      } else {
+        setError(message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -112,6 +130,7 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
           )}
 
           {result && <div className="status-note">{result}</div>}
+          {warning && <div className="status-note">{warning}</div>}
 
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onClose}>
