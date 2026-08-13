@@ -1,6 +1,9 @@
 import { useRef, useState } from 'react';
+import { servicesApi } from '../../api/servicesApi';
 import { systemApi } from '../../api/systemApi';
 import type { RestoreCommitResult, RestorePreview } from '../../types/systemApi';
+
+type PostActionId = 'smb' | 'nfs' | 'webui' | 'reload';
 
 interface ConfigRestoreWizardProps {
   onClose: () => void;
@@ -35,6 +38,29 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
   const [commitResult, setCommitResult] = useState<RestoreCommitResult | null>(null);
   const [commitError, setCommitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // The result step's own follow-up actions (restart SMB/NFS/nonraid-webui to actually pick up
+  // what was just restored, retry the driver reload if the automatic one failed) — buttons, not
+  // just the text hints this screen used to leave the user to go act on manually elsewhere.
+  const [postActionPending, setPostActionPending] = useState<PostActionId | null>(null);
+  const [postActionMessage, setPostActionMessage] = useState<string | null>(null);
+  const [postActionError, setPostActionError] = useState<string | null>(null);
+  const [reloadRetrySucceeded, setReloadRetrySucceeded] = useState(false);
+
+  const runPostAction = async (id: PostActionId, action: () => Promise<{ message?: string }>) => {
+    setPostActionPending(id);
+    setPostActionMessage(null);
+    setPostActionError(null);
+    try {
+      const result = await action();
+      setPostActionMessage(result.message ?? 'Done.');
+      if (id === 'reload') setReloadRetrySucceeded(true);
+    } catch (err) {
+      setPostActionError((err as Error).message);
+    } finally {
+      setPostActionPending(null);
+    }
+  };
 
   const handleFileSelected = async (file: File) => {
     setFileName(file.name);
@@ -201,8 +227,62 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
               <div className="status-note">
                 Restored {commitResult.restoredCount} item(s)
                 {commitResult.skippedSuperblock ? ' — array superblock skipped, array already has disks assigned' : ''}.
-                Samba/NFS may need a service restart (Settings → Services) to pick up the restored config, and
-                nonraid-webui itself may need a restart to fully apply restored settings.
+                Samba/NFS may need a service restart to pick up the restored config, and nonraid-webui itself may
+                need a restart to fully apply restored settings — both available below.
+              </div>
+
+              {commitResult.superblockReloadError && !reloadRetrySucceeded && (
+                <div className="status-note status-note--error">
+                  The restored array superblock is on disk, but reloading the driver to pick it up failed:{' '}
+                  {commitResult.superblockReloadError} The array will keep showing as unconfigured until this is
+                  retried below or the host is rebooted.
+                </div>
+              )}
+
+              <div className="toggle-row--bordered" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                <div className="dialog__actions" style={{ justifyContent: 'flex-start' }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={postActionPending !== null}
+                    onClick={() => runPostAction('smb', () => servicesApi.restart('smb'))}
+                  >
+                    {postActionPending === 'smb' ? 'Restarting…' : 'Restart SMB'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={postActionPending !== null}
+                    onClick={() => runPostAction('nfs', () => servicesApi.restart('nfs'))}
+                  >
+                    {postActionPending === 'nfs' ? 'Restarting…' : 'Restart NFS'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={postActionPending !== null}
+                    onClick={() => runPostAction('webui', () => servicesApi.restart('webui'))}
+                  >
+                    {postActionPending === 'webui' ? 'Restarting…' : 'Restart nonraid-webui'}
+                  </button>
+                  {commitResult.superblockReloadError && !reloadRetrySucceeded && (
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      disabled={postActionPending !== null}
+                      onClick={() =>
+                        runPostAction('reload', async () => {
+                          const { result } = await systemApi.reloadDriver();
+                          return { message: `Driver reloaded, ${result.importedCount} disk(s) re-imported.` };
+                        })
+                      }
+                    >
+                      {postActionPending === 'reload' ? 'Reloading…' : 'Retry driver reload'}
+                    </button>
+                  )}
+                </div>
+                {postActionMessage && <div className="status-note">{postActionMessage}</div>}
+                {postActionError && <div className="status-note status-note--error">{postActionError}</div>}
               </div>
 
               <div className="dialog__actions">

@@ -109,6 +109,13 @@ export interface NmdClient {
   // config/nmdctl's default), exposed for callers that just need to know the
   // path without committing anything (the boot disk config backup). Read-only.
   getSuperblockPath(): Promise<string>;
+  // For a caller that has *already* written a new superblock file directly onto the target path
+  // itself (the config-restore route's tar extraction, unlike commitImportedSuperblock()'s own
+  // staged-file-copy) — the running module has no idea the file changed until told, so this does
+  // the same stop/unload/reload/import sequence commitImportedSuperblock() ends with, minus the
+  // file handling that caller already doesn't need. Same risk category as reloadDriver()'s module
+  // reload; the caller is responsible for the same unmount-before composition.
+  reloadModuleAndImport(): Promise<ImportResult>;
   // The driver has no readback for write method — it's a write-only kernel
   // command (confirmed: absent from both `status -o json` and /proc/nmdstat)
   // — so the caller is the source of truth for what's "currently" set, same

@@ -365,28 +365,11 @@ export class RealNmdClient implements NmdClient {
     }
   }
 
-  async commitImportedSuperblock(stagedFilePath: string): Promise<{ result: ImportResult; targetPath: string; backedUpTo: string | null }> {
-    const targetPath = await this.getSuperblockPath();
-
-    let backedUpTo: string | null = null;
-    try {
-      await this.runSystem('test', ['-f', targetPath]);
-      backedUpTo = `${targetPath}.bak-import-${Date.now()}`;
-      await this.runSystem('mv', [targetPath, backedUpTo]);
-    } catch {
-      // Nothing at targetPath yet — first-ever import, nothing to back up.
-    }
-
-    try {
-      await this.runSystem('cp', [stagedFilePath, targetPath]);
-    } catch (err) {
-      // Restore the backup filename before surfacing the error — nothing
-      // kernel-side has changed yet at this point, same recovery shape as
-      // shrinkArray()'s modprobe-failure branch.
-      if (backedUpTo) await this.runSystem('mv', [backedUpTo, targetPath]).catch(() => {});
-      throw err;
-    }
-
+  // Shared by commitImportedSuperblock() and reloadModuleAndImport(): stop, unload, reload
+  // against targetPath, then scan-import whatever the driver finds there. backedUpTo is only for
+  // the error messages below (commitImportedSuperblock's own backup — reloadModuleAndImport has
+  // none, its caller already placed the file directly).
+  private async stopUnloadReloadImport(targetPath: string, backedUpTo: string | null): Promise<ImportResult> {
     await this.run(['stop']);
 
     try {
@@ -410,7 +393,38 @@ export class RealNmdClient implements NmdClient {
     }
 
     const { stdout } = await this.run(['import']);
-    return { result: parseImportOutput(stdout), targetPath, backedUpTo };
+    return parseImportOutput(stdout);
+  }
+
+  async commitImportedSuperblock(stagedFilePath: string): Promise<{ result: ImportResult; targetPath: string; backedUpTo: string | null }> {
+    const targetPath = await this.getSuperblockPath();
+
+    let backedUpTo: string | null = null;
+    try {
+      await this.runSystem('test', ['-f', targetPath]);
+      backedUpTo = `${targetPath}.bak-import-${Date.now()}`;
+      await this.runSystem('mv', [targetPath, backedUpTo]);
+    } catch {
+      // Nothing at targetPath yet — first-ever import, nothing to back up.
+    }
+
+    try {
+      await this.runSystem('cp', [stagedFilePath, targetPath]);
+    } catch (err) {
+      // Restore the backup filename before surfacing the error — nothing
+      // kernel-side has changed yet at this point, same recovery shape as
+      // shrinkArray()'s modprobe-failure branch.
+      if (backedUpTo) await this.runSystem('mv', [backedUpTo, targetPath]).catch(() => {});
+      throw err;
+    }
+
+    const result = await this.stopUnloadReloadImport(targetPath, backedUpTo);
+    return { result, targetPath, backedUpTo };
+  }
+
+  async reloadModuleAndImport(): Promise<ImportResult> {
+    const targetPath = await this.getSuperblockPath();
+    return this.stopUnloadReloadImport(targetPath, null);
   }
 
   async getStatus(): Promise<NmdStatusResponse> {

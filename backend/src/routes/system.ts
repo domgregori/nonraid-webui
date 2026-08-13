@@ -159,10 +159,32 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
       dropStagedRestore(token);
       await unlink(staged.filePath).catch(() => {});
 
+      // restoreArchiveMembers() only writes the file — the already-running kernel module has no
+      // way to know its superblock file changed underneath it (confirmed live: the array stayed
+      // reporting blank, and the onboarding wizard kept bouncing back to its very first screen,
+      // no matter how many times status was re-fetched, since that was genuinely accurate live
+      // driver state, not stale frontend data). Only needed when the superblock was actually
+      // restored (skippedSuperblock covers "wasn't in the archive" and "already had disks" both);
+      // a reload failure doesn't undo the file restore, so it's reported alongside success rather
+      // than turned into a 502 — the files are safely on disk either way, only the running
+      // module's own state needs a retry (or a reboot) to catch up.
+      const superblockRestored = members.includes(superblockMember) && arrayIsBlank;
+      let superblockReloadError: string | null = null;
+      if (superblockRestored) {
+        try {
+          await nmd.reloadModuleAndImport();
+        } catch (err) {
+          superblockReloadError = (err as Error).message;
+        }
+      }
+
       const text = `Config restored (${restoredCount} item${restoredCount === 1 ? '' : 's'}${skippedSuperblock ? ', array superblock skipped — array already has disks assigned' : ''})`;
       activity.log(text, 'blue').catch(() => {});
+      if (superblockReloadError) {
+        activity.log(`Config restore's superblock reload failed: ${superblockReloadError}`, 'red').catch(() => {});
+      }
 
-      res.json({ restoredCount, skippedSuperblock });
+      res.json({ restoredCount, skippedSuperblock, superblockReloadError });
     } catch (err) {
       const message = err instanceof HttpError ? err.message : (err as Error).message;
       activity.log(`Config restore failed: ${message}`, 'red').catch(() => {});
@@ -171,6 +193,22 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
       } else {
         res.status(502).json({ error: message });
       }
+    }
+  });
+
+  // Manual retry for the reload restoreArchiveMembers's superblock member above already attempts
+  // automatically — same operation, exposed on its own so a failed auto-reload (or any other case
+  // where the superblock file on disk changed without the running module knowing, e.g. this route
+  // itself only ever half-succeeding earlier) can be retried without redoing the whole restore.
+  router.post('/system/reload-driver', async (_req, res) => {
+    try {
+      const result = await nmd.reloadModuleAndImport();
+      activity.log(`Driver reloaded, ${result.importedCount} disk(s) re-imported`, 'blue').catch(() => {});
+      res.json({ result });
+    } catch (err) {
+      const message = (err as Error).message;
+      activity.log(`Driver reload failed: ${message}`, 'red').catch(() => {});
+      res.status(502).json({ error: message });
     }
   });
 

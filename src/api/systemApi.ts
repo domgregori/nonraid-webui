@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './config';
 import { request } from './request';
 import type { BenchmarkResult } from '../types/benchmark';
+import type { ImportResult } from '../types/nmdApi';
 import type { CommandResult } from '../types/settingsApi';
 import type { NetLiveRate, RestoreCommitResult, RestorePreview, SystemStats } from '../types/systemApi';
 
@@ -19,6 +20,9 @@ export const systemApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ token }),
     }),
+  // Manual retry for the reload a restore already attempts automatically — see
+  // backend/src/routes/system.ts's own comment on why this needs its own endpoint.
+  reloadDriver: () => request<{ result: ImportResult }>('/api/system/reload-driver', { method: 'POST' }),
 
   bootDiskImageBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/image`,
   bootDiskConfigBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/config`,

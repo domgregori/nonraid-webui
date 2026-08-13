@@ -54,4 +54,9 @@ export interface RestorePreview {
 export interface RestoreCommitResult {
   restoredCount: number;
   skippedSuperblock: boolean;
+  /** Set only when the archive's superblock was restored (skippedSuperblock false, the archive
+   *  had one) but reloading the driver against it afterward failed — the file itself is in place
+   *  either way, this only means the running module hasn't picked it up yet. Null on success or
+   *  when there was no superblock to reload for. */
+  superblockReloadError: string | null;
 }
