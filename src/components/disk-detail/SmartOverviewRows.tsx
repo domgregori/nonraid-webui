@@ -23,10 +23,6 @@ export function SmartOverviewRows({ attributes, typeLabel }: SmartOverviewRowsPr
         <span className="detail-row__value">{attributes.serial ?? '—'}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-row__label">UUID</span>
-        <span className="detail-row__value">{attributes.wwn ?? '—'}</span>
-      </div>
-      <div className="detail-row">
         <span className="detail-row__label">Capacity</span>
         <span className="detail-row__value">{attributes.capacityBytes != null ? formatBytesHuman(attributes.capacityBytes) : '—'}</span>
       </div>
