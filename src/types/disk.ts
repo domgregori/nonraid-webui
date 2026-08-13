@@ -34,4 +34,10 @@ export interface DiskViewModel extends DiskBase {
   healthLabel: string;
   isSSD: boolean | null;
   typeLabel: string;
+  /** True for a data disk that's DISK_OK (present, correctly identified, no redundancy problem)
+   *  but has never been formatted — nmdctl's own "unknown" filesystem sentinel. Not a parity/
+   *  redundancy issue (isDegraded() correctly leaves this alone), but not a disk you can actually
+   *  store anything on yet either — surfaced separately so it doesn't get lost inside a plain
+   *  green "Active" card. */
+  needsFormat: boolean;
 }

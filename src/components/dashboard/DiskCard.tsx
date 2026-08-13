@@ -1,4 +1,5 @@
 import type { MouseEvent } from 'react';
+import { COLORS } from '../../styles/colors';
 import type { ParityViewModel } from '../../types/parity';
 import type { DiskViewModel } from '../../types';
 
@@ -85,6 +86,11 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
         </span>
       </div>
       <div className="disk-card__device">{disk.device}</div>
+      {disk.needsFormat && (
+        <div className="disk-card__row--sub" style={{ color: COLORS.amber }}>
+          Needs formatting — no filesystem yet
+        </div>
+      )}
       <div className="progress-track">
         <div className="progress-track__fill" style={{ width: disk.barWidth, background: disk.barColor }} />
       </div>

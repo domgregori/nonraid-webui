@@ -28,6 +28,14 @@ function normalize(value: string | undefined): string {
   return value && value !== '-' ? value : '—';
 }
 
+/** True for a data disk that's DISK_OK (present, correctly identified, no redundancy problem)
+ *  but has never been formatted — nmdctl's own "unknown" filesystem sentinel (see get_fs_type()
+ *  in tools/nmdctl), not an error state. Parity never has a filesystem of its own by design.
+ *  Exported so both the per-disk card border and a dashboard-wide summary can share one check. */
+export function diskNeedsFormat(disk: NmdDisk): boolean {
+  return disk.type !== 'P' && disk.type !== 'Q' && disk.status === 'DISK_OK' && (!disk.filesystem?.type || disk.filesystem.type === 'unknown');
+}
+
 export function deriveDisk(
   disk: NmdDisk,
   arrayStarted: boolean,
@@ -58,6 +66,7 @@ export function deriveDisk(
   const usedPct = role === 'data' ? parseUsagePct(disk.filesystem?.usage) : 0;
   const sizeTB = disk.size_gb / 1024;
   const tempColor = typeof tempC === 'number' && tempC >= 40 ? COLORS.amber : COLORS.textSecondary;
+  const needsFormat = diskNeedsFormat(disk);
 
   return {
     id: String(disk.slot),
@@ -80,12 +89,14 @@ export function deriveDisk(
     tempColor,
     barWidth: `${usedPct}%`,
     barColor: usedPct >= 90 ? COLORS.red : usedPct >= 75 ? COLORS.amber : COLORS.blue,
-    borderColor: status === 'missing' ? COLORS.red : status === 'standby' ? COLORS.border : COLORS.borderLit,
+    borderColor:
+      status === 'missing' ? COLORS.red : needsFormat ? COLORS.amber : status === 'standby' ? COLORS.border : COLORS.borderLit,
     health: health ?? null,
     healthColor: health === 'failed' ? COLORS.red : health === 'passed' ? COLORS.green : COLORS.textDim,
     healthLabel: health === 'failed' ? 'SMART Failing' : health === 'passed' ? 'SMART OK' : 'SMART —',
     isSSD: isSSD ?? null,
     typeLabel: isSSD === true ? 'SSD' : isSSD === false ? 'HDD' : '—',
+    needsFormat,
   };
 }
 
