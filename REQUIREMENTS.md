@@ -1,4 +1,4 @@
-z# Production Requirements — NonRAID and nonraid-webui
+# Production Requirements — NonRAID and nonraid-webui
 
 This is a list of items needed to run NonRAID and nonraid-webui in production, on one VM under
 Proxmox VE. Update this list as items change or new items appear.
@@ -61,10 +61,11 @@ Proxmox VE. Update this list as items change or new items appear.
 ## Build output
 
 **Built.** `tools/install-webui.sh` builds both halves (`npm ci` + `tsc` for the backend, `npm ci`
-+ `vite build` for the frontend) and stages them into `/opt/nonraid-webui`. The backend serves the
-frontend's built files itself (`SERVE_FRONTEND=true`, same origin/port) — no separate reverse
-proxy needed; TLS also terminates natively in this same process (see Security below), so a
-reverse proxy in front is optional, not required.
+
+- `vite build` for the frontend) and stages them into `/opt/nonraid-webui`. The backend serves the
+  frontend's built files itself (`SERVE_FRONTEND=true`, same origin/port) — no separate reverse
+  proxy needed; TLS also terminates natively in this same process (see Security below), so a
+  reverse proxy in front is optional, not required.
 
 ## Process management
 

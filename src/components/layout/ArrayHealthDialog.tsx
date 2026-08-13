@@ -23,7 +23,7 @@ export function ArrayHealthDialog({ onClose }: ArrayHealthDialogProps) {
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Why is the array degraded?</div>
+          <div className="dialog__title">Array Degraded</div>
           <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
             &#10005;
           </button>

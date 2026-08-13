@@ -15,13 +15,6 @@
 # A value present in this file but with the wrong type (e.g. port = "abc")
 # silently falls back to the built-in default. A syntax error in this file
 # fails the backend at startup with a clear message naming the problem.
-#
-# Every *use_sudo flag below shows "false" (this app running as root, no sudo needed) because an
-# env var always wins over this file, and tools/install-webui.sh sets every one of them to true via
-# a systemd override — along with the matching sudoers rule and running the service as a non-root
-# user — automatically. Nothing to edit here for that; see the override at
-# /etc/systemd/system/nonraid-webui.service.d/override.conf and the sudoers rule at
-# /etc/sudoers.d/nonraid-webui if you need to see or change exactly what's allowed.
 
 [server]
 #port = 3001

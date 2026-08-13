@@ -1,6 +1,6 @@
 # NonRAID WebUI
 
-<img src="./public/logo.png" width="300">
+<center><img src="./public/logo.png" width="300"></center>
 
 ### Disclaimer: **EXPERIMENTAL!**
 
@@ -26,7 +26,7 @@ containers, LXC containers, historical metrics, and array management.
 - A file browser to interact with shares
 - Docker template **Apps** from [Community Applications](https://github.com/Squidly271/community.applications)
 - Custom docker containers
-- LXC containers
+- LXC containers with snapshot support
 - Choose where to store containers
 - History graphs of Temps, CPU, RAM, I/O, Net, Usage
 - Import an Unraid array or a previous NonRAID array/config
@@ -41,6 +41,8 @@ containers, LXC containers, historical metrics, and array management.
 ## Requirements
 
 - Debian 13 new install with a sudo user, to run install script
+  - NonRAID has specific kernel needs
+  - Not tested on other distros. Only tested on fresh install of Debian 13
 - Install script installs the other requirements. Read [REQUIREMENTS.md](REQUIREMENTS.md) and [install-webui.sh](tools/install-webui.sh)
 
 ## Installing
@@ -48,7 +50,7 @@ containers, LXC containers, historical metrics, and array management.
 ```
 git clone https://github.com/domgregori/nonraid-webui
 cd nonraid-webui
-sudo tools/install-webui.sh
+sudo bash tools/install-webui.sh
 ```
 
 ## Development
