@@ -1,8 +1,7 @@
-import { execFile, execFileSync, execSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import os from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { BUILD_HASH } from '../buildInfo.generated.js';
 import { config } from '../config.js';
 import type { SmartService } from '../smart/service.js';
 import { VERSION } from '../version.js';
@@ -35,18 +34,14 @@ function getNetworkInterfaces(): NetworkInterfaceInfo[] {
   return result;
 }
 
-const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const execFileAsync = promisify(execFile);
 const BOOT_DISK_REFRESH_MS = 60_000;
 
+// Baked in at build time by scripts/gen-build-info.mjs, not read live from git here - the
+// installed deployment only ever gets backend/dist/ copied over (see tools/install-webui.sh),
+// with no .git alongside it for a runtime `git rev-parse` to find.
 function readBuildVersion(): string | null {
-  try {
-    return execSync('git rev-parse --short HEAD', { cwd: THIS_DIR, stdio: ['ignore', 'pipe', 'ignore'] })
-      .toString()
-      .trim();
-  } catch {
-    return null; // not a git checkout (e.g. a packaged deployment with no .git) - fine, just omit it
-  }
+  return BUILD_HASH;
 }
 
 interface BootDiskIdentity {

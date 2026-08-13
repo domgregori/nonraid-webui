@@ -4,9 +4,12 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/gen-build-info.mjs",
     "dev": "tsx watch src/index.ts",
+    "prebuild": "node scripts/gen-build-info.mjs",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "pretypecheck": "node scripts/gen-build-info.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
