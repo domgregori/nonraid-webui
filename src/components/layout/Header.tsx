@@ -4,6 +4,7 @@ import { useArrayStatus } from '../../state/useArrayStatus';
 import { useAuth } from '../../state/useAuth';
 import { ArrayStatusPill } from './ArrayStatusPill';
 import { HeaderSystemInfo } from './HeaderSystemInfo';
+import { NotificationBell } from './NotificationBell';
 
 export function Header() {
   const { status, arrayPending, toggleArray } = useArrayStatus();
@@ -30,6 +31,7 @@ export function Header() {
         >
           {toggleBtn.label}
         </button>
+        <NotificationBell />
         <button type="button" className="btn" onClick={() => logout()}>
           Log out
         </button>

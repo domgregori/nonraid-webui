@@ -1,5 +1,5 @@
-import { ActivityCard } from '../components/dashboard/ActivityCard';
 import { ArrayDisks } from '../components/dashboard/ArrayDisks';
+import { ArrayErrorCard } from '../components/dashboard/ArrayErrorCard';
 import { CacheCard } from '../components/dashboard/CacheCard';
 import { CacheMoverProgressCard } from '../components/dashboard/CacheMoverProgressCard';
 import { DiskQueueCard } from '../components/dashboard/DiskQueueCard';
@@ -25,6 +25,7 @@ export function DashboardPage() {
         {status && (
           <>
             <StatCards />
+            <ArrayErrorCard />
             <ParityCheckCard />
             <DiskQueueCard />
             <CacheCard />
@@ -39,7 +40,6 @@ export function DashboardPage() {
       <div className="dashboard__sidebar">
         <SystemCard />
         <SharesCard />
-        <ActivityCard />
       </div>
     </div>
   );

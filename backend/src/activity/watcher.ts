@@ -20,6 +20,13 @@ function diskLabel(disk: NmdDisk): string {
   return disk.disk_name || (disk.device !== 'none' ? disk.device : `slot ${disk.slot}`);
 }
 
+/** Mirrors the frontend's selectors/disks.ts:diskNeedsFormat exactly — a data disk (never
+ *  parity/Q) that's DISK_OK but has no recognized filesystem yet. "unknown" is nmdctl's own
+ *  sentinel for that (see get_fs_type() in tools/nmdctl), not an error. */
+function diskNeedsFormat(disk: NmdDisk): boolean {
+  return disk.type !== 'P' && disk.type !== 'Q' && disk.status === 'DISK_OK' && (!disk.filesystem?.type || disk.filesystem.type === 'unknown');
+}
+
 interface DiskSnapshot {
   status: DiskStatus;
   errors: number;
@@ -50,6 +57,12 @@ export class ActivityWatcher {
   // on the crossing rather than every tick.
   private overTemp = new Map<string, boolean>();
   private lastCacheHealth: CacheHealth | null = null;
+  // undefined = not observed yet (seed silently, same reasoning as every other snapshot above);
+  // null = confirmed not currently erroring.
+  private lastErrorState: string | null | undefined = undefined;
+  // Map, not a Set, so a slot's *first* observation can be seeded without logging — same
+  // undefined-means-unseen idiom as diskSnapshots/healthSnapshots above.
+  private needsFormatSnapshots = new Map<number, boolean>();
 
   constructor(
     private nmd: NmdClient,
@@ -71,11 +84,49 @@ export class ActivityWatcher {
       return; // driver unreachable this round — try again next tick
     }
 
+    this.checkArrayError(status.array.state);
     this.checkParitySync(status.array.last_sync, status.array.counters.sync_errors);
     this.checkDisks(status.disks);
+    this.checkNeedsFormat(status.disks);
     await this.checkSmartHealth(status.disks);
     await this.checkTemperatures(status.disks);
     await this.checkCacheMirror();
+  }
+
+  /** Edge-triggered on the array entering (or changing) an ERROR:* state — see isArrayError()'s
+   *  own reasoning in selectors/status.ts for why this means something genuinely needs a look,
+   *  not just a normal stopped/degraded array. Deliberately doesn't log on *recovery* (state
+   *  leaving ERROR:*), same "only log getting worse" reasoning as checkCacheMirror below — the
+   *  dashboard's own ArrayErrorCard disappearing already communicates that. */
+  private checkArrayError(state: string): void {
+    const prev = this.lastErrorState;
+    const isError = state.startsWith('ERROR:');
+    this.lastErrorState = isError ? state : null;
+    if (prev === undefined) return; // first tick — seed only, don't log pre-existing state
+
+    if (isError && state !== prev) {
+      const text = `Array error: ${state}`;
+      this.activity.log(text, 'red').catch(() => {});
+      notifyEvent(this.settings, 'arrayError', 'NonRAID: array error', text);
+    }
+  }
+
+  /** Edge-triggered per slot, same seed-then-diff idiom as checkDisks above. Only logs a slot
+   *  newly *needing* format — a slot that gets formatted (leaves the set) is silent, same
+   *  no-recovery-event reasoning as checkCacheMirror. */
+  private checkNeedsFormat(disks: NmdDisk[]): void {
+    for (const disk of disks) {
+      const prev = this.needsFormatSnapshots.get(disk.slot);
+      const needsFormat = diskNeedsFormat(disk);
+      this.needsFormatSnapshots.set(disk.slot, needsFormat);
+      if (prev === undefined) continue; // first observation of this slot — seed only
+
+      if (needsFormat && !prev) {
+        const text = `Disk ${disk.slot} (${diskLabel(disk)}) needs formatting — no filesystem detected`;
+        this.activity.log(text, 'amber').catch(() => {});
+        notifyEvent(this.settings, 'diskNeedsFormat', 'NonRAID: disk needs formatting', text);
+      }
+    }
   }
 
   /**

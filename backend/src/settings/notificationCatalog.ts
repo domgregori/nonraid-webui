@@ -15,7 +15,9 @@ export type NotificationEventType =
   | 'arrayStopped'
   | 'cacheMirrorDegraded'
   | 'cacheMoverFailed'
-  | 'cacheMoverCompleted';
+  | 'cacheMoverCompleted'
+  | 'arrayError'
+  | 'diskNeedsFormat';
 
 export type NotificationSeverity = 'high' | 'medium' | 'low';
 
@@ -37,6 +39,7 @@ export interface NotificationEventDef {
  * list (via GET /settings/notification-events) so they can't drift apart.
  */
 export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
+  { id: 'arrayError', label: 'Array in an error state', severity: 'high', defaultEnabled: true },
   { id: 'diskFailed', label: 'Disk failed or went offline', severity: 'high', defaultEnabled: true },
   { id: 'diskErrors', label: 'Disk reported new errors', severity: 'high', defaultEnabled: true },
   { id: 'smartFailed', label: 'SMART health check failed', severity: 'high', defaultEnabled: true },
@@ -48,6 +51,7 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { id: 'tempAlertDisk', label: 'Disk temperature alert', severity: 'medium', defaultEnabled: true, group: 'Temperature' },
   { id: 'diskAdded', label: 'Disk added or replaced', severity: 'medium', defaultEnabled: true },
   { id: 'arrayReconfigured', label: 'Array reconfigured (disk dropped)', severity: 'medium', defaultEnabled: true },
+  { id: 'diskNeedsFormat', label: 'Disk needs formatting', severity: 'medium', defaultEnabled: true },
   { id: 'parityStarted', label: 'Parity check started', severity: 'low', defaultEnabled: false },
   { id: 'parityCompleted', label: 'Parity check finished with no errors', severity: 'low', defaultEnabled: false },
   { id: 'backupCompleted', label: 'Scheduled backup completed', severity: 'low', defaultEnabled: false },

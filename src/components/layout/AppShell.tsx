@@ -1,16 +1,16 @@
 import type { ReactNode } from 'react';
 import { DiskDetailPanel } from '../disk-detail/DiskDetailPanel';
-import { ArrayErrorBanner } from './ArrayErrorBanner';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { NavTabs } from './NavTabs';
+import { ToastStack } from './ToastStack';
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <Header />
       <NavTabs />
-      <ArrayErrorBanner />
+      <ToastStack />
       {children}
       <Footer />
       <DiskDetailPanel />
