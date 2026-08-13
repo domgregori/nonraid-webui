@@ -1,9 +1,13 @@
 import { useRef, useState } from 'react';
-import { servicesApi } from '../../api/servicesApi';
 import { systemApi } from '../../api/systemApi';
-import type { RestoreCommitResult, RestorePreview } from '../../types/systemApi';
+import { ProgressBar } from '../shared/ProgressBar';
+import type { RestartServicesResult, RestoreCommitResult, RestorePreview } from '../../types/systemApi';
 
-type PostActionId = 'smb' | 'nfs' | 'webui' | 'reload';
+// getStats() polled every POLL_INTERVAL_MS after triggering a restart, up to POLL_MAX_ATTEMPTS
+// times, to detect nonraid-webui actually coming back — a generous ceiling (2 minutes) since a
+// slow reboot-adjacent host shouldn't get told to give up while it's still genuinely coming back.
+const POLL_INTERVAL_MS = 1500;
+const POLL_MAX_ATTEMPTS = 80;
 
 interface ConfigRestoreWizardProps {
   onClose: () => void;
@@ -39,27 +43,43 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
   const [commitError, setCommitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // The result step's own follow-up actions (restart SMB/NFS/nonraid-webui to actually pick up
-  // what was just restored, retry the driver reload if the automatic one failed) — buttons, not
-  // just the text hints this screen used to leave the user to go act on manually elsewhere.
-  const [postActionPending, setPostActionPending] = useState<PostActionId | null>(null);
-  const [postActionMessage, setPostActionMessage] = useState<string | null>(null);
-  const [postActionError, setPostActionError] = useState<string | null>(null);
-  const [reloadRetrySucceeded, setReloadRetrySucceeded] = useState(false);
+  // The result step's own single follow-up action — restart SMB/NFS, reload the driver, and
+  // restart nonraid-webui itself, so what was just restored actually takes effect, instead of
+  // just a text hint left for the user to go act on manually elsewhere. `restarting` covers the
+  // whole span from click through nonraid-webui actually coming back — the request itself only
+  // resolves the SMB/NFS/driver-reload part, since nonraid-webui's own restart drops the
+  // connection; `backOnline` flips once polling confirms that happened.
+  const [restarting, setRestarting] = useState(false);
+  const [restartSteps, setRestartSteps] = useState<RestartServicesResult | null>(null);
+  const [backOnline, setBackOnline] = useState(false);
+  const [restartTimedOut, setRestartTimedOut] = useState(false);
 
-  const runPostAction = async (id: PostActionId, action: () => Promise<{ message?: string }>) => {
-    setPostActionPending(id);
-    setPostActionMessage(null);
-    setPostActionError(null);
+  const handleRestartServices = async () => {
+    setRestarting(true);
+    setRestartSteps(null);
+    setBackOnline(false);
+    setRestartTimedOut(false);
     try {
-      const result = await action();
-      setPostActionMessage(result.message ?? 'Done.');
-      if (id === 'reload') setReloadRetrySucceeded(true);
-    } catch (err) {
-      setPostActionError((err as Error).message);
-    } finally {
-      setPostActionPending(null);
+      const result = await systemApi.restartServices();
+      setRestartSteps(result);
+    } catch {
+      // The connection can drop mid-response if nonraid-webui's own restart lands before this
+      // fetch's response finishes flushing — expected, not a real failure. Polling below is what
+      // actually decides success, not this request settling cleanly.
     }
+    for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      try {
+        await systemApi.getStats();
+        setBackOnline(true);
+        setRestarting(false);
+        return;
+      } catch {
+        // Still restarting — keep polling.
+      }
+    }
+    setRestartTimedOut(true);
+    setRestarting(false);
   };
 
   const handleFileSelected = async (file: File) => {
@@ -227,62 +247,50 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
               <div className="status-note">
                 Restored {commitResult.restoredCount} item(s)
                 {commitResult.skippedSuperblock ? ' — array superblock skipped, array already has disks assigned' : ''}.
-                Samba/NFS may need a service restart to pick up the restored config, and nonraid-webui itself may
-                need a restart to fully apply restored settings — both available below.
+                Samba/NFS, the driver, and nonraid-webui itself all need to restart to fully pick up what was just
+                restored — one button below does all of it.
               </div>
 
-              {commitResult.superblockReloadError && !reloadRetrySucceeded && (
+              {commitResult.superblockReloadError && !backOnline && (
                 <div className="status-note status-note--error">
                   The restored array superblock is on disk, but reloading the driver to pick it up failed:{' '}
-                  {commitResult.superblockReloadError} The array will keep showing as unconfigured until this is
-                  retried below or the host is rebooted.
+                  {commitResult.superblockReloadError} Restart services below to retry it.
                 </div>
               )}
 
               <div className="toggle-row--bordered" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                <div className="dialog__actions" style={{ justifyContent: 'flex-start' }}>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={postActionPending !== null}
-                    onClick={() => runPostAction('smb', () => servicesApi.restart('smb'))}
-                  >
-                    {postActionPending === 'smb' ? 'Restarting…' : 'Restart SMB'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={postActionPending !== null}
-                    onClick={() => runPostAction('nfs', () => servicesApi.restart('nfs'))}
-                  >
-                    {postActionPending === 'nfs' ? 'Restarting…' : 'Restart NFS'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={postActionPending !== null}
-                    onClick={() => runPostAction('webui', () => servicesApi.restart('webui'))}
-                  >
-                    {postActionPending === 'webui' ? 'Restarting…' : 'Restart nonraid-webui'}
-                  </button>
-                  {commitResult.superblockReloadError && !reloadRetrySucceeded && (
-                    <button
-                      type="button"
-                      className="btn btn--primary"
-                      disabled={postActionPending !== null}
-                      onClick={() =>
-                        runPostAction('reload', async () => {
-                          const { result } = await systemApi.reloadDriver();
-                          return { message: `Driver reloaded, ${result.importedCount} disk(s) re-imported.` };
-                        })
-                      }
-                    >
-                      {postActionPending === 'reload' ? 'Reloading…' : 'Retry driver reload'}
+                {!restarting ? (
+                  <div className="dialog__actions" style={{ justifyContent: 'flex-start' }}>
+                    <button type="button" className="btn btn--primary" onClick={handleRestartServices}>
+                      {backOnline ? 'Restart Services Again' : 'Restart Services'}
                     </button>
-                  )}
-                </div>
-                {postActionMessage && <div className="status-note">{postActionMessage}</div>}
-                {postActionError && <div className="status-note status-note--error">{postActionError}</div>}
+                  </div>
+                ) : (
+                  <>
+                    <div className="toggle-row__desc">
+                      Restarting SMB, NFS, and the driver, then nonraid-webui itself — this page will reconnect
+                      automatically once it's back.
+                    </div>
+                    <ProgressBar indeterminate color="var(--color-blue)" height={6} />
+                  </>
+                )}
+
+                {restartSteps && (
+                  <ul className="browse-bulk-failures">
+                    <li style={restartSteps.smb.ok ? undefined : { color: 'var(--color-red)' }}>SMB: {restartSteps.smb.message}</li>
+                    <li style={restartSteps.nfs.ok ? undefined : { color: 'var(--color-red)' }}>NFS: {restartSteps.nfs.message}</li>
+                    <li style={restartSteps.driverReload.ok ? undefined : { color: 'var(--color-red)' }}>
+                      Driver: {restartSteps.driverReload.message}
+                    </li>
+                  </ul>
+                )}
+                {backOnline && <div className="status-note">nonraid-webui is back online.</div>}
+                {restartTimedOut && (
+                  <div className="status-note status-note--error">
+                    nonraid-webui didn't come back within 2 minutes — check `systemctl status nonraid-webui` on the
+                    host, or just reload this page in a bit.
+                  </div>
+                )}
               </div>
 
               <div className="dialog__actions">

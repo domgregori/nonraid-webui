@@ -3,7 +3,7 @@ import { request } from './request';
 import type { BenchmarkResult } from '../types/benchmark';
 import type { ImportResult } from '../types/nmdApi';
 import type { CommandResult } from '../types/settingsApi';
-import type { NetLiveRate, RestoreCommitResult, RestorePreview, SystemStats } from '../types/systemApi';
+import type { NetLiveRate, RestartServicesResult, RestoreCommitResult, RestorePreview, SystemStats } from '../types/systemApi';
 
 export const systemApi = {
   getStats: () => request<SystemStats>('/api/system'),
@@ -23,6 +23,11 @@ export const systemApi = {
   // Manual retry for the reload a restore already attempts automatically — see
   // backend/src/routes/system.ts's own comment on why this needs its own endpoint.
   reloadDriver: () => request<{ result: ImportResult }>('/api/system/reload-driver', { method: 'POST' }),
+  // The config-restore result screen's single "make everything take effect" action — see
+  // backend/src/routes/system.ts's own comment. Resolves once SMB/NFS/driver-reload have run;
+  // nonraid-webui's own restart happens after that and drops the connection, so the caller polls
+  // getStats() separately to know when it's actually back.
+  restartServices: () => request<RestartServicesResult>('/api/system/restart-services', { method: 'POST' }),
 
   bootDiskImageBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/image`,
   bootDiskConfigBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/config`,

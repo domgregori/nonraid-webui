@@ -22,6 +22,7 @@ import {
 } from '../system/configRestore.js';
 import { listTimezones, rebootHost, setHostname, setTimezone } from '../system/hostConfig.js';
 import type { SystemStatsService } from '../system/service.js';
+import { restartService, SERVICE_DEFS } from '../system/services.js';
 
 // Config backups are small text files plus the 4KB superblock, but a long-lived activity log or
 // many shares' worth of config could add up — generous but bounded, matching the same "don't
@@ -210,6 +211,56 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
       activity.log(`Driver reload failed: ${message}`, 'red').catch(() => {});
       res.status(502).json({ error: message });
     }
+  });
+
+  // The config-restore result screen's single "make everything take effect" action — SMB, NFS,
+  // driver reload, and nonraid-webui itself, instead of four separate buttons for what's really
+  // one "apply what was just restored" step. Order matters: SMB/NFS/driver run first so their own
+  // outcomes can still be reported in this response; the webui restart runs last (self-exit, same
+  // pattern as /services/webui/restart) since it drops this connection. Each step is independent
+  // and best-effort — one failing doesn't skip the rest, since e.g. a driver reload failure
+  // shouldn't leave Samba serving a stale smb.conf just because it ran second.
+  router.post('/system/restart-services', async (_req, res) => {
+    const runStep = async (label: string, step: () => Promise<string>): Promise<{ ok: boolean; message: string }> => {
+      try {
+        const message = await step();
+        activity.log(message, 'blue').catch(() => {});
+        return { ok: true, message };
+      } catch (err) {
+        const message = (err as Error).message;
+        activity.log(`${label} failed: ${message}`, 'red').catch(() => {});
+        return { ok: false, message };
+      }
+    };
+
+    const smb = await runStep('SMB restart', async () => {
+      const def = SERVICE_DEFS.find((d) => d.id === 'smb')!;
+      await restartService(def, config.systemUseSudo);
+      return 'SMB restarted';
+    });
+    const nfs = await runStep('NFS restart', async () => {
+      const def = SERVICE_DEFS.find((d) => d.id === 'nfs')!;
+      await restartService(def, config.systemUseSudo);
+      return 'NFS restarted';
+    });
+    const driverReload = await runStep('Driver reload', async () => {
+      const result = await nmd.reloadModuleAndImport();
+      return `Driver reloaded, ${result.importedCount} disk(s) re-imported`;
+    });
+
+    activity.log('Restarting nonraid-webui backend', 'amber').catch(() => {});
+    res.json({
+      smb,
+      nfs,
+      driverReload,
+      message: 'Restarting nonraid-webui — this page will reconnect automatically in a few seconds.',
+    });
+    // Same self-exit pattern as /services/webui/restart: this unit's own Restart=on-failure
+    // brings it back, and routing through `systemctl restart` here would just get killed by
+    // systemd's stop phase before it could ever reach the start phase.
+    res.on('finish', () => {
+      setTimeout(() => process.exit(1), 200);
+    });
   });
 
   router.post('/system/boot-disk/benchmark/read', async (req, res) => {

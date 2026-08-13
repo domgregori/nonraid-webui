@@ -60,3 +60,18 @@ export interface RestoreCommitResult {
    *  when there was no superblock to reload for. */
   superblockReloadError: string | null;
 }
+
+export interface RestartServicesStepResult {
+  ok: boolean;
+  message: string;
+}
+
+// The response the request itself carries — nonraid-webui's own restart happens after this, so
+// its outcome is never part of the JSON body (the connection drops instead); the caller confirms
+// it separately by polling for the backend coming back.
+export interface RestartServicesResult {
+  smb: RestartServicesStepResult;
+  nfs: RestartServicesStepResult;
+  driverReload: RestartServicesStepResult;
+  message: string;
+}
