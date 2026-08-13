@@ -32,20 +32,37 @@ export function deriveParityViewModel(
   const { resync, array } = status;
   const arrayStarted = array.state === 'STARTED';
   const degraded = isDegraded(status);
-  const canStart = arrayStarted && !resync.active && !pending;
+  // See realClient.ts's parityCheck() for the full story: the driver's own num_new/num_invalid
+  // counters only ever increment within a loaded module's lifetime, never decrement, so
+  // unassigning a disk that had briefly gone "new" can leave a clear/recon permanently pending
+  // with size_gb stuck at 0 — no real disk behind it, and Start is guaranteed to fail with a raw
+  // "Invalid argument" until the driver's reloaded. "check" pending (an actual queued parity
+  // check) doesn't hit this — its size comes from every disk's real size, never legitimately 0.
+  const needsDriverReload =
+    resync.pending && !resync.active && resync.size_gb === 0 && !resync.action.trim().toLowerCase().startsWith('check');
+  const canStart = arrayStarted && !resync.active && !pending && !needsDriverReload;
   const progressPct = Math.round(resync.progress_percent);
 
   return {
     isRunning: resync.active,
     isClearing: resync.action.trim().toLowerCase().startsWith('clear'),
+    needsDriverReload,
     canStart,
     progressPct,
     barColor: degraded ? COLORS.red : COLORS.blue,
     progressLabel: resync.active
       ? `${progressVerb(resync.action)}: ${progressPct}%`
-      : array.counters.sync_errors > 0
-        ? `Last check: completed, ${array.counters.sync_errors} errors`
-        : 'Last check: completed, 0 errors',
+      : needsDriverReload
+        ? 'Stuck pending with no real disk behind it — reload the driver to clear this'
+        : resync.pending
+          ? // Queued but not yet started (e.g. a new disk waiting to be cleared before it joins) —
+            // distinct from resync.active, and from the driver's perspective can sit like this
+            // indefinitely until something calls Start. Falling through to the "Last check"
+            // summary below here would misreport a still-pending operation as already finished.
+            `${resync.action.trim().toLowerCase().startsWith('clear') ? 'New disk needs to be cleared' : 'Queued'} — press Start to begin`
+          : array.counters.sync_errors > 0
+            ? `Last check: completed, ${array.counters.sync_errors} errors`
+            : 'Last check: completed, 0 errors',
     speedText: resync.active && !resync.paused ? `${Math.round(resync.rate_mb_s)} MB/s` : '—',
     etaText: resync.active ? (resync.paused ? 'Paused' : formatEta(resync.eta_seconds)) : '—',
     etaCompact: resync.active ? (resync.paused ? 'Paused' : formatEtaCompact(resync.eta_seconds)) : '—',

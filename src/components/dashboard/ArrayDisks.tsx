@@ -14,12 +14,16 @@ export function ArrayDisks({ showManageLink }: ArrayDisksProps = {}) {
 
   const { parity, data } = deriveDisks(status, temps, diskHealths, diskTypes);
   // A new-disk clear reuses the same resync status a parity check would — reuse the same view
-  // model, just route it to the clearing disk's own card instead of the Parity Check card (which
-  // hides itself while isClearing is true, see ParityCheckCard).
+  // model, just route it to the clearing disk's own card instead of the Parity Check card. Only
+  // once the clear is actually running, though (see ParityCheckCard's own comment) — while it's
+  // merely queued, this card has no Start control of its own (Pause/Cancel assume something's
+  // already going), so the disk stays on its normal card (showing its plain "New" status) and the
+  // Parity Check card is where Start actually lives.
   const clearingView = deriveParityViewModel(status, parityPending, parityAction);
-  const clearingDiskId = clearingView.isClearing
-    ? data.find((d) => d.rawStatus === 'DISK_NEW' || d.rawStatus === 'DISK_DSBL_NEW')?.id
-    : undefined;
+  const clearingDiskId =
+    clearingView.isClearing && clearingView.isRunning
+      ? data.find((d) => d.rawStatus === 'DISK_NEW' || d.rawStatus === 'DISK_DSBL_NEW')?.id
+      : undefined;
 
   return (
     <div>

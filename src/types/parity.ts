@@ -5,6 +5,11 @@ export interface ParityViewModel {
    *  from this view model alone. Callers use this to route the same progress/controls to the
    *  clearing disk's own card instead of the Parity Check card. */
   isClearing: boolean;
+  /** True when a clear/recon is queued (pending, not active) but the driver's own recorded size
+   *  for it is 0 — a stale-counter state, not a real operation with a real disk behind it (see
+   *  realClient.ts's parityCheck doc comment). Start would just fail; only a driver reload fixes
+   *  it, so the UI leads with that instead of a start button that's guaranteed to error. */
+  needsDriverReload: boolean;
   canStart: boolean;
   barColor: string;
   progressPct: number;

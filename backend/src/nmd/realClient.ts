@@ -1,5 +1,4 @@
 import { execFile, spawn } from 'node:child_process';
-import { closeSync, constants, openSync } from 'node:fs';
 import { readFile, rmdir, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { promisify } from 'node:util';
@@ -208,7 +207,7 @@ export class RealNmdClient implements NmdClient {
       }
     }
 
-    const superblockPath = status.array.superblock;
+    const superblockPath = this.resolveSuperblockPath(status.array.superblock);
     const backupPath = `${superblockPath}.bak-shrink-${Date.now()}`;
 
     await this.run(['stop']);
@@ -288,7 +287,8 @@ export class RealNmdClient implements NmdClient {
    */
   async reloadDriver(): Promise<NmdCommandResult> {
     const before = await this.getStatus();
-    const superblockPath = before.array.superblock;
+    // Validated, not before.array.superblock directly — see resolveSuperblockPath's doc comment.
+    const superblockPath = this.resolveSuperblockPath(before.array.superblock);
 
     const known = before.disks.filter((d) => d.disk_id && d.disk_id !== 'none');
     if (known.length === 0) {
@@ -351,30 +351,37 @@ export class RealNmdClient implements NmdClient {
    * composition reloadDriver()'s callers use.
    */
   /**
+   * The live value must actually look like an absolute path before it's trusted — confirmed live,
+   * twice: the module ended up loaded with its super= parameter set to the *literal, unexpanded*
+   * string "$SUPER" (nonraid.service's own boot-time start resolves this correctly via its
+   * Environment= default — confirmed separately — so the literal only ever showed up *after* one
+   * of this class's own methods read a bad status.array.superblock and handed it straight back to
+   * modprobe as the *next* reload's target, without validating it first). Once that happens,
+   * status.array.superblock faithfully reports the same garbage back from then on, and every
+   * caller that trusts it perpetuates it — the automatic post-restore reload "succeeded" (modprobe
+   * doesn't validate its own arguments) while doing nothing, and the array stayed stuck
+   * unconfigured no matter how many times it ran. getSuperblockPath() and shrinkArray() both hit
+   * this independently (two separate inline reads of the same live field) before both were routed
+   * through this one validated resolver.
+   */
+  private resolveSuperblockPath(live: string | null | undefined): string {
+    if (live && live.startsWith('/')) return live;
+    return config.nmdSuperblock || DEFAULT_SUPERBLOCK_PATH;
+  }
+
+  /**
    * The superblock file actually in play right now: the live path
    * (`status.array.superblock`) when something's loaded, else this app's own
    * configured override, else nmdctl's own hardcoded default. `getStatus()`
    * can throw on a genuinely fresh host — see check_module_loaded() in
    * tools/nmdctl — so that's the fallback trigger, not a real error here.
-   *
-   * The live value must actually look like an absolute path before it's trusted — confirmed
-   * live: the module ended up loaded with its super= parameter set to the *literal, unexpanded*
-   * string "$SUPER" (root cause not fully pinned down — something upstream of this app set it
-   * that way once), and status.array.superblock faithfully reported that same garbage back from
-   * then on. Every caller here (commitImportedSuperblock, reloadModuleAndImport) uses this path
-   * as the target of their own *next* modprobe — trusting a bogus live value meant this app kept
-   * silently reloading the module right back into the same broken state instead of fixing it: the
-   * automatic post-restore reload "succeeded" (modprobe doesn't validate its own arguments) while
-   * doing nothing, and the array stayed stuck unconfigured no matter how many times it ran.
    */
   async getSuperblockPath(): Promise<string> {
     try {
-      const live = (await this.getStatus()).array.superblock;
-      if (live.startsWith('/')) return live;
+      return this.resolveSuperblockPath((await this.getStatus()).array.superblock);
     } catch {
-      // getStatus() can throw on a genuinely fresh host — falls through to the same default below.
+      return this.resolveSuperblockPath(null);
     }
-    return config.nmdSuperblock || DEFAULT_SUPERBLOCK_PATH;
   }
 
   // Shared by commitImportedSuperblock() and reloadModuleAndImport(): stop, unload, reload
@@ -518,6 +525,21 @@ export class RealNmdClient implements NmdClient {
     if (action === 'CORRECT' || action === 'NOCORRECT') {
       const status = await this.getStatus();
       if (status.resync.pending && !status.resync.action.trim().toLowerCase().startsWith('check')) {
+        // The driver's own num_new/num_invalid/etc counters (see md_unraid.c's status_resync())
+        // only ever increment across import_slot() calls within a loaded module's lifetime, never
+        // decrement — so unassigning a disk that had briefly been "new" leaves resync.pending true
+        // (and resync.action still naming a clear/recon) with nothing real backing it, forever.
+        // size_gb reads 0 in exactly that phantom case (real array disks are never actually this
+        // small), and the kernel's own offset check (0 >= 0) then rejects any attempt to start it
+        // with a bare "Invalid argument" — confirmed live on the test rig, traced all the way to
+        // check_array() in md_unraid.c. A full module reload is the only thing that resets these
+        // counters (see reloadModuleAndImport) — surfacing that here instead of the raw EINVAL.
+        if (status.resync.size_gb === 0) {
+          const pendingWord = status.resync.action.trim().split(/\s+/)[0];
+          throw new Error(
+            `A ${pendingWord} operation is stuck pending with no real disk behind it — a known driver state issue after unassigning a disk without reloading afterward. Reload the driver, then try again.`,
+          );
+        }
         const pendingAction = status.resync.action.trim().split(/\s+/)[0]!;
         const { stdout } = await this.run(['check', pendingAction]);
         return { ok: true, message: stdout.trim() };
@@ -588,10 +610,25 @@ export class RealNmdClient implements NmdClient {
     const partition = await this.findAvailablePartition(dev);
     if (partition === undefined) return null; // disk has a mounted partition elsewhere — excluded entirely, see findAvailablePartition's doc comment
 
+    // Was a plain unprivileged openSync(..., O_EXCL) — but /dev/sdX is root:disk 660 and the
+    // nonraid service user is in neither group, so that always threw EACCES regardless of the
+    // device's real lock state, reporting every disk as "locked" unconditionally (confirmed live:
+    // the same permission gap as alignedSizeKb()'s blockdev call, just a raw fs call this time
+    // instead of a subprocess, so it couldn't simply be routed through sudo the same way).
+    // blockdev --rereadpt forces the kernel to reread the partition table, which requires the same
+    // no-other-openers exclusivity a mount/mkfs/wipefs already holds — it fails with EBUSY exactly
+    // when something else has the device open, confirmed live against both a free disk (exit 0)
+    // and the actively-mounted boot disk (fails: "Device or resource busy"). Already covered by
+    // the existing blockdev sudoers grant (added for alignedSizeKb()), so no new sudo scope needed.
+    //
+    // Always against `dev` (the whole disk), never `partition` — BLKRRPART only means anything on
+    // a whole-disk device node; run against a partition it fails with EINVAL regardless of lock
+    // state, misreporting every disk with an existing partition table as locked. Findable only by
+    // testing against a real partitioned disk, not the raw/unpartitioned ones this was first
+    // checked against — confirmed live on the test rig.
     let locked = false;
     try {
-      const fd = openSync(partition ?? dev, constants.O_WRONLY | constants.O_EXCL);
-      closeSync(fd);
+      await this.runSystem('blockdev', ['--rereadpt', dev]);
     } catch {
       locked = true;
     }
@@ -690,10 +727,20 @@ export class RealNmdClient implements NmdClient {
    * KB whenever the raw sector count isn't itself a multiple of 8 — nmdctl
    * itself reports the aligned value (see status.disks[].size_kb), so
    * that's the number to predict here, not lsblk's.
+   *
+   * Unlike lsblk (which reads from /sys, world-readable), `blockdev --getsz`
+   * opens the device node itself — /dev/sdX is root:disk 660, and the
+   * nonraid service user is in neither group, so this failed with EACCES on
+   * every call, always returning null here. That silently made every import
+   * preview's size check compare `null !== recordedSize`, which is always
+   * true — every disk showed as SIZE MISMATCH regardless of its actual
+   * size, confirmed live on the test rig. Routed through runSystem() (sudo,
+   * same as every other root-requiring call in this class) instead of a bare
+   * execFileAsync.
    */
   private async alignedSizeKb(partitionOrDevice: string): Promise<number | null> {
     try {
-      const { stdout } = await execFileAsync('blockdev', ['--getsz', partitionOrDevice]);
+      const { stdout } = await this.runSystem('blockdev', ['--getsz', partitionOrDevice]);
       const sectors = Number(stdout.trim());
       if (!Number.isFinite(sectors)) return null;
       return (Math.floor(sectors / 8) * 8) / 2;

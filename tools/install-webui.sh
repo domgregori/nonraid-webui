@@ -264,7 +264,7 @@ SUDO_BINS=(
   tar hostnamectl timedatectl journalctl
   getent useradd usermod userdel groupadd groupdel chpasswd smbpasswd
   lxc-ls lxc-info lxc-start lxc-stop lxc-destroy lxc-snapshot lxc-create
-  btrfs mkfs.btrfs mkdir mountpoint lsblk blkid udevadm
+  btrfs mkfs.btrfs mkdir mountpoint lsblk blkid udevadm blockdev
   openssl
 )
 SUDOERS_TMP="$(mktemp)"
