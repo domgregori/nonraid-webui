@@ -388,13 +388,14 @@
 }
 
 .notification-channel-header__col {
-  width: 18px;
+  width: 50px;
   text-align: center;
   font-size: 10px;
   font-weight: 700;
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .notification-event-row {
@@ -412,7 +413,7 @@
 }
 
 .notification-event-row__channel {
-  width: 18px;
+  width: 50px;
   display: flex;
   justify-content: center;
 }
