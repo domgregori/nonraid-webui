@@ -6,6 +6,7 @@ import type { AppSettings, AppSettingsUpdate } from './types.js';
 
 const DEFAULTS: AppSettings = {
   turboWrite: false,
+  trustProxy: false,
   notifications: { enabled: false, appriseUrls: '', eventTypes: DEFAULT_EVENT_TYPES },
   minFreeSpaceGb: 4,
   paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2 },

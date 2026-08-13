@@ -72,6 +72,7 @@ export interface OnboardingSettings {
 
 export interface AppSettings {
   turboWrite: boolean;
+  trustProxy: boolean;
   notifications: NotificationSettings;
   minFreeSpaceGb: number;
   paritySchedule: ParitySchedule;
@@ -85,6 +86,7 @@ export interface AppSettings {
 
 export type AppSettingsUpdate = Partial<{
   turboWrite: boolean;
+  trustProxy: boolean;
   notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {
     eventTypes?: Partial<Record<NotificationEventType, boolean>>;
   };

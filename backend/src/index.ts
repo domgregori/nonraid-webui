@@ -99,6 +99,12 @@ async function main() {
     await nmd.setWriteMethod(true).catch(() => {});
   }
 
+  // Either source enables it - lets a deployment force this on via env var/config.toml without
+  // touching the UI, while still letting the UI toggle (routes/settings.ts) turn it on/off live.
+  if (persistedSettings.trustProxy) {
+    config.trustProxy = true;
+  }
+
   // config.lxcDefaultPath (the -P flag every lxc-* call gets) has no other source of truth, unlike
   // Docker's own daemon.json - reapply a persisted relocation now, before anything handles a
   // request, so it survives this app's own restart (see lxc/storagePath.ts). Safe to set even
@@ -172,7 +178,7 @@ async function main() {
   app.use('/api', statusRouter(nmd));
   app.use('/api', arrayRouter(nmd, settingsStore, activity, shares, lxc));
   app.use('/api', parityRouter(nmd, activity, settingsStore));
-  app.use('/api', settingsRouter(settingsStore, nmd, activity, shares));
+  app.use('/api', settingsRouter(settingsStore, nmd, activity, shares, app));
   app.use('/api', disksRouter(nmd, smart, activity, settingsStore, cache, diskQueue));
   app.use('/api', emptyDiskRouter(emptyDisk, activity));
   app.use('/api', cacheRouter(cache, cacheMover, settingsStore, activity, shares, diskQueue));

@@ -1163,6 +1163,24 @@ export function SettingsPage() {
       <div className={`settings-card${activeSection === 'security' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Security</div>
         <TlsSection />
+        <div className="toggle-row">
+          <div>
+            <div className="toggle-row__title">Trust reverse proxy</div>
+            <div className="toggle-row__desc">
+              Only enable if a reverse proxy is the sole way to reach this backend (it's firewalled off from any
+              other direct access) and that proxy always sets/overwrites X-Forwarded-Proto/Host/For itself -
+              otherwise a direct client could spoof those headers to fake an HTTPS connection or dodge login/TOTP
+              rate limiting. Once enabled, the session cookie's Secure flag and passkey RP ID/origin are detected
+              from the request automatically, no need to set them by hand.
+            </div>
+          </div>
+          <ToggleSwitch
+            on={settings?.trustProxy ?? false}
+            onToggle={() => settings && update({ trustProxy: !settings.trustProxy })}
+            label="Trust reverse proxy"
+            disabled={!settings || saving}
+          />
+        </div>
         <div className="settings-field">
           <div className="toggle-row__title">Change admin password</div>
           <div className="toggle-row__desc">

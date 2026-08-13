@@ -1,5 +1,6 @@
-import { Router } from 'express';
+import { Router, type Express } from 'express';
 import type { ActivityStore } from '../activity/index.js';
+import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import { NOTIFICATION_EVENTS, sendAppriseNotification, type SettingsStore } from '../settings/index.js';
 import type { ShareService } from '../shares/index.js';
@@ -26,7 +27,7 @@ function validateSchedulePatch(fieldName: string, schedule: Record<string, unkno
   }
 }
 
-export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: ActivityStore, shares: ShareService): Router {
+export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: ActivityStore, shares: ShareService, app: Express): Router {
   const router = Router();
 
   router.get('/settings', async (_req, res) => {
@@ -51,6 +52,14 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
       if (typeof patch.turboWrite === 'boolean') {
         await nmd.setWriteMethod(patch.turboWrite);
         activity.log(patch.turboWrite ? 'Turbo write enabled' : 'Turbo write disabled', 'blue').catch(() => {});
+      }
+      // Express re-reads 'trust proxy' on every request, so this takes effect immediately -
+      // no restart needed, unlike TLS enable/disable. config.trustProxy is updated too since
+      // webauthn.ts's requireWebauthnConfig() reads it directly, not via app.get().
+      if (typeof patch.trustProxy === 'boolean') {
+        app.set('trust proxy', patch.trustProxy);
+        config.trustProxy = patch.trustProxy;
+        activity.log(patch.trustProxy ? 'Trust reverse proxy enabled' : 'Trust reverse proxy disabled', 'blue').catch(() => {});
       }
       if ('minFreeSpaceGb' in patch) {
         if (typeof patch.minFreeSpaceGb !== 'number' || !Number.isInteger(patch.minFreeSpaceGb) || patch.minFreeSpaceGb < 0) {
