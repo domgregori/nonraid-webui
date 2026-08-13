@@ -69,6 +69,29 @@ export class DiskQueueService {
     return this.processing;
   }
 
+  /** Device paths claimed by a queue item that hasn't finished successfully — queued, running,
+   *  or failed (a failed item pauses the queue at the head rather than disappearing, so its
+   *  device is still "spoken for" until the user retries or removes it). Used by
+   *  /disks/available to hide a disk already in the queue from Unassigned Devices — confirmed
+   *  live: without this, the same physical disk could be enqueued a second time while its first
+   *  queue item was still waiting its turn, since nothing had claimed it from nmdctl's own point
+   *  of view yet. 'done' items are deliberately excluded: by then the disk is either actually in
+   *  the array (nmdctl's own listing already excludes it) or was a cache-mirror member (the
+   *  existing btrfs-claim check already excludes those) — no separate hold needed here either way. */
+  queuedDevicePaths(): Set<string> {
+    const paths = new Set<string>();
+    for (const item of this.items) {
+      if (item.status === 'done') continue;
+      if ('device' in item.input) {
+        paths.add(item.input.device);
+      } else {
+        paths.add(item.input.deviceA);
+        paths.add(item.input.deviceB);
+      }
+    }
+    return paths;
+  }
+
   enqueueAddDisk(type: Extract<DiskQueueItemType, 'add-parity' | 'add-data'>, slot: number, device: string, label: string): DiskQueueItem {
     const item: DiskQueueItem = {
       id: randomUUID(),

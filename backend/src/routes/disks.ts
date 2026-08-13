@@ -39,7 +39,11 @@ export function disksRouter(
       // confirmed live: both mirror members still showed up in Unassigned Devices as if addable.
       const cacheStatus = await cache.getStatus().catch(() => null);
       const cacheDevicePaths = new Set((cacheStatus?.devices ?? []).map((d) => d.path).filter((p): p is string => p !== null));
-      res.json(devices.filter((d) => !cacheDevicePaths.has(d.device)));
+      // Same reasoning for a disk already sitting in the disk-add queue — nmdctl has no idea it's
+      // "claimed" until the queue actually gets around to running its add, so without this it
+      // could be queued a second time while the first item was still waiting its turn.
+      const queuedDevicePaths = diskQueue.queuedDevicePaths();
+      res.json(devices.filter((d) => !cacheDevicePaths.has(d.device) && !queuedDevicePaths.has(d.device)));
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }
