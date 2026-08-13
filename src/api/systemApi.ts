@@ -40,6 +40,7 @@ export const systemApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ timezone }),
     }),
+  reboot: () => request<CommandResult>('/api/system/reboot', { method: 'POST' }),
 
   benchmarkBootRead: (durationSeconds: number) =>
     request<BenchmarkResult>('/api/system/boot-disk/benchmark/read', {

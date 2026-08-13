@@ -100,6 +100,11 @@ export function SettingsPage() {
   const [reloadResult, setReloadResult] = useState<string | null>(null);
   const [reloadError, setReloadError] = useState<string | null>(null);
 
+  const [rebootConfirming, setRebootConfirming] = useState(false);
+  const [rebootRunning, setRebootRunning] = useState(false);
+  const [rebootResult, setRebootResult] = useState<string | null>(null);
+  const [rebootError, setRebootError] = useState<string | null>(null);
+
   const [appriseDraft, setAppriseDraft] = useState('');
   const [eventTypesDraft, setEventTypesDraft] = useState<Record<NotificationEventType, boolean>>({} as Record<NotificationEventType, boolean>);
   const [testResult, setTestResult] = useState<string | null>(null);
@@ -367,6 +372,21 @@ export function SettingsPage() {
     }
   };
 
+  const handleReboot = async () => {
+    setRebootRunning(true);
+    setRebootError(null);
+    setRebootResult(null);
+    try {
+      const result = await systemApi.reboot();
+      setRebootResult(result.message);
+      setRebootConfirming(false);
+    } catch (err) {
+      setRebootError((err as Error).message);
+    } finally {
+      setRebootRunning(false);
+    }
+  };
+
   const saveNotifications = () => update({ notifications: { appriseUrls: appriseDraft, eventTypes: eventTypesDraft } });
 
   const toggleEventType = (eventType: NotificationEventType, enabled: boolean) => {
@@ -586,6 +606,34 @@ export function SettingsPage() {
           <button type="button" className="btn" style={{ marginTop: 6 }} onClick={replay}>
             Replay setup tour
           </button>
+        </div>
+
+        <div className="settings-field toggle-row--bordered">
+          <div className="toggle-row__title">Reboot system</div>
+          <div className="toggle-row__desc">
+            Reboots the whole host, not just this app. The array stops and unmounts cleanly first (the normal
+            shutdown sequence — same as if you ran this at the console), then Docker, LXC, Samba, and NFS all stop
+            too. Everything comes back on its own once the host finishes booting; this page reconnects
+            automatically, no need to refresh by hand.
+          </div>
+          {!rebootConfirming ? (
+            <div className="settings-field__row">
+              <button type="button" className="btn" onClick={() => setRebootConfirming(true)}>
+                Reboot System
+              </button>
+            </div>
+          ) : (
+            <div className="settings-field__row">
+              <button type="button" className="btn" disabled={rebootRunning} onClick={() => setRebootConfirming(false)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn--danger" disabled={rebootRunning} onClick={handleReboot}>
+                {rebootRunning ? 'Rebooting…' : 'Confirm Reboot'}
+              </button>
+            </div>
+          )}
+          {rebootResult && <div className="status-note">{rebootResult}</div>}
+          {rebootError && <div className="status-note status-note--error">{rebootError}</div>}
         </div>
       </div>
 

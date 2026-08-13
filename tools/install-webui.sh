@@ -281,7 +281,8 @@ SUDOERS_TMP="$(mktemp)"
   fi
   if [ -n "$systemctl_path" ]; then
     # The complete, closed set from system/services.ts's SERVICE_DEFS (Docker/LXC/SMB/NFS/SSH
-    # start/stop/is-active) plus routes/array.ts's driver-reload Docker stop/start.
+    # start/stop/is-active), routes/array.ts's driver-reload Docker stop/start, and
+    # routes/system.ts's Settings -> About reboot action.
     for args in \
       "is-active docker.service" "is-active lxc.service" \
       "is-active smbd.service nmbd.service winbind.service" \
@@ -290,7 +291,8 @@ SUDOERS_TMP="$(mktemp)"
       "stop lxc" "start lxc" \
       "stop smbd.service nmbd.service winbind.service" "start smbd.service nmbd.service winbind.service" \
       "stop nfs-server" "start nfs-server" \
-      "stop ssh" "start ssh"; do
+      "stop ssh" "start ssh" \
+      "reboot"; do
       echo "$NONRAID_WEBUI_USER ALL=(root) NOPASSWD: $systemctl_path $args"
     done
   fi

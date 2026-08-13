@@ -20,7 +20,7 @@ import {
   stageRestoreFile,
   sweepStagedRestores,
 } from '../system/configRestore.js';
-import { listTimezones, setHostname, setTimezone } from '../system/hostConfig.js';
+import { listTimezones, rebootHost, setHostname, setTimezone } from '../system/hostConfig.js';
 import type { SystemStatsService } from '../system/service.js';
 
 // Config backups are small text files plus the 4KB superblock, but a long-lived activity log or
@@ -291,6 +291,16 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
       await setTimezone(tz, config.systemUseSudo);
       activity.log(`Timezone changed to "${tz}"`, 'blue').catch(() => {});
       res.json({ ok: true, message: `Timezone set to "${tz}".` });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/system/reboot', async (_req, res) => {
+    try {
+      await rebootHost(config.systemUseSudo);
+      activity.log('System reboot requested', 'amber').catch(() => {});
+      res.json({ ok: true, message: 'Rebooting now — this page will reconnect automatically once the host is back up.' });
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

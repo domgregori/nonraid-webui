@@ -32,3 +32,12 @@ export async function setTimezone(tz: string, useSudo: boolean): Promise<void> {
   }
   await runSudoMaybe('timedatectl', ['set-timezone', tz], useSudo);
 }
+
+// `systemctl reboot` only *schedules* the shutdown and returns immediately — it doesn't block
+// until the host actually goes down, so this resolves in well under a second regardless of how
+// long the real shutdown sequence takes. That sequence is the normal, graceful one (every unit's
+// own ExecStop runs in order — nonraid.service unmounts and stops the array, docker/lxc/samba/nfs
+// stop cleanly), not a hard cut, so nothing extra needs to happen here first.
+export async function rebootHost(useSudo: boolean): Promise<void> {
+  await runSudoMaybe('systemctl', ['reboot'], useSudo);
+}
