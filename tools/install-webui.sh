@@ -51,14 +51,31 @@ log "Installing system dependencies"
 # happens to touch first. apt-get install is naturally idempotent — already-installed packages
 # are just skipped.
 apt-get install -y \
-  rsync openssl gpg curl git dkms build-essential \
+  rsync openssl gpg dkms build-essential \
   smartmontools hdparm \
-  xfsprogs e2fsprogs btrfs-progs parted \
-  samba nfs-kernel-server \
+  xfsprogs btrfs-progs parted \
   apprise \
   docker.io \
   lxc lxc-templates \
   linux-headers-amd64
+
+# Separate --no-install-recommends call for the packages whose recommends are pure bloat for this
+# app's headless, scripted use rather than something it (or a human at the console) actually
+# benefits from: samba's own samba-ad-dc is a full Active Directory domain controller (Kerberos,
+# LDAP, a DNS server) that this app has no use for at all — it only does plain file sharing via
+# smb.conf — plus python3-samba (net-command admin tooling this app never shells out to, it uses
+# smbd/nmbd/smbpasswd directly). e2fsprogs-l10n is pure localization data. curl's bash-completion
+# and git's less/ssh-client/patch are interactive-shell/SSH-remote conveniences this script's own
+# scripted HTTPS clone and non-interactive `git log`/`git diff` calls never need — patch
+# specifically is what got removed as a dependency entirely when this script switched to building
+# from source, so silently pulling it back in as an unused transitive recommend would undo that.
+# Kept as its own call rather than a global --no-install-recommends flag on the install above,
+# since several packages there (docker.io, lxc, lxc-templates) genuinely need theirs — lxc's
+# recommends in particular (debootstrap, lxcfs, libpam-cgfs, uidmap) are load-bearing for container
+# creation actually working, not bloat.
+apt-get install -y --no-install-recommends \
+  curl git e2fsprogs \
+  samba nfs-kernel-server
 
 # docker.sock is root:docker mode 660 (created by the docker.io package just installed above) —
 # dockerode (backend/src/docker/realClient.ts) connects to it directly, no sudo wrapper exists for
