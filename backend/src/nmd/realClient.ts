@@ -356,13 +356,25 @@ export class RealNmdClient implements NmdClient {
    * configured override, else nmdctl's own hardcoded default. `getStatus()`
    * can throw on a genuinely fresh host — see check_module_loaded() in
    * tools/nmdctl — so that's the fallback trigger, not a real error here.
+   *
+   * The live value must actually look like an absolute path before it's trusted — confirmed
+   * live: the module ended up loaded with its super= parameter set to the *literal, unexpanded*
+   * string "$SUPER" (root cause not fully pinned down — something upstream of this app set it
+   * that way once), and status.array.superblock faithfully reported that same garbage back from
+   * then on. Every caller here (commitImportedSuperblock, reloadModuleAndImport) uses this path
+   * as the target of their own *next* modprobe — trusting a bogus live value meant this app kept
+   * silently reloading the module right back into the same broken state instead of fixing it: the
+   * automatic post-restore reload "succeeded" (modprobe doesn't validate its own arguments) while
+   * doing nothing, and the array stayed stuck unconfigured no matter how many times it ran.
    */
   async getSuperblockPath(): Promise<string> {
     try {
-      return (await this.getStatus()).array.superblock;
+      const live = (await this.getStatus()).array.superblock;
+      if (live.startsWith('/')) return live;
     } catch {
-      return config.nmdSuperblock || DEFAULT_SUPERBLOCK_PATH;
+      // getStatus() can throw on a genuinely fresh host — falls through to the same default below.
     }
+    return config.nmdSuperblock || DEFAULT_SUPERBLOCK_PATH;
   }
 
   // Shared by commitImportedSuperblock() and reloadModuleAndImport(): stop, unload, reload
