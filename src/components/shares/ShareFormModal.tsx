@@ -53,11 +53,6 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
   useEffect(() => {
     if (useAllDisks) setDisks(allDiskSlots);
   }, [useAllDisks, allDiskSlotsKey]);
-  const [smbEnabled, setSmbEnabled] = useState(initial?.protocols.includes('smb') ?? true);
-  const [smbPublic, setSmbPublic] = useState(initial?.smb?.public ?? true);
-  const [nfsEnabled, setNfsEnabled] = useState(initial?.protocols.includes('nfs') ?? false);
-  const [nfsReadOnly, setNfsReadOnly] = useState(initial?.nfs?.readOnly ?? false);
-  const [nfsHosts, setNfsHosts] = useState(initial?.nfs?.allowedHosts?.join(', ') ?? '*');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -85,14 +80,13 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
 
   const validate = (): string | null => {
     if (!/^[a-zA-Z0-9_-]{1,32}$/.test(name)) return 'Name must be 1-32 characters: letters, numbers, dash, underscore.';
-    if (!isEdit && existingNames.includes(name)) return `Share "${name}" already exists.`;
+    if (!isEdit && existingNames.includes(name)) return `Pool "${name}" already exists.`;
     if (allocationMethod === 'cache-only') {
-      if (!cacheConfigured) return 'Set up a cache pool on the Disks page before creating a cache-only share.';
+      if (!cacheConfigured) return 'Set up a cache pool on the Disks page before creating a cache-only pool.';
     } else {
       if (disks.length === 0) return 'Select at least one disk.';
       if (allocationMethod === 'single-disk' && disks.length !== 1) return 'Single-disk allocation requires exactly one disk.';
     }
-    if (!smbEnabled && !nfsEnabled) return 'Enable at least one protocol.';
     return null;
   };
 
@@ -104,16 +98,16 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
       return;
     }
 
+    // SMB/NFS export settings aren't edited here — see the Sharing tab — so an edit passes them
+    // through unchanged, and a new pool starts with none at all (not shared anywhere yet).
     const input: ShareInput = {
       name,
       disks,
       allDisks: useAllDisks,
       allocationMethod,
-      protocols: [...(smbEnabled ? (['smb'] as const) : []), ...(nfsEnabled ? (['nfs'] as const) : [])],
-      smb: smbEnabled ? { public: smbPublic } : undefined,
-      nfs: nfsEnabled
-        ? { readOnly: nfsReadOnly, allowedHosts: nfsHosts.split(',').map((h) => h.trim()).filter(Boolean) }
-        : undefined,
+      protocols: initial?.protocols ?? [],
+      smb: initial?.smb,
+      nfs: initial?.nfs,
       description: description.trim() || undefined,
     };
 
@@ -129,7 +123,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
       <div className="detail-overlay" onClick={onCancel} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">{isEdit ? `Edit ${initial.name}` : 'Add Share'}</div>
+          <div className="dialog__title">{isEdit ? `Edit ${initial.name}` : 'Add Pool'}</div>
           <button type="button" className="detail-panel__close" onClick={onCancel} aria-label="Close">
             &#10005;
           </button>
@@ -148,13 +142,13 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
               style={{ width: '100%' }}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What's this share for?"
+              placeholder="What's this pool for?"
               maxLength={200}
             />
           </label>
 
           {allocationMethod === 'cache-only' ? (
-            <div className="status-note">This share lives entirely on the cache pool — no array disk is used, and the mover never touches it.</div>
+            <div className="status-note">This pool lives entirely on the cache disks — no array disk is used, and the mover never touches it.</div>
           ) : (
             <div className="form-field">
               <div className="toggle-row" style={{ padding: 0 }}>
@@ -208,31 +202,12 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
             </select>
           </label>
 
-          <div className="form-field">
-            <span className="form-field__label">Protocols</span>
-            <label className="disk-checkbox">
-              <input type="checkbox" checked={smbEnabled} onChange={(e) => setSmbEnabled(e.target.checked)} /> SMB
-            </label>
-            {smbEnabled && (
-              <label className="disk-checkbox" style={{ marginLeft: 20 }}>
-                <input type="checkbox" checked={smbPublic} onChange={(e) => setSmbPublic(e.target.checked)} /> Public (guest access)
-              </label>
-            )}
-            <label className="disk-checkbox">
-              <input type="checkbox" checked={nfsEnabled} onChange={(e) => setNfsEnabled(e.target.checked)} /> NFS
-            </label>
-            {nfsEnabled && (
-              <div style={{ marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label className="disk-checkbox">
-                  <input type="checkbox" checked={nfsReadOnly} onChange={(e) => setNfsReadOnly(e.target.checked)} /> Read-only
-                </label>
-                <label className="form-field">
-                  <span className="form-field__label">Allowed hosts (comma-separated, * for any)</span>
-                  <input className="history-input" style={{ width: '100%' }} value={nfsHosts} onChange={(e) => setNfsHosts(e.target.value)} />
-                </label>
-              </div>
-            )}
-          </div>
+          {!isEdit && (
+            <div className="status-note">
+              Not shared anywhere yet — turn on SMB or NFS access for this pool from the Sharing tab once it's
+              created.
+            </div>
+          )}
 
           {error && <div className="status-note status-note--error">{error}</div>}
 
@@ -241,7 +216,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
               Cancel
             </button>
             <button type="submit" className="btn--primary" disabled={submitting}>
-              {submitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Share'}
+              {submitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Pool'}
             </button>
           </div>
         </form>

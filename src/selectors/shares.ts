@@ -24,7 +24,8 @@ export interface ShareViewModel {
 
 /** Groups get Samba's own "@groupname" convention, matching how they're already written into
  *  smb.conf's valid/invalid/read lists elsewhere in this app. */
-export function deriveAccessLabel(share: Pick<ShareWithStats, 'access' | 'smb'>): string {
+export function deriveAccessLabel(share: Pick<ShareWithStats, 'access' | 'smb' | 'protocols'>): string {
+  if (!share.protocols.includes('smb')) return 'Not shared over SMB';
   const principals = [
     ...Object.entries(share.access.users)
       .filter(([, p]) => p === 'read-write' || p === 'read-only')
@@ -45,7 +46,7 @@ export function deriveShareViewModel(share: ShareWithStats): ShareViewModel {
   return {
     name: share.name,
     description: share.description?.trim() || null,
-    protocolLabel: share.protocols.map((p) => p.toUpperCase()).join(', '),
+    protocolLabel: share.protocols.length > 0 ? share.protocols.map((p) => p.toUpperCase()).join(', ') : 'Not shared',
     allocationLabel:
       share.allocationMethod === 'single-disk'
         ? `Single disk (Disk ${share.disks[0]})`

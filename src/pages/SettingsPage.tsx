@@ -38,7 +38,7 @@ const SECTIONS = [
   { id: 'logs', label: 'System Logs' },
   { id: 'parity', label: 'Parity' },
   { id: 'import', label: 'Import from Unraid' },
-  { id: 'shares', label: 'Shares' },
+  { id: 'shares', label: 'Pools' },
   { id: 'backups', label: 'Backups' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'security', label: 'Security' },
@@ -939,13 +939,13 @@ export function SettingsPage() {
       {showConfigRestoreWizard && <ConfigRestoreWizard onClose={() => setShowConfigRestoreWizard(false)} />}
 
       <div className={`settings-card${activeSection === 'shares' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Shares</div>
+        <div className="settings-card__title">Pools</div>
         <div className="settings-field">
           <div className="toggle-row__title">Minimum free space (MB)</div>
           <div className="toggle-row__desc">
-            When a share spans multiple disks, mergerfs won't pick a disk with less free space than this for a new
+            When a pool spans multiple disks, mergerfs won't pick a disk with less free space than this for a new
             file. Its own default is 4096 MB (4 GB) — a sane margin on large disks, but on small disks that can make
-            every disk ineligible and every write fail. Applies immediately to every currently-mounted share.
+            every disk ineligible and every write fail. Applies immediately to every currently-mounted pool.
           </div>
           <div className="settings-field__row">
             <input

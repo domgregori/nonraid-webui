@@ -39,12 +39,11 @@ export function validateShareInput(input: unknown): ShareInput {
   if (i.allDisks === true && (allocationMethod === 'single-disk' || allocationMethod === 'cache-only')) {
     throw new HttpError(400, 'allDisks cannot be combined with single-disk or cache-only allocation.');
   }
-  if (
-    !Array.isArray(i.protocols) ||
-    i.protocols.length === 0 ||
-    !i.protocols.every((p) => PROTOCOLS.includes(p as ShareProtocol))
-  ) {
-    throw new HttpError(400, `protocols must be a non-empty array of: ${PROTOCOLS.join(', ')}`);
+  // Empty is valid and normal now: a pool doesn't have to be exported over SMB/NFS at all —
+  // that's configured separately (see routes/shares.ts callers on the Sharing page), not required
+  // at pool-creation time the way it used to be.
+  if (!Array.isArray(i.protocols) || !i.protocols.every((p) => PROTOCOLS.includes(p as ShareProtocol))) {
+    throw new HttpError(400, `protocols must be an array of: ${PROTOCOLS.join(', ')}`);
   }
   if (i.description !== undefined && typeof i.description !== 'string') {
     throw new HttpError(400, 'description must be a string.');

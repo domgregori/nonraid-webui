@@ -10,11 +10,11 @@ export function SharesCard() {
   return (
     <Card>
       <div className="eyebrow" style={{ marginBottom: 12 }}>
-        Shares
+        Pools
       </div>
 
       {views.length === 0 ? (
-        <div className="status-note">No shares yet.</div>
+        <div className="status-note">No pools yet.</div>
       ) : (
         views.map((share, i) => (
           <div key={share.name} className={`share-summary-row${i > 0 ? ' share-summary-row--bordered' : ''}`}>
@@ -31,7 +31,7 @@ export function SharesCard() {
       )}
 
       <Link to="/shares" className="share-summary-manage-link">
-        Manage shares &rarr;
+        Manage pools &rarr;
       </Link>
     </Card>
   );
