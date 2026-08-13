@@ -51,8 +51,7 @@ export function PasskeySection() {
     <div className="settings-field">
       <div className="toggle-row__title">Passkeys</div>
       <div className="toggle-row__desc">
-        A hardware key, or your device's built-in Touch ID/Windows Hello, as an alternative second factor to an
-        authenticator app.
+        A hardware key, or your device's built-in Touch ID/Windows Hello, as 2FA.
       </div>
 
       {passkeys.length > 0 && (
@@ -90,8 +89,7 @@ export function PasskeySection() {
         </>
       ) : (
         <div className="status-note">
-          Passkeys need a secure connection (HTTPS, or "localhost") - this page is loaded over plain HTTP, so adding
-          one isn't available here.
+          Passkeys need a secure connection. This page is loaded over plain HTTP. Enable HTTPS or use reverse proxy.
         </div>
       )}
 

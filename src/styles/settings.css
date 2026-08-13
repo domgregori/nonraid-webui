@@ -63,6 +63,7 @@
 }
 
 .settings-info-grid {
+  padding-bottom: 10px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: var(--space-md) var(--space-xl);

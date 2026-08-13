@@ -2,7 +2,7 @@ import type { Share, ShareAccess, ShareCommandResult, ShareStats } from '../type
 
 export interface ApplyContext {
   diskMountpoints: Record<number, string>; // data disk slot -> real mountpoint, e.g. { 1: '/mnt/disk1' }
-  minFreeSpaceMb: number; // mergerfs's minfreespace, from settings - see settings/types.ts
+  minFreeSpaceGb: number; // mergerfs's minfreespace, from settings - see settings/types.ts
   // Set only when cache is enabled AND its mirror is confirmed fully mounted (both members present)
   // - never a degraded or unmounted cache, see RealShareApplier.branchPaths()'s doc comment. null
   // means every share pools its array branches only, same as before the cache feature existed.

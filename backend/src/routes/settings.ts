@@ -52,9 +52,9 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
         await nmd.setWriteMethod(patch.turboWrite);
         activity.log(patch.turboWrite ? 'Turbo write enabled' : 'Turbo write disabled', 'blue').catch(() => {});
       }
-      if ('minFreeSpaceMb' in patch) {
-        if (typeof patch.minFreeSpaceMb !== 'number' || !Number.isInteger(patch.minFreeSpaceMb) || patch.minFreeSpaceMb < 0) {
-          throw new Error('minFreeSpaceMb must be a non-negative integer (MB).');
+      if ('minFreeSpaceGb' in patch) {
+        if (typeof patch.minFreeSpaceGb !== 'number' || !Number.isInteger(patch.minFreeSpaceGb) || patch.minFreeSpaceGb < 0) {
+          throw new Error('minFreeSpaceGb must be a non-negative integer (GB).');
         }
       }
       if (patch.paritySchedule) {
@@ -94,12 +94,12 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
         }
       }
       const updated = await store.update(patch);
-      if ('minFreeSpaceMb' in patch) {
+      if ('minFreeSpaceGb' in patch) {
         // mergerfs's minfreespace is a mount option - only takes effect on
         // (re)mount, so reapply every currently-mounted share now rather
         // than leaving them on the old value until the next backend restart.
         await shares.remountAll();
-        activity.log(`Minimum free space set to ${patch.minFreeSpaceMb} MB`, 'blue').catch(() => {});
+        activity.log(`Minimum free space set to ${patch.minFreeSpaceGb} GB`, 'blue').catch(() => {});
       }
       res.json(updated);
     } catch (err) {

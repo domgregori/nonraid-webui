@@ -88,7 +88,7 @@ export interface AppSettings {
   // this threshold from create-policy consideration - its own default is
   // 4096 (4G), a sane margin on real multi-TB disks but one that silently
   // makes every branch ineligible (ENOSPC on every write) on small disks.
-  minFreeSpaceMb: number;
+  minFreeSpaceGb: number;
   paritySchedule: ParitySchedule;
   backupSchedule: BackupSchedule;
   tempAlerts: TempAlertSettings;
@@ -103,7 +103,7 @@ export type AppSettingsUpdate = Partial<{
   notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {
     eventTypes?: Partial<Record<NotificationEventType, boolean>>;
   };
-  minFreeSpaceMb: number;
+  minFreeSpaceGb: number;
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<BackupSchedule>;
   tempAlerts: Partial<TempAlertSettings>;

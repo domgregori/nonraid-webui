@@ -150,7 +150,7 @@ export function TwoFactorSection() {
       <div className="toggle-row__desc">
         {status.totpEnabled
           ? `Enabled - ${status.backupCodesRemaining} backup code${status.backupCodesRemaining === 1 ? '' : 's'} remaining.`
-          : 'Not enabled. Adds a code from an authenticator app as a second step after your password.'}
+          : 'Not enabled. Adds a code from an authenticator app as 2FA.'}
       </div>
       {enrollError && enrollStep === 'idle' && <div className="status-note status-note--error">{enrollError}</div>}
       {status.totpEnabled ? (

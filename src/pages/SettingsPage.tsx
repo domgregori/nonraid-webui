@@ -224,7 +224,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (settings && !minFreeSpaceInitialized.current) {
-      setMinFreeSpaceDraft(String(settings.minFreeSpaceMb));
+      setMinFreeSpaceDraft(String(settings.minFreeSpaceGb));
       minFreeSpaceInitialized.current = true;
     }
   }, [settings]);
@@ -402,7 +402,7 @@ export function SettingsPage() {
     }
     setMinFreeSpaceSaving(true);
     setMinFreeSpaceError(null);
-    await update({ minFreeSpaceMb: value });
+    await update({ minFreeSpaceGb: value });
     setMinFreeSpaceSaving(false);
   };
 
@@ -576,7 +576,6 @@ export function SettingsPage() {
               {hostnameSaving ? 'Saving…' : 'Save'}
             </button>
           </div>
-          <div className="toggle-row__desc">Some services (e.g. mDNS/.local advertisement) may need a restart to fully pick up a new hostname.</div>
           {hostnameResult && <div className="status-note">{hostnameResult}</div>}
           {hostnameError && <div className="status-note status-note--error">{hostnameError}</div>}
         </div>
@@ -640,7 +639,7 @@ export function SettingsPage() {
       <div className={`settings-card${activeSection === 'network' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Network</div>
         <div className="toggle-row__desc" style={{ marginBottom: 10 }}>
-          Live interface addresses, read-only - this app doesn't manage network configuration.
+          Interface addresses
         </div>
         {!stats ? (
           <div className="status-note">Loading…</div>
@@ -664,7 +663,6 @@ export function SettingsPage() {
         <div className="settings-card__title">Appearance</div>
         <div className="settings-field">
           <div className="toggle-row__title">Theme</div>
-          <div className="toggle-row__desc">Stored in this browser only - doesn't sync across devices.</div>
           <div className="settings-field__row">
             <select className="history-input" value={themePreference} onChange={(e) => setThemePreference(e.target.value as ThemePreference)}>
               <option value="system">System</option>
@@ -681,9 +679,8 @@ export function SettingsPage() {
           <div>
             <div className="toggle-row__title">Turbo write</div>
             <div className="toggle-row__desc">
-              Reconstruct write mode - faster writes, but needs every disk spinning. The driver can't report its
-              current setting back, so this switch reflects what was last saved here, not necessarily live kernel
-              state after an out-of-band change.
+              Faster writes but at the expense of more power draw and all drives must be spun up on HDDs.
+              Best for large transfters, rebuilds, and parity checks.
             </div>
           </div>
           <ToggleSwitch
@@ -711,7 +708,7 @@ export function SettingsPage() {
             </button>
           </div>
           {arrayStarted && (
-            <div className="toggle-row__desc">Stop the array first - nmdctl only allows changing the label while stopped.</div>
+            <div className="toggle-row__desc">Array must be stopped first.</div>
           )}
           {labelResult && <div className="status-note">{labelResult}</div>}
           {labelError && <div className="status-note status-note--error">{labelError}</div>}
@@ -727,12 +724,14 @@ export function SettingsPage() {
         <div className="settings-field toggle-row--bordered">
           <div className="toggle-row__title">Reload driver</div>
           <div className="toggle-row__desc">
-            Reloads the storage driver against the current superblock and re-imports every disk's already-known
-            identity - doesn't change which disks are in the array or touch any data, only refreshes stale
-            internal state. A routine sequence of unassign/replace operations can leave driver-side counters out
-            of sync with reality even when the array otherwise looks healthy; this clears that without waiting
-            for it to surface as a real array error. Like any driver reload, the array is briefly unavailable
-            while it runs.
+            Reloads the storage driver and re-imports every disk's already-known
+            identity
+            <br>
+            A routine sequence of unassign/replace operations can leave driver-side counters out
+            of sync; this clears that without waiting
+            for it to surface as a real array error.
+            <br>
+            The array is briefly unavailable while it runs and containers must be stopped if stored on array.
           </div>
           {!reloadConfirming ? (
             <div className="settings-field__row">
@@ -775,10 +774,9 @@ export function SettingsPage() {
         <div className="settings-card__title">Cache</div>
         <div className="toggle-row">
           <div>
-            <div className="toggle-row__title">Use cache for shares</div>
+            <div className="toggle-row__title">Use cache for pools</div>
             <div className="toggle-row__desc">
-              While on, every share not pinned to a single disk writes to the cache mirror first - set up the mirror
-              on the Disks page before enabling this. A scheduled mover then drains cache onto the array below.
+              Writes to the cache mirror first. A scheduled mover then drains cache onto the array below. Speeds up read/writes.
             </div>
           </div>
           <ToggleSwitch on={cacheEnabled} onToggle={toggleCacheEnabled} label="Use cache for shares" disabled={!settings || cacheEnabledSaving} />
@@ -789,8 +787,7 @@ export function SettingsPage() {
           <div>
             <div className="toggle-row__title">Automatic mover</div>
             <div className="toggle-row__desc">
-              Moves everything currently on cache onto the array, per each share's own allocation settings, on the
-              schedule below.
+              Moves everything on cache onto the array.
             </div>
           </div>
           <ToggleSwitch on={cacheSchedEnabled} onToggle={() => setCacheSchedEnabled((v) => !v)} label="Automatic mover" disabled={!settings} />
@@ -814,18 +811,23 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <div className="toggle-row toggle-row--bordered">
+        <div className="settings-field toggle-row--bordered">
           <div>
             <div className="toggle-row__title">Run mover now</div>
             <div className="toggle-row__desc">
-              Moves everything currently on cache onto the array right away, outside the schedule above. A file
-              that's currently open (e.g. by a running Docker container) is skipped rather than failing the whole
-              run - stop anything actively using cache-hosted paths first for a complete move.
+              Moves cache onto the array now.
+              <br>
+              A file that's currently open (e.g. by a running Docker container) is skipped rather than failing the whole
+              run.
+              <br>
+              Stop anything actively using cache-hosted paths first for a complete move.
             </div>
           </div>
-          <button type="button" className="btn" disabled={cacheMoverSaving} onClick={runCacheMover}>
-            {cacheMoverSaving ? 'Starting…' : 'Move Now'}
-          </button>
+          <div className="settings-field__row">
+            <button type="button" className="btn" disabled={cacheMoverSaving} onClick={runCacheMover}>
+              {cacheMoverSaving ? 'Starting…' : 'Move'}
+            </button>
+          </div>
         </div>
         {cacheMoverError && <div className="status-note status-note--error">{cacheMoverError}</div>}
       </div>
@@ -834,7 +836,7 @@ export function SettingsPage() {
         <div className="settings-card__title">Docker &amp; LXC Storage</div>
         <StorageLocationField
           title="Docker"
-          desc="Where Docker images and containers are stored."
+          desc="Location of docker system and image file storage."
           dataDisks={dataDisks}
           getStorage={dockerApi.getStorage}
           moveStorage={dockerApi.moveStorage}
@@ -842,9 +844,7 @@ export function SettingsPage() {
         <div className="settings-field toggle-row--bordered">
           <div className="toggle-row__title">Prune unused Docker images</div>
           <div className="toggle-row__desc">
-            Removes every Docker image not used by any container, running or stopped - not just dangling/untagged
-            ones. Destroying a container already removes its own image if nothing else uses it; this catches
-            anything left over from before that (or images pulled but never run).
+            Remove unused docker images.
           </div>
           <button type="button" className="btn" disabled={dockerPruneSaving} onClick={handlePruneImages}>
             {dockerPruneSaving ? 'Pruning…' : 'Prune Images'}
@@ -862,10 +862,7 @@ export function SettingsPage() {
         <div className="settings-field toggle-row--bordered">
           <div className="toggle-row__title">Clear LXC template cache</div>
           <div className="toggle-row__desc">
-            Clears lxc-create's downloaded distro template cache. Unlike Docker images, this is never in use by an
-            existing container - each container gets its own full rootfs copy at creation time - so it's always
-            safe to clear; the only effect is a slower re-download next time you create a container from the same
-            distro/release/arch.
+            Remove LXC distro cache.
           </div>
           <button type="button" className="btn" disabled={lxcPruneSaving} onClick={handlePruneTemplateCache}>
             {lxcPruneSaving ? 'Clearing…' : 'Clear Cache'}
@@ -891,8 +888,7 @@ export function SettingsPage() {
           <div>
             <div className="toggle-row__title">Automatic check</div>
             <div className="toggle-row__desc">
-              Runs a correcting parity check automatically on the schedule below. Skipped if the array isn't started
-              or a check is already running.
+              Schedule a parity check.
             </div>
           </div>
           <ToggleSwitch
@@ -923,10 +919,9 @@ export function SettingsPage() {
       </div>
 
       <div className={`settings-card${activeSection === 'import' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Import from Unraid</div>
+        <div className="settings-card__title">Import Array</div>
         <div className="toggle-row__desc">
-          Migrating an existing Unraid array? This walks through picking the original superblock file, checking it
-          against what's physically connected, and importing only once everything checks out.
+          Migrate from a previous NonRAID or Unraid array.
         </div>
         <div className="settings-field__row">
           <button type="button" className="btn" onClick={() => setShowImportWizard(true)}>
@@ -941,11 +936,10 @@ export function SettingsPage() {
       <div className={`settings-card${activeSection === 'shares' ? '' : ' settings-hidden'}`}>
         <div className="settings-card__title">Pools</div>
         <div className="settings-field">
-          <div className="toggle-row__title">Minimum free space (MB)</div>
+          <div className="toggle-row__title">Minimum free space (GB)</div>
           <div className="toggle-row__desc">
             When a pool spans multiple disks, mergerfs won't pick a disk with less free space than this for a new
-            file. Its own default is 4096 MB (4 GB) - a sane margin on large disks, but on small disks that can make
-            every disk ineligible and every write fail. Applies immediately to every currently-mounted pool.
+            file. Its own default is 4GB.
           </div>
           <div className="settings-field__row">
             <input
@@ -971,9 +965,9 @@ export function SettingsPage() {
           <div>
             <div className="toggle-row__title">Automatic config backup</div>
             <div className="toggle-row__desc">
-              Writes a config backup (Samba/NFS config, this app's settings/shares/users, the array superblock) on
-              the schedule below. Point this at a directory on the array, not the boot disk - the whole point is
-              surviving a boot disk failure.
+              Backsup Samba/NFS config, this app's settings/pools/shares/users, the array superblock, and docker config.
+              <br>
+              Set schedule and and location below. 
             </div>
           </div>
           <ToggleSwitch on={backupSchedEnabled} onToggle={() => setBackupSchedEnabled((v) => !v)} label="Automatic config backup" disabled={!settings} />
@@ -1015,7 +1009,6 @@ export function SettingsPage() {
               onChange={(e) => setBackupRetainDraft(e.target.value)}
               disabled={!settings}
             />
-            <span className="toggle-row__desc">backups - older ones are pruned automatically.</span>
           </div>
           <div className="settings-field__row">
             <button type="button" className="btn" disabled={backupSchedSaving || !settings} onClick={saveBackupSchedule}>
@@ -1026,12 +1019,7 @@ export function SettingsPage() {
         </div>
 
         <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Back up now</div>
-          <div className="toggle-row__desc">
-            Runs the same backup as the schedule above, right now, into the saved destination directory - save it
-            first if you haven't. Or download a one-off copy straight to this device instead, which never touches
-            the array.
-          </div>
+          <div className="toggle-row__title">Back up config now</div>
           <div className="settings-field__row">
             <button type="button" className="btn" disabled={backupRunning || !settings} onClick={runBackupNow} title="Writes a config backup into the destination directory above, right now.">
               {backupRunning ? 'Backing up…' : 'Back up now'}
@@ -1052,9 +1040,11 @@ export function SettingsPage() {
         <div className="settings-field toggle-row--bordered">
           <div className="toggle-row__title">Import config</div>
           <div className="toggle-row__desc">
-            Restores a previously saved config backup - Samba/NFS config, this app's own settings/shares/users, and
-            the activity log. The array is only reconstructed too if it currently has nothing assigned; otherwise
-            use Settings → Import From Unraid for the array itself. Requires the array to be stopped first.
+            Restores a previously saved config backup
+            <br>
+            Requires the array to be stopped first.
+            <br>
+            Note: this is not for restoring an array.
           </div>
           <div className="settings-field__row">
             <button type="button" className="btn" onClick={() => setShowConfigRestoreWizard(true)}>
@@ -1070,8 +1060,7 @@ export function SettingsPage() {
           <div>
             <div className="toggle-row__title">Event notifications</div>
             <div className="toggle-row__desc">
-              Master switch for dispatching notifications via apprise - turns off every event below regardless of
-              its own toggle.
+              Dispatch notifications via apprise
             </div>
           </div>
           <ToggleSwitch
@@ -1084,9 +1073,6 @@ export function SettingsPage() {
 
         <div className="settings-field toggle-row--bordered">
           <div className="toggle-row__title">Which events notify</div>
-          <div className="toggle-row__desc" style={{ marginBottom: 8 }}>
-            Grouped by severity - saves each toggle immediately.
-          </div>
           <NotificationEventToggles
             eventTypes={eventTypesDraft}
             onChange={toggleEventType}
@@ -1180,7 +1166,7 @@ export function SettingsPage() {
         <div className="settings-field">
           <div className="toggle-row__title">Change admin password</div>
           <div className="toggle-row__desc">
-            Also signs out every other session - this stateless-cookie design has no other way to revoke a session
+            Also signs out every other session.
             early.
           </div>
           <input

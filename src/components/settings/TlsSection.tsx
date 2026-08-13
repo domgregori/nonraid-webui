@@ -131,12 +131,7 @@ export function TlsSection() {
     <div className="settings-field toggle-row--bordered">
       <div className="toggle-row__title">HTTPS</div>
       <div className="toggle-row__desc">
-        Passkeys and other secure-context browser features only work over HTTPS. Unblocks
-        WebAuthn passkeys when enabled.
-      </div>
-
-      <div className="toggle-row__desc">
-        HTTPS is currently <strong>{status.enabled ? 'on' : 'off'}</strong>
+        HTTPS is <strong>{status.enabled ? 'on' : 'off'}</strong>
         {status.configured && (
           <>
             {' '}
@@ -166,6 +161,9 @@ export function TlsSection() {
       <div className="toggle-row__title" style={{ marginTop: 12 }}>
         Generate a self-signed certificate
       </div>
+      <div className="toggle-row__desc">
+        Main FQDN, IP, or hostname address. Ex. nonraid.lan
+      </div>
       <div className="settings-field__row">
         <input
           className="history-input"
@@ -175,6 +173,9 @@ export function TlsSection() {
           placeholder="Common name, e.g. nonraid.lan"
           disabled={!!reconnecting}
         />
+      </div>
+      <div className="toggle-row__desc">
+        Additional hostnames/IPs, comma-separated (DNS:host or IP:address)
       </div>
       <div className="settings-field__row">
         <input

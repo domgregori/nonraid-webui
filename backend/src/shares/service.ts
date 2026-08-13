@@ -39,7 +39,7 @@ export class ShareService {
       if (mp && mp.startsWith('/')) diskMountpoints[d.slot] = mp;
     }
 
-    return { diskMountpoints, minFreeSpaceMb: settings.minFreeSpaceMb, cacheMountPoint: cacheActive ? config.cacheMountPoint : null };
+    return { diskMountpoints, minFreeSpaceGb: settings.minFreeSpaceGb, cacheMountPoint: cacheActive ? config.cacheMountPoint : null };
   }
 
   /**

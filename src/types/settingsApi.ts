@@ -73,7 +73,7 @@ export interface OnboardingSettings {
 export interface AppSettings {
   turboWrite: boolean;
   notifications: NotificationSettings;
-  minFreeSpaceMb: number;
+  minFreeSpaceGb: number;
   paritySchedule: ParitySchedule;
   backupSchedule: BackupSchedule;
   tempAlerts: TempAlertSettings;
@@ -88,7 +88,7 @@ export type AppSettingsUpdate = Partial<{
   notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {
     eventTypes?: Partial<Record<NotificationEventType, boolean>>;
   };
-  minFreeSpaceMb: number;
+  minFreeSpaceGb: number;
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<BackupSchedule>;
   tempAlerts: Partial<TempAlertSettings>;

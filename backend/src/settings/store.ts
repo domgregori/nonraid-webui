@@ -7,7 +7,7 @@ import type { AppSettings, AppSettingsUpdate } from './types.js';
 const DEFAULTS: AppSettings = {
   turboWrite: false,
   notifications: { enabled: false, appriseUrls: '', eventTypes: DEFAULT_EVENT_TYPES },
-  minFreeSpaceMb: 100,
+  minFreeSpaceGb: 4
   paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2 },
   backupSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3, destDir: '', retain: 7 },
   tempAlerts: { cpuWarnAboveCelsius: 55, diskWarnAboveCelsius: 55 },

@@ -198,7 +198,7 @@ export class RealShareApplier implements ShareApplier {
       const policy = this.usesCacheBranch(share, ctx) ? 'ff' : mergerfsPolicy(share.allocationMethod);
       // mergerfs excludes any branch below `minfreespace` from create-policy consideration -
       // its own default (4G) is a sane safety margin on real multi-TB disks, but it silently
-      // makes every branch ineligible (ENOSPC on every write) on small disks. ctx.minFreeSpaceMb
+      // makes every branch ineligible (ENOSPC on every write) on small disks. ctx.minFreeSpaceGb
       // comes from Settings (default 100M, matching this repo's small test disks) rather than
       // being hardcoded, so real deployments can raise it back toward mergerfs's own default.
       //
@@ -210,7 +210,7 @@ export class RealShareApplier implements ShareApplier {
       // unaffected. This is the real root cause behind what looked like a guest-only SMB gap.
       // Safe here specifically because this process runs as root - allow_other otherwise needs
       // `user_allow_other` in /etc/fuse.conf, which only matters for a non-root mounting process.
-      await run('mergerfs', ['-o', `allow_other,category.create=${policy},use_ino,minfreespace=${ctx.minFreeSpaceMb}M`, branches.join(':'), mountPoint]);
+      await run('mergerfs', ['-o', `allow_other,category.create=${policy},use_ino,minfreespace=${ctx.minFreeSpaceGb}G`, branches.join(':'), mountPoint]);
     }
 
     return { ok: true, message: `Share "${share.name}" mounted at ${mountPoint} (${branches.length} disk${branches.length === 1 ? '' : 's'})` };
