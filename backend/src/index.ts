@@ -62,7 +62,8 @@ async function main() {
   const diskQueue = new DiskQueueService(nmd, cache, activity);
   new ActivityWatcher(nmd, smart, activity, settingsStore, cache);
   new ParityScheduler(nmd, settingsStore, activity);
-  const backupScheduler = new BackupScheduler(nmd, settingsStore, activity);
+  const metrics = new MetricsService(openMetricsDb());
+  const backupScheduler = new BackupScheduler(nmd, settingsStore, activity, metrics);
   const authStore = new AuthStore();
   const authService = new AuthService(authStore);
   await authStore.get(); // fail fast at boot on a corrupt auth.json
@@ -86,7 +87,6 @@ async function main() {
   await caFeedStore.start();
   const apps = new AppsService(caFeedStore, docker, activity);
 
-  const metrics = new MetricsService(openMetricsDb());
   new MetricsSampler(metrics, system, nmd, smart).start();
 
   // The driver has no readback for write method (see nmd/client.ts), so on a
@@ -178,7 +178,7 @@ async function main() {
   app.use('/api', smartRouter(nmd, smart, system));
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
-  app.use('/api', systemRouter(system, nmd, activity, backupScheduler));
+  app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics));
   app.use('/api', servicesRouter(activity));
   app.use('/api', usersRouter(users));
   app.use('/api', appsRouter(apps));

@@ -3,7 +3,7 @@ import { request } from './request';
 import type { BenchmarkResult } from '../types/benchmark';
 import type { ImportResult } from '../types/nmdApi';
 import type { CommandResult } from '../types/settingsApi';
-import type { NetLiveRate, RestartServicesResult, RestoreCommitResult, RestorePreview, SystemStats } from '../types/systemApi';
+import type { BackupCategoryId, NetLiveRate, RestartServicesResult, RestoreCommitResult, RestorePreview, SystemStats } from '../types/systemApi';
 
 export const systemApi = {
   getStats: () => request<SystemStats>('/api/system'),
@@ -14,11 +14,11 @@ export const systemApi = {
     form.append('file', file);
     return request<RestorePreview>('/api/system/backup/restore/preview', { method: 'POST', body: form });
   },
-  commitConfigRestore: (token: string) =>
+  commitConfigRestore: (token: string, categories: BackupCategoryId[]) =>
     request<RestoreCommitResult>('/api/system/backup/restore/commit', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({ token, categories }),
     }),
   // Manual retry for the reload a restore already attempts automatically — see
   // backend/src/routes/system.ts's own comment on why this needs its own endpoint.
@@ -27,7 +27,12 @@ export const systemApi = {
   // backend/src/routes/system.ts's own comment. Resolves once SMB/NFS/driver-reload have run;
   // nonraid-webui's own restart happens after that and drops the connection, so the caller polls
   // getStats() separately to know when it's actually back.
-  restartServices: () => request<RestartServicesResult>('/api/system/restart-services', { method: 'POST' }),
+  restartServices: (restartDocker: boolean) =>
+    request<RestartServicesResult>('/api/system/restart-services', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ restartDocker }),
+    }),
 
   bootDiskImageBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/image`,
   bootDiskConfigBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/config`,

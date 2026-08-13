@@ -12,7 +12,10 @@ import { runSudoMaybe } from '../system/procUtil.js';
 import type { DockerClient } from './client.js';
 
 const execFileAsync = promisify(execFile);
-const DAEMON_JSON_PATH = '/etc/docker/daemon.json';
+// Exported so backupCatalog.ts can back this up under the same name a relocated Docker storage
+// root is written to — without it, a config restore onto a fresh OS install would leave Docker
+// pointed at the default data-root, unaware any previously-relocated containers/images exist.
+export const DAEMON_JSON_PATH = '/etc/docker/daemon.json';
 
 export interface StoragePathProgress {
   phase: string;

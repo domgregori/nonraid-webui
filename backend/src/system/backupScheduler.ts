@@ -2,6 +2,7 @@ import { access, constants, readdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { ActivityStore } from '../activity/index.js';
 import { config } from '../config.js';
+import type { MetricsService } from '../metrics/service.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
 import { notifyEvent } from '../settings/notify.js';
@@ -29,6 +30,7 @@ export class BackupScheduler {
     private nmd: NmdClient,
     private settings: SettingsStore,
     private activity: ActivityStore,
+    private metrics: MetricsService,
     intervalMs: number = config.schedulerTickIntervalMs,
   ) {
     this.timer = setInterval(() => this.tick(), intervalMs);
@@ -79,6 +81,7 @@ export class BackupScheduler {
     }
 
     try {
+      this.metrics.checkpointForBackup();
       const paths = await resolveConfigBackupPaths(this.nmd);
       if (paths.length === 0) {
         const msg = `${label} skipped — no config files found to back up`;

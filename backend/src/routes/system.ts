@@ -5,12 +5,15 @@ import { Router } from 'express';
 import multer from 'multer';
 import type { ActivityStore } from '../activity/store.js';
 import { config } from '../config.js';
+import { DAEMON_JSON_PATH } from '../docker/storagePath.js';
 import { HttpError } from '../httpError.js';
 import { NetRateTracker } from '../metrics/net.js';
 import type { NmdClient } from '../nmd/client.js';
+import type { MetricsService } from '../metrics/service.js';
 import { benchmarkRead, benchmarkWrite, resolveDurationMs } from '../system/benchmark.js';
 import { resolveConfigBackupPaths, streamBootDiskImage, streamConfigBackup } from '../system/backupStream.js';
 import type { BackupScheduler } from '../system/backupScheduler.js';
+import { categoryForMember, resolveBackupCategories, type BackupCategoryId } from '../system/backupCatalog.js';
 import {
   dropStagedRestore,
   getStagedRestore,
@@ -29,7 +32,13 @@ import { restartService, SERVICE_DEFS } from '../system/services.js';
 // silently truncate, reject clearly" intent as array.ts's own superblock upload limit.
 const restoreUpload = multer({ dest: os.tmpdir(), limits: { fileSize: 200 * 1024 * 1024 } });
 
-export function systemRouter(system: SystemStatsService, nmd: NmdClient, activity: ActivityStore, backupScheduler: BackupScheduler): Router {
+export function systemRouter(
+  system: SystemStatsService,
+  nmd: NmdClient,
+  activity: ActivityStore,
+  backupScheduler: BackupScheduler,
+  metrics: MetricsService,
+): Router {
   const router = Router();
 
   router.get('/system', (_req, res) => {
@@ -57,6 +66,7 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
 
   router.get('/system/boot-disk/backup/config', async (_req, res) => {
     try {
+      metrics.checkpointForBackup();
       const existing = await resolveConfigBackupPaths(nmd);
       if (existing.length === 0) {
         throw new HttpError(400, 'No NonRAID config files were found to back up.');
@@ -109,12 +119,27 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
       const status = await nmd.getStatus().catch(() => null);
       const arrayStopped = status ? status.array.state !== 'STARTED' : true;
 
+      const categories = await resolveBackupCategories(nmd);
+      // Directory members (e.g. "etc/nonraid/") are counted in their category's totals below but
+      // dropped from the flat `entries` shown per-member — same reasoning restoreArchiveMembers()
+      // itself already has for not extracting them: a bare directory carries nothing the file
+      // members inside it don't already imply.
+      const categoryPreviews = categories
+        .map((cat) => ({
+          id: cat.id,
+          label: cat.label,
+          description: cat.description,
+          entries: members.filter((m) => !m.endsWith('/') && categoryForMember(m, categories) === cat.id).map((m) => `/${m}`),
+        }))
+        .filter((c) => c.entries.length > 0);
+
       const token = randomUUID();
       stageRestoreFile(token, file.path);
 
       res.json({
         token,
         entries: members.map((m) => ({ path: `/${m}`, isSuperblock: m === superblockMember })),
+        categories: categoryPreviews,
         arrayIsBlank,
         arrayStopped,
       });
@@ -148,8 +173,21 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
       const superblockPath = await nmd.getSuperblockPath();
       const superblockMember = superblockPath.replace(/^\//, '');
       const arrayIsBlank = await isArrayBlank(nmd);
+      const categories = await resolveBackupCategories(nmd);
 
-      const toRestore = members.filter((m) => m !== superblockMember || arrayIsBlank);
+      // Missing/malformed `categories` means "everything" (the field didn't exist before this
+      // selection feature — old clients, or a plain re-POST of a preview response, still restore
+      // the full archive rather than silently restoring nothing).
+      const requestedCategories = Array.isArray(req.body?.categories) ? (req.body.categories as unknown[]) : null;
+      const selected: Set<BackupCategoryId> = requestedCategories
+        ? new Set(requestedCategories.filter((c): c is BackupCategoryId => categories.some((cat) => cat.id === c)))
+        : new Set(categories.map((c) => c.id));
+
+      const toRestore = members.filter((m) => {
+        if (m === superblockMember && !arrayIsBlank) return false; // the existing safety gate, independent of selection
+        const cat = categoryForMember(m, categories);
+        return cat !== null && selected.has(cat);
+      });
       const skippedSuperblock = members.includes(superblockMember) && !arrayIsBlank;
       // restoreArchiveMembers() itself drops bare directory members before extracting (see its own
       // doc comment) — mirrored here so the reported count matches what was actually written, not
@@ -160,6 +198,27 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
       dropStagedRestore(token);
       await unlink(staged.filePath).catch(() => {});
 
+      // The archived metrics.db is a complete, checkpointed snapshot on its own (see
+      // MetricsService.checkpointForBackup) — but the *current* database this just overwrote may
+      // still have its own -wal/-shm sidecars sitting next to it from live activity since the last
+      // checkpoint. Left in place, SQLite would try to replay that leftover WAL against the freshly
+      // restored (unrelated) .db file the next time it's opened, misapplying old transactions onto
+      // data from a different point in time entirely. Only the restored .db file itself should be
+      // trusted going forward — nonraid-webui's own restart (part of Restart Services) is what
+      // actually reopens the connection and needs these gone before that happens.
+      const graphHistoryMember = config.metricsDbPath.replace(/^\//, '');
+      if (toRestore.includes(graphHistoryMember)) {
+        await unlink(`${config.metricsDbPath}-wal`).catch(() => {});
+        await unlink(`${config.metricsDbPath}-shm`).catch(() => {});
+      }
+
+      // Docker only reads daemon.json at startup — a restored data-root relocation is inert until
+      // the daemon restarts, and restarting Docker stops every running container, so this is only
+      // ever done when the archive actually had this member (see restart-services below, which
+      // takes this as an explicit opt-in rather than restarting Docker on every restore).
+      const dockerConfigMember = DAEMON_JSON_PATH.replace(/^\//, '');
+      const dockerConfigRestored = toRestore.includes(dockerConfigMember);
+
       // restoreArchiveMembers() only writes the file — the already-running kernel module has no
       // way to know its superblock file changed underneath it (confirmed live: the array stayed
       // reporting blank, and the onboarding wizard kept bouncing back to its very first screen,
@@ -169,7 +228,7 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
       // a reload failure doesn't undo the file restore, so it's reported alongside success rather
       // than turned into a 502 — the files are safely on disk either way, only the running
       // module's own state needs a retry (or a reboot) to catch up.
-      const superblockRestored = members.includes(superblockMember) && arrayIsBlank;
+      const superblockRestored = toRestore.includes(superblockMember);
       let superblockReloadError: string | null = null;
       if (superblockRestored) {
         try {
@@ -185,7 +244,7 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
         activity.log(`Config restore's superblock reload failed: ${superblockReloadError}`, 'red').catch(() => {});
       }
 
-      res.json({ restoredCount, skippedSuperblock, superblockReloadError });
+      res.json({ restoredCount, skippedSuperblock, superblockReloadError, dockerConfigRestored });
     } catch (err) {
       const message = err instanceof HttpError ? err.message : (err as Error).message;
       activity.log(`Config restore failed: ${message}`, 'red').catch(() => {});
@@ -220,7 +279,7 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
   // pattern as /services/webui/restart) since it drops this connection. Each step is independent
   // and best-effort — one failing doesn't skip the rest, since e.g. a driver reload failure
   // shouldn't leave Samba serving a stale smb.conf just because it ran second.
-  router.post('/system/restart-services', async (_req, res) => {
+  router.post('/system/restart-services', async (req, res) => {
     const runStep = async (label: string, step: () => Promise<string>): Promise<{ ok: boolean; message: string }> => {
       try {
         const message = await step();
@@ -247,12 +306,24 @@ export function systemRouter(system: SystemStatsService, nmd: NmdClient, activit
       const result = await nmd.reloadModuleAndImport();
       return `Driver reloaded, ${result.importedCount} disk(s) re-imported`;
     });
+    // Docker only reads daemon.json at startup, and restarting it stops every running container —
+    // an explicit opt-in from the caller, not run by default, so a restore that never touched
+    // daemon.json (or a click of this button outside a restore) doesn't bounce Docker for no
+    // reason. The config-restore wizard sets this from commitResult.dockerConfigRestored.
+    const docker = req.body?.restartDocker
+      ? await runStep('Docker restart', async () => {
+          const def = SERVICE_DEFS.find((d) => d.id === 'docker')!;
+          await restartService(def, config.systemUseSudo);
+          return 'Docker restarted';
+        })
+      : null;
 
     activity.log('Restarting nonraid-webui backend', 'amber').catch(() => {});
     res.json({
       smb,
       nfs,
       driverReload,
+      docker,
       message: 'Restarting nonraid-webui — this page will reconnect automatically in a few seconds.',
     });
     // Same self-exit pattern as /services/webui/restart: this unit's own Restart=on-failure

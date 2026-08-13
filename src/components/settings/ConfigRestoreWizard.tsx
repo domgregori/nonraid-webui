@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { systemApi } from '../../api/systemApi';
 import { ProgressBar } from '../shared/ProgressBar';
-import type { RestartServicesResult, RestoreCommitResult, RestorePreview } from '../../types/systemApi';
+import type { BackupCategoryId, RestartServicesResult, RestoreCommitResult, RestorePreview } from '../../types/systemApi';
 
 // getStats() polled every POLL_INTERVAL_MS after triggering a restart, up to POLL_MAX_ATTEMPTS
 // times, to detect nonraid-webui actually coming back — a generous ceiling (2 minutes) since a
@@ -37,6 +37,8 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
   const [preview, setPreview] = useState<RestorePreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
+  const [selectedCategories, setSelectedCategories] = useState<Set<BackupCategoryId>>(new Set());
+
   const [acknowledged, setAcknowledged] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [commitResult, setCommitResult] = useState<RestoreCommitResult | null>(null);
@@ -60,7 +62,7 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
     setBackOnline(false);
     setRestartTimedOut(false);
     try {
-      const result = await systemApi.restartServices();
+      const result = await systemApi.restartServices(commitResult?.dockerConfigRestored ?? false);
       setRestartSteps(result);
     } catch {
       // The connection can drop mid-response if nonraid-webui's own restart lands before this
@@ -89,6 +91,12 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
     try {
       const result = await systemApi.previewConfigRestore(file);
       setPreview(result);
+      // Default to everything selected, except the array category when it can't actually be
+      // restored (array already has disks assigned) — leaving it checked-but-disabled would read
+      // as "this will happen" when it won't.
+      setSelectedCategories(
+        new Set(result.categories.filter((c) => c.entries.length > 0 && (c.id !== 'array' || result.arrayIsBlank)).map((c) => c.id)),
+      );
       setStep('review');
     } catch (err) {
       setPreviewError((err as Error).message);
@@ -103,7 +111,7 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
     setCommitting(true);
     setCommitError(null);
     try {
-      const result = await systemApi.commitConfigRestore(preview.token);
+      const result = await systemApi.commitConfigRestore(preview.token, Array.from(selectedCategories));
       setCommitResult(result);
       setStep('result');
       onRestored?.();
@@ -114,9 +122,19 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
     }
   };
 
+  const toggleCategory = (id: BackupCategoryId) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const startOver = () => {
     setPreview(null);
     setPreviewError(null);
+    setSelectedCategories(new Set());
     setAcknowledged(false);
     setCommitResult(null);
     setCommitError(null);
@@ -126,6 +144,7 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
 
   const hasSuperblock = preview?.entries.some((e) => e.isSuperblock) ?? false;
   const superblockWillRestore = hasSuperblock && preview!.arrayIsBlank;
+  const selectedEntryCount = preview?.categories.filter((c) => selectedCategories.has(c.id)).reduce((sum, c) => sum + c.entries.length, 0) ?? 0;
 
   return (
     <>
@@ -196,14 +215,46 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
                 </div>
               )}
 
-              <ul className="browse-bulk-failures" style={{ maxHeight: 240 }}>
-                {preview.entries.map((entry) => (
-                  <li key={entry.path}>
-                    {entry.path}
-                    {entry.isSuperblock ? ' — array superblock' : ''}
-                  </li>
-                ))}
-              </ul>
+              <div className="toggle-row__desc">Select what to restore:</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {preview.categories
+                  .filter((cat) => cat.entries.length > 0)
+                  .map((cat) => {
+                    const disabled = cat.id === 'array' && !preview.arrayIsBlank;
+                    return (
+                      <label
+                        key={cat.id}
+                        className="container-form-row__checkbox"
+                        style={disabled ? { opacity: 0.6 } : undefined}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedCategories.has(cat.id)}
+                          disabled={disabled}
+                          onChange={() => toggleCategory(cat.id)}
+                        />
+                        <span>
+                          <strong>{cat.label}</strong> — {cat.description} ({cat.entries.length} file
+                          {cat.entries.length === 1 ? '' : 's'})
+                        </span>
+                      </label>
+                    );
+                  })}
+              </div>
+
+              <details>
+                <summary className="toggle-row__desc" style={{ cursor: 'pointer' }}>
+                  Show all {preview.entries.length} file(s) in this archive
+                </summary>
+                <ul className="browse-bulk-failures" style={{ maxHeight: 240 }}>
+                  {preview.entries.map((entry) => (
+                    <li key={entry.path}>
+                      {entry.path}
+                      {entry.isSuperblock ? ' — array superblock' : ''}
+                    </li>
+                  ))}
+                </ul>
+              </details>
 
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={startOver}>
@@ -219,9 +270,9 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
           {step === 'confirm' && preview && (
             <>
               <div className="status-note status-note--error">
-                This overwrites {preview.entries.length - (hasSuperblock && !superblockWillRestore ? 1 : 0)} file(s) at
-                their original locations on this host — Samba/NFS config, this app's own settings/shares/users, and
-                the activity log. There's no undo beyond restoring a different (or older) backup afterward.
+                This overwrites {selectedEntryCount} file(s) at their original locations on this host, covering only
+                what's checked on the previous step. There's no undo beyond restoring a different (or older) backup
+                afterward.
               </div>
 
               <label className="container-form-row__checkbox">
@@ -235,7 +286,12 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
                 <button type="button" className="btn" onClick={() => setStep('review')}>
                   Back
                 </button>
-                <button type="button" className="btn btn--danger" disabled={!acknowledged || committing} onClick={handleCommit}>
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  disabled={!acknowledged || committing || selectedEntryCount === 0}
+                  onClick={handleCommit}
+                >
                   {committing ? 'Restoring…' : 'Restore config'}
                 </button>
               </div>
@@ -247,8 +303,11 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
               <div className="status-note">
                 Restored {commitResult.restoredCount} item(s)
                 {commitResult.skippedSuperblock ? ' — array superblock skipped, array already has disks assigned' : ''}.
-                Samba/NFS, the driver, and nonraid-webui itself all need to restart to fully pick up what was just
-                restored — one button below does all of it.
+                Samba/NFS, the driver, {commitResult.dockerConfigRestored ? 'Docker, ' : ''}and nonraid-webui itself
+                all need to restart to fully pick up what was just restored — one button below does all of it.
+                {commitResult.dockerConfigRestored
+                  ? ' Restarting Docker stops every currently-running container until it comes back up.'
+                  : ''}
               </div>
 
               {commitResult.superblockReloadError && !backOnline && (
@@ -282,6 +341,11 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
                     <li style={restartSteps.driverReload.ok ? undefined : { color: 'var(--color-red)' }}>
                       Driver: {restartSteps.driverReload.message}
                     </li>
+                    {restartSteps.docker && (
+                      <li style={restartSteps.docker.ok ? undefined : { color: 'var(--color-red)' }}>
+                        Docker: {restartSteps.docker.message}
+                      </li>
+                    )}
                   </ul>
                 )}
                 {backOnline && <div className="status-note">nonraid-webui is back online.</div>}

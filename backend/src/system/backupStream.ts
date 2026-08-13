@@ -1,11 +1,8 @@
 import { createWriteStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { createGzip } from 'node:zlib';
 import type { Response } from 'express';
 import type { ActivityStore } from '../activity/store.js';
-import { config } from '../config.js';
-import type { NmdClient } from '../nmd/index.js';
 import { spawnMaybeSudo } from './procUtil.js';
 
 const STDERR_TAIL_MAX = 4000;
@@ -128,35 +125,10 @@ export function streamConfigBackup(paths: string[], useSudo: boolean, res: Respo
   activity.log('Config backup started', 'blue').catch(() => {});
 }
 
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await stat(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * The set of config paths worth backing up, filtered to ones that actually exist right now.
- * Shared by the on-demand download route (routes/system.ts) and BackupScheduler, so both back up
- * exactly the same things.
- */
-export async function resolveConfigBackupPaths(nmd: NmdClient): Promise<string[]> {
-  const candidates = [
-    config.smbConfPath,
-    config.exportsPath,
-    '/etc/nonraid',
-    config.authConfigPath,
-    config.sharesConfigPath,
-    config.shareAccessConfigPath,
-    config.settingsConfigPath,
-    config.activityConfigPath,
-    await nmd.getSuperblockPath(),
-  ];
-  const existing = await Promise.all(candidates.map(async (p) => ((await pathExists(p)) ? p : null)));
-  return existing.filter((p): p is string => p !== null);
-}
+// resolveConfigBackupPaths() moved to backupCatalog.ts, now derived from the same category list
+// the restore side uses for its per-category selection — re-exported here so existing callers
+// (routes/system.ts, BackupScheduler) don't need an import path change.
+export { resolveConfigBackupPaths } from './backupCatalog.js';
 
 /**
  * Non-streaming sibling of streamConfigBackup — writes the same gzip-compressed tar to a file on

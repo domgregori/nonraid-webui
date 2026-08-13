@@ -42,9 +42,20 @@ export interface RestoreArchiveEntry {
   isSuperblock: boolean;
 }
 
+// Mirrors backend/src/system/backupCatalog.ts's BackupCategoryId.
+export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory';
+
+export interface RestoreCategoryPreview {
+  id: BackupCategoryId;
+  label: string;
+  description: string;
+  entries: string[];
+}
+
 export interface RestorePreview {
   token: string;
   entries: RestoreArchiveEntry[];
+  categories: RestoreCategoryPreview[];
   // Whether the archive's superblock member (if it has one) will actually be restored — only
   // true when this array currently has nothing assigned. See backend/src/system/configRestore.ts.
   arrayIsBlank: boolean;
@@ -59,6 +70,10 @@ export interface RestoreCommitResult {
    *  either way, this only means the running module hasn't picked it up yet. Null on success or
    *  when there was no superblock to reload for. */
   superblockReloadError: string | null;
+  // Whether Docker's daemon.json (storage-location relocation) was part of what was just
+  // restored — passed back into restartServices() below so it only bounces Docker (which stops
+  // every running container) when a restore actually touched it.
+  dockerConfigRestored: boolean;
 }
 
 export interface RestartServicesStepResult {
@@ -73,5 +88,9 @@ export interface RestartServicesResult {
   smb: RestartServicesStepResult;
   nfs: RestartServicesStepResult;
   driverReload: RestartServicesStepResult;
+  // Null when the caller didn't opt in via restartDocker (see systemApi.restartServices) — Docker
+  // stops every running container on restart, so it's never bounced unless daemon.json was
+  // actually part of what was just restored.
+  docker: RestartServicesStepResult | null;
   message: string;
 }
