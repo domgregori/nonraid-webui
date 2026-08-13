@@ -166,7 +166,7 @@ export function DiskQueueCard() {
               <div key={item.id} className="unassigned-device-row" style={{ cursor: 'default', opacity: 0.6 }}>
                 <div className="unassigned-device-row__info">
                   <div className="unassigned-device-row__name">{typeLabel(item.type)}</div>
-                  <div className="unassigned-device-row__meta">{item.label}</div>
+                  <div className="unassigned-device-row__meta">{item.note ?? item.label}</div>
                 </div>
               </div>
             ))}

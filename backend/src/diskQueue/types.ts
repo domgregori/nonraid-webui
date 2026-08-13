@@ -13,6 +13,11 @@ export interface DiskQueueItem {
   startedAt: number | null;
   finishedAt: number | null;
   error: string | null;
+  /** Set only on a 'done' item that completed with a caveat worth surfacing — e.g. a parity disk
+   *  added to a still-blank array, which can't start (nothing to protect yet) until a data disk
+   *  joins it too. Distinct from `error`: this is an expected, non-failing outcome, not a problem
+   *  the user needs to act on — see DiskQueueService.runAddDiskItem's NO_DATA_DISKS handling. */
+  note: string | null;
 }
 
 export interface DiskQueueState {

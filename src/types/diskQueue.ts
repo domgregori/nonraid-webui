@@ -13,6 +13,7 @@ export interface DiskQueueItem {
   startedAt: number | null;
   finishedAt: number | null;
   error: string | null;
+  note: string | null;
 }
 
 export interface DiskQueueState {

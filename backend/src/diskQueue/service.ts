@@ -104,6 +104,7 @@ export class DiskQueueService {
       startedAt: null,
       finishedAt: null,
       error: null,
+      note: null,
     };
     this.items.push(item);
     this.kick();
@@ -122,6 +123,7 @@ export class DiskQueueService {
       startedAt: null,
       finishedAt: null,
       error: null,
+      note: null,
     };
     this.items.push(item);
     this.kick();
@@ -187,7 +189,11 @@ export class DiskQueueService {
           head.status = 'done';
           head.phase = null;
           head.finishedAt = Date.now();
-          this.activity.log(`${describeItem(head)} completed`, 'green').catch(() => {});
+          if (head.note) {
+            this.activity.log(head.note, 'amber').catch(() => {});
+          } else {
+            this.activity.log(`${describeItem(head)} completed`, 'green').catch(() => {});
+          }
           this.pruneHistory();
         } catch (err) {
           head.status = 'failed';
@@ -267,7 +273,23 @@ export class DiskQueueService {
     }
 
     await this.nmd.addDisk(input.slot, target, match.diskId ?? undefined, { autoStart: false });
-    await this.nmd.startArray();
+    try {
+      await this.nmd.startArray();
+    } catch (err) {
+      // A parity-only array (no data disks assigned yet) refuses to start at all — nothing to
+      // protect yet, confirmed live via ERROR:NO_DATA_DISKS. This is expected, not a real
+      // failure: the disk itself is already correctly committed to its slot (addDisk() above
+      // succeeded), it just can't clear/build parity until a data disk joins it too. Treat it as
+      // done rather than failed, so a data disk already queued behind this one isn't blocked on
+      // a manual Remove for something that was never actually wrong — it'll pick this parity
+      // disk right up on its own turn.
+      const afterFailedStart = await this.nmd.getStatus().catch(() => null);
+      if (afterFailedStart?.array.state === 'ERROR:NO_DATA_DISKS') {
+        item.note = `${describeItem(item)} is in place but can't start yet — add at least one data disk to begin building parity.`;
+        return;
+      }
+      throw err;
+    }
     // start() alone only marks the pending clear/rebuild — parityCheck('CORRECT') is what
     // actually kicks it off running, same as ArrayBuilder.tsx and RealNmdClient.parityCheck()'s
     // own doc comments explain.
