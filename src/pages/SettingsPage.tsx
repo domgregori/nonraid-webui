@@ -726,11 +726,11 @@ export function SettingsPage() {
           <div className="toggle-row__desc">
             Reloads the storage driver and re-imports every disk's already-known
             identity
-            <br>
+            <br />
             A routine sequence of unassign/replace operations can leave driver-side counters out
             of sync; this clears that without waiting
             for it to surface as a real array error.
-            <br>
+            <br />
             The array is briefly unavailable while it runs and containers must be stopped if stored on array.
           </div>
           {!reloadConfirming ? (
@@ -816,10 +816,10 @@ export function SettingsPage() {
             <div className="toggle-row__title">Run mover now</div>
             <div className="toggle-row__desc">
               Moves cache onto the array now.
-              <br>
+              <br />
               A file that's currently open (e.g. by a running Docker container) is skipped rather than failing the whole
               run.
-              <br>
+              <br />
               Stop anything actively using cache-hosted paths first for a complete move.
             </div>
           </div>
@@ -966,7 +966,7 @@ export function SettingsPage() {
             <div className="toggle-row__title">Automatic config backup</div>
             <div className="toggle-row__desc">
               Backsup Samba/NFS config, this app's settings/pools/shares/users, the array superblock, and docker config.
-              <br>
+              <br />
               Set schedule and and location below. 
             </div>
           </div>
@@ -1041,9 +1041,9 @@ export function SettingsPage() {
           <div className="toggle-row__title">Import config</div>
           <div className="toggle-row__desc">
             Restores a previously saved config backup
-            <br>
+            <br />
             Requires the array to be stopped first.
-            <br>
+            <br />
             Note: this is not for restoring an array.
           </div>
           <div className="settings-field__row">
