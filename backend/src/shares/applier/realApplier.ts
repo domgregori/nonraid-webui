@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { config } from '../../config.js';
 import { HttpError } from '../../httpError.js';
@@ -173,12 +173,17 @@ export class RealShareApplier implements ShareApplier {
       throw new HttpError(409, `No mounted disks available for share "${share.name}" - ${reason}.`);
     }
 
+    // Array disks (and /mnt itself) are root:root - creating a new share directory under one
+    // needs the same sudo escalation every other privileged operation in this file already gets
+    // via run(), not fs/promises' own unprivileged mkdir. Confirmed live: this was throwing EACCES
+    // on every multi-disk array (nonraid ALL=(root) NOPASSWD: /usr/bin/mkdir was already
+    // provisioned in the sudoers file for exactly this, just never actually used).
     for (const branch of branches) {
-      await mkdir(branch, { recursive: true });
+      await run('mkdir', ['-p', branch]);
     }
 
     const mountPoint = userMountPath(share.name);
-    await mkdir(mountPoint, { recursive: true });
+    await run('mkdir', ['-p', mountPoint]);
 
     // idempotent: branch list or policy may have changed since last apply
     if (await isMounted(mountPoint)) {
