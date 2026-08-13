@@ -95,7 +95,6 @@ export function ServicesSection() {
         const isWebui = service.id === 'webui';
         return (
           <div key={service.id}>
-            {WARNINGS[service.id] && <div className="status-note">{WARNINGS[service.id]}</div>}
             <div className="toggle-row toggle-row--bordered">
               <div>
                 <div className="toggle-row__title">{service.label}</div>
@@ -130,6 +129,7 @@ export function ServicesSection() {
                 </button>
               </div>
             </div>
+            {WARNINGS[service.id] && <div className="status-note">{WARNINGS[service.id]}</div>}
           </div>
         );
       })}

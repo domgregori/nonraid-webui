@@ -302,11 +302,11 @@ SUDOERS_TMP="$(mktemp)"
     # routes/system.ts's Settings -> About reboot action.
     for args in \
       "is-active docker.service" "is-active lxc.service" \
-      "is-active smbd.service nmbd.service winbind.service" \
+      "is-active smbd.service nmbd.service" \
       "is-active nfs-server.service" "is-active ssh.service" \
       "stop docker.socket docker.service" "start docker" \
       "stop lxc" "start lxc" \
-      "stop smbd.service nmbd.service winbind.service" "start smbd.service nmbd.service winbind.service" \
+      "stop smbd.service nmbd.service" "start smbd.service nmbd.service" \
       "stop nfs-server" "start nfs-server" \
       "stop ssh" "start ssh" \
       "reboot"; do

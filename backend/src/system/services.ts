@@ -25,9 +25,13 @@ export const SERVICE_DEFS: ServiceDef[] = [
   {
     id: 'smb',
     label: 'SMB Sharing',
-    statusUnits: ['smbd.service', 'nmbd.service', 'winbind.service'],
-    stopArgs: ['smbd.service', 'nmbd.service', 'winbind.service'],
-    startArgs: ['smbd.service', 'nmbd.service', 'winbind.service'],
+    // winbind is deliberately not included: it's only relevant for AD-domain-joined Samba, which
+    // this app never sets up (install-webui.sh only enables smbd/nmbd, see its own systemctl
+    // enable --now line) — with it included here, a fully healthy standalone install permanently
+    // reported 'mixed' ("Partially running") since winbind.service is never active.
+    statusUnits: ['smbd.service', 'nmbd.service'],
+    stopArgs: ['smbd.service', 'nmbd.service'],
+    startArgs: ['smbd.service', 'nmbd.service'],
   },
   { id: 'nfs', label: 'NFS Sharing', statusUnits: ['nfs-server.service'], stopArgs: ['nfs-server'], startArgs: ['nfs-server'] },
   { id: 'ssh', label: 'SSH', statusUnits: ['ssh.service'], stopArgs: ['ssh'], startArgs: ['ssh'] },
