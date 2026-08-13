@@ -1,32 +1,66 @@
-# nonraid-webui
+# NonRAID WebUI
 
-A web dashboard for [nonraid](https://github.com/qvr/nonraid) / `nmdctl` — an unRAID-style storage
-array driver + CLI. Surfaces array status, parity protection, per-disk detail, shares, users, Docker
-containers, LXC containers, historical metrics (via Grafana), and array settings.
+<img src="./public/logo.png" width="300">
 
-Two-part repo: a React frontend (this directory) and an Express backend (`backend/`) that wraps
-`nmdctl`, the Docker Engine API, the `lxc-*` command-line tools, `smartctl`, mergerfs/Samba/NFS
-(shares), and host CPU/memory — see `backend/README.md`.
+### Disclaimer: **EXPERIMENTAL!**
 
-Users means SMB/NFS share accounts (real Linux/Samba users, uid/gid ≥ 20000), **not** a webui login
-system — the API itself still has no auth layer at all (see `backend/README.md`'s Privileges section);
-those are two separate, still-separate concerns.
+- **This webui was AI coded.**
+- The backbone nonraid kernel driver from [qvr/nonraid](https://github.com/qvr/nonraid) is based on the unraid kernel driver, not AI coded.
+- The nonraid tool (nmdctl) was written by [qvr](https://github.com/qvr/nonraid)
+- I am using my own [fork](https://github.com/domgregori/nonraid) of nonraid that has fixes to the nmdctl tool and the service files. The driver code was not touched.
 
-## Stack
+This is a web dashboard for [NonRAID](https://github.com/qvr/nonraid) - an alternative to Unraid NAS. Surfaces array status, parity protection, per-disk detail, shares, users, Docker
+containers, LXC containers, historical metrics, and array management.
 
-- Frontend: React 19 + TypeScript, Vite, react-router-dom (routes: `/`, `/shares`, `/browse`,
-  `/users`, `/docker`, `/lxc`, `/apps`, `/history`, `/settings`). Plain CSS with a token file
-  (`src/styles/tokens.css`) — no CSS-in-JS, no component library.
-- Backend: Node + TypeScript, Express. See `backend/README.md`.
+## Features
 
-## Getting started (frontend)
+- Parity (allows for 1 or 2 disk failures)
+- Storage disk (up to 28 non matching disks)
+- Wizard to setup or import an array
+- A mirrored pair of cache disks with scheduled moving to array
+- Dashboard with up-to-date info
+- Disks menu to easily add parity, storage, and cache disks
+- Sharing for creating shares (pools)
+- Users for sharing shares via samba/nfs
+  - Groups are supported
+- A file browser to interact with shares
+- Docker template **Apps** from [Community Applications](https://github.com/Squidly271/community.applications)
+- Custom docker containers
+- LXC containers
+- Choose where to store containers
+- History graphs of Temps, CPU, RAM, I/O, Net, Usage
+- Import an Unraid array or a previous NonRAID array/config
+- Service management
+- System log viewer
+- Schedule automatic parity checks
+- Automatic config backups
+- Apprise notifications
+- http, https self signed, or import cert/key
+- 2FA: TOTP, Passkey when using https
+
+## Requirements
+
+- Debian 13 new install with a sudo user, to run install script
+- Install script installs the other requirements. Read [REQUIREMENTS.md](REQUIREMENTS.md) and [install-webui.sh](tools/install-webui.sh)
+
+## Installing
+
+```
+git clone https://github.com/domgregori/nonraid-webui
+cd nonraid-webui
+sudo tools/install-webui.sh
+```
+
+## Development
+
+### Frontend
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Getting started (backend)
+### Backend
 
 ```bash
 cd backend
@@ -34,11 +68,10 @@ npm install
 npm run dev   # http://localhost:3001
 ```
 
-Run both, then open the frontend — Dashboard, Docker, Sharing, and Users will show live data. Users
+Run both, then open the frontend. Users
 needs root (`useradd`/`smbpasswd` family) — see `backend/README.md`'s Privileges section. For a real
 end-to-end test environment (real kernel driver, real array, real Samba/NFS), use a VM — see the main
-`nonraid` repo's development docs. There is no Docker-based test environment for this project; don't
-reintroduce one.
+`nonraid` repo's development docs.
 
 See `backend/README.md` for the API and configuration.
 
@@ -79,34 +112,3 @@ backend/                 Express API wrapping nmdctl, Docker, lxc-*, smartctl, s
   src/routes/  /api/status, /api/array/*, /api/parity/*, /api/docker/*, /api/lxc/*, /api/smart/*,
                /api/shares/*, /api/users/*, /api/groups/*, /api/system
 ```
-
-There is no Docker-based test environment for this project. Real-mode testing (Shares, Users,
-mergerfs, Samba) happens on a VM with the real NonRAID kernel driver — see the main `nonraid`
-repo's development docs. Don't reintroduce a Docker test environment.
-
-## Notes
-
-- The frontend's demo scenario switcher (Healthy / Degraded / Parity Check) is gone — array/disk
-  state is real now, driven by the backend.
-- Disk temperature comes from `smartctl` via the backend's `/api/smart/temperatures`, merged into
-  disk view models by device path — nmdctl itself has no concept of temperature.
-- Turbo write / event notifications toggles on the Dashboard and Settings pages are **not** wired to
-  `nmdctl set` yet — they still just flip local state. Same for the Activity feed — no backend event
-  log source exists.
-- Docker Engine API integration (containers page) is done. Grafana URL storage (history page) needs
-  no backend beyond storing the URL, and isn't started.
-- LXC containers page/backend is done for Phase 1 — lifecycle, create-from-download-template (live
-  distro index + host bridge picker), and direct config-file editing. Verified end-to-end against a
-  real VM with liblxc installed (real `lxc-create`, real DHCP IP via `lxcbr0`). Snapshots, backups,
-  ZFS/BTRFS conversion, and a community-template catalog are deferred — see `backend/README.md`'s
-  LXC section.
-- Shares backend and frontend (create/edit/delete via a form modal, real mergerfs/Samba/NFS) are done
-  and tested against a real VM environment — see `backend/README.md`'s Shares section for what was
-  actually verified.
-- Users backend and frontend (real Linux/Samba accounts at uid/gid ≥ 20000, groups, per-share
-  read-write/read-only/none/hidden access) are done — see `backend/README.md`'s Users section for the
-  `hidden` approximation caveat and what's deliberately out of scope for this first version (rename,
-  quotas, API tokens, 2FA).
-- System card (CPU/Memory) and the header's hostname/uptime/CPU/mem are wired to `/api/system` — real
-  host stats via Node's `os` module, confirmed live (values change between polls, not a static
-  snapshot).
