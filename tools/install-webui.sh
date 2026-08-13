@@ -241,7 +241,7 @@ mkdir -p /etc/systemd/system/nonraid-webui.service.d
   echo "Group=$(id -gn "$NONRAID_WEBUI_USER")"
   # One per backend/src/config.ts *_use_sudo flag — see the sudoers generation right below for
   # exactly which commands each of these actually unlocks.
-  for flag in NMD SMART HDPARM TLS SHARES SYSTEM USERS LXC CACHE; do
+  for flag in NMD SMART HDPARM TLS SHARES SYSTEM USERS LXC CACHE BROWSE FILE_MOVE; do
     echo "Environment=${flag}_USE_SUDO=true"
   done
 } > /etc/systemd/system/nonraid-webui.service.d/override.conf
@@ -257,7 +257,7 @@ log "Restricting $NONRAID_WEBUI_USER's sudo to exactly what nonraid-webui shells
 # they're pinned below to the exact invocations nmd/realClient.ts, system/services.ts, and
 # routes/array.ts actually make instead of granted as plain binaries.
 SUDO_BINS=(
-  nmdctl mv cp test mkfs.xfs
+  nmdctl mv cp rm test mkfs.xfs
   smartctl
   hdparm dd
   mount umount mergerfs exportfs smbstatus smbcontrol smbd
@@ -265,7 +265,7 @@ SUDO_BINS=(
   getent useradd usermod userdel groupadd groupdel chpasswd smbpasswd
   lxc-ls lxc-info lxc-start lxc-stop lxc-destroy lxc-snapshot lxc-create
   btrfs mkfs.btrfs mkdir mountpoint lsblk blkid udevadm blockdev
-  openssl
+  openssl chmod rmdir touch chown
 )
 SUDOERS_TMP="$(mktemp)"
 {

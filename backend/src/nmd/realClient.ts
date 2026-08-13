@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process';
-import { readFile, rmdir, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
@@ -272,7 +272,10 @@ export class RealNmdClient implements NmdClient {
     // rmdir also refuses on an active mount point) is left alone rather
     // than risking deleting something real.
     for (const slot of dropSlots) {
-      await rmdir(`/mnt/disk${slot}`).catch(() => {});
+      // /mnt/diskN is root:root, same sudo escalation as every other filesystem touch in this
+      // class - a raw fs/promises rmdir here bypassed nmdUseSudo entirely and silently no-op'd
+      // via the .catch() below on every real deployment, leaving these orphaned forever.
+      await this.runSystem('rmdir', [`/mnt/disk${slot}`]).catch(() => {});
     }
 
     return { ok: true, message: `Array reconfigured to ${keep.length} disks (backup of old superblock at ${backupPath}); parity rebuild started.` };

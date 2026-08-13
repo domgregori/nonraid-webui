@@ -1,10 +1,11 @@
 import { execFile } from 'node:child_process';
-import { copyFile, cp, mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises';
+import { readdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { ShareService } from '../shares/index.js';
+import { runSudoMaybe } from '../system/procUtil.js';
 import { isMountPoint, resolveExisting, resolveForCreate } from './paths.js';
 import type { BrowseCommandResult, BrowseEntry, BrowseListing } from './types.js';
 
@@ -80,7 +81,9 @@ export class BrowseService {
     const exists = await stat(absPath).then(() => true).catch(() => false);
     if (exists) throw new HttpError(409, `"${name}" already exists.`);
 
-    await mkdir(absPath);
+    // Array disks, cache, and /mnt itself are root:root - same sudo escalation every other
+    // privileged path in this app already gets (see shares/service.ts).
+    await runSudoMaybe('mkdir', [absPath], config.browseUseSudo);
     return { ok: true, message: `Created folder "${name}"` };
   }
 
@@ -98,7 +101,7 @@ export class BrowseService {
     const destExists = await stat(destAbs).then(() => true).catch(() => false);
     if (destExists) throw new HttpError(409, `"${newName}" already exists.`);
 
-    await rename(absPath, destAbs);
+    await runSudoMaybe('mv', [absPath, destAbs], config.browseUseSudo);
     return { ok: true, message: `Renamed to "${newName}"` };
   }
 
@@ -119,14 +122,14 @@ export class BrowseService {
     if (destExists) throw new HttpError(409, `"${name}" already exists at the destination.`);
 
     try {
-      await rename(absPath, destAbs);
+      await runSudoMaybe('mv', [absPath, destAbs], config.browseUseSudo);
     } catch {
       // Cross-device rename normally fails with EXDEV, but FUSE-backed mounts like mergerfs
       // return ENOTCONN instead when source and destination land on different physical
       // branches - same reason saveUpload() below falls back to copy+remove. cp's recursive
       // option handles both files and directories in one call.
-      await cp(absPath, destAbs, { recursive: true });
-      await rm(absPath, { recursive: true });
+      await runSudoMaybe('cp', ['-r', absPath, destAbs], config.browseUseSudo);
+      await runSudoMaybe('rm', ['-rf', absPath], config.browseUseSudo);
     }
     return { ok: true, message: `Moved "${name}"` };
   }
@@ -144,7 +147,7 @@ export class BrowseService {
     const destExists = await stat(destAbs).then(() => true).catch(() => false);
     if (destExists) throw new HttpError(409, `"${name}" already exists at the destination.`);
 
-    await cp(absPath, destAbs, { recursive: true });
+    await runSudoMaybe('cp', ['-r', absPath, destAbs], config.browseUseSudo);
     return { ok: true, message: `Copied "${name}"` };
   }
 
@@ -163,7 +166,7 @@ export class BrowseService {
     if (await isMountPoint(absPath)) {
       throw new HttpError(400, `"${path.basename(absPath)}" is a mount point (e.g. an array disk) - it can't be deleted from here.`);
     }
-    await rm(absPath, { recursive: true });
+    await runSudoMaybe('rm', ['-rf', absPath], config.browseUseSudo);
     return { ok: true, message: `Deleted "${path.basename(absPath)}"` };
   }
 
@@ -178,13 +181,13 @@ export class BrowseService {
       if (exists) throw new HttpError(409, `"${safeName}" already exists.`);
 
       try {
-        await rename(tempPath, absPath);
+        await runSudoMaybe('mv', [tempPath, absPath], config.browseUseSudo);
       } catch {
         // Cross-device rename normally fails with EXDEV, but FUSE-backed mounts like
         // mergerfs return ENOTCONN instead when the source (our OS temp dir) lives
         // outside the union - so fall back to copy+unlink on any rename failure here;
-        // a genuine destination problem (permissions, no space) will surface from copyFile.
-        await copyFile(tempPath, absPath);
+        // a genuine destination problem (permissions, no space) will surface from the copy.
+        await runSudoMaybe('cp', [tempPath, absPath], config.browseUseSudo);
         await unlink(tempPath).catch(() => {});
       }
       return { ok: true, message: `Uploaded "${safeName}"` };

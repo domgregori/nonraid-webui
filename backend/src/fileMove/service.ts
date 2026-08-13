@@ -1,9 +1,11 @@
 import { execFile } from 'node:child_process';
-import { copyFile, mkdir, stat, unlink } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { AllocationMethod, Share } from '../shares/types.js';
+import { runSudoMaybe } from '../system/procUtil.js';
 import type { FileMoveJobState, FileMovePlanSummary, FileMoveUnfitExample } from './types.js';
 
 const execFileAsync = promisify(execFile);
@@ -282,18 +284,20 @@ export class FileMoveService {
         const destMount = destMounts.get(item.destSlot);
         if (!destMount) throw new Error(`Destination disk (slot ${item.destSlot}) is no longer mounted.`);
         const destPath = `${destMount}/${item.share}/${item.relativePath}`;
-        await mkdir(path.dirname(destPath), { recursive: true });
+        // Array disks and the cache pool are root:root - same sudo escalation every other
+        // privileged path in this app already gets (see shares/service.ts).
+        await runSudoMaybe('mkdir', ['-p', path.dirname(destPath)], config.fileMoveUseSudo);
 
         const destExists = await stat(destPath).then((s) => s.size, () => null);
         if (destExists !== item.sizeBytes) {
-          await copyFile(item.absSource, destPath);
+          await runSudoMaybe('cp', [item.absSource, destPath], config.fileMoveUseSudo);
           const verify = await stat(destPath);
           if (verify.size !== item.sizeBytes) {
             throw new Error(`Size mismatch after copy (source ${item.sizeBytes}, destination ${verify.size}) - leaving source in place.`);
           }
         }
         // Copy verified (or a prior partial run already got here) - now safe to remove the source.
-        await unlink(item.absSource);
+        await runSudoMaybe('rm', ['-f', item.absSource], config.fileMoveUseSudo);
 
         this.job = {
           ...this.job,

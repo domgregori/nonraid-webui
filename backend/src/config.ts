@@ -175,6 +175,10 @@ export const config = {
   // disks, cache, etc.), not just one share, so it needs a wider root.
   browseRoot: str('BROWSE_ROOT', t('browse', 'root'), '/mnt'),
   browseDefaultPath: str('BROWSE_DEFAULT_PATH', t('browse', 'default_path'), '/mnt/user'),
+  // Create/move/copy/delete/upload all write directly under browseRoot - array disks, cache, and
+  // /mnt itself are root:root, same "this process may not itself have permission" reasoning as
+  // every other *UseSudo flag here.
+  browseUseSudo: bool('BROWSE_USE_SUDO', t('browse', 'use_sudo'), false),
   smbConfPath: str('SMB_CONF_PATH', t('shares', 'smb_conf_path'), '/etc/samba/smb.conf'),
   exportsPath: str('EXPORTS_PATH', t('shares', 'exports_path'), '/etc/exports'),
   sharesUseSudo: bool('SHARES_USE_SUDO', t('shares', 'use_sudo'), false),
@@ -265,4 +269,7 @@ export const config = {
   // than every other privileged command in this app, none of which format a
   // filesystem from scratch.
   cacheMkfsTimeoutMs: num('CACHE_MKFS_TIMEOUT_MS', t('cache', 'mkfs_timeout_ms'), 5 * 60 * 1000),
+  // fileMove/service.ts - the shared engine behind Empty Disk and the cache mover, moving real
+  // files between array disks and the cache pool (root:root, same as every other *UseSudo flag).
+  fileMoveUseSudo: bool('FILE_MOVE_USE_SUDO', t('fileMove', 'use_sudo'), false),
 };

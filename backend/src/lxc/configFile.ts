@@ -1,6 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
+import { config } from '../config.js';
+import { runSudoMaybe } from '../system/procUtil.js';
 
 /**
  * Line-based get/set against an LXC container's `config` file - this repo's
@@ -64,11 +67,15 @@ export function applyVariable(content: string, key: string, value: string | null
   return lines.join('\n') + (hadTrailingNewline || lines.length > 0 ? '\n' : '');
 }
 
-/** Temp-file-then-rename so a concurrent read never sees a half-written file. */
+/** Temp-file-then-rename so a concurrent read never sees a half-written file. configPath's own
+ *  directory (/var/lib/lxc/<name>/, or wherever LXC storage was relocated to - see
+ *  lxc/storagePath.ts) is root-owned, so the temp file is written to os.tmpdir() (unprivileged)
+ *  and moved into place with sudo - same escalation every other privileged path in this app
+ *  already gets (see shares/service.ts). */
 async function atomicWrite(configPath: string, content: string): Promise<void> {
-  const tmpPath = path.join(path.dirname(configPath), `.${path.basename(configPath)}.${randomBytes(4).toString('hex')}.tmp`);
+  const tmpPath = path.join(os.tmpdir(), `nonraid-lxc-config-${randomBytes(4).toString('hex')}.tmp`);
   await fs.writeFile(tmpPath, content, 'utf8');
-  await fs.rename(tmpPath, configPath);
+  await runSudoMaybe('mv', [tmpPath, configPath], config.lxcUseSudo);
 }
 
 /** Raw read of the whole config file - backs the LXC page's "Edit config"

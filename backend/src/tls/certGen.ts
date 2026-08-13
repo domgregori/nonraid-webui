@@ -1,4 +1,4 @@
-import { chmod, mkdir, rename, unlink } from 'node:fs/promises';
+import { mkdir, rename, unlink } from 'node:fs/promises';
 import { isIP } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -85,7 +85,12 @@ export async function generateSelfSigned(input: GenerateSelfSignedInput): Promis
     throw new HttpError(502, `openssl failed to generate a certificate: ${(err as Error).message}`);
   }
 
-  await chmod(tmpKey, 0o600);
+  // tmpKey was created by openssl above, which ran as root when tlsUseSudo is on (the production
+  // default) - unlike rename/unlink (which only need write permission on the containing
+  // directory, already granted to this process since it owns tlsCertDir by default), chmod
+  // requires owning the file itself, so an unprivileged chmod here throws EPERM whenever
+  // tlsUseSudo is on.
+  await runSudoMaybe('chmod', ['600', tmpKey], config.tlsUseSudo);
   await rename(tmpCert, certPath);
   await rename(tmpKey, keyPath);
 
