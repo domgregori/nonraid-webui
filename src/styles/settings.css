@@ -96,6 +96,12 @@
   gap: 6px;
 }
 
+/* A .btn placed directly in this flex column (not wrapped in .settings-field__row) would
+   otherwise inherit align-items: stretch and fill the full row width. */
+.settings-field > .btn {
+  align-self: flex-start;
+}
+
 .settings-field__row {
   display: flex;
   flex-wrap: wrap;
