@@ -26,7 +26,7 @@ interface StagedImport {
   uploadedAt: number;
 }
 
-// Single-admin, single-session, upload-then-immediately-decide flow — no
+// Single-admin, single-session, upload-then-immediately-decide flow - no
 // need for a persisted store, just an in-memory map local to this route
 // module. Swept lazily (see sweepStagedImports()) rather than on its own
 // timer, since this feature is used rarely (once per migration).
@@ -35,12 +35,12 @@ const STAGING_TTL_MS = 30 * 60 * 1000;
 
 /**
  * After mountDisks() reports success, nmdctl's own mount step can still silently skip a disk
- * whose filesystem it didn't mount as expected — a skip, unlike a real per-disk mount error,
+ * whose filesystem it didn't mount as expected - a skip, unlike a real per-disk mount error,
  * doesn't affect nmdctl's exit code, so the try/catch around mountDisks() at each call site below
  * never sees it. Re-checks live status and logs a warning naming any data disk that has a
- * detected filesystem but still isn't mounted, so it doesn't go unnoticed — this exact situation
+ * detected filesystem but still isn't mounted, so it doesn't go unnoticed - this exact situation
  * left three disks DISK_OK/"unmounted" through several array starts, each reporting clean
- * success. Disks with no filesystem at all are skipped — that's the normal state for a genuinely
+ * success. Disks with no filesystem at all are skipped - that's the normal state for a genuinely
  * blank new disk awaiting Format, not a problem worth flagging.
  */
 async function warnUnmountedDataDisks(nmd: NmdClient, activity: ActivityStore): Promise<void> {
@@ -49,9 +49,9 @@ async function warnUnmountedDataDisks(nmd: NmdClient, activity: ActivityStore): 
     const stuck = status.disks.filter((d) => d.type === 'data' && d.filesystem?.type && d.filesystem.mountpoint === 'unmounted');
     if (stuck.length === 0) return;
     const names = stuck.map((d) => `Disk ${d.slot} (${d.filesystem!.type})`).join(', ');
-    activity.log(`${names} still not mounted after mounting disks — try Mount Disk from the Disks page.`, 'amber').catch(() => {});
+    activity.log(`${names} still not mounted after mounting disks - try Mount Disk from the Disks page.`, 'amber').catch(() => {});
   } catch {
-    // best-effort — a status-fetch failure here shouldn't compound whatever's already happening
+    // best-effort - a status-fetch failure here shouldn't compound whatever's already happening
   }
 }
 
@@ -67,7 +67,7 @@ function sweepStagedImports(): void {
 
 /**
  * Shared by /array/import/preview (browser upload) and /array/import/preview-from-path (locate
- * an existing .dat already on this host's own root filesystem) — both end up with identical raw
+ * an existing .dat already on this host's own root filesystem) - both end up with identical raw
  * bytes on disk at this point, so from here the preview response is built identically regardless
  * of how the file got there. Stages the bytes under `stagedImports` so /array/import/commit (also
  * shared) can re-validate against live disk state right before doing anything real.
@@ -91,7 +91,7 @@ async function buildImportPreview(nmd: NmdClient, buf: Buffer, stagedPath: strin
   });
 
   // Cheaply predicts the kernel's own ERROR:PARITY_NOT_BIGGEST (confirmed from md_unraid.c)
-  // directly from the superblock's own recorded sizes — no physical disk needed for this one.
+  // directly from the superblock's own recorded sizes - no physical disk needed for this one.
   const dataSlots = parsed.slots.filter((s) => s.role === 'data');
   const paritySlots = parsed.slots.filter((s) => s.role !== 'data');
   const largestDataKb = dataSlots.length > 0 ? Math.max(...dataSlots.map((s) => s.sizeKb)) : 0;
@@ -101,7 +101,7 @@ async function buildImportPreview(nmd: NmdClient, buf: Buffer, stagedPath: strin
   try {
     currentArrayActive = (await nmd.getStatus()).array.state === 'STARTED';
   } catch {
-    currentArrayActive = false; // nothing configured yet — nothing to warn about
+    currentArrayActive = false; // nothing configured yet - nothing to warn about
   }
 
   const token = randomUUID();
@@ -118,10 +118,10 @@ async function buildImportPreview(nmd: NmdClient, buf: Buffer, stagedPath: strin
   };
 }
 
-// Directories that are pointless to offer when locating a superblock backup — pseudo-filesystems
+// Directories that are pointless to offer when locating a superblock backup - pseudo-filesystems
 // with huge or synthetic content, never a real place to keep a .dat file. Not a security boundary
 // (browse-root's whole point is "the same filesystem the backend already trusts and reads
-// /nonraid.dat from" — see the route below), just keeping the listing usable.
+// /nonraid.dat from" - see the route below), just keeping the listing usable.
 const SKIP_LISTING_ENTRIES = new Set(['proc', 'sys', 'dev', 'run']);
 
 interface BrowseEntry {
@@ -133,7 +133,7 @@ interface BrowseEntry {
 /**
  * Resolves an untrusted path against the real filesystem root ("/") for the import-locate
  * picker. Unlike browse/paths.ts (deliberately scoped to config.shareMountRoot for the
- * user-facing file browser), this one is allowed to see the whole root filesystem on purpose —
+ * user-facing file browser), this one is allowed to see the whole root filesystem on purpose -
  * the backend already reads /nonraid.dat straight off this same filesystem for every status
  * poll, so there's no new trust boundary crossed by letting an authenticated admin browse it
  * read-only to find a backup copy. realpath() still collapses any ".."/symlink games down to a
@@ -155,7 +155,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
     try {
       const result = await nmd.startArray();
       // The driver forgets write method across a stop/start (no persistence
-      // of its own — see nmd/client.ts's setWriteMethod doc comment), so
+      // of its own - see nmd/client.ts's setWriteMethod doc comment), so
       // reapply our persisted preference every time, the same way real
       // Unraid's webGUI resends its tunable as part of its own array-start
       // sequence. Best-effort: a failure here shouldn't fail array start.
@@ -163,7 +163,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       if (settings.turboWrite) await nmd.setWriteMethod(true).catch(() => {});
 
       // nmdctl start activates the array's md device but doesn't mount each
-      // disk's own filesystem — do that, then bring shares back up on top of
+      // disk's own filesystem - do that, then bring shares back up on top of
       // them (mirrors ShareService.unmountAll on the /array/stop side).
       // Best-effort: the array itself did start even if a disk fails to mount.
       try {
@@ -185,7 +185,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
   router.post('/array/stop', async (_req, res) => {
     try {
       // nmdctl refuses to stop (in unattended mode, always used here) with
-      // any disk filesystem still mounted — and a share's mergerfs/bind mount
+      // any disk filesystem still mounted - and a share's mergerfs/bind mount
       // holds a live reference into those disk mounts that nmdctl itself has
       // no idea exists, so both layers need unmounting before nmdctl stop.
       await shares.unmountAll();
@@ -203,7 +203,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
   // exactly what it expects and how that lines up against what's physically
   // connected, then explicitly commit. Parsing is done directly on the raw
   // bytes (see nmd/superblock.ts) rather than by loading it into the kernel
-  // — nmdctl itself has no dry-run/preview command, so this is the only way
+  // - nmdctl itself has no dry-run/preview command, so this is the only way
   // to show a genuinely safe, zero-side-effect preview before anything real
   // happens. Replaces the old bare "scan whatever's already loaded" /array/import.
   router.post('/array/import/preview', upload.single('file'), async (req, res) => {
@@ -227,7 +227,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
     }
   });
 
-  // Where nmdctl itself looks for a superblock by default — checked directly so the wizard can
+  // Where nmdctl itself looks for a superblock by default - checked directly so the wizard can
   // offer it as a one-click option before falling back to browsing or uploading.
   router.get('/array/import/default-path', async (_req, res) => {
     try {
@@ -242,7 +242,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
   });
 
   // Lists real subdirectories and .dat files under an absolute path on this host's own root
-  // filesystem — the "locate on disk" half of the import wizard's file picker, for hosts (like
+  // filesystem - the "locate on disk" half of the import wizard's file picker, for hosts (like
   // this one) where the boot/OS disk is the same filesystem the backend itself runs on, not a
   // separate flash drive the way Unraid uses. Read-only; see resolveRootPath() above for scope.
   router.get('/array/import/browse-root', async (req, res) => {
@@ -276,7 +276,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
   });
 
   // Same preview as the upload flow, but sourced from a path already on this host rather than a
-  // browser upload — the file is copied into a private tmp location first (never referenced by
+  // browser upload - the file is copied into a private tmp location first (never referenced by
   // its original path past this point), so /array/import/commit's cleanup can never delete the
   // user's own original copy.
   router.post('/array/import/preview-from-path', async (req, res) => {
@@ -317,14 +317,14 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
     const token = typeof req.body?.token === 'string' ? req.body.token : '';
     const staged = token ? stagedImports.get(token) : undefined;
     if (!staged) {
-      res.status(400).json({ error: 'This import preview has expired or was already used — upload the file again.' });
+      res.status(400).json({ error: 'This import preview has expired or was already used - upload the file again.' });
       return;
     }
     stagedImports.delete(token);
 
     try {
       // Re-checked against the live safety gate rather than trusting
-      // whatever the client remembers from the original preview response —
+      // whatever the client remembers from the original preview response -
       // this is the one thing that hard-blocks with no override.
       const buf = await readFile(staged.filePath);
       const parsed = parseSuperblock(buf);
@@ -333,13 +333,13 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       if (hasSizeMismatch) {
         res.status(409).json({
           error:
-            'Refusing to import — one or more disks have a size mismatch against the superblock. ' +
+            'Refusing to import - one or more disks have a size mismatch against the superblock. ' +
             'Starting the array like this can corrupt filesystems and lose data; resolve the mismatch first.',
         });
         return;
       }
 
-      // Same reasoning as /array/stop — shares/disk mounts have to come down
+      // Same reasoning as /array/stop - shares/disk mounts have to come down
       // before the module can be safely unloaded and reloaded.
       await shares.unmountAll().catch(() => {});
       await nmd.unmountDisks().catch(() => {});
@@ -349,7 +349,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
 
       const suffix = backedUpTo ? ` (previous superblock backed up at ${backedUpTo})` : '';
       if (result.errors.length > 0 || status.array.state.startsWith('ERROR:')) {
-        activity.log(`Array import completed with issues${suffix} — see Settings for details`, 'amber').catch(() => {});
+        activity.log(`Array import completed with issues${suffix} - see Settings for details`, 'amber').catch(() => {});
       } else {
         activity.log(`Imported ${result.importedCount} disk(s) from uploaded superblock${suffix}`, 'blue').catch(() => {});
       }
@@ -369,7 +369,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       return;
     }
     try {
-      // Same reasoning as /array/stop — shares/disk mounts have to come down
+      // Same reasoning as /array/stop - shares/disk mounts have to come down
       // before nmdctl (which shrinkArray stops internally) will allow it.
       await shares.unmountAll();
       await nmd.unmountDisks();
@@ -391,17 +391,17 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
   });
 
   router.post('/array/reload-driver', async (req, res) => {
-    // Opt-in — stopping Docker/every running LXC container is a real disruption, so it only
+    // Opt-in - stopping Docker/every running LXC container is a real disruption, so it only
     // happens if the caller explicitly agreed to it (see the Settings UI's warning) AND it turns
     // out to actually be necessary (unmountDisks() below only fails this way when something has a
-    // file open on an array disk, e.g. Docker/LXC storage relocated there — see docker/storagePath.ts
+    // file open on an array disk, e.g. Docker/LXC storage relocated there - see docker/storagePath.ts
     // and lxc/storagePath.ts for the same class of conflict during a storage move).
     const stopContainers = req.body?.stopContainers === true;
     let dockerStopped = false;
     const stoppedLxcNames: string[] = [];
 
     try {
-      // Best-effort here, unlike /array/stop and /array/shrink — this is a
+      // Best-effort here, unlike /array/stop and /array/shrink - this is a
       // recovery action meant to work from an already-broken state (e.g.
       // ERROR:TOO_MANY_MISSING_DISKS), where the array may already be
       // stopped with nothing mounted; failing the whole recovery because
@@ -424,7 +424,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
         }
 
         await shares.unmountAll().catch(() => {});
-        await nmd.unmountDisks(); // still busy after stopping containers — let this one throw for real
+        await nmd.unmountDisks(); // still busy after stopping containers - let this one throw for real
       }
 
       const result = await nmd.reloadDriver();
@@ -441,7 +441,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       res.status(502).json({ error: (err as Error).message });
     } finally {
       // Always try to bring back whatever was stopped, regardless of whether the reload itself
-      // ultimately succeeded — leaving Docker/containers down on a failed reload attempt would
+      // ultimately succeeded - leaving Docker/containers down on a failed reload attempt would
       // turn a recovery action into a second outage.
       if (dockerStopped) {
         await runSudoMaybe('systemctl', ['start', 'docker'], config.systemUseSudo).catch(() => {});

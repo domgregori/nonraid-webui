@@ -27,7 +27,7 @@ export const browseApi = {
 
   calculateSize: (path: string) => request<{ bytes: number }>(withPath('/api/browse/size', path)),
 
-  // Copy/Move/Delete over one or more paths — used for both single-row actions and multi-select,
+  // Copy/Move/Delete over one or more paths - used for both single-row actions and multi-select,
   // always through the streamed/cancelable path (see progressStream.ts).
   bulk: (paths: string[], op: BulkOp, destPath: string | undefined, onProgress: (p: BulkOpProgress) => void, signal: AbortSignal) =>
     streamNdjson<BulkOpProgress, BulkOpResult>(

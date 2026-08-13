@@ -2,7 +2,7 @@ import { API_BASE_URL } from './config';
 
 export class UnauthorizedError extends Error {}
 
-/** Set on the thrown Error when the response body carries a `code` field — generic, so any
+/** Set on the thrown Error when the response body carries a `code` field - generic, so any
  *  endpoint's caller can key off a stable code instead of matching the human-readable message. */
 export class CodedError extends Error {
   code: string;
@@ -12,7 +12,7 @@ export class CodedError extends Error {
   }
 }
 
-// AuthProvider registers/unregisters this on mount/unmount — the single
+// AuthProvider registers/unregisters this on mount/unmount - the single
 // place every 401 (login expired, session revoked by a password change
 // elsewhere, etc.) routes back to the login screen, since every API call in
 // this app goes through this one function.

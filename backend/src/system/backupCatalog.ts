@@ -5,12 +5,12 @@ import type { NmdClient } from '../nmd/index.js';
 
 // Single source of truth for what a config backup covers, shared by backup creation
 // (backupStream.ts's resolveConfigBackupPaths, BackupScheduler) and restore (configRestore.ts,
-// routes/system.ts's preview/commit) — grouped into categories a user can individually pick to
+// routes/system.ts's preview/commit) - grouped into categories a user can individually pick to
 // restore rather than an undifferentiated flat file list. 'array' stays special-cased by callers
-// (only ever actually restorable onto a currently-blank array — see configRestore.ts's
+// (only ever actually restorable onto a currently-blank array - see configRestore.ts's
 // isArrayBlank) on top of whatever this reports; 'adminAccount' is its own category rather than
 // folded into 'appConfig' specifically so a restore can bring back shares/settings/history without
-// silently swapping out whoever's currently logged in — confirmed live this session: restoring a
+// silently swapping out whoever's currently logged in - confirmed live this session: restoring a
 // backup clobbered a freshly-created admin account with the older one saved inside it, with no way
 // to have kept the current login and restored everything else.
 export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory';
@@ -24,7 +24,7 @@ export interface BackupCategory {
 
 export async function resolveBackupCategories(nmd: NmdClient): Promise<BackupCategory[]> {
   return [
-    { id: 'array', label: 'Array', description: 'The array superblock — disk assignments and parity configuration.', paths: [await nmd.getSuperblockPath()] },
+    { id: 'array', label: 'Array', description: 'The array superblock - disk assignments and parity configuration.', paths: [await nmd.getSuperblockPath()] },
     { id: 'sharing', label: 'Samba/NFS config', description: 'smb.conf and /etc/exports.', paths: [config.smbConfPath, config.exportsPath] },
     {
       id: 'appConfig',
@@ -38,7 +38,7 @@ export async function resolveBackupCategories(nmd: NmdClient): Promise<BackupCat
   ];
 }
 
-/** Flattened, existing-only path list — what actually gets archived. Shared by the on-demand
+/** Flattened, existing-only path list - what actually gets archived. Shared by the on-demand
  *  backup route and BackupScheduler so both back up exactly the same things. */
 export async function resolveConfigBackupPaths(nmd: NmdClient): Promise<string[]> {
   const categories = await resolveBackupCategories(nmd);
@@ -56,8 +56,8 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
-/** Which category (if any) an archive member — a tar path like "etc/samba/smb.conf", relative,
- *  no leading "/" — belongs to. A category's own paths are absolute; matched either as an exact
+/** Which category (if any) an archive member - a tar path like "etc/samba/smb.conf", relative,
+ *  no leading "/" - belongs to. A category's own paths are absolute; matched either as an exact
  *  file or as a member living under a directory category ('appConfig''s "/etc/nonraid"). */
 export function categoryForMember(member: string, categories: BackupCategory[]): BackupCategoryId | null {
   for (const cat of categories) {

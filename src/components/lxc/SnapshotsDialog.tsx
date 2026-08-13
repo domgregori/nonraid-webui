@@ -120,7 +120,7 @@ export function SnapshotsDialog({ name, containerState, onClose, onDone }: Snaps
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog lxc-create-dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Snapshots — {name}</div>
+          <div className="dialog__title">Snapshots - {name}</div>
           <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
             &#10005;
           </button>
@@ -142,7 +142,7 @@ export function SnapshotsDialog({ name, containerState, onClose, onDone }: Snaps
               </button>
             </div>
             {containerState === 'running' && (
-              <span className="apps-field__hint">Stop the container first — snapshots can only be taken while it's stopped.</span>
+              <span className="apps-field__hint">Stop the container first - snapshots can only be taken while it's stopped.</span>
             )}
           </label>
 

@@ -22,7 +22,7 @@ function healthColor(health: CacheHealth): string {
   return COLORS.border;
 }
 
-// Hidden entirely until a mirror exists — same "nothing to show yet" treatment ParityCheckCard
+// Hidden entirely until a mirror exists - same "nothing to show yet" treatment ParityCheckCard
 // gives a state that doesn't apply right now, rather than a permanent empty card on every install.
 export function CacheCard() {
   const { status } = useCacheStatus();
@@ -92,7 +92,7 @@ export function CacheCard() {
             <div className="disk-card__head">
               <span className="disk-card__label">{d.missing ? 'Missing' : (d.model ?? `Device ${d.devid}`)}</span>
             </div>
-            <div className="disk-card__device">{d.path ?? '—'}</div>
+            <div className="disk-card__device">{d.path ?? '-'}</div>
           </div>
         ))}
       </div>

@@ -19,7 +19,7 @@ export interface UseLxcContainers {
 }
 
 /**
- * Polls the backend for the live LXC container list — same shape as
+ * Polls the backend for the live LXC container list - same shape as
  * useDockerContainers. Actions call the backend then refetch rather than
  * optimistically guessing the resulting state.
  */

@@ -17,7 +17,7 @@ const DEBOUNCE_MS = 150;
  * Directory-only path completion, backed by GET /api/browse/suggest. `scope`
  * must match whatever root the caller's own real validation uses
  * (isAllowedBindPath's appsBindRoots for Docker/Apps binds, browseRoot for
- * anything reachable from the file browser) — suggesting a path the field
+ * anything reachable from the file browser) - suggesting a path the field
  * would then reject at submit time would be worse than no suggestions at all.
  */
 export function PathAutocomplete({ value, onChange, scope, placeholder, className, disabled, autoFocus }: PathAutocompleteProps) {

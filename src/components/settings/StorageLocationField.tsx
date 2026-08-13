@@ -25,10 +25,10 @@ function currentLabel(current: CurrentLocation | null): string {
   if (current.mode === 'boot') return 'Boot Disk';
   if (current.mode === 'cache') return 'Cache';
   if (current.mode === 'array') return `Disk ${current.diskSlot}`;
-  return current.path; // 'custom' — a data-root this app didn't set
+  return current.path; // 'custom' - a data-root this app didn't set
 }
 
-/** Shared by the Docker and LXC storage-location settings fields — same subsystem-picker + streamed
+/** Shared by the Docker and LXC storage-location settings fields - same subsystem-picker + streamed
  *  migration-progress shape for both, just pointed at different API modules. */
 export function StorageLocationField({ title, desc, dataDisks, getStorage, moveStorage }: StorageLocationFieldProps) {
   const [current, setCurrent] = useState<CurrentLocation | null>(null);
@@ -39,7 +39,7 @@ export function StorageLocationField({ title, desc, dataDisks, getStorage, moveS
   const [messages, setMessages] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const seeded = useRef(false);
-  // A cache pool must actually be set up before "Cache" can be picked as a target — moving storage
+  // A cache pool must actually be set up before "Cache" can be picked as a target - moving storage
   // onto a mirror that can never mount is worse than just not offering the option yet. Mirrors the
   // same gate ShareFormModal uses for its "Cache only" allocation option.
   const { status: cacheStatus } = useCacheStatus();
@@ -56,7 +56,7 @@ export function StorageLocationField({ title, desc, dataDisks, getStorage, moveS
         }
       })
       .catch((err) => setLoadError((err as Error).message));
-    // Only ever seeded once, on mount — re-running this on every getStorage identity change would
+    // Only ever seeded once, on mount - re-running this on every getStorage identity change would
     // fight the user's own in-progress selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

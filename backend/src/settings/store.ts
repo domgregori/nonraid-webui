@@ -18,7 +18,7 @@ const DEFAULTS: AppSettings = {
 };
 
 /**
- * Owns settings.json — mirrors shares/store.ts's pattern (in-memory cache,
+ * Owns settings.json - mirrors shares/store.ts's pattern (in-memory cache,
  * writes serialized through one promise chain, atomic write-then-rename) for
  * the same reason: there's no external system that's authoritative for these
  * values, so this file is the only source of truth.
@@ -73,7 +73,7 @@ export class SettingsStore {
     try {
       const raw = await readFile(this.filePath, 'utf8');
       const parsed = JSON.parse(raw) as Partial<AppSettings>;
-      // One-time migration from the pre-split shape ({ warnAboveCelsius, enabled }) — seed both
+      // One-time migration from the pre-split shape ({ warnAboveCelsius, enabled }) - seed both
       // new thresholds from whatever single value was already configured, rather than silently
       // resetting an existing deployment back to the 55°C default.
       const legacyTempAlerts = parsed.tempAlerts as { warnAboveCelsius?: number } | undefined;
@@ -81,7 +81,7 @@ export class SettingsStore {
         legacyTempAlerts && typeof legacyTempAlerts.warnAboveCelsius === 'number'
           ? { cpuWarnAboveCelsius: legacyTempAlerts.warnAboveCelsius, diskWarnAboveCelsius: legacyTempAlerts.warnAboveCelsius }
           : undefined;
-      // One-time migration from the pre-split single "tempAlert" toggle — seed both new toggles
+      // One-time migration from the pre-split single "tempAlert" toggle - seed both new toggles
       // from whatever was already configured, rather than silently re-enabling notifications an
       // existing deployment had turned off.
       const legacyEventTypes = parsed.notifications?.eventTypes as Partial<Record<string, boolean>> | undefined;

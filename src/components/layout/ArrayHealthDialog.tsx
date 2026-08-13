@@ -5,7 +5,7 @@ interface ArrayHealthDialogProps {
   onClose: () => void;
 }
 
-/** Opened from the header's DEGRADED pill (see ArrayStatusPill) — explains each reason
+/** Opened from the header's DEGRADED pill (see ArrayStatusPill) - explains each reason
  *  deriveDegradedReasons found and, where there's a safe one-click fix, offers a button for it. */
 export function ArrayHealthDialog({ onClose }: ArrayHealthDialogProps) {
   const { status, parityPending, parityAction, selectDisk } = useArrayStatus();
@@ -31,7 +31,7 @@ export function ArrayHealthDialog({ onClose }: ArrayHealthDialogProps) {
 
         <div className="dialog__body">
           {!isDegraded(status) ? (
-            <div className="status-note">Good news — the array is no longer degraded.</div>
+            <div className="status-note">Good news - the array is no longer degraded.</div>
           ) : (
             reasons.map((reason) => (
               <div key={reason.key} className="import-warning import-warning--danger">

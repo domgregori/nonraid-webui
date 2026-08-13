@@ -19,22 +19,22 @@ function stageForStep(step: Step): Stage {
 }
 
 /**
- * Where to (re)open the wizard for the array's actual current state — used both on the
+ * Where to (re)open the wizard for the array's actual current state - used both on the
  * automatic first-run open and on manual "Replay setup tour" (see OnboardingGate). There's
  * deliberately no persisted "which step was I on" pointer: live array/cache state is always
  * authoritative, so a step is recomputed from it fresh every time rather than trusted from a
  * stale save. Both hasAnyDisk and hasDataDisk (see their computation above) read status.disks
  * directly rather than array.total_slots, which only reflects *committed* data disks and stays 0
- * for a disk that's been add-ed but not yet start-ed — exactly the state disks sit in for most of
+ * for a disk that's been add-ed but not yet start-ed - exactly the state disks sit in for most of
  * the 'disks' step now that assigning doesn't auto-start after each one. NEW_ARRAY isn't used here
  * either: it means "disks assigned, first parity build still pending," which is already past the
  * disks/import step, not a sign of a blank array.
  *
- * 'welcome' (machine name/timezone) only ever appears here, on a genuinely blank array — it's a
+ * 'welcome' (machine name/timezone) only ever appears here, on a genuinely blank array - it's a
  * one-time first-run convenience, not something worth resurfacing on every "Replay setup tour"
  * once the array's already configured, since Settings → About already covers editing both any
  * time. A second parity disk, more data disks, and a cache mirror are all Disks-page (or Settings
- * → Cache) actions once the array's up — not something this wizard asks about at all, so reaching
+ * → Cache) actions once the array's up - not something this wizard asks about at all, so reaching
  * 'info' only ever depends on hasDataDisk, nothing about cache.
  */
 function deriveStartStep(hasAnyDisk: boolean, hasDataDisk: boolean): Step {
@@ -43,7 +43,7 @@ function deriveStartStep(hasAnyDisk: boolean, hasDataDisk: boolean): Step {
   return 'info';
 }
 
-// Checked against status.disks directly, not array.total_slots — total_slots only reflects
+// Checked against status.disks directly, not array.total_slots - total_slots only reflects
 // *committed* data disks (see md_unraid.c's sb->num_disks update), staying 0 until a `start`
 // commits whatever's been add-ed so far, which ArrayBuilder's whole plan-then-build model
 // deliberately defers until the very end (see its own doc comment).
@@ -58,27 +58,27 @@ const INFO_SLIDES = [
   {
     eyebrow: 'Apps',
     title: 'Install ready-made apps',
-    body: 'The Apps catalog has one-click installs for common self-hosted services — media servers, downloaders, home automation, and more. Find it any time from the sidebar.',
+    body: 'The Apps catalog has one-click installs for common self-hosted services - media servers, downloaders, home automation, and more. Find it any time from the sidebar.',
   },
   {
     eyebrow: 'Docker',
     title: 'Or run your own containers',
-    body: "Bringing your own image? The Docker page pulls it, sets ports/volumes/env vars, and shows a live log tail — no app catalog entry needed.",
+    body: "Bringing your own image? The Docker page pulls it, sets ports/volumes/env vars, and shows a live log tail - no app catalog entry needed.",
   },
   {
     eyebrow: 'LXC',
     title: 'Or a full lightweight VM',
-    body: "When a container isn't isolated enough, LXC gives you a more complete lightweight VM instead — with its own storage location, separate from Docker's.",
+    body: "When a container isn't isolated enough, LXC gives you a more complete lightweight VM instead - with its own storage location, separate from Docker's.",
   },
   {
     eyebrow: 'Notifications',
     title: 'Stay in the loop',
-    body: 'Turn on notifications in Settings to hear about it — by email, Discord, or anything Apprise supports — when a disk fails, a parity check finishes, or something needs a look.',
+    body: 'Turn on notifications in Settings to hear about it - by email, Discord, or anything Apprise supports - when a disk fails, a parity check finishes, or something needs a look.',
   },
 ] as const;
 
 interface OnboardingWizardProps {
-  /** Always marks the wizard dismissed/completed and unmounts it — fired from every exit point
+  /** Always marks the wizard dismissed/completed and unmounts it - fired from every exit point
    *  (Skip, and finishing the tour). There's no separate "finished vs. skipped" outcome to
    *  distinguish: both mean "don't auto-open this again," which is exactly what dismissed=true
    *  represents. */
@@ -113,7 +113,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
     }
   }, [stats]);
 
-  // Both fields already show this host's real current values (see the effect above) — Continue
+  // Both fields already show this host's real current values (see the effect above) - Continue
   // just re-saves them (a harmless no-op if the user didn't change anything) rather than needing
   // a separate "skip" path. Same setHostname/setTimezone calls Settings → About uses.
   const saveWelcome = async () => {
@@ -130,7 +130,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
   };
 
   // status is still null on the very first render (polls async); once real data has arrived,
-  // resolve the actual resume step once — covers reopening mid-setup (a reload, or Replay)
+  // resolve the actual resume step once - covers reopening mid-setup (a reload, or Replay)
   // landing somewhere other than the very first screen.
   const resolvedOnce = useRef(false);
   useEffect(() => {
@@ -143,13 +143,13 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
   const stage = stageForStep(step);
 
   // `status` (and hasAnyDisk/hasDataDisk derived from it) is only as fresh as the last poll tick
-  // — up to STATUS_POLL_MS old — so reading it immediately after the wizard just committed a real
+  // - up to STATUS_POLL_MS old - so reading it immediately after the wizard just committed a real
   // change would usually still see the pre-change array and wrongly resolve back to 'welcome'
   // (confirmed live: closing a just-finished config restore reliably bounced back to the very
   // start of the wizard instead of resuming past it). Deriving from refresh()'s own return value,
   // not the hasAnyDisk/hasDataDisk already in scope: those were fixed by closure back when this
   // function was created, so awaiting refresh() updates the *context* but can never change what
-  // this already-running call sees on its own next line — has to read the fresh value directly.
+  // this already-running call sees on its own next line - has to read the fresh value directly.
   const handleImportClose = async () => {
     if (!importedJustNow) {
       setStep('start');
@@ -161,7 +161,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
   };
 
   // A successful restore can bring back a fully-configured array (superblock included, when the
-  // array was blank) plus shares/users/settings all at once — resolving the same way a successful
+  // array was blank) plus shares/users/settings all at once - resolving the same way a successful
   // array import does covers both that case and the config-only case (superblock skipped, array
   // still blank) identically, since deriveStartStep would just land back on 'disks' for the latter
   // on next resolve anyway. Simplest to just re-derive live rather than special-case it here.
@@ -208,7 +208,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
               <div className="eyebrow onboarding-hero__eyebrow">First-time setup</div>
               <div className="onboarding-hero__title">Name this machine</div>
               <div className="onboarding-hero__desc">
-                A couple of quick basics before the array — both are already set to sensible defaults and can always
+                A couple of quick basics before the array - both are already set to sensible defaults and can always
                 be changed later from Settings &rarr; About.
               </div>
 
@@ -256,7 +256,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
               <div className="eyebrow onboarding-hero__eyebrow">First-time setup</div>
               <div className="onboarding-hero__title">Let's build your array</div>
               <div className="onboarding-hero__desc">
-                Every disk that's part of the array — one or two parity disks plus your data disks — needs to be
+                Every disk that's part of the array - one or two parity disks plus your data disks - needs to be
                 assigned before it can start. If this isn't a fresh install, you can bring an existing array's
                 configuration in instead of assigning disks by hand.
               </div>
@@ -275,7 +275,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
                 >
                   <span className="onboarding-choice__title">Import an existing array</span>
                   <span className="onboarding-choice__desc">
-                    From Unraid or a previous NonRAID install — both save the same superblock file.
+                    From Unraid or a previous NonRAID install - both save the same superblock file.
                   </span>
                 </button>
                 <button
@@ -288,8 +288,8 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
                 >
                   <span className="onboarding-choice__title">Restore a full config backup</span>
                   <span className="onboarding-choice__desc">
-                    Bring back everything from a previous nonraid-webui install at once — array, shares, users, and
-                    settings — from a config backup archive.
+                    Bring back everything from a previous nonraid-webui install at once - array, shares, users, and
+                    settings - from a config backup archive.
                   </span>
                 </button>
               </div>
@@ -304,15 +304,15 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
               <div className="eyebrow onboarding-hero__eyebrow">First-time setup &middot; Array</div>
               <div className="onboarding-hero__title">Build your array</div>
               <div className="onboarding-hero__desc">
-                Pick a parity disk and a data disk, then press Build Array. Initialization — clearing the data disk
-                and building parity — happens in the background, so you don't need to wait here. Once it's running,
+                Pick a parity disk and a data disk, then press Build Array. Initialization - clearing the data disk
+                and building parity - happens in the background, so you don't need to wait here. Once it's running,
                 add more disks, a second parity disk, or a cache mirror any time from the Disks page.
               </div>
 
               {status && status.disks.some((d) => d.disk_id) && (
                 <div className="onboarding-summary">
                   {/* nmdctl always reports a placeholder slot-0 (parity) row with an empty
-                      disk_id even on a totally blank array — filtered out here so this only
+                      disk_id even on a totally blank array - filtered out here so this only
                       shows disks actually assigned so far, not an empty template row. */}
                   {status.disks
                     .filter((d) => d.disk_id)

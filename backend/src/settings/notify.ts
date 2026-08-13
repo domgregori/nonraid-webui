@@ -8,7 +8,7 @@ import type { SettingsStore } from './store.js';
 const execFileAsync = promisify(execFile);
 
 /**
- * Shells out to the real `apprise` CLI (https://github.com/caronc/apprise) —
+ * Shells out to the real `apprise` CLI (https://github.com/caronc/apprise) -
  * URLs are passed as separate argv entries (execFile, no shell), never
  * concatenated into a command string, so this is safe even though the URLs
  * are user-supplied config. `apprise` itself isn't bundled with this project;
@@ -18,7 +18,7 @@ const execFileAsync = promisify(execFile);
 export async function sendAppriseNotification(appriseUrls: string, title: string, body: string): Promise<NmdCommandResult> {
   const urls = appriseUrls.split(/\s+/).filter(Boolean);
   if (urls.length === 0) {
-    throw new Error('No notification URLs configured — add at least one apprise target URL first.');
+    throw new Error('No notification URLs configured - add at least one apprise target URL first.');
   }
 
   try {
@@ -34,10 +34,10 @@ export async function sendAppriseNotification(appriseUrls: string, title: string
 }
 
 /**
- * Gate + send for one specific event type — respects the master enabled toggle, the per-event
+ * Gate + send for one specific event type - respects the master enabled toggle, the per-event
  * toggle (see notificationCatalog.ts), and whether any apprise target is configured. Best-effort:
  * a bad/unreachable target must never break the caller's own tick/request, so every failure here is
- * swallowed — the activity log entry each call site already writes is the record either way.
+ * swallowed - the activity log entry each call site already writes is the record either way.
  */
 export async function notifyEvent(settingsStore: SettingsStore, eventType: NotificationEventType, title: string, body: string): Promise<void> {
   try {
@@ -47,6 +47,6 @@ export async function notifyEvent(settingsStore: SettingsStore, eventType: Notif
     }
     await sendAppriseNotification(settings.notifications.appriseUrls, title, body);
   } catch {
-    // swallowed — see doc comment above
+    // swallowed - see doc comment above
   }
 }

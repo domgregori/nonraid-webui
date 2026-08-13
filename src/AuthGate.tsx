@@ -7,12 +7,12 @@ import { useAuth } from './state/useAuth';
 
 /**
  * The only branching point between "not authenticated yet" and the real
- * app — App.tsx's route table is untouched. ArrayStatusProvider/
+ * app - App.tsx's route table is untouched. ArrayStatusProvider/
  * NotificationsProvider (and their polls) only mount once authenticated, so
  * the login/setup screens never generate a stream of 401s in the
  * background. OnboardingGate (not App directly) decides whether a
  * just-authenticated user with a genuinely blank array sees the first-run
- * setup wizard before the real dashboard — see its own doc comment.
+ * setup wizard before the real dashboard - see its own doc comment.
  */
 export function AuthGate() {
   const { loadState, configured, authenticated, error } = useAuth();

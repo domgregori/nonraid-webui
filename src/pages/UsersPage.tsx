@@ -69,7 +69,7 @@ export function UsersPage() {
           </div>
         ))}
         {shares.status === 'ready' && shareViews.length === 0 && (
-          <div className="status-note">No pools yet — create one from the Pools tab first.</div>
+          <div className="status-note">No pools yet - create one from the Pools tab first.</div>
         )}
       </div>
 

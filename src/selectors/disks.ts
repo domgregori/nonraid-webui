@@ -25,11 +25,11 @@ function parseUsagePct(usage: string | undefined): number {
 }
 
 function normalize(value: string | undefined): string {
-  return value && value !== '-' ? value : '—';
+  return value && value !== '-' ? value : '-';
 }
 
 /** True for a data disk that's DISK_OK (present, correctly identified, no redundancy problem)
- *  but has never been formatted — nmdctl's own "unknown" filesystem sentinel (see get_fs_type()
+ *  but has never been formatted - nmdctl's own "unknown" filesystem sentinel (see get_fs_type()
  *  in tools/nmdctl), not an error state. Parity never has a filesystem of its own by design.
  *  Exported so both the per-disk card border and a dashboard-wide summary can share one check. */
 export function diskNeedsFormat(disk: NmdDisk): boolean {
@@ -82,10 +82,10 @@ export function deriveDisk(
     statusLabel,
     statusColor,
     sizeLabel: formatSize(disk.size_gb),
-    usedLabel: role === 'parity' ? '—' : `${usedPct}%`,
-    fsType: role === 'parity' ? '—' : (disk.filesystem?.type ?? '—').toUpperCase(),
-    mountpoint: role === 'parity' ? '—' : normalize(disk.filesystem?.mountpoint),
-    tempLabel: typeof tempC === 'number' ? `${Math.round(tempC)}°C` : '—',
+    usedLabel: role === 'parity' ? '-' : `${usedPct}%`,
+    fsType: role === 'parity' ? '-' : (disk.filesystem?.type ?? '-').toUpperCase(),
+    mountpoint: role === 'parity' ? '-' : normalize(disk.filesystem?.mountpoint),
+    tempLabel: typeof tempC === 'number' ? `${Math.round(tempC)}°C` : '-',
     tempColor,
     barWidth: `${usedPct}%`,
     barColor: usedPct >= 90 ? COLORS.red : usedPct >= 75 ? COLORS.amber : COLORS.blue,
@@ -93,9 +93,9 @@ export function deriveDisk(
       status === 'missing' ? COLORS.red : needsFormat ? COLORS.amber : status === 'standby' ? COLORS.border : COLORS.borderLit,
     health: health ?? null,
     healthColor: health === 'failed' ? COLORS.red : health === 'passed' ? COLORS.green : COLORS.textDim,
-    healthLabel: health === 'failed' ? 'SMART Failing' : health === 'passed' ? 'SMART OK' : 'SMART —',
+    healthLabel: health === 'failed' ? 'SMART Failing' : health === 'passed' ? 'SMART OK' : 'SMART -',
     isSSD: isSSD ?? null,
-    typeLabel: isSSD === true ? 'SSD' : isSSD === false ? 'HDD' : '—',
+    typeLabel: isSSD === true ? 'SSD' : isSSD === false ? 'HDD' : '-',
     needsFormat,
   };
 }
@@ -121,7 +121,7 @@ export function deriveCapacity(dataDisks: DiskViewModel[], arrayStarted: boolean
   const usedTB = dataDisks.reduce((s, d) => s + d.size * (d.usedPct / 100), 0);
   const freeTB = totalTB - usedTB;
   const pct = arrayStarted && totalTB > 0 ? Math.round((usedTB / totalTB) * 100) : 0;
-  // formatSize picks GB vs TB itself — small test disks (e.g. 5 GB total) would
+  // formatSize picks GB vs TB itself - small test disks (e.g. 5 GB total) would
   // otherwise round to "0 / 0 TB" if this stayed hardcoded to TB.
   return {
     usedLabel: formatSize(usedTB * 1024),

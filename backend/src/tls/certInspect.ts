@@ -10,7 +10,7 @@ export interface CertInfo {
 }
 
 // openssl's -startdate/-enddate output ("notBefore=Aug 10 12:00:00 2026 GMT") is a format
-// Node's Date constructor parses natively — no manual date-string handling needed.
+// Node's Date constructor parses natively - no manual date-string handling needed.
 function parseDateLine(line: string): Date {
   const value = line.split('=').slice(1).join('=').trim();
   const date = new Date(value);
@@ -30,7 +30,7 @@ export async function parseCertInfo(certPath: string): Promise<CertInfo> {
   const notBeforeLine = lines.find((l) => l.startsWith('notBefore='));
   const notAfterLine = lines.find((l) => l.startsWith('notAfter='));
   if (!subjectLine || !issuerLine || !notBeforeLine || !notAfterLine) {
-    throw new Error('Unexpected output from openssl x509 — could not parse certificate.');
+    throw new Error('Unexpected output from openssl x509 - could not parse certificate.');
   }
 
   // subjectAltName is queried separately: -ext isn't valid alongside the flags above in every
@@ -48,7 +48,7 @@ export async function parseCertInfo(certPath: string): Promise<CertInfo> {
       .map((s) => s.trim().replace(/^IP Address:/, 'IP:'))
       .filter(Boolean);
   } catch {
-    sans = []; // no SAN extension present — not a parse failure
+    sans = []; // no SAN extension present - not a parse failure
   }
 
   return {
@@ -66,7 +66,7 @@ export interface KeyMatchResult {
 }
 
 // `openssl pkey` (not `openssl rsa`) so this works uniformly across RSA/EC/Ed25519 keys, and
-// conveniently rejects passphrase-protected keys for free (fails without -passin) — there's
+// conveniently rejects passphrase-protected keys for free (fails without -passin) - there's
 // nowhere in this app to store a passphrase, so an encrypted key is correctly treated the same
 // as an invalid one. Match is decided by comparing each side's derived public key PEM directly
 // rather than an RSA-modulus-only check, so it works for any key algorithm too.

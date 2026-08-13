@@ -43,7 +43,7 @@ export function emptyDiskRouter(emptyDisk: EmptyDiskService, activity: ActivityS
 
   router.post('/disks/empty/cancel', (_req, res) => {
     emptyDisk.cancel();
-    res.json({ ok: true, message: 'Cancelling — finishing the current file first.' });
+    res.json({ ok: true, message: 'Cancelling - finishing the current file first.' });
   });
 
   router.get('/disks/empty/status', (_req, res) => {

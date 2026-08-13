@@ -28,7 +28,7 @@ const STATE_COLOR: Record<LxcContainerSummary['state'], string> = {
 
 const IPV4_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
 
-/** lxc-info -i returns a flat mix of IPv4 and IPv6 addresses with no ordering guarantee — prefer
+/** lxc-info -i returns a flat mix of IPv4 and IPv6 addresses with no ordering guarantee - prefer
  *  showing IPv4 (shorter, more familiar for a LAN-facing container) and only fall back to IPv6 when
  *  a container genuinely has no IPv4 address at all, rather than cluttering the card with both. */
 function preferIPv4(ips: string[]): string[] {
@@ -45,9 +45,9 @@ export function deriveLxcContainerViewModel(container: LxcContainerSummary, acti
     autostart: container.autostart,
     description: container.description,
     webUiUrl: container.webUiUrl,
-    cpuLabel: container.cpuPercent === null ? '—' : `${Math.round(container.cpuPercent)}%`,
-    memLabel: container.memUsedBytes === null ? '—' : formatBytesAsMB(container.memUsedBytes),
-    ips: container.ips.length > 0 ? preferIPv4(container.ips).join(', ') : '—',
+    cpuLabel: container.cpuPercent === null ? '-' : `${Math.round(container.cpuPercent)}%`,
+    memLabel: container.memUsedBytes === null ? '-' : formatBytesAsMB(container.memUsedBytes),
+    ips: container.ips.length > 0 ? preferIPv4(container.ips).join(', ') : '-',
     toggleLabel: running ? 'Stop' : 'Start',
     toggleBorder: running ? COLORS.red : COLORS.green,
     toggleBg: running ? 'transparent' : tint(COLORS.green, 15),

@@ -20,10 +20,10 @@ export const systemApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ token, categories }),
     }),
-  // Manual retry for the reload a restore already attempts automatically — see
+  // Manual retry for the reload a restore already attempts automatically - see
   // backend/src/routes/system.ts's own comment on why this needs its own endpoint.
   reloadDriver: () => request<{ result: ImportResult }>('/api/system/reload-driver', { method: 'POST' }),
-  // The config-restore result screen's single "make everything take effect" action — see
+  // The config-restore result screen's single "make everything take effect" action - see
   // backend/src/routes/system.ts's own comment. Resolves once SMB/NFS/driver-reload have run;
   // nonraid-webui's own restart happens after that and drops the connection, so the caller polls
   // getStats() separately to know when it's actually back.

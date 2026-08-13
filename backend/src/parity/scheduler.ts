@@ -8,13 +8,13 @@ import { scheduleMatchesHour } from '../settings/scheduleMatch.js';
 /**
  * Fires an automatic correcting parity check at the configured weekly or
  * monthly day/hour, in the server's own local time. nmdctl has no scheduling
- * of its own, so this lives entirely here — no cron dependency needed, a
+ * of its own, so this lives entirely here - no cron dependency needed, a
  * 1-minute tick comparing against the stored schedule is enough for an
  * hour-granularity trigger. Same self-unref'd background-ticker shape as
  * ActivityWatcher.
  *
  * Caveat: lastFiredDateKey is in-memory only, so a backend restart during the
- * scheduled hour resets it and could refire that same day — acceptable for a
+ * scheduled hour resets it and could refire that same day - acceptable for a
  * convenience feature, not worth persisting.
  */
 export class ParityScheduler {
@@ -47,7 +47,7 @@ export class ParityScheduler {
     try {
       status = await this.nmd.getStatus();
     } catch {
-      return; // driver unreachable this tick — try again next time
+      return; // driver unreachable this tick - try again next time
     }
     if (status.array.state !== 'STARTED' || status.resync.active) return;
 

@@ -27,14 +27,14 @@ export interface NotificationEventDef {
   severity: NotificationSeverity;
   defaultEnabled: boolean;
   // Consecutive events sharing the same group render together inside one bordered box in the
-  // frontend's toggle list, instead of as flat, unrelated-looking rows — e.g. CPU/Disk temperature.
+  // frontend's toggle list, instead of as flat, unrelated-looking rows - e.g. CPU/Disk temperature.
   group?: string;
 }
 
 /**
  * Single source of truth for which array/storage-health events can trigger a notification, their
  * severity grouping, and default on/off state. Scoped deliberately to passive health events, not
- * management actions (Docker/LXC/share/user changes) — an admin already sees those the moment they
+ * management actions (Docker/LXC/share/user changes) - an admin already sees those the moment they
  * perform them. Both the settings defaults and the frontend's grouped toggle UI read from this same
  * list (via GET /settings/notification-events) so they can't drift apart.
  */

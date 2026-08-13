@@ -5,7 +5,7 @@ import type { CaFeed } from './types.js';
 
 /**
  * Owns the cached Community Applications feed. The feed is ~20MB of JSON
- * hosted by the CA maintainers (not an official public API) — this fetches it
+ * hosted by the CA maintainers (not an official public API) - this fetches it
  * on startup, persists it to disk so a restart doesn't require re-fetching
  * immediately, and refreshes on a long background interval rather than per
  * request. The primary URL is Unraid's own CDN; the GitHub-hosted mirror is

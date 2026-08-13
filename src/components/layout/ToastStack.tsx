@@ -1,9 +1,9 @@
 import { useNotifications } from '../../state/useNotifications';
 import { COLORS } from '../../styles/colors';
 
-/** Fixed, viewport-relative popup stack for the notifications context's amber/red toasts — see
+/** Fixed, viewport-relative popup stack for the notifications context's amber/red toasts - see
  *  NotificationsProvider for the toast-worthy filter and auto-dismiss timing. Mounted once,
- *  globally, in AppShell — same spot the old ArrayErrorBanner/NeedsFormatBanner used to live. */
+ *  globally, in AppShell - same spot the old ArrayErrorBanner/NeedsFormatBanner used to live. */
 export function ToastStack() {
   const { toasts, dismissToast } = useNotifications();
   if (toasts.length === 0) return null;

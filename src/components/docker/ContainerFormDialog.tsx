@@ -23,7 +23,7 @@ interface ContainerFormDialogProps {
 
 type Stage = 'loading' | 'editing' | 'reviewed' | 'installing' | 'done' | 'load-error';
 
-// Sentinel for "not one of the curated devices" — same pattern as
+// Sentinel for "not one of the curated devices" - same pattern as
 // CreateLxcDialog's distro picker (CUSTOM_VALUE). A device path typed by
 // hand, or loaded from an existing container that used something outside
 // the curated GPU/audio/serial categories, falls back to free text.
@@ -271,8 +271,8 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
               renderHeader={
                 ports.length > 0 ? (
                   <div className="container-form-row container-form-row--header">
-                    <span className="apps-field__hint">Container port — what the app listens on inside</span>
-                    <span className="apps-field__hint">Host port — what you'll actually browse to</span>
+                    <span className="apps-field__hint">Container port - what the app listens on inside</span>
+                    <span className="apps-field__hint">Host port - what you'll actually browse to</span>
                   </div>
                 ) : null
               }
@@ -442,7 +442,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
               )}
               renderRow={(d, i) => {
                 const issue = plan?.devices[i] && !plan.devices[i].allowed;
-                // Deliberately not keyed on "hostPath === ''" — that would make picking "Custom
+                // Deliberately not keyed on "hostPath === ''" - that would make picking "Custom
                 // path…" (which clears hostPath so there's something to type into) collapse
                 // straight back to looking unselected, since an empty path also fails the match.
                 // Any non-matched value, including empty, means "show the custom field."
@@ -593,7 +593,7 @@ function ListField<T>({ label, locked, items, onAdd, renderRow, renderLocked, re
     <div className="form-field">
       <span className="form-field__label">{label}</span>
       {locked ? (
-        <div className="form-field__value">{items.length === 0 ? '—' : items.map((item, i) => renderLocked(item, i))}</div>
+        <div className="form-field__value">{items.length === 0 ? '-' : items.map((item, i) => renderLocked(item, i))}</div>
       ) : (
         <>
           {renderHeader}

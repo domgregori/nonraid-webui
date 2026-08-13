@@ -8,7 +8,7 @@ import type { CaApp, CaConfigEntry, InstallOverrides, InstallPlan } from '../../
 import type { HostDevice } from '../../types/dockerApi';
 
 // Same sentinel/pattern as ContainerFormDialog's manual-container Device
-// picker — a device outside the curated GPU/audio/serial categories (or a
+// picker - a device outside the curated GPU/audio/serial categories (or a
 // template default that doesn't match any of them) falls back to free text.
 const DEVICE_CUSTOM = '__custom__';
 
@@ -36,7 +36,7 @@ function resolveWebUi(template: string | null): string | null {
 
 /**
  * Mirrors backend/src/apps/service.ts's elevatedAccessReasons so the warning
- * banner can appear before the first plan review, not just after — privileged,
+ * banner can appear before the first plan review, not just after - privileged,
  * host networking, and raw device passthrough are all host-access escalations
  * of comparable severity, so they share one ack rather than only gating on
  * the Privileged flag.
@@ -133,7 +133,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
   const advancedEntries = configEntries.filter((e) => isAdvanced(e['@attributes'].Display));
   const elevatedReasons = plan?.elevatedAccessReasons ?? (app ? preReviewElevatedReasons(app) : []);
   const needsElevatedAck = elevatedReasons.length > 0;
-  // Nothing is editable once install has actually started — show the values
+  // Nothing is editable once install has actually started - show the values
   // that are actually being installed as plain info instead of live inputs.
   const locked = stage === 'installing' || stage === 'done';
 
@@ -290,7 +290,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
                         {plan.env.map((e) => (
                           <div className="apps-plan-review__kv" key={e.target}>
                             <span className="apps-plan-review__kv-label">{e.label}</span>
-                            <span className="apps-plan-review__kv-value">{e.masked ? '••••••••' : e.value || '—'}</span>
+                            <span className="apps-plan-review__kv-value">{e.masked ? '••••••••' : e.value || '-'}</span>
                           </div>
                         ))}
                       </div>
@@ -383,7 +383,7 @@ function ConfigField({ entry, value, onChange, plan, locked, availableDevices }:
 
   const label = attrs.Type === 'Port' ? `${attrs.Name} (host port)` : attrs.Name;
 
-  // See ContainerFormDialog's identical device picker for why this isn't keyed on "value === ''" —
+  // See ContainerFormDialog's identical device picker for why this isn't keyed on "value === ''" -
   // that would make picking "Custom path…" (which clears value) collapse back to looking unselected.
   const deviceMatched = availableDevices.some((dev) => dev.path === value);
   const deviceSelectValue = deviceMatched ? value : DEVICE_CUSTOM;
@@ -395,7 +395,7 @@ function ConfigField({ entry, value, onChange, plan, locked, availableDevices }:
         {required && <span className="apps-required-mark"> *</span>}
       </span>
       {locked ? (
-        <div className="form-field__value">{masked ? '••••••••' : value || '—'}</div>
+        <div className="form-field__value">{masked ? '••••••••' : value || '-'}</div>
       ) : attrs.Type === 'Path' ? (
         <PathAutocomplete
           scope="binds"

@@ -13,7 +13,7 @@ import type { DockerClient } from './client.js';
 
 const execFileAsync = promisify(execFile);
 // Exported so backupCatalog.ts can back this up under the same name a relocated Docker storage
-// root is written to — without it, a config restore onto a fresh OS install would leave Docker
+// root is written to - without it, a config restore onto a fresh OS install would leave Docker
 // pointed at the default data-root, unaware any previously-relocated containers/images exist.
 export const DAEMON_JSON_PATH = '/etc/docker/daemon.json';
 
@@ -24,7 +24,7 @@ export interface StoragePathProgress {
 
 export interface DockerStorageInfo {
   // 'custom' covers a data-root this app didn't set (e.g. hand-edited outside boot/array/cache
-  // convention) — there's nothing to migrate *from* cleanly in that case beyond just picking a new target.
+  // convention) - there's nothing to migrate *from* cleanly in that case beyond just picking a new target.
   mode: 'boot' | 'array' | 'cache' | 'custom';
   diskSlot: number | null;
   path: string;
@@ -49,21 +49,21 @@ export async function getCurrentDockerStorage(docker: DockerClient): Promise<Doc
 }
 
 /** Same "don't move onto a mirror that can't actually serve the data" gate for both cache
- *  consumers (Docker here, LXC in lxc/storagePath.ts) — not-configured or fully unavailable
+ *  consumers (Docker here, LXC in lxc/storagePath.ts) - not-configured or fully unavailable
  *  refuses outright; degraded (single-disk, no redundancy but still fully readable/writable) is
  *  allowed, matching how the cache pool itself stays usable in that state. */
 async function requireCacheUsable(cache: CacheService): Promise<void> {
   const status = await cache.getStatus();
   if (status.health === 'not-configured' || status.health === 'unavailable') {
-    throw new HttpError(400, `Cache pool isn't available (${status.health}) — set it up on the Disks page first.`);
+    throw new HttpError(400, `Cache pool isn't available (${status.health}) - set it up on the Disks page first.`);
   }
 }
 
-// One storage move at a time, system-wide — see lxc/storagePath.ts's identical lock for why.
+// One storage move at a time, system-wide - see lxc/storagePath.ts's identical lock for why.
 let running = false;
 
 async function withLock<T>(fn: () => Promise<T>): Promise<T> {
-  if (running) throw new Error('A storage move is already running — wait for it to finish first.');
+  if (running) throw new Error('A storage move is already running - wait for it to finish first.');
   running = true;
   try {
     return await fn();
@@ -101,7 +101,7 @@ function sleep(ms: number): Promise<void> {
  * Stops the Docker service entirely (both the socket unit and the daemon, so socket-activation
  * can't silently relaunch dockerd mid-copy), rsyncs /var/lib/docker's contents to the new location,
  * points daemon.json's data-root at it, restarts the service, and polls `docker info` until it
- * reports the new root. Containers without a restart policy simply stay stopped after this — normal
+ * reports the new root. Containers without a restart policy simply stay stopped after this - normal
  * Docker behavior, not something this handles specially. Never deletes the old data.
  */
 export async function migrateDockerStorage(
@@ -118,7 +118,7 @@ export async function migrateDockerStorage(
 
     const status = await deps.nmd.getStatus();
     if (status.resync.active) {
-      throw new Error('A parity check or clear is in progress — refusing to move storage mid-operation.');
+      throw new Error('A parity check or clear is in progress - refusing to move storage mid-operation.');
     }
     if (target.mode === 'array') {
       const disk = status.disks.find((d) => d.slot === target.diskSlot);
@@ -135,7 +135,7 @@ export async function migrateDockerStorage(
     const targetMount = target.mode === 'array' ? `/mnt/disk${target.diskSlot}` : target.mode === 'cache' ? config.cacheMountPoint : '/';
     const available = await freeSpaceBytes(targetMount);
     if (sourceSize > 0 && available < sourceSize * 1.1) {
-      throw new Error(`Not enough free space at the target — needs about ${Math.ceil((sourceSize * 1.1) / 1024 / 1024)} MB.`);
+      throw new Error(`Not enough free space at the target - needs about ${Math.ceil((sourceSize * 1.1) / 1024 / 1024)} MB.`);
     }
 
     onProgress({ phase: 'stopping', message: 'Stopping the Docker service…' });
@@ -152,7 +152,7 @@ export async function migrateDockerStorage(
     try {
       daemonConfig = JSON.parse(await readFile(DAEMON_JSON_PATH, 'utf8'));
     } catch {
-      // missing, or unreadable without privilege — start fresh rather than blocking the move on a
+      // missing, or unreadable without privilege - start fresh rather than blocking the move on a
       // pre-existing file this app doesn't own
     }
     daemonConfig['data-root'] = targetPath;
@@ -171,16 +171,16 @@ export async function migrateDockerStorage(
       try {
         verified = (await deps.docker.getDataRoot()) === targetPath;
       } catch {
-        // still starting — retry
+        // still starting - retry
       }
     }
     if (!verified) {
-      throw new Error('Docker restarted but did not report the new storage location — check `docker info` and the service status manually.');
+      throw new Error('Docker restarted but did not report the new storage location - check `docker info` and the service status manually.');
     }
 
     onProgress({
       phase: 'done',
-      message: `Done. Old data is still at ${currentPath} — remove it manually once you've verified everything works.`,
+      message: `Done. Old data is still at ${currentPath} - remove it manually once you've verified everything works.`,
     });
     return { path: targetPath };
   });

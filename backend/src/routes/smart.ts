@@ -29,7 +29,7 @@ export function smartRouter(nmd: NmdClient, smart: SmartService, system: SystemS
 
   // isSSD never changes at runtime for a given device, so this is a plain per-request lsblk call
   // (fast, no caching needed) rather than SmartService's stale-while-revalidate machinery, which
-  // exists specifically because smartctl reads are slow — lsblk isn't.
+  // exists specifically because smartctl reads are slow - lsblk isn't.
   router.get('/smart/disk-types', async (_req, res) => {
     try {
       const status = await nmd.getStatus();
@@ -43,7 +43,7 @@ export function smartRouter(nmd: NmdClient, smart: SmartService, system: SystemS
 
   // Device-path-based SMART lookup, for disks with no array slot to key off (unassigned devices,
   // the boot disk). Never trusts a raw client-supplied path without validating it's a real,
-  // currently-relevant device first — same discipline routes/disks.ts's add/replace handlers use.
+  // currently-relevant device first - same discipline routes/disks.ts's add/replace handlers use.
   router.get('/smart/by-device', async (req, res) => {
     const device = req.query.device;
     if (typeof device !== 'string' || !device) {

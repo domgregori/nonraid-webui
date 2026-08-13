@@ -60,7 +60,7 @@ export function GroupsModal({ groups, onClose }: GroupsModalProps) {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!GROUP_NAME_RE.test(name)) {
-      setError('Group name must be lowercase letters, numbers, dash, underscore — starting with a letter or underscore.');
+      setError('Group name must be lowercase letters, numbers, dash, underscore - starting with a letter or underscore.');
       return;
     }
     if (groups.groups.some((g) => g.name === name)) {

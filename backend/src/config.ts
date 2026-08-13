@@ -4,12 +4,12 @@ import path from 'node:path';
 import { parse as parseToml, TomlError, type TomlTable, type TomlValue } from 'smol-toml';
 
 /**
- * Structured config file, checked in this order — whichever is found first is
+ * Structured config file, checked in this order - whichever is found first is
  * the only one read (not merged): $HOME/.config/nonraid/config.toml (for a
  * non-root dev run, or the systemd service's own $HOME, typically /root),
  * then /etc/nonraid/config.toml (the usual production location, see
  * tools/config/nonraid-webui.toml.example). Neither existing falls back to
- * today's behavior — env vars / hardcoded defaults only, same as before this
+ * today's behavior - env vars / hardcoded defaults only, same as before this
  * existed. A missing file is fine; a file that exists but fails to parse is a
  * real misconfiguration and must throw at boot, same as every JSON-backed
  * store in this codebase (AuthStore, ShareStore, SettingsStore, ...) failing
@@ -23,7 +23,7 @@ function loadTomlConfig(): TomlTable {
       raw = readFileSync(candidate, 'utf8');
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') continue;
-      throw err; // e.g. EACCES — a real misconfiguration, not "no file present"
+      throw err; // e.g. EACCES - a real misconfiguration, not "no file present"
     }
     try {
       return parseToml(raw);
@@ -40,7 +40,7 @@ function loadTomlConfig(): TomlTable {
 const toml = loadTomlConfig();
 
 // Tolerates a missing/malformed table (undefined section, or a section that
-// isn't itself a table) as "not set" rather than throwing — a syntactically
+// isn't itself a table) as "not set" rather than throwing - a syntactically
 // valid TOML file with the wrong shape for one key falls through to that
 // key's hardcoded default, same as a wrong-typed env var does today.
 function t(section: string, key: string): TomlValue | undefined {
@@ -51,7 +51,7 @@ function t(section: string, key: string): TomlValue | undefined {
 
 // Every config value resolves env var (if set) > TOML value (if the winning
 // file sets it) > hardcoded fallback. Env vars stay authoritative so quick
-// ad hoc overrides keep working (e.g. `PORT=4000 npm run dev`) — TOML is
+// ad hoc overrides keep working (e.g. `PORT=4000 npm run dev`) - TOML is
 // the preferred *durable* surface, layered underneath.
 function str(envName: string, tomlValue: TomlValue | undefined, fallback: string): string {
   const envVal = process.env[envName];
@@ -81,7 +81,7 @@ function strArray(envName: string, tomlValue: TomlValue | undefined, fallback: s
   return fallback;
 }
 
-// See appsBindRoots below — resolved once, ahead of the object literal, so
+// See appsBindRoots below - resolved once, ahead of the object literal, so
 // both its own field and appsBindRoots's cross-key fallback can reuse the one
 // already-precedence-resolved value instead of re-running env/TOML lookup twice.
 const shareMountRoot = str('SHARE_MOUNT_ROOT', t('shares', 'mount_root'), '/mnt/user');
@@ -91,46 +91,46 @@ export const config = {
   corsOrigin: str('CORS_ORIGIN', t('server', 'cors_origin'), 'http://localhost:5183'),
   // When true, this backend also serves the frontend's built static files
   // (and falls back to index.html for client-side routes) from this same
-  // Express instance — the production deployment shape, see
+  // Express instance - the production deployment shape, see
   // tools/systemd/nonraid-webui.service. Must stay false for today's dev
   // setup, where Vite's own dev server serves the frontend separately on
   // its own origin/port (see corsOrigin above).
   serveFrontend: bool('SERVE_FRONTEND', t('server', 'serve_frontend'), false),
   // Absolute path to the frontend's built dist/ output (`npm run build` at
-  // the repo root — Vite's default outDir, see vite.config.ts). Only read
+  // the repo root - Vite's default outDir, see vite.config.ts). Only read
   // when serveFrontend is true.
   frontendDistPath: str('FRONTEND_DIST_PATH', t('server', 'frontend_dist_path'), path.join(process.cwd(), 'frontend-dist')),
-  // Single admin account — see backend/src/auth/.
+  // Single admin account - see backend/src/auth/.
   authConfigPath: str('AUTH_CONFIG_PATH', t('auth', 'config_path'), path.join(process.cwd(), 'data', 'auth.json')),
-  // MUST be true once real TLS termination exists in front of this backend —
+  // MUST be true once real TLS termination exists in front of this backend -
   // see REQUIREMENTS.md's Security section. false is only correct
   // for a non-TLS dev/test setup; a Secure cookie sent over plain HTTP is
   // simply dropped by the browser, silently breaking login. index.ts flips
   // this to true automatically at boot when this app's own built-in TLS
-  // (backend/src/tls/) is enabled — this manual default only still matters
+  // (backend/src/tls/) is enabled - this manual default only still matters
   // for a non-default setup, e.g. TLS terminated by a reverse proxy in front
   // of this app instead.
   cookieSecure: bool('COOKIE_SECURE', t('auth', 'cookie_secure'), false),
   sessionTtlMs: num('SESSION_TTL_MS', t('auth', 'session_ttl_ms'), 30 * 24 * 60 * 60 * 1000),
   loginRateLimitWindowMs: num('LOGIN_RATE_LIMIT_WINDOW_MS', t('auth', 'login_rate_limit_window_ms'), 15 * 60 * 1000),
   loginRateLimitMax: num('LOGIN_RATE_LIMIT_MAX', t('auth', 'login_rate_limit_max'), 10),
-  // How long a "password verified, second factor pending" cookie stays valid — short on purpose,
+  // How long a "password verified, second factor pending" cookie stays valid - short on purpose,
   // this is a narrower window than a real session and doesn't need session-length TTLs.
   twoFactorPendingTtlMs: num('TWO_FACTOR_PENDING_TTL_MS', t('auth', 'two_factor_pending_ttl_ms'), 5 * 60 * 1000),
   totpRateLimitWindowMs: num('TOTP_RATE_LIMIT_WINDOW_MS', t('auth', 'totp_rate_limit_window_ms'), 15 * 60 * 1000),
   totpRateLimitMax: num('TOTP_RATE_LIMIT_MAX', t('auth', 'totp_rate_limit_max'), 10),
-  // Unset by default — passkey routes 400 with a clear message until both are set. Unlike
+  // Unset by default - passkey routes 400 with a clear message until both are set. Unlike
   // cookieSecure, there's no safe default to guess here: RP ID/origin are inherently
   // per-deployment (bare domain vs full scheme+host+port), and guessing wrong doesn't just
   // silently break a feature, it risks accepting assertions bound to the wrong origin.
   webauthnRpId: optStr('WEBAUTHN_RP_ID', t('auth', 'webauthn_rp_id')),
   webauthnOrigin: optStr('WEBAUTHN_ORIGIN', t('auth', 'webauthn_origin')),
-  // HTTPS termination — see backend/src/tls/. Metadata lives in tlsConfigPath, the actual PEM
+  // HTTPS termination - see backend/src/tls/. Metadata lives in tlsConfigPath, the actual PEM
   // material under tlsCertDir (never embedded in the JSON record).
   tlsConfigPath: str('TLS_CONFIG_PATH', t('tls', 'config_path'), path.join(process.cwd(), 'data', 'tls.json')),
   tlsCertDir: str('TLS_CERT_DIR', t('tls', 'cert_dir'), path.join(process.cwd(), 'data', 'tls')),
   // Self-signed certs never chain to a public trust store, so the shrinking lifetime caps public
-  // CAs must follow (825 days and falling) don't apply — long-lived by default so a headless NAS
+  // CAs must follow (825 days and falling) don't apply - long-lived by default so a headless NAS
   // admin isn't nagged to regenerate one every year.
   tlsSelfSignedDays: num('TLS_SELF_SIGNED_DAYS', t('tls', 'self_signed_days'), 3650),
   opensslBin: str('OPENSSL_BIN', t('tls', 'openssl_bin'), 'openssl'),
@@ -148,16 +148,16 @@ export const config = {
   smartTimeoutMs: num('SMART_TIMEOUT_MS', t('smart', 'timeout_ms'), 10_000),
   smartCacheTtlMs: num('SMART_CACHE_TTL_MS', t('smart', 'cache_ttl_ms'), 60_000),
   // Attribute/self-test reads are on-demand (a disk's detail panel open), not
-  // polled continuously like temperature — short TTL so self-test progress
+  // polled continuously like temperature - short TTL so self-test progress
   // (see smart/service.ts) shows up promptly without hammering smartctl.
   smartAttributesCacheTtlMs: num('SMART_ATTRIBUTES_CACHE_TTL_MS', t('smart', 'attributes_cache_ttl_ms'), 4_000),
-  // Spin up/down actions (backend/src/system/hdparm.ts) — not bundled with this project, same
+  // Spin up/down actions (backend/src/system/hdparm.ts) - not bundled with this project, same
   // "clear error if missing" treatment appriseBin/smartctlBin get rather than a hard crash.
   hdparmBin: str('HDPARM_BIN', t('hdparm', 'bin'), 'hdparm'),
   hdparmUseSudo: bool('HDPARM_USE_SUDO', t('hdparm', 'use_sudo'), false),
   sharesConfigPath: str('SHARES_CONFIG_PATH', t('shares', 'config_path'), path.join(process.cwd(), 'data', 'shares.json')),
   shareMountRoot,
-  // The file Browse page's own ceiling/starting point — independent of
+  // The file Browse page's own ceiling/starting point - independent of
   // shareMountRoot above (that one's for the Shares subsystem's own share
   // paths). Browse spans the whole /mnt tree (shares, individual array
   // disks, cache, etc.), not just one share, so it needs a wider root.
@@ -169,7 +169,7 @@ export const config = {
   shareAccessConfigPath: str('SHARE_ACCESS_CONFIG_PATH', t('shares', 'access_config_path'), path.join(process.cwd(), 'data', 'share-access.json')),
   systemStatsIntervalMs: num('SYSTEM_STATS_INTERVAL_MS', t('system', 'stats_interval_ms'), 2_000),
   // Boot disk backups (backend/src/system/backupStream.ts) shell out to dd/tar
-  // to read raw block devices and root-owned config files — same "this
+  // to read raw block devices and root-owned config files - same "this
   // process may not itself have permission, only sudo does" reasoning as
   // nmdUseSudo/sharesUseSudo/usersUseSudo.
   systemUseSudo: bool('SYSTEM_USE_SUDO', t('system', 'use_sudo'), false),
@@ -183,7 +183,7 @@ export const config = {
   usersUidRangeEnd: num('USERS_UID_RANGE_END', t('users', 'uid_range_end'), 59_999),
   usersTimeoutMs: num('USERS_TIMEOUT_MS', t('users', 'timeout_ms'), 15_000),
   usersShellPath: str('USERS_SHELL_PATH', t('users', 'shell_path'), '/usr/sbin/nologin'),
-  // Community Applications template feed — see backend/src/apps/. Primary is
+  // Community Applications template feed - see backend/src/apps/. Primary is
   // Unraid's own CDN; backup is the GitHub-hosted mirror the CA plugin itself
   // falls back to.
   appsFeedPrimaryUrl: str('APPS_FEED_PRIMARY_URL', t('apps', 'feed_primary_url'), 'https://assets.ca.unraid.net/feed/applicationFeed.json'),
@@ -194,19 +194,19 @@ export const config = {
   ),
   appsFeedCachePath: str('APPS_FEED_CACHE_PATH', t('apps', 'feed_cache_path'), path.join(process.cwd(), 'data', 'ca-feed.json')),
   appsFeedRefreshIntervalMs: num('APPS_FEED_REFRESH_INTERVAL_MS', t('apps', 'feed_refresh_interval_ms'), 24 * 60 * 60 * 1000),
-  // Host paths a container's volumes may bind-mount — shared by both Apps
+  // Host paths a container's volumes may bind-mount - shared by both Apps
   // (a CA template's "Path" Config entries) and the Docker tab's manual
   // Add/Edit Container dialog, since both end up calling the same
   // createContainer with caller-influenced host paths. Anything outside
-  // these roots is rejected when building a plan — there's no auth layer in
+  // these roots is rejected when building a plan - there's no auth layer in
   // front of this API yet, so it needs to be a hard boundary, not just a UI
   // warning.
   appsBindRoots: strArray('APPS_BIND_ROOTS', t('apps', 'bind_roots'), [shareMountRoot]),
   // App-level settings with no home elsewhere (turbo write's *desired* state,
-  // notification config) — see backend/src/settings/.
+  // notification config) - see backend/src/settings/.
   settingsConfigPath: str('SETTINGS_CONFIG_PATH', t('settings', 'config_path'), path.join(process.cwd(), 'data', 'settings.json')),
   appriseBin: str('APPRISE_BIN', t('settings', 'apprise_bin'), 'apprise'),
-  // Dashboard activity feed — see backend/src/activity/.
+  // Dashboard activity feed - see backend/src/activity/.
   activityConfigPath: str('ACTIVITY_CONFIG_PATH', t('activity', 'config_path'), path.join(process.cwd(), 'data', 'activity.json')),
   // How often the background watcher (backend/src/activity/watcher.ts) polls
   // for passive state changes (parity check completing on its own, a disk
@@ -214,10 +214,10 @@ export const config = {
   activityWatcherIntervalMs: num('ACTIVITY_WATCHER_INTERVAL_MS', t('activity', 'watcher_interval_ms'), 30_000),
   // How often the weekly/monthly background schedulers (ParityScheduler,
   // BackupScheduler) check their stored schedule against the current time.
-  // A 1-minute tick is plenty for an hour-granularity schedule — no cron
+  // A 1-minute tick is plenty for an hour-granularity schedule - no cron
   // dependency needed for either.
   schedulerTickIntervalMs: num('SCHEDULER_TICK_INTERVAL_MS', t('scheduler', 'tick_interval_ms'), 60_000),
-  // LXC containers — see backend/src/lxc/. Shells out to the classic liblxc
+  // LXC containers - see backend/src/lxc/. Shells out to the classic liblxc
   // `lxc-*` command-line tools (lxc-ls/lxc-info/lxc-create/...), the same
   // toolset ich777's unraid-lxc-plugin wraps in PHP. `lxcDefaultPath` is
   // passed as `-P` to every lxc-* call, matching that plugin's configurable
@@ -226,30 +226,30 @@ export const config = {
   lxcUseSudo: bool('LXC_USE_SUDO', t('lxc', 'use_sudo'), false),
   lxcTimeoutMs: num('LXC_TIMEOUT_MS', t('lxc', 'timeout_ms'), 15_000),
   // lxc-create --template download fetches a rootfs tarball from
-  // images.linuxcontainers.org — needs much longer than other lxc-* calls.
+  // images.linuxcontainers.org - needs much longer than other lxc-* calls.
   lxcCreateTimeoutMs: num('LXC_CREATE_TIMEOUT_MS', t('lxc', 'create_timeout_ms'), 10 * 60 * 1000),
   lxcStopTimeoutSec: num('LXC_STOP_TIMEOUT_SEC', t('lxc', 'stop_timeout_sec'), 30),
   // `lxc-create --template download -- --list` fetches the live image index
-  // from the image server on a cold cache — the download template caches
+  // from the image server on a cold cache - the download template caches
   // it on disk afterward (~30ms on a warm cache, observed), but the first
   // call on a fresh host needs real network time.
   lxcDistroListTimeoutMs: num('LXC_DISTRO_LIST_TIMEOUT_MS', t('lxc', 'distro_list_timeout_ms'), 30_000),
-  // Poll-and-cache interval for the CPU/memory/IP stats worker — see
+  // Poll-and-cache interval for the CPU/memory/IP stats worker - see
   // lxc/statsPoller.ts, same shape as SystemStatsService.
   lxcStatsIntervalMs: num('LXC_STATS_INTERVAL_MS', t('lxc', 'stats_interval_ms'), 3_000),
-  // First-party history (History page) — see backend/src/metrics/. Independent
+  // First-party history (History page) - see backend/src/metrics/. Independent
   // of the live-UI poll intervals above: those are for "what's happening right
   // now", this is "what happened over time", sampled far less often on purpose.
   metricsDbPath: str('METRICS_DB_PATH', t('metrics', 'db_path'), path.join(process.cwd(), 'data', 'metrics.db')),
   metricsSampleIntervalMs: num('METRICS_SAMPLE_INTERVAL_MS', t('metrics', 'sample_interval_ms'), 60_000),
   metricsRetentionDays: num('METRICS_RETENTION_DAYS', t('metrics', 'retention_days'), 30),
-  // Mirrored cache pool (btrfs RAID1) — see backend/src/cache/. A single fixed
+  // Mirrored cache pool (btrfs RAID1) - see backend/src/cache/. A single fixed
   // mountpoint, unlike shareMountRoot/browseRoot which are roots for many
   // per-name paths underneath them.
   cacheMountPoint: str('CACHE_MOUNT_POINT', t('cache', 'mount_point'), '/mnt/cache'),
   cacheUseSudo: bool('CACHE_USE_SUDO', t('cache', 'use_sudo'), false),
   cacheTimeoutMs: num('CACHE_TIMEOUT_MS', t('cache', 'timeout_ms'), 15_000),
-  // mkfs.btrfs against a real multi-TB disk pair can take a while — longer
+  // mkfs.btrfs against a real multi-TB disk pair can take a while - longer
   // than every other privileged command in this app, none of which format a
   // filesystem from scratch.
   cacheMkfsTimeoutMs: num('CACHE_MKFS_TIMEOUT_MS', t('cache', 'mkfs_timeout_ms'), 5 * 60 * 1000),

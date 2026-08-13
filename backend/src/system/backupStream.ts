@@ -14,7 +14,7 @@ function describeExit(code: number | null, signal: NodeJS.Signals | null): strin
 }
 
 /**
- * Streams a gzip-compressed raw byte copy of `device` straight to the response — never buffers
+ * Streams a gzip-compressed raw byte copy of `device` straight to the response - never buffers
  * the image in memory or on disk. This is a live read of a mounted, in-use device, not a
  * filesystem-consistent snapshot; the caller (route) is responsible for surfacing that caveat to
  * the user before triggering this.
@@ -31,13 +31,13 @@ export function streamBootDiskImage(device: string, useSudo: boolean, res: Respo
   });
 
   // The browser cancelling mid-download (closing the tab, navigating away) closes `res` without
-  // dd ever knowing — without this, dd keeps reading the full device into a pipe nothing drains,
+  // dd ever knowing - without this, dd keeps reading the full device into a pipe nothing drains,
   // wasting device I/O for however long it takes to finish. Kill it the moment the client's gone.
   res.on('close', () => {
     if (!child.killed) child.kill();
   });
 
-  // Only commit to the download once dd has actually started — an ENOENT/permission failure
+  // Only commit to the download once dd has actually started - an ENOENT/permission failure
   // fires as an 'error' event before this, letting a clean JSON error go out instead.
   child.on('spawn', () => {
     headersSent = true;
@@ -65,7 +65,7 @@ export function streamBootDiskImage(device: string, useSudo: boolean, res: Respo
       return;
     }
     // Non-zero/signalled close after headers went out means the browser already has a truncated
-    // file — nothing better to do than end the response; the activity log is the only place this
+    // file - nothing better to do than end the response; the activity log is the only place this
     // failure can still be surfaced.
     if (headersSent) res.destroy();
     else res.status(500).json({ error: `dd ${describeExit(code, signal)}: ${stderrTail.trim()}` });
@@ -126,12 +126,12 @@ export function streamConfigBackup(paths: string[], useSudo: boolean, res: Respo
 }
 
 // resolveConfigBackupPaths() moved to backupCatalog.ts, now derived from the same category list
-// the restore side uses for its per-category selection — re-exported here so existing callers
+// the restore side uses for its per-category selection - re-exported here so existing callers
 // (routes/system.ts, BackupScheduler) don't need an import path change.
 export { resolveConfigBackupPaths } from './backupCatalog.js';
 
 /**
- * Non-streaming sibling of streamConfigBackup — writes the same gzip-compressed tar to a file on
+ * Non-streaming sibling of streamConfigBackup - writes the same gzip-compressed tar to a file on
  * disk instead of an HTTP response, for BackupScheduler's unattended runs. Resolves with the byte
  * count written, rejects with a message built the same way streamConfigBackup's error paths are.
  */

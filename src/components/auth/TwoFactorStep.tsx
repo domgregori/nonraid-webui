@@ -13,7 +13,7 @@ interface TwoFactorStepProps {
 export function TwoFactorStep({ methods }: TwoFactorStepProps) {
   const { completeTwoFactor } = useAuth();
   const canUsePasskey = methods.includes('passkey') && webauthnAvailable();
-  // Defaults to the code form unless TOTP was never enrolled — a passkey is still offered
+  // Defaults to the code form unless TOTP was never enrolled - a passkey is still offered
   // alongside the code form when both are available, not instead of it.
   const [usingPasskey, setUsingPasskey] = useState(!methods.includes('totp') && canUsePasskey);
   const [code, setCode] = useState('');
@@ -28,7 +28,7 @@ export function TwoFactorStep({ methods }: TwoFactorStepProps) {
       await authApi.verifyTotp(code);
       await completeTwoFactor();
     } catch (err) {
-      // request() throws a bare UnauthorizedError (no body) on any 401 — the backend's real
+      // request() throws a bare UnauthorizedError (no body) on any 401 - the backend's real
       // "Incorrect code." message never reaches here, so substitute a message that still makes
       // sense for this specific step.
       setError(err instanceof UnauthorizedError ? 'Incorrect code.' : (err as Error).message);

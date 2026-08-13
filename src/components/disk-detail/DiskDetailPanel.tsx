@@ -17,7 +17,7 @@ const SELF_TEST_LABELS: Record<SelfTestType, string> = { short: 'Short Test', lo
 type SmartTab = 'overview' | 'attributes' | 'capabilities';
 
 function boolLabel(v: boolean | null): string {
-  return v === null ? '—' : v ? 'Yes' : 'No';
+  return v === null ? '-' : v ? 'Yes' : 'No';
 }
 
 export function DiskDetailPanel() {
@@ -44,23 +44,23 @@ export function DiskDetailPanel() {
 
   const needsFormat = disk.role === 'data' && disk.fsType === 'UNKNOWN';
   // nmdctl's own JSON status reports an unmounted filesystem's mountpoint as the literal word
-  // "unmounted", not "-" — confirmed against tools/nmdctl's get_mountpoint()/DISK_STATUS_DATA
-  // default. selectors/disks.ts's normalize() only collapses "-"/empty to "—", so "unmounted"
+  // "unmounted", not "-" - confirmed against tools/nmdctl's get_mountpoint()/DISK_STATUS_DATA
+  // default. selectors/disks.ts's normalize() only collapses "-"/empty to "-", so "unmounted"
   // passes through unchanged and needs its own check here too, or a disk with a real but
   // never-mounted-by-this-app filesystem (e.g. reused from another system) never shows Mount
-  // Disk or Force Format at all — confirmed live, this exact state was unreachable before this fix.
-  const needsMount = disk.role === 'data' && !needsFormat && (disk.mountpoint === '—' || disk.mountpoint === 'unmounted');
-  // Same trigger as needsMount — a recognized filesystem that isn't mounted here means either
+  // Disk or Force Format at all - confirmed live, this exact state was unreachable before this fix.
+  const needsMount = disk.role === 'data' && !needsFormat && (disk.mountpoint === '-' || disk.mountpoint === 'unmounted');
+  // Same trigger as needsMount - a recognized filesystem that isn't mounted here means either
   // "Mount Disk" hasn't been tried yet, or it's foreign data (e.g. ext4/ntfs from another system)
   // that this app's mount step can never bring up. Offered alongside Mount Disk rather than
   // instead of it, since a real prior array member can land in this same state.
   const canForceFormat = needsMount;
   const arrayStarted = status.array.state === 'STARTED';
-  // Unassigned but not yet committed via a start since — the disk's identity
+  // Unassigned but not yet committed via a start since - the disk's identity
   // is still intact and restoreUnassignedDisk() can put it back with no
   // clear/rebuild involved. Once a start commits it, this stops applying.
   const isRestorable = disk.rawStatus === 'DISK_NP_MISSING' && !arrayStarted;
-  // Committed-unassigned — identity already cleared, restore no longer applies.
+  // Committed-unassigned - identity already cleared, restore no longer applies.
   // This is the only state shrinkArray() can drop, so it's the only state that offers it.
   const isDroppable = disk.role === 'data' && disk.rawStatus === 'DISK_NP_DSBL';
 
@@ -73,7 +73,7 @@ export function DiskDetailPanel() {
     } catch (err) {
       const message = (err as Error).message;
       // formatDisk() itself refuses without force the moment it sees a recognized filesystem
-      // already on the disk — a real safety backstop for a disk added by mistake, but not
+      // already on the disk - a real safety backstop for a disk added by mistake, but not
       // something to make the user click through a second confirmation dialog for every time
       // (this is exactly what the danger-styled "Force Format" flow below used to require).
       // Retrying once with force and surfacing what happened as a plain note instead of an
@@ -81,7 +81,7 @@ export function DiskDetailPanel() {
       if (/already has a filesystem/i.test(message)) {
         try {
           await nmdApi.formatDisk(disk.slot, true);
-          setFormatWarning(`Detected an existing ${disk.fsType} filesystem on this disk — formatted over it anyway.`);
+          setFormatWarning(`Detected an existing ${disk.fsType} filesystem on this disk - formatted over it anyway.`);
         } catch (err2) {
           setFormatError((err2 as Error).message);
         }
@@ -247,7 +247,7 @@ export function DiskDetailPanel() {
                           <div className="smart-history__row" key={i}>
                             <span>{entry.type}</span>
                             <span style={{ color: entry.passed === false ? COLORS.red : COLORS.textSecondary }}>{entry.status}</span>
-                            <span>{entry.lifetimeHours != null ? `${entry.lifetimeHours}h` : '—'}</span>
+                            <span>{entry.lifetimeHours != null ? `${entry.lifetimeHours}h` : '-'}</span>
                           </div>
                         ))}
                       </div>
@@ -277,11 +277,11 @@ export function DiskDetailPanel() {
                               <tr key={a.id}>
                                 <td>{a.id}</td>
                                 <td>{a.name.replace(/_/g, ' ')}</td>
-                                <td>{a.value ?? '—'}</td>
-                                <td>{a.worst ?? '—'}</td>
-                                <td>{a.threshold ?? '—'}</td>
-                                <td>{a.type ?? '—'}</td>
-                                <td style={{ color: a.whenFailed !== 'Never' ? COLORS.red : undefined }}>{a.rawString ?? a.rawValue ?? '—'}</td>
+                                <td>{a.value ?? '-'}</td>
+                                <td>{a.worst ?? '-'}</td>
+                                <td>{a.threshold ?? '-'}</td>
+                                <td>{a.type ?? '-'}</td>
+                                <td style={{ color: a.whenFailed !== 'Never' ? COLORS.red : undefined }}>{a.rawString ?? a.rawValue ?? '-'}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -295,26 +295,26 @@ export function DiskDetailPanel() {
                   <div className="detail-rows">
                     <div className="detail-row">
                       <span className="detail-row__label">Offline Data Collection</span>
-                      <span className="detail-row__value">{attributes.capabilitiesInfo.offlineDataCollectionStatus ?? '—'}</span>
+                      <span className="detail-row__value">{attributes.capabilitiesInfo.offlineDataCollectionStatus ?? '-'}</span>
                     </div>
                     <div className="detail-row">
                       <span className="detail-row__label">Offline Collection Time</span>
                       <span className="detail-row__value">
                         {attributes.capabilitiesInfo.offlineDataCollectionSeconds != null
                           ? `${attributes.capabilitiesInfo.offlineDataCollectionSeconds}s`
-                          : '—'}
+                          : '-'}
                       </span>
                     </div>
                     <div className="detail-row">
                       <span className="detail-row__label">Last Self-Test Result</span>
-                      <span className="detail-row__value">{attributes.capabilitiesInfo.selfTestExecutionStatus ?? '—'}</span>
+                      <span className="detail-row__value">{attributes.capabilitiesInfo.selfTestExecutionStatus ?? '-'}</span>
                     </div>
                     <div className="detail-row">
                       <span className="detail-row__label">Short Test Polling</span>
                       <span className="detail-row__value">
                         {attributes.capabilitiesInfo.shortSelfTestPollingMinutes != null
                           ? `${attributes.capabilitiesInfo.shortSelfTestPollingMinutes} min`
-                          : '—'}
+                          : '-'}
                       </span>
                     </div>
                     <div className="detail-row">
@@ -322,7 +322,7 @@ export function DiskDetailPanel() {
                       <span className="detail-row__value">
                         {attributes.capabilitiesInfo.extendedSelfTestPollingMinutes != null
                           ? `${attributes.capabilitiesInfo.extendedSelfTestPollingMinutes} min`
-                          : '—'}
+                          : '-'}
                       </span>
                     </div>
                     <div className="detail-row">
@@ -374,7 +374,7 @@ export function DiskDetailPanel() {
 
         {isRestorable && (
           <div className="status-note status-note--error">
-            This disk was unassigned but the array hasn't been started since — the change isn't committed yet and
+            This disk was unassigned but the array hasn't been started since - the change isn't committed yet and
             this disk's identity is still intact.
             <div className="detail-actions">
               <button
@@ -382,7 +382,7 @@ export function DiskDetailPanel() {
                 className="btn btn--block"
                 disabled={restorePending}
                 onClick={() => restoreDisk(disk.slot)}
-                title="Cancels the pending unassign and puts this disk back exactly as it was — the array hasn't started since, so nothing was actually committed yet."
+                title="Cancels the pending unassign and puts this disk back exactly as it was - the array hasn't started since, so nothing was actually committed yet."
               >
                 {restorePending ? 'Restoring…' : 'Restore This Disk'}
               </button>
@@ -392,7 +392,7 @@ export function DiskDetailPanel() {
 
         {isDroppable && (
           <div className="status-note status-note--error">
-            This disk is permanently disabled and no longer part of the array — it still shows up here and counts
+            This disk is permanently disabled and no longer part of the array - it still shows up here and counts
             toward DEGRADED because this driver keeps removed slots as placeholders rather than shrinking the array
             automatically. Reconfiguring drops it from the topology for good, at the cost of a full parity rebuild.
             <div className="detail-actions">
@@ -400,7 +400,7 @@ export function DiskDetailPanel() {
                 type="button"
                 className="btn btn--block btn--danger"
                 onClick={() => setShowShrinkDialog(true)}
-                title="Permanently drops this slot from the array topology and rebuilds parity to match — there's no undo."
+                title="Permanently drops this slot from the array topology and rebuilds parity to match - there's no undo."
               >
                 Reconfigure Array Without This Disk
               </button>
@@ -442,7 +442,7 @@ export function DiskDetailPanel() {
               className="btn btn--block btn--danger"
               disabled={formatPending}
               onClick={handleFormat}
-              title="Wipes this disk's existing (non-array) filesystem and formats it as XFS — destroys everything on it, with no undo."
+              title="Wipes this disk's existing (non-array) filesystem and formats it as XFS - destroys everything on it, with no undo."
             >
               {formatPending ? 'Formatting…' : 'Force Format'}
             </button>
@@ -490,7 +490,7 @@ export function DiskDetailPanel() {
             type="button"
             className="btn btn--block"
             onClick={() => setShowReplaceDialog(true)}
-            title="Swaps in a genuinely different physical disk for this slot — the array rebuilds this disk's data from parity onto the new one."
+            title="Swaps in a genuinely different physical disk for this slot - the array rebuilds this disk's data from parity onto the new one."
           >
             Replace Disk
           </button>

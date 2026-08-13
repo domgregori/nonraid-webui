@@ -26,7 +26,7 @@ const DESCRIPTION_KEY = '#container_description';
 const WEBUI_KEY = '#container_webui';
 const AUTOSTART_KEY = 'lxc.start.auto';
 // Fixed, obviously-synthetic name used only to satisfy lxc-create's
-// mandatory -n flag when probing the download template's image index —
+// mandatory -n flag when probing the download template's image index -
 // see listDistros(). Not user-facing, never actually persists a container.
 const DISTRO_LIST_PROBE_NAME = '__nonraid_lxc_distro_probe';
 
@@ -58,7 +58,7 @@ function parseMemLimitBytes(raw: string | null): number | null {
 }
 
 function randomLocallyAdministeredMac(): string {
-  // 52:54:00: is the standard QEMU/KVM locally-administered OUI prefix — the
+  // 52:54:00: is the standard QEMU/KVM locally-administered OUI prefix - the
   // same one the reference plugin generates, implying bridged veth
   // networking rather than a routable, vendor-assigned address.
   const suffix = Array.from(randomBytes(3), (b) => b.toString(16).padStart(2, '0')).join(':');
@@ -75,16 +75,16 @@ export class RealLxcClient implements LxcClient {
       return await execFileAsync(cmd, fullArgs, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 });
     } catch (err) {
       // Node's raw spawn failure (e.g. "spawn lxc-ls ENOENT") is accurate but
-      // not exactly self-explanatory on a dashboard — the actual missing
+      // not exactly self-explanatory on a dashboard - the actual missing
       // piece is the lxc-utils package, not literally the word "spawn".
       if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
-        throw new Error(`'${bin}' not found — lxc-utils isn't installed on this host.`);
+        throw new Error(`'${bin}' not found - lxc-utils isn't installed on this host.`);
       }
       throw err;
     }
   }
 
-  /** Unlike `lxc-info`, this build's `lxc-ls` has no `-H`/`--no-humanize` — its
+  /** Unlike `lxc-info`, this build's `lxc-ls` has no `-H`/`--no-humanize` - its
    * `--fancy` output always prints a header row, so skip the first line. */
   private async listNames(): Promise<{ name: string; state: LxcRuntimeState; autostart: boolean }[]> {
     const { stdout } = await this.run('lxc-ls', ['-P', config.lxcDefaultPath, '--fancy', '--fancy-format=NAME,STATE,AUTOSTART']);
@@ -198,7 +198,7 @@ export class RealLxcClient implements LxcClient {
 
   async destroyContainer(name: string): Promise<LxcCommandResult> {
     await this.run('lxc-stop', ['-P', config.lxcDefaultPath, '-n', name, '--kill']).catch(() => {});
-    // -s: also destroy any snapshots — without it, lxc-destroy refuses outright ("container has
+    // -s: also destroy any snapshots - without it, lxc-destroy refuses outright ("container has
     // snapshots") the moment a container has ever been snapshotted, confirmed live. A snapshot is
     // this app's own feature now, so cascading its cleanup into the normal Destroy flow is the
     // right default rather than surfacing that refusal as a dead end.
@@ -208,7 +208,7 @@ export class RealLxcClient implements LxcClient {
 
   /**
    * `lxc-snapshot -L -C` output is "No snapshots" (exit 0) when there are none, otherwise one
-   * header line per snapshot — "<name> (<path>) <YYYY:MM:DD HH:MM:SS>" — immediately followed by
+   * header line per snapshot - "<name> (<path>) <YYYY:MM:DD HH:MM:SS>" - immediately followed by
    * a comment line *only* if that snapshot has one (no blank placeholder line when it doesn't;
    * confirmed live). This app only ever writes single-line comments (see createSnapshot), so a
    * non-header line is unambiguously the single comment belonging to the header directly above it.
@@ -229,7 +229,7 @@ export class RealLxcClient implements LxcClient {
     return snapshots;
   }
 
-  // -c takes a *file* to read the comment from, not inline text — write one to a scratch temp
+  // -c takes a *file* to read the comment from, not inline text - write one to a scratch temp
   // file rather than requiring the caller to manage that.
   async createSnapshot(name: string, comment: string): Promise<LxcCommandResult> {
     const args = ['-P', config.lxcDefaultPath, '-n', name];
@@ -247,7 +247,7 @@ export class RealLxcClient implements LxcClient {
     return { ok: true, message: `Snapshot of "${name}" created` };
   }
 
-  // newName is always required — see the client.ts interface doc comment for why this app never
+  // newName is always required - see the client.ts interface doc comment for why this app never
   // lets "restore" silently default to in-place (same name = replace original, confirmed live;
   // this app's own UI treats that as a distinct, explicitly-confirmed danger action instead).
   async restoreSnapshot(name: string, snapshotName: string, newName: string): Promise<LxcCommandResult> {
@@ -265,10 +265,10 @@ export class RealLxcClient implements LxcClient {
     } catch (err) {
       // Confirmed live: overlayfs snapshots that another container was restored *from* can't be
       // deleted while that derived container still exists (it's a dependent CoW layer, not a free
-      // copy) — surface that plainly instead of the raw "has snapshots on its rootfs" LXC error.
+      // copy) - surface that plainly instead of the raw "has snapshots on its rootfs" LXC error.
       const message = (err as { stderr?: string; message: string }).stderr ?? (err as Error).message;
       if (message.includes('has snapshots on its rootfs')) {
-        throw new Error(`Can't delete "${snapshotName}" — a container restored from it still exists. Destroy that container first.`);
+        throw new Error(`Can't delete "${snapshotName}" - a container restored from it still exists. Destroy that container first.`);
       }
       throw err;
     }
@@ -286,19 +286,19 @@ export class RealLxcClient implements LxcClient {
 
   /**
    * A real Linux bridge always exposes a `/sys/class/net/<name>/bridge`
-   * directory — checking for that is a reliable, naming-scheme-independent
+   * directory - checking for that is a reliable, naming-scheme-independent
    * way to find veth-attachable bridges, unlike guessing from interface name
-   * prefixes (br-, eth-, bond-, vhost-, virbr- per the reference plugin —
+   * prefixes (br-, eth-, bond-, vhost-, virbr- per the reference plugin -
    * that list is Unraid-specific and misses e.g. `lxcbr0`, the bridge
    * `lxc-net` itself creates by default on Debian/Ubuntu, or `docker0`).
    * Physical/predictable-named NICs (enp2s0, eth0, wlan0...) and loopback
    * correctly fall out of this check since they aren't bridges.
    *
    * Enumerates via `/sys/class/net` directly rather than
-   * `os.networkInterfaces()` — that API silently omits interfaces with no
+   * `os.networkInterfaces()` - that API silently omits interfaces with no
    * active carrier (observed: a freshly created, unattached `lxcbr0`/
-   * `docker0` — both administratively up with an assigned IPv4 address, but
-   * `NO-CARRIER` since nothing's plugged into them yet — never showed up in
+   * `docker0` - both administratively up with an assigned IPv4 address, but
+   * `NO-CARRIER` since nothing's plugged into them yet - never showed up in
    * its output at all, even though `ip addr show` sees them fine).
    */
   async listBridges(): Promise<string[]> {
@@ -318,7 +318,7 @@ export class RealLxcClient implements LxcClient {
 
   /**
    * A real physical NIC always exposes a `/sys/class/net/<name>/device` symlink pointing at its
-   * backing PCI/USB device — the kernel's own marker for "this is real hardware", mirroring how
+   * backing PCI/USB device - the kernel's own marker for "this is real hardware", mirroring how
    * listBridges() above uses the `bridge` subdirectory as the marker for "this is a bridge".
    * Purely virtual interfaces (bridges, veth pairs, bonds, VLAN sub-interfaces, loopback) have no
    * such symlink, so they're correctly excluded without needing a name-prefix guess (eno0/enp2s0/
@@ -344,16 +344,16 @@ export class RealLxcClient implements LxcClient {
    * <throwaway> -t download -- --list`.
    *
    * `-n`/`--name` is mandatory on `lxc-create` even for a pure listing
-   * operation — omitting it (verified empirically, not documented) doesn't
+   * operation - omitting it (verified empirically, not documented) doesn't
    * error out up front; `lxc-create` instead falls back to treating a
    * literal argument as the name and actually starts creating a container
    * with that bogus name, leaving a stray directory behind. Passing a real
    * name isn't enough on its own either: even though the download
    * template's own `--list` prints the index and exits before doing any
    * actual creation work (confirmed: nothing appears on disk under a
-   * throwaway `-P` — see below), there's still a window, while `lxc-create`
+   * throwaway `-P` - see below), there's still a window, while `lxc-create`
    * is running, where `lxc-ls`/`lxc-info` against that path can see a
-   * half-registered container — observed directly: a concurrent
+   * half-registered container - observed directly: a concurrent
    * `listContainers()` poll caught `__nonraid_lxc_distro_probe` mid-flight
    * as a real (if stopped) entry in the container list for over a second.
    * Pointing `-P` at an isolated scratch directory instead of the real
@@ -362,10 +362,10 @@ export class RealLxcClient implements LxcClient {
    *
    * Not routed through a hardcoded template script path (e.g.
    * `/usr/share/lxc/templates/lxc-download`, which is Debian/Ubuntu-
-   * specific) — going through `lxc-create` resolves the template the same
+   * specific) - going through `lxc-create` resolves the template the same
    * way an actual create would.
    *
-   * Only entries for `DEFAULT_ARCH` with the "default" variant are kept —
+   * Only entries for `DEFAULT_ARCH` with the "default" variant are kept -
    * this backs the create form's distribution dropdown, which has a
    * separate, freely-editable architecture field, so surfacing every
    * arch/variant combination here would just be noise.
@@ -413,7 +413,7 @@ export class RealLxcClient implements LxcClient {
 
   /**
    * Runs `lxc-create --template download` to completion, streaming its
-   * stdout/stderr as progress lines — the download template's own output is
+   * stdout/stderr as progress lines - the download template's own output is
    * plain text with no byte-level progress protocol (unlike Docker's
    * registry pulls), so there is no percentage to compute, only a message
    * per line. Uses `spawn` rather than `execFile` specifically so output can
@@ -458,7 +458,7 @@ export class RealLxcClient implements LxcClient {
   async createContainer(options: CreateLxcContainerOptions, onProgress?: CreateLxcProgressCallback): Promise<LxcCommandResult> {
     onProgress?.({
       phase: 'creating',
-      message: `Downloading ${options.distribution} ${options.release} (${options.arch}) — this can take a while`,
+      message: `Downloading ${options.distribution} ${options.release} (${options.arch}) - this can take a while`,
       percent: null,
     });
 
@@ -469,7 +469,7 @@ export class RealLxcClient implements LxcClient {
         '--name',
         options.name,
         // overlayfs, not dir: gives real copy-on-write snapshots (see listSnapshots() etc. below)
-        // regardless of the underlying filesystem (XFS array disk or Btrfs cache pool) — a plain
+        // regardless of the underlying filesystem (XFS array disk or Btrfs cache pool) - a plain
         // dir-backed container's "snapshot" is a full rsync copy of the whole rootfs every time,
         // confirmed live to still nominally work but is neither fast nor space-efficient.
         '--bdev=overlayfs',
@@ -489,10 +489,10 @@ export class RealLxcClient implements LxcClient {
     onProgress?.({ phase: 'configuring', message: 'Writing network and metadata configuration', percent: null });
     const configPath = containerConfigPath(options.name);
     // 'bridge' (default): a veth pair, one end on the container, the other attached to a host
-    // bridge — the container gets an IP on whatever subnet that bridge serves. 'macvlan': the
+    // bridge - the container gets an IP on whatever subnet that bridge serves. 'macvlan': the
     // container's virtual interface rides directly on a physical NIC (lxc.net.0.link becomes that
     // NIC's name, e.g. eno0) with mode=bridge, so the container's own DHCP/ARP traffic reaches the
-    // real LAN directly and it gets a real LAN IP — indistinguishable from a separate physical
+    // real LAN directly and it gets a real LAN IP - indistinguishable from a separate physical
     // device, except the host itself can't reach the container over this interface (a macvlan
     // kernel limitation: container-to-LAN and container-to-container both work, host-to-container
     // doesn't).

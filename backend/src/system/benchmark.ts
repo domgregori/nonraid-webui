@@ -15,10 +15,10 @@ export interface BenchmarkResult {
 }
 
 // A fixed time window (rather than a fixed byte count) bounds worst-case wait time regardless of
-// how slow the target disk is — confirmed live: the boot disk's USB stick took ~55 real seconds to
+// how slow the target disk is - confirmed live: the boot disk's USB stick took ~55 real seconds to
 // write a fixed 512MB, which a duration cap turns into a predictable ~4s regardless of device speed.
 // The caller picks the duration (see resolveDurationMs); MAX_MB is a generous safety ceiling for the
-// opposite case (an unexpectedly fast device, or a deliberately long test) — 16GB is still a small
+// opposite case (an unexpectedly fast device, or a deliberately long test) - 16GB is still a small
 // fraction of any real disk in this app's NAS context, so it only ever caps a genuinely fast/long
 // combination rather than a normal run.
 export const DEFAULT_BENCHMARK_DURATION_SECONDS = 4;
@@ -30,7 +30,7 @@ const READ_CHUNK_BYTES = 4 * 1024 * 1024;
 const WRITE_CHUNK_BYTES = 1024 * 1024;
 const BENCHMARK_FILENAME = '.nonraid-benchmark-tmp';
 
-// NmdDisk.device (from nmdctl status) is a bare name like "sdd4" — same idiom as
+// NmdDisk.device (from nmdctl status) is a bare name like "sdd4" - same idiom as
 // hdparm.ts's own devicePath().
 function devicePath(device: string): string {
   return device.startsWith('/dev/') ? device : `/dev/${device}`;
@@ -38,7 +38,7 @@ function devicePath(device: string): string {
 
 /**
  * Validates and converts a client-supplied duration (seconds) into milliseconds, clamped to a sane
- * range — null on invalid input (not a positive number), which route handlers turn into a 400
+ * range - null on invalid input (not a positive number), which route handlers turn into a 400
  * rather than letting a nonsense value silently become e.g. a 10-minute benchmark. Undefined/null
  * input (the param wasn't supplied) falls back to the existing 4s default rather than being an error,
  * so existing callers that don't yet pass a duration keep working unchanged.
@@ -57,7 +57,7 @@ export function resolveDurationMs(durationSeconds: unknown): number | null {
 let running = false;
 
 async function withLock<T>(fn: () => Promise<T>): Promise<T> {
-  if (running) throw new Error('A benchmark is already running — wait for it to finish first.');
+  if (running) throw new Error('A benchmark is already running - wait for it to finish first.');
   running = true;
   try {
     return await fn();
@@ -73,21 +73,21 @@ const DD_BYTES_RE = /^(\d+) bytes/;
  * comes first), sampling instantaneous throughput every SAMPLE_INTERVAL_MS so callers can chart
  * speed over time, not just a single aggregate number.
  *
- * Shells out to `dd ... iflag=direct` rather than reading via Node's own fs — reading the raw
+ * Shells out to `dd ... iflag=direct` rather than reading via Node's own fs - reading the raw
  * device (rather than a file, like benchmarkWrite does) already sidesteps filesystem-level
  * caching, but the block device's own page cache entries are a separate, real effect on top of
  * that: confirmed live, re-reading the same first 400MB of a spinning disk went from 198 MB/s to
- * 6.9 GB/s purely from cache — a 35x inflation a second benchmark run (or anything else that
+ * 6.9 GB/s purely from cache - a 35x inflation a second benchmark run (or anything else that
  * happened to read the same region) would silently report as real. iflag=direct bypasses the page
  * cache entirely and confirmed live flattens both runs back to ~200 MB/s consistently. This can't
  * be done from pure Node: O_DIRECT requires the read buffer's underlying memory to be aligned to
- * the device's sector size, and there's no portable way to get aligned memory from a JS Buffer —
+ * the device's sector size, and there's no portable way to get aligned memory from a JS Buffer -
  * confirmed live, every offset in a 4096-byte window still failed with EINVAL, meaning the
  * backing ArrayBuffer's own base address isn't aligned either, which pure JS can't control
  * without a native addon. `dd`'s own C implementation handles this correctly.
  *
  * Sampling: `dd` only auto-prints progress (status=progress) about once a second, coarser than
- * this app's 250ms cadence — instead this polls by sending it SIGUSR1 on its own timer, which
+ * this app's 250ms cadence - instead this polls by sending it SIGUSR1 on its own timer, which
  * (GNU coreutils dd) forces an immediate one-line stats report to stderr on demand, so the actual
  * sample rate is fully this code's choice, not dd's.
  */
@@ -148,7 +148,7 @@ export async function benchmarkRead(device: string, durationMs: number): Promise
         clearTimeout(durationTimer);
         // A non-zero exit we didn't cause ourselves (stop() always signals SIGTERM/SIGUSR1, which
         // report as a null code with a signal, not a numeric one) and no bytes read at all means
-        // dd itself refused to run — e.g. iflag=direct unsupported on this particular device.
+        // dd itself refused to run - e.g. iflag=direct unsupported on this particular device.
         if (!stopping && code !== 0 && totalBytes === 0) {
           reject(new Error(stderrTail || `dd exited with code ${code}`));
           return;
@@ -164,16 +164,16 @@ export async function benchmarkRead(device: string, durationMs: number): Promise
 }
 
 /**
- * Writes a throwaway file through the disk's own existing mount, deletes it when done — never
+ * Writes a throwaway file through the disk's own existing mount, deletes it when done - never
  * touches raw sectors, so this is safe on any mounted disk including an active array member. Calls
- * handle.datasync() after every chunk, not just periodically — confirmed live this is necessary,
+ * handle.datasync() after every chunk, not just periodically - confirmed live this is necessary,
  * not just extra-cautious: a buffered write() call returns as soon as the data hits the page cache,
  * which for a burst of chunks is fast enough that write-behind buffering silently absorbed over
  * 1GB into RAM before the first periodic sync ever ran, then blocked for 7+ real seconds flushing
- * that whole backlog in one call — blowing straight through the duration cap and collapsing what
+ * that whole backlog in one call - blowing straight through the duration cap and collapsing what
  * should have been ~16 samples into 1. Syncing every chunk means every loop iteration takes real,
  * bounded device time, so the elapsed-time check actually holds and sampling stays meaningful. Plain
- * fs, no subprocess: the backend already runs as root on the real deployment (confirmed live — the
+ * fs, no subprocess: the backend already runs as root on the real deployment (confirmed live - the
  * systemd unit has no User=), so no sudo wrapping is needed for a normal file write.
  */
 export async function benchmarkWrite(mountpoint: string, durationMs: number): Promise<BenchmarkResult> {

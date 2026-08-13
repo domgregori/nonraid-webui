@@ -13,7 +13,7 @@ function readFileTrim(path: string): string | null {
 
 /**
  * Best-effort CPU package temperature via the kernel's own hwmon sysfs
- * interface (/sys/class/hwmon) — no lm-sensors dependency, just file reads.
+ * interface (/sys/class/hwmon) - no lm-sensors dependency, just file reads.
  * Returns null on any environment without a recognized CPU temp driver
  * (containers, VMs, unusual hardware) rather than guessing.
  */

@@ -50,7 +50,7 @@ interface DockerDevice {
   PathInContainer: string;
 }
 
-/** Parses "host:container" or "host:container:ro" — the exact format Binds
+/** Parses "host:container" or "host:container:ro" - the exact format Binds
  * is written in by createContainer, so this is a lossless round-trip. */
 function parseBind(bind: string): { hostPath: string; containerPath: string; readOnly: boolean } {
   const parts = bind.split(':');
@@ -79,14 +79,14 @@ function parsePortBindings(bindings: DockerPortBindings | undefined): { containe
 /**
  * A container without a TTY (the default, and what our own createContainer
  * always produces) has its stdout/stderr multiplexed into one stream: each
- * frame is an 8-byte header — [stream type, 0, 0, 0, size as big-endian
- * uint32] — followed by that many bytes of payload. A TTY container's logs
+ * frame is an 8-byte header - [stream type, 0, 0, 0, size as big-endian
+ * uint32] - followed by that many bytes of payload. A TTY container's logs
  * are raw text with no framing at all. `container.logs()` doesn't tell you
  * which you got, so the caller has to check `Tty` from inspect first.
  */
 // Docker's `timestamps: true` prefixes each returned line with an RFC3339Nano timestamp
 // ("2024-01-15T10:23:45.123456789Z log line"), space-separated from the payload. Used to derive the
-// `since` cursor for the next live-tail poll — deliberately not nudged forward by an epsilon here
+// `since` cursor for the next live-tail poll - deliberately not nudged forward by an epsilon here
 // (JS Date only has millisecond resolution, so a flat nudge risks skipping a same-millisecond line);
 // LogsDialog instead de-dupes on the client by comparing the last line already shown.
 function nextSinceFromLogText(text: string): number | null {
@@ -113,7 +113,7 @@ function demuxLogBuffer(buffer: Buffer): string {
 }
 
 function formatPorts(ports: Docker.Port[]): string {
-  if (!ports || ports.length === 0) return '—';
+  if (!ports || ports.length === 0) return '-';
   const seen = new Set<string>();
   for (const p of ports) {
     seen.add(p.PublicPort ? `${p.PublicPort}:${p.PrivatePort}` : `${p.PrivatePort}/${p.Type}`);
@@ -129,7 +129,7 @@ function toPortMappings(ports: Docker.Port[]): ContainerPortMapping[] {
 }
 
 /** dockerode's own error for a missing/unreachable daemon is just the raw Node
- *  socket-connect failure (e.g. "connect ENOENT /var/run/docker.sock") — accurate
+ *  socket-connect failure (e.g. "connect ENOENT /var/run/docker.sock") - accurate
  *  but not exactly self-explanatory to someone reading it on a dashboard. */
 function isDockerUnreachable(err: unknown): boolean {
   const code = (err as NodeJS.ErrnoException | undefined)?.code;
@@ -144,7 +144,7 @@ export class RealDockerClient implements DockerClient {
       return await fn();
     } catch (err) {
       if (isDockerUnreachable(err)) {
-        throw new Error('Could not reach the Docker daemon (checked /var/run/docker.sock) — is Docker installed and running on this host?');
+        throw new Error('Could not reach the Docker daemon (checked /var/run/docker.sock) - is Docker installed and running on this host?');
       }
       throw err;
     }
@@ -173,7 +173,7 @@ export class RealDockerClient implements DockerClient {
             memUsedBytes = computeMemUsed(stats.memory_stats);
             memLimitBytes = stats.memory_stats.limit;
           } catch {
-            // container may have stopped between list and stats calls — leave stats null
+            // container may have stopped between list and stats calls - leave stats null
           }
         }
 
@@ -215,7 +215,7 @@ export class RealDockerClient implements DockerClient {
     return {
       id: info.Id,
       name: info.Name.replace(/^\//, ''),
-      image: info.Config.Image, // the reference actually used to create it (e.g. "repo:tag") — Id/top-level Image is a resolved sha256 digest, not editable
+      image: info.Config.Image, // the reference actually used to create it (e.g. "repo:tag") - Id/top-level Image is a resolved sha256 digest, not editable
       network: info.HostConfig.NetworkMode ?? 'bridge',
       privileged: info.HostConfig.Privileged ?? false,
       env,
@@ -258,15 +258,15 @@ export class RealDockerClient implements DockerClient {
     return this.guard(async () => {
       const container = this.docker.getContainer(id);
       const info = await container.inspect();
-      const imageRef = info.Config.Image; // e.g. "repo:tag" — the reference actually used to create it
+      const imageRef = info.Config.Image; // e.g. "repo:tag" - the reference actually used to create it
       await container.remove({ force: true });
       try {
         await this.docker.getImage(imageRef).remove({ force: false });
         return { ok: true, message: `Container removed, image "${imageRef}" removed` };
       } catch {
-        // Still referenced by another container (running or stopped) — not an error, just means
+        // Still referenced by another container (running or stopped) - not an error, just means
         // this wasn't the last container using it.
-        return { ok: true, message: `Container removed (image "${imageRef}" kept — still used by another container)` };
+        return { ok: true, message: `Container removed (image "${imageRef}" kept - still used by another container)` };
       }
     });
   }
@@ -275,7 +275,7 @@ export class RealDockerClient implements DockerClient {
     return this.guard(async () => {
       const container = this.docker.getContainer(id);
       const info = await container.inspect();
-      // `since` supersedes `tail` — a live-tail poll wants everything new since the last poll, not
+      // `since` supersedes `tail` - a live-tail poll wants everything new since the last poll, not
       // just the last N lines (which could silently drop output if more than N lines landed between
       // polls).
       const logOptions: { stdout: true; stderr: true; timestamps: true; follow: false; tail?: number; since?: number } =
@@ -298,7 +298,7 @@ export class RealDockerClient implements DockerClient {
   async pruneImages(): Promise<{ imagesDeleted: number; spaceReclaimedBytes: number }> {
     return this.guard(async () => {
       // dangling: ['false'] widens this from Docker's own default (untagged/dangling images only)
-      // to every image not referenced by any container — the case an admin actually means by
+      // to every image not referenced by any container - the case an admin actually means by
       // "prune images" (e.g. a leftover tagged image from a container that was since destroyed).
       const result = await this.docker.pruneImages({ filters: { dangling: ['false'] } });
       return {
@@ -309,7 +309,7 @@ export class RealDockerClient implements DockerClient {
   }
 
   /** dockerode's createContainer, unlike the `docker` CLI, does not pull a missing
-   * image on its own — it fails outright with a 404 if the image isn't already
+   * image on its own - it fails outright with a 404 if the image isn't already
    * cached locally, which is the common case for a template being installed for
    * the first time. */
   private async ensureImagePulled(image: string, onProgress?: CreateContainerProgressCallback): Promise<void> {
@@ -317,13 +317,13 @@ export class RealDockerClient implements DockerClient {
       await this.docker.getImage(image).inspect();
       return;
     } catch {
-      // not present locally — pull it below
+      // not present locally - pull it below
     }
 
     onProgress?.({ phase: 'pulling', message: `Pulling ${image}`, percent: 0 });
 
     // Each image layer ("id") reports its own current/total bytes independently
-    // and in parallel — sum across all layers seen so far for one overall
+    // and in parallel - sum across all layers seen so far for one overall
     // percentage rather than showing a per-layer breakdown.
     const layerBytes = new Map<string, { current: number; total: number }>();
     const aggregatePercent = (): number | null => {
@@ -401,7 +401,7 @@ export class RealDockerClient implements DockerClient {
       await container.start();
     } catch (err) {
       // dockerode's create() can succeed (e.g. a bad NetworkMode isn't checked until start)
-      // and leave a container object registered but never running — confirmed live with a
+      // and leave a container object registered but never running - confirmed live with a
       // nonexistent network name, where retrying Start failed identically forever since the
       // bad config is baked in at create time. Remove it so the name is free again and the
       // failure doesn't linger as an unusable, unlabeled "Created" container.

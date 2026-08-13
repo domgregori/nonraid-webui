@@ -1,9 +1,9 @@
 import { COLORS, tint } from '../styles/colors';
 import type { NmdDisk, NmdStatusResponse } from '../types/nmdApi';
 
-// Per-slot explanation shown in the "why is the array degraded" dialog — keyed on the driver's own
+// Per-slot explanation shown in the "why is the array degraded" dialog - keyed on the driver's own
 // raw disk status string. Deliberately not the same wording as selectors/disks.ts's short
-// STATUS_LABELS chips — these need to explain the problem and hint at the fix, not just name it.
+// STATUS_LABELS chips - these need to explain the problem and hint at the fix, not just name it.
 const DISK_ISSUE_DETAIL: Partial<Record<string, { title: string; detail: string }>> = {
   DISK_NP_MISSING: {
     title: 'Missing',
@@ -15,7 +15,7 @@ const DISK_ISSUE_DETAIL: Partial<Record<string, { title: string; detail: string 
   },
   DISK_NP_DSBL: {
     title: 'Disabled, unassigned',
-    detail: 'Unassigned, and the array has started since — its identity is cleared. Add a disk to this slot to rebuild, or remove the slot from the array.',
+    detail: 'Unassigned, and the array has started since - its identity is cleared. Add a disk to this slot to rebuild, or remove the slot from the array.',
   },
   DISK_INVALID: {
     title: 'Invalid',
@@ -33,17 +33,17 @@ export interface DegradedReason {
   key: string;
   title: string;
   detail: string;
-  /** Set when this reason points at one disk — the dialog offers a "View Disk" button using this. */
+  /** Set when this reason points at one disk - the dialog offers a "View Disk" button using this. */
   diskId?: string;
-  /** Set when the fix is a correcting parity check — the dialog offers a "Start" button for it. */
+  /** Set when the fix is a correcting parity check - the dialog offers a "Start" button for it. */
   startParityCheck?: boolean;
 }
 
 // resync.action is a raw driver token like "recon D1" (rebuilding data slot 1), "recon P"/"recon Q"
-// (rebuilding a parity disk), or "clear D1" (zeroing a newly-added disk before it joins) — confirmed
+// (rebuilding a parity disk), or "clear D1" (zeroing a newly-added disk before it joins) - confirmed
 // against tools/nmdctl's format_resync_action(). Matched here so a disk mid-rebuild, which reports a
 // transient DISK_INVALID/DISK_NEW status until the rebuild finishes, isn't reported as if it were a
-// real problem needing reconnection — confirmed live: adding a fresh disk to fill a missing slot
+// real problem needing reconnection - confirmed live: adding a fresh disk to fill a missing slot
 // shows exactly this transient DISK_INVALID state for the whole rebuild.
 function isResyncTarget(status: NmdStatusResponse, disk: NmdDisk): boolean {
   if (!status.resync.active) return false;
@@ -54,7 +54,7 @@ function isResyncTarget(status: NmdStatusResponse, disk: NmdDisk): boolean {
 }
 
 /**
- * Explains, per-cause, why isDegraded() is currently true — read directly from per-disk status and
+ * Explains, per-cause, why isDegraded() is currently true - read directly from per-disk status and
  * array counters rather than the driver's own `health.details` string, since that string bundles in
  * the harmless stale-counter noise isPhantomDegradedGlitch works around (see its own comment) and
  * isn't actionable UI copy anyway.
@@ -91,7 +91,7 @@ export function deriveDegradedReasons(status: NmdStatusResponse): DegradedReason
   if (sync_errors > 0) {
     reasons.push({
       key: 'sync-errors',
-      title: `Parity out of sync — ${sync_errors} error${sync_errors === 1 ? '' : 's'} found`,
+      title: `Parity out of sync - ${sync_errors} error${sync_errors === 1 ? '' : 's'} found`,
       detail: "The last parity check found data that doesn't match parity. Run a correcting check to fix it.",
       startParityCheck: true,
     });
@@ -101,7 +101,7 @@ export function deriveDegradedReasons(status: NmdStatusResponse): DegradedReason
     reasons.push({
       key: 'rebuilding',
       title: `Rebuilding ${rebuildingLabel} from parity`,
-      detail: `In progress — ${Math.round(status.resync.progress_percent)}% complete. The array stays degraded until this finishes.`,
+      detail: `In progress - ${Math.round(status.resync.progress_percent)}% complete. The array stays degraded until this finishes.`,
     });
   }
 
@@ -116,21 +116,21 @@ export function deriveDegradedReasons(status: NmdStatusResponse): DegradedReason
 
 /**
  * The driver's own health.status/counters aren't trustworthy as ground truth for whether the array
- * actually has a problem — confirmed two different ways live: a single-parity array's unused
+ * actually has a problem - confirmed two different ways live: a single-parity array's unused
  * second-parity (Q) slot is permanently counted as "invalid" + "disabled" (nmdctl's own status
  * output even warns "Driver internal state is inconsistent ... but all individual disks are
  * DISK_OK status"), and separately, a plain Unassign-then-Restore-before-Start cycle (2026-08-11)
- * left counters.missing stuck at 1 with every disk genuinely DISK_OK afterward — no Add Disk or
+ * left counters.missing stuck at 1 with every disk genuinely DISK_OK afterward - no Add Disk or
  * repeat-slot involved, just stale internal state Reload Driver clears. Per-disk status/errors and
  * sync_errors are what the rest of deriveDegradedReasons() below keys off, so trust those instead:
  * if every disk is DISK_OK with zero logged errors and there are no recorded parity mismatches,
  * there's no real problem, regardless of what the aggregate counters claim. A disk that's genuinely
  * missing, wrong, invalid, etc. always reports a non-DISK_OK status of its own, and a disk with
  * logged I/O errors always has `errors > 0` even while still DISK_OK, so neither can be masked here
- * — confirmed via a fixture check, 2026-08-11 (an inherited gap from this function's predecessor,
+ * - confirmed via a fixture check, 2026-08-11 (an inherited gap from this function's predecessor,
  * not introduced by the generalization above: a `DISK_OK` disk with `errors > 0` was already being
  * swallowed as a phantom glitch even though deriveDegradedReasons() below has always had a correct,
- * separate branch for exactly this case — it just never got a chance to run).
+ * separate branch for exactly this case - it just never got a chance to run).
  */
 function isPhantomDegradedGlitch(status: NmdStatusResponse): boolean {
   return (
@@ -146,8 +146,8 @@ export function isDegraded(status: NmdStatusResponse): boolean {
 
 // The kernel driver itself bakes this prefix into the state name for the
 // handful of states that mean something needs a human look (confirmed
-// against md_unraid.c this session — TOO_MANY_MISSING_DISKS,
-// INVALID_EXPANSION, PARITY_NOT_BIGGEST, NEW_DISK_TOO_SMALL, NO_DATA_DISKS —
+// against md_unraid.c this session - TOO_MANY_MISSING_DISKS,
+// INVALID_EXPANSION, PARITY_NOT_BIGGEST, NEW_DISK_TOO_SMALL, NO_DATA_DISKS -
 // every other abnormal state doesn't carry it). Distinct from DEGRADED:
 // this means the array likely isn't even running right now, not just
 // running with reduced protection.
@@ -172,14 +172,14 @@ export function deriveArrayStatus(status: NmdStatusResponse | null) {
     color = COLORS.red;
   } else if (status.resync.active || status.resync.pending) {
     // resync.active/pending both cover a real parity check AND every other resync the driver runs
-    // through the same fields — see isResyncTarget's own comment above for the confirmed grammar:
+    // through the same fields - see isResyncTarget's own comment above for the confirmed grammar:
     // "recon D<n>" rebuilds a data disk (e.g. after Replace/Restore), "recon P"/"recon Q" (re)builds
-    // parity itself (this is what the very first parity build after adding a disk reports — the
+    // parity itself (this is what the very first parity build after adding a disk reports - the
     // single most common resync this app ever runs), "clear D<n>" zeroes a newly-added disk, and
     // only "check" is an actual parity check/verify. Confirmed live: the pill showed "PARITY CHECK"
     // throughout an initial parity build and a disk clear, neither of which is one.
     //
-    // pending without active means something's queued to run but hasn't actually started yet —
+    // pending without active means something's queued to run but hasn't actually started yet -
     // e.g. the moment between startArray() succeeding and parityCheck() kicking it off, or (before
     // this session's superblock persistence fix) a resync stuck forever unable to run at all.
     // Falling through to a plain green STARTED here would hide exactly that stuck case behind a
@@ -196,11 +196,11 @@ export function deriveArrayStatus(status: NmdStatusResponse | null) {
 }
 
 export function deriveProtection(status: NmdStatusResponse | null) {
-  if (!status) return { short: '—', color: COLORS.textDim, text: 'Loading array status…' };
+  if (!status) return { short: '-', color: COLORS.textDim, text: 'Loading array status…' };
 
   const arrayStarted = status.array.state === 'STARTED';
   if (!arrayStarted) {
-    return { short: 'Stopped', color: COLORS.textDim, text: 'Array stopped — all disks unmounted.' };
+    return { short: 'Stopped', color: COLORS.textDim, text: 'Array stopped - all disks unmounted.' };
   }
 
   if (isDegraded(status)) {
@@ -210,18 +210,18 @@ export function deriveProtection(status: NmdStatusResponse | null) {
       color: COLORS.red,
       text:
         status.array.health.details ||
-        `${missing} disk${missing === 1 ? '' : 's'} missing. Data is emulated from parity — replace the disk to restore full protection.`,
+        `${missing} disk${missing === 1 ? '' : 's'} missing. Data is emulated from parity - replace the disk to restore full protection.`,
     };
   }
 
   const { has_parity, has_second_parity } = status.array.size;
   if (has_second_parity) {
-    return { short: 'Dual Parity', color: COLORS.green, text: 'Both parity disks active — array can survive up to two simultaneous disk failures.' };
+    return { short: 'Dual Parity', color: COLORS.green, text: 'Both parity disks active - array can survive up to two simultaneous disk failures.' };
   }
   if (has_parity) {
-    return { short: 'Single Parity', color: COLORS.green, text: 'Parity disk active — array can survive one disk failure.' };
+    return { short: 'Single Parity', color: COLORS.green, text: 'Parity disk active - array can survive one disk failure.' };
   }
-  return { short: 'No Parity', color: COLORS.amber, text: 'No parity disk assigned — a disk failure means data loss.' };
+  return { short: 'No Parity', color: COLORS.amber, text: 'No parity disk assigned - a disk failure means data loss.' };
 }
 
 export function deriveToggleButton(status: NmdStatusResponse | null) {

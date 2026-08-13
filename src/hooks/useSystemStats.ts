@@ -14,7 +14,7 @@ export function useSystemStats(): SystemStats | null {
       systemApi
         .getStats()
         .then((s) => mounted.current && setStats(s))
-        .catch(() => {}); // best-effort — leave last-known stats on a transient failure
+        .catch(() => {}); // best-effort - leave last-known stats on a transient failure
     };
     refresh();
     const id = setInterval(refresh, POLL_MS);

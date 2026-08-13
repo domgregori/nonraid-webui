@@ -4,7 +4,7 @@ export const DEFAULT_ARCH = 'amd64';
 
 /**
  * Used only when the live index fetch (RealLxcClient.listDistros(), which
- * shells out to `lxc-create --template download -- --list`) fails — no
+ * shells out to `lxc-create --template download -- --list`) fails - no
  * network, tool not installed, etc. When the live fetch succeeds this list
  * plays no part; see FRIENDLY_LABELS below for how live entries get a human
  * label.
@@ -23,10 +23,10 @@ export const FALLBACK_DISTROS: LxcDistroOption[] = [
 ];
 
 /**
- * Cosmetic only — the image index gives us bare codenames/version numbers
+ * Cosmetic only - the image index gives us bare codenames/version numbers
  * (e.g. "bookworm", "9"), not marketing names. A missing entry just falls
  * back to `${distribution} ${release}` (see labelFor), which is already
- * clear on its own for most distros — this only exists to add the version
+ * clear on its own for most distros - this only exists to add the version
  * number alongside a codename for the handful of distros that use one.
  * Unlike FALLBACK_DISTROS, a stale/missing entry here can't break
  * container creation, only cosmetics, so there's no correctness pressure

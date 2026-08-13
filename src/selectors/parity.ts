@@ -4,20 +4,20 @@ import type { ParityViewModel } from '../types';
 import type { NmdStatusResponse, ParityCheckAction } from '../types/nmdApi';
 
 function formatEta(seconds: number): string {
-  if (!seconds || seconds <= 0) return '—';
+  if (!seconds || seconds <= 0) return '-';
   const mins = Math.round(seconds / 60);
   if (mins < 60) return `${mins} min remaining`;
   return `${Math.floor(mins / 60)}h ${mins % 60}m remaining`;
 }
 
 function formatEtaCompact(seconds: number): string {
-  if (!seconds || seconds <= 0) return '—';
+  if (!seconds || seconds <= 0) return '-';
   const mins = Math.round(seconds / 60);
   if (mins < 60) return `${mins}m remain`;
   return `${Math.floor(mins / 60)}h ${mins % 60}m remain`;
 }
 
-/** resync is a single shared field — a new-disk clear or a parity rebuild uses the same progress data as a parity check, just a different `action` value. */
+/** resync is a single shared field - a new-disk clear or a parity rebuild uses the same progress data as a parity check, just a different `action` value. */
 function progressVerb(action: string): string {
   if (action.startsWith('clear')) return 'Clearing new disk';
   if (action.startsWith('recon')) return 'Reconstructing parity';
@@ -35,9 +35,9 @@ export function deriveParityViewModel(
   // See realClient.ts's parityCheck() for the full story: the driver's own num_new/num_invalid
   // counters only ever increment within a loaded module's lifetime, never decrement, so
   // unassigning a disk that had briefly gone "new" can leave a clear/recon permanently pending
-  // with size_gb stuck at 0 — no real disk behind it, and Start is guaranteed to fail with a raw
+  // with size_gb stuck at 0 - no real disk behind it, and Start is guaranteed to fail with a raw
   // "Invalid argument" until the driver's reloaded. "check" pending (an actual queued parity
-  // check) doesn't hit this — its size comes from every disk's real size, never legitimately 0.
+  // check) doesn't hit this - its size comes from every disk's real size, never legitimately 0.
   const needsDriverReload =
     resync.pending && !resync.active && resync.size_gb === 0 && !resync.action.trim().toLowerCase().startsWith('check');
   const canStart = arrayStarted && !resync.active && !pending && !needsDriverReload;
@@ -53,19 +53,19 @@ export function deriveParityViewModel(
     progressLabel: resync.active
       ? `${progressVerb(resync.action)}: ${progressPct}%`
       : needsDriverReload
-        ? 'Stuck pending with no real disk behind it — reload the driver to clear this'
+        ? 'Stuck pending with no real disk behind it - reload the driver to clear this'
         : resync.pending
-          ? // Queued but not yet started (e.g. a new disk waiting to be cleared before it joins) —
+          ? // Queued but not yet started (e.g. a new disk waiting to be cleared before it joins) -
             // distinct from resync.active, and from the driver's perspective can sit like this
             // indefinitely until something calls Start. Falling through to the "Last check"
             // summary below here would misreport a still-pending operation as already finished.
-            `${resync.action.trim().toLowerCase().startsWith('clear') ? 'New disk needs to be cleared' : 'Queued'} — press Start to begin`
+            `${resync.action.trim().toLowerCase().startsWith('clear') ? 'New disk needs to be cleared' : 'Queued'} - press Start to begin`
           : array.counters.sync_errors > 0
             ? `Last check: completed, ${array.counters.sync_errors} errors`
             : 'Last check: completed, 0 errors',
-    speedText: resync.active && !resync.paused ? `${Math.round(resync.rate_mb_s)} MB/s` : '—',
-    etaText: resync.active ? (resync.paused ? 'Paused' : formatEta(resync.eta_seconds)) : '—',
-    etaCompact: resync.active ? (resync.paused ? 'Paused' : formatEtaCompact(resync.eta_seconds)) : '—',
+    speedText: resync.active && !resync.paused ? `${Math.round(resync.rate_mb_s)} MB/s` : '-',
+    etaText: resync.active ? (resync.paused ? 'Paused' : formatEta(resync.eta_seconds)) : '-',
+    etaCompact: resync.active ? (resync.paused ? 'Paused' : formatEtaCompact(resync.eta_seconds)) : '-',
     pauseLabel: resync.paused ? 'Resume' : 'Pause',
     startHandler: () => onAction('CORRECT'),
     pauseHandler: () => onAction(resync.paused ? 'RESUME' : 'PAUSE'),

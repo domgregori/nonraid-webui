@@ -16,10 +16,10 @@ import type {
 const execFileAsync = promisify(execFile);
 
 /**
- * NmdDisk.device (from nmdctl status) is a bare name like "sda1" — every other caller in this
+ * NmdDisk.device (from nmdctl status) is a bare name like "sda1" - every other caller in this
  * codebase that needs a real path prepends /dev/ itself (see realClient.ts's own `add` command
  * construction). This one didn't, so smartctl got literally "sda1" and failed outright
- * ("Smartctl open device: sda1 failed: No such device") — confirmed live, every array disk's
+ * ("Smartctl open device: sda1 failed: No such device") - confirmed live, every array disk's
  * temperature/health/attributes silently came back null everywhere (live UI and history both).
  * The boot disk's own identity (SystemStatsService) already resolves a full /dev/-prefixed path,
  * so this has to be idempotent rather than a blind prepend, to stay correct for both callers.
@@ -94,7 +94,7 @@ interface SmartctlJson {
   smart_status?: { passed?: boolean };
 }
 
-// ATA SMART attribute IDs — same well-known numbering across drive vendors.
+// ATA SMART attribute IDs - same well-known numbering across drive vendors.
 const ATTR_ID_REALLOCATED_SECTOR_CT = 5;
 const ATTR_ID_POWER_ON_HOURS = 9;
 const ATTR_ID_POWER_CYCLE_COUNT = 12;
@@ -108,10 +108,10 @@ function findAttr(data: SmartctlJson, id: number): number | null {
 
 /**
  * Field names verified against real `smartctl --json -a` output from a PNY
- * SATA SSD (smartmontools 7.5) — see the Disks tab handoff for how this was
+ * SATA SSD (smartmontools 7.5) - see the Disks tab handoff for how this was
  * originally written speculatively, then confirmed. NVMe/other-vendor shapes
  * are still unverified, so every field falls back to null/unknown rather than
- * throwing — an unexpected shape degrades to "—" in the UI instead of breaking it.
+ * throwing - an unexpected shape degrades to "-" in the UI instead of breaking it.
  */
 function extractSelfTest(data: SmartctlJson): SelfTestStatus {
   const ataStatus = data.ata_smart_data?.self_test?.status;
@@ -183,7 +183,7 @@ function extractRawAttributes(data: SmartctlJson): SmartRawAttribute[] {
   }));
 }
 
-/** SCT "Status supported" is bit 0 of the capabilities word — the named sub-flags cover other SCT features. */
+/** SCT "Status supported" is bit 0 of the capabilities word - the named sub-flags cover other SCT features. */
 function extractCapabilitiesInfo(data: SmartctlJson): SmartCapabilitiesInfo {
   const caps = data.ata_smart_data?.capabilities;
   const offline = data.ata_smart_data?.offline_data_collection;
@@ -224,14 +224,14 @@ function extractTemperatureC(data: SmartctlJson): number | null {
 }
 
 /** Concatenates naa+oui+id into the same hex string smartctl's own classic "LU WWN Device Id"
- *  output shows (e.g. "5 0014ee 0038f42c5" without the spaces) — verified live against a real
+ *  output shows (e.g. "5 0014ee 0038f42c5" without the spaces) - verified live against a real
  *  drive's `smartctl -i` output this session. */
 function formatWwn(wwn: SmartctlWwn | undefined): string | null {
   if (typeof wwn?.naa !== 'number' || typeof wwn?.oui !== 'number' || typeof wwn?.id !== 'number') return null;
   return wwn.naa.toString(16) + wwn.oui.toString(16).padStart(6, '0') + wwn.id.toString(16).padStart(9, '0');
 }
 
-/** rotation_rate of 0 means SSD (not a meaningful RPM value) — null here for both that case and
+/** rotation_rate of 0 means SSD (not a meaningful RPM value) - null here for both that case and
  *  drives that just don't report the field at all (confirmed live: some HDDs genuinely omit it). */
 function extractRotationRpm(data: SmartctlJson): number | null {
   return typeof data.rotation_rate === 'number' && data.rotation_rate > 0 ? data.rotation_rate : null;
@@ -250,9 +250,9 @@ export class RealSmartClient implements SmartClient {
       return { data: JSON.parse(stdout) as SmartctlJson, spinState: 'active' };
     } catch (err) {
       // smartctl's exit code is a bitmask of conditions (device asleep, SMART
-      // check failed, etc) — nonzero doesn't mean the JSON on stdout is bad.
+      // check failed, etc) - nonzero doesn't mean the JSON on stdout is bad.
       // Bit 1 (value 2) specifically means the device didn't return an IDENTIFY
-      // structure because -n standby made it skip rather than spin up — smartctl's
+      // structure because -n standby made it skip rather than spin up - smartctl's
       // own documented exit-status bitmask, not stated anywhere in the JSON itself.
       const stdout = (err as { stdout?: string }).stdout;
       const exitCode = (err as { code?: number | string }).code;
@@ -296,7 +296,7 @@ export class RealSmartClient implements SmartClient {
     } catch {
       return null;
     }
-    // A standby skip means "asleep", not "error" — worth reporting (mostly-null attributes plus
+    // A standby skip means "asleep", not "error" - worth reporting (mostly-null attributes plus
     // the real spin state) rather than collapsing to null like a genuine read failure would.
     if (
       spinState !== 'standby' &&
@@ -304,7 +304,7 @@ export class RealSmartClient implements SmartClient {
       !data.ata_smart_attributes &&
       !data.nvme_smart_health_information_log
     ) {
-      return null; // no SMART data at all — e.g. a virtio-blk device with no pass-through
+      return null; // no SMART data at all - e.g. a virtio-blk device with no pass-through
     }
 
     const caps = data.ata_smart_data?.capabilities;
@@ -341,12 +341,12 @@ export class RealSmartClient implements SmartClient {
     const bin = config.smartUseSudo ? 'sudo' : config.smartctlBin;
     const fullArgs = config.smartUseSudo ? [config.smartctlBin, ...args] : args;
     try {
-      // smartctl returns immediately once the drive's controller has accepted the test — see types.ts's doc comment.
+      // smartctl returns immediately once the drive's controller has accepted the test - see types.ts's doc comment.
       await execFileAsync(bin, fullArgs, { timeout: config.smartTimeoutMs, maxBuffer: 4 * 1024 * 1024 });
     } catch (err) {
       // Same bitmask-exit-code caveat as run() above: smartctl -t can exit
       // nonzero (e.g. "previous self-test still in progress") while still
-      // having done nothing harmful — surface it as a real error either way,
+      // having done nothing harmful - surface it as a real error either way,
       // since unlike a passive read there's no JSON payload to fall back to.
       throw new Error(`smartctl -t ${type} failed: ${(err as Error).message}`);
     }

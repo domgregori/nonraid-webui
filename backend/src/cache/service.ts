@@ -31,7 +31,7 @@ function emptyStatus(health: CacheHealth, enabled: boolean, fsUuid: string | nul
 /**
  * Owns the cache mirror's lifecycle: one-time setup (mkfs.btrfs -m raid1 -d
  * raid1 across exactly two devices), mounting it at every backend startup
- * (this app has no fstab/systemd .mount unit anywhere — see mount.ts),
+ * (this app has no fstab/systemd .mount unit anywhere - see mount.ts),
  * health reporting, and replacing a failed member via btrfs's own online
  * `replace` command. Deliberately has no ShareService dependency: callers
  * (cacheRouter) trigger shares.remountAll() themselves after a mutating call
@@ -46,9 +46,9 @@ export class CacheService {
   ) {}
 
   /**
-   * Cheap yes/no check for RealShareApplier.branchPaths() — every share (re)mount calls this, so
+   * Cheap yes/no check for RealShareApplier.branchPaths() - every share (re)mount calls this, so
    * unlike getStatus() (which also enriches with SMART/model for the UI) this skips everything but
-   * "is the mirror enabled, fully present (both members — never a degraded one), and mounted."
+   * "is the mirror enabled, fully present (both members - never a degraded one), and mounted."
    */
   async isActiveForShares(): Promise<boolean> {
     const settings = await this.settingsStore.get();
@@ -104,7 +104,7 @@ export class CacheService {
         if (!Number.isFinite(usedBytes)) usedBytes = null;
         if (!Number.isFinite(totalBytes)) totalBytes = null;
       } catch {
-        // leave both null — a stale/failed df shouldn't hide health/device info
+        // leave both null - a stale/failed df shouldn't hide health/device info
       }
     }
 
@@ -123,22 +123,22 @@ export class CacheService {
     if (current.cache.fsUuid) throw new HttpError(409, 'Cache pool is already set up.');
     if (deviceA === deviceB) throw new HttpError(400, 'Pick two different devices for the mirror.');
 
-    // Never trust client-supplied paths directly — revalidate against a fresh
+    // Never trust client-supplied paths directly - revalidate against a fresh
     // scan right before acting, same discipline every other disk-mutating
     // route in this app follows (see routes/disks.ts).
     const available = await this.nmd.listAvailableDevices();
     for (const dev of [deviceA, deviceB]) {
       const match = available.find((d) => d.device === dev);
       if (!match) throw new HttpError(400, `${dev} is not a currently available device.`);
-      if (match.locked) throw new HttpError(409, `${dev} appears to be in use by another process — refusing to touch it.`);
+      if (match.locked) throw new HttpError(409, `${dev} appears to be in use by another process - refusing to touch it.`);
     }
 
     // Without force, no -f: mkfs.btrfs refuses on its own if either device already carries a
-    // recognized filesystem/RAID/partition-table signature — the same real safety backstop
+    // recognized filesystem/RAID/partition-table signature - the same real safety backstop
     // formatDisk() relies on for array disks, on top of the fresh-scan check above
     // (listAvailableDevices() already excludes a disk with any mounted partition, but not one
     // with an unmounted-but-real filesystem or leftover partition table on it). force=true passes
-    // -f, deliberately discarding that backstop — the caller (routes/cache.ts) only does that
+    // -f, deliberately discarding that backstop - the caller (routes/cache.ts) only does that
     // after a first, unforced attempt already hit this exact refusal.
     const mkfsArgs = force ? ['-f', '-m', 'raid1', '-d', 'raid1', deviceA, deviceB] : ['-m', 'raid1', '-d', 'raid1', deviceA, deviceB];
     await run('mkfs.btrfs', mkfsArgs, config.cacheMkfsTimeoutMs);
@@ -156,17 +156,17 @@ export class CacheService {
     if (!settings.cache.fsUuid) throw new HttpError(400, 'Cache pool is not set up.');
 
     const status = await this.getStatus();
-    if (status.health !== 'degraded') throw new HttpError(409, 'Cache pool is not degraded — nothing to replace.');
+    if (status.health !== 'degraded') throw new HttpError(409, 'Cache pool is not degraded - nothing to replace.');
 
     const available = await this.nmd.listAvailableDevices();
     const match = available.find((d) => d.device === newDevice);
     if (!match) throw new HttpError(400, `${newDevice} is not a currently available device.`);
-    if (match.locked) throw new HttpError(409, `${newDevice} appears to be in use by another process — refusing to touch it.`);
+    if (match.locked) throw new HttpError(409, `${newDevice} appears to be in use by another process - refusing to touch it.`);
 
     const missingDevice = status.devices.find((d) => d.missing);
     if (!missingDevice) throw new HttpError(409, 'No missing mirror member found to replace.');
 
-    // btrfs replace requires the new device be at least as large as the one it's replacing — check
+    // btrfs replace requires the new device be at least as large as the one it's replacing - check
     // up front against the still-present member (same size by construction, both created together
     // in setup()) rather than letting `btrfs replace start` fail deep into the operation.
     const survivingDevice = status.devices.find((d) => !d.missing);
@@ -175,7 +175,7 @@ export class CacheService {
       if (survivingSize !== null && newSize !== null && newSize < survivingSize) {
         throw new HttpError(
           400,
-          `${newDevice} is smaller than the existing mirror member (${(newSize / 1e9).toFixed(1)} GB vs ${(survivingSize / 1e9).toFixed(1)} GB) — btrfs requires the replacement be the same size or larger.`,
+          `${newDevice} is smaller than the existing mirror member (${(newSize / 1e9).toFixed(1)} GB vs ${(survivingSize / 1e9).toFixed(1)} GB) - btrfs requires the replacement be the same size or larger.`,
         );
       }
     }

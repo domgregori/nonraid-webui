@@ -17,7 +17,7 @@ export interface UseDiskSmart {
 
 /**
  * Fetches SMART attributes/self-test status for one disk slot, on demand
- * (pass null when no detail panel is open — nothing is fetched). Polls
+ * (pass null when no detail panel is open - nothing is fetched). Polls
  * faster while a self-test is running so progress updates promptly, same
  * pattern as ArrayStatusProvider's parity-check poll.
  */

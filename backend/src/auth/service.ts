@@ -76,7 +76,7 @@ export class AuthService {
     if (!record) {
       throw new HttpError(409, 'No admin account is configured yet.');
     }
-    // Constant-shape check regardless of which field is wrong — a bad guess
+    // Constant-shape check regardless of which field is wrong - a bad guess
     // fails as a generic 401, never distinguishing "no such user" from
     // "wrong password" (this is a single-account system, so username
     // mismatches are effectively part of the same guess).
@@ -105,7 +105,7 @@ export class AuthService {
     const newHash = await hashPassword(newPassword);
     const updated = await this.store.updatePassword(newHash);
     // Regenerated secret invalidates the cookie that authenticated this very
-    // request too — issue a fresh one against the new secret so this session
+    // request too - issue a fresh one against the new secret so this session
     // keeps working, while every other open session is now logged out.
     return this.issueSession(updated.sessionSecret);
   }
@@ -124,10 +124,10 @@ export class AuthService {
   async confirmTotp(cookieHeader: string | undefined, code: string): Promise<BackupCodesResult> {
     const record = await this.requireSession(cookieHeader);
     if (!record.pendingTotp) {
-      throw new HttpError(409, 'No pending two-factor enrollment — start enrollment again.');
+      throw new HttpError(409, 'No pending two-factor enrollment - start enrollment again.');
     }
     if (!(await verifyTotpCode(record.pendingTotp.secret, code))) {
-      throw new HttpError(401, 'Incorrect code — check your authenticator app and try again.');
+      throw new HttpError(401, 'Incorrect code - check your authenticator app and try again.');
     }
     const backupCodes = await this.generateHashedBackupCodes();
     await this.store.confirmTotp(backupCodes.hashed);
@@ -164,7 +164,7 @@ export class AuthService {
     };
   }
 
-  // Pending-cookie gated — runs before a real session exists. Verifies the second factor and, on
+  // Pending-cookie gated - runs before a real session exists. Verifies the second factor and, on
   // success, issues the real session via the exact same path password-only login already uses, so
   // nothing downstream of this needs to know 2FA exists at all.
   async verifyTwoFactor(cookieHeader: string | undefined, code: string): Promise<AuthResult> {
@@ -195,7 +195,7 @@ export class AuthService {
     return passkeyAuthenticationOptions(record);
   }
 
-  // Pending-cookie gated, mirrors verifyTwoFactor above — issues the real session on success via
+  // Pending-cookie gated, mirrors verifyTwoFactor above - issues the real session on success via
   // the same path every other login method uses.
   async passkeyAuthVerify(cookieHeader: string | undefined, response: AuthenticationResponseJSON): Promise<AuthResult> {
     const record = await this.requirePendingTwoFactor(cookieHeader);
@@ -209,7 +209,7 @@ export class AuthService {
     await this.store.removePasskey(id);
   }
 
-  // Re-verifies the current session and issues a fresh cookie for it — used when something about
+  // Re-verifies the current session and issues a fresh cookie for it - used when something about
   // cookie *policy* changes mid-session (currently: disabling TLS, which must flip cookieSecure to
   // false so the browser doesn't carry a now-unusable Secure cookie into the plain-HTTP page it's
   // about to be redirected to). Deliberately re-verifies rather than trusting the caller already

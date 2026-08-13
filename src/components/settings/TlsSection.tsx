@@ -3,7 +3,7 @@ import { tlsApi } from '../../api/tlsApi';
 import type { TlsImportPreview, TlsStatus } from '../../types/tlsApi';
 
 // Giving the backend's Restart=on-failure (RestartSec=5) plus Node's own startup time to actually
-// come back before navigating — same reasoning as ServicesSection's health-poll timeout, but this
+// come back before navigating - same reasoning as ServicesSection's health-poll timeout, but this
 // flow can't poll (see the redirect note below), so it's a fixed wait instead.
 const RECONNECT_DELAY_MS = 5000;
 
@@ -101,7 +101,7 @@ export function TlsSection() {
     setApplying(true);
     setApplyError(null);
     // Best-effort fallback if the backend's response never arrives (it may exit mid-response,
-    // same as the plain webui restart) — this flow can't poll for it, since switching http<->https
+    // same as the plain webui restart) - this flow can't poll for it, since switching http<->https
     // changes the page's origin and a fetch can never succeed across that change either direction.
     const port = window.location.port ? `:${window.location.port}` : '';
     const fallbackOrigin = `${enable ? 'https' : 'http'}://${status.commonName ?? status.suggestedCommonName}${port}`;
@@ -111,7 +111,7 @@ export function TlsSection() {
       newOrigin = result.newOrigin;
     } catch (err) {
       if (!(err instanceof TypeError)) {
-        // A real error response (e.g. no certificate configured yet) — not the backend dying
+        // A real error response (e.g. no certificate configured yet) - not the backend dying
         // mid-restart, which shows up as a network-level TypeError instead.
         setApplyError((err as Error).message);
         setApplying(false);
@@ -140,23 +140,23 @@ export function TlsSection() {
         {status.configured && (
           <>
             {' '}
-            — {status.source === 'self-signed' ? 'self-signed' : 'imported'} certificate for{' '}
-            <strong>{status.commonName}</strong>, expires {status.expiresAt ? formatExpiry(status.expiresAt) : '—'}.
+            - {status.source === 'self-signed' ? 'self-signed' : 'imported'} certificate for{' '}
+            <strong>{status.commonName}</strong>, expires {status.expiresAt ? formatExpiry(status.expiresAt) : '-'}.
           </>
         )}
-        {!status.configured && ' — no certificate configured yet.'}
+        {!status.configured && ' - no certificate configured yet.'}
       </div>
 
       {status.enabled && status.source === 'self-signed' && (
         <div className="status-note">
-          Self-signed certificate — your browser will show a security warning the first time you
+          Self-signed certificate - your browser will show a security warning the first time you
           visit over HTTPS. This is expected; accept/proceed past it once per browser/device.
         </div>
       )}
 
       {reconnecting && (
         <div className="status-note">
-          Restarting with the new settings — you'll be redirected to <strong>{reconnecting}</strong> in a few
+          Restarting with the new settings - you'll be redirected to <strong>{reconnecting}</strong> in a few
           seconds. If this is a self-signed certificate, your browser will show a security warning; this is
           expected, proceed past it. If it doesn't come back, browse to {reconnecting} directly.
         </div>
@@ -245,7 +245,7 @@ export function TlsSection() {
           {preview.expiringSoon && ' (expiring soon)'}
           <br />
           Keys match: <strong>{preview.keyMatchesCert ? 'yes' : 'no'}</strong>
-          {!preview.keyMatchesCert && ' — this certificate and key don\'t belong together, cannot import.'}
+          {!preview.keyMatchesCert && ' - this certificate and key don\'t belong together, cannot import.'}
         </div>
       )}
       {commitError && <div className="status-note status-note--error">{commitError}</div>}

@@ -122,7 +122,7 @@ export interface ImportResult {
 }
 
 export interface AvailableDevice {
-  device: string; // internal use only (add/replace calls) — not meant for display
+  device: string; // internal use only (add/replace calls) - not meant for display
   partition: string | null;
   sizeKb: number | null;
   diskId: string | null;
@@ -139,7 +139,7 @@ export interface AddDiskResult {
 }
 
 // Mirrors backend/src/nmd/superblock.ts's parsed shape plus the per-slot
-// disk-matching result — see the import wizard.
+// disk-matching result - see the import wizard.
 export type SuperblockDiskRole = 'parity' | 'parity2' | 'data';
 export type DiskMatchStatus = 'ok' | 'size-mismatch' | 'missing';
 
@@ -161,7 +161,7 @@ export interface ImportPreview {
   hasSizeMismatch: boolean;
   hasMissing: boolean;
   // Only set when the preview came from /array/import/preview-from-path (the "locate on this
-  // system" picker) rather than a browser upload — the absolute path it was read from.
+  // system" picker) rather than a browser upload - the absolute path it was read from.
   sourcePath?: string;
 }
 

@@ -11,11 +11,11 @@ const SOURCE_ID = 'cache';
 
 /**
  * Drains everything currently on the cache mirror onto the array, per each eligible share's own
- * allocation policy — the same FileMoveService engine EmptyDiskService uses, just sourced from
+ * allocation policy - the same FileMoveService engine EmptyDiskService uses, just sourced from
  * /mnt/cache instead of a disk being retired, and with no destSlot to exclude (cache isn't itself
  * an array slot). Unlike EmptyDiskService there's no separate user-facing "check" step: run()
  * plans and starts in one call, since the mover always moves everything, every run (see the cache
- * pool plan's scope decisions) — nothing for a user to review first.
+ * pool plan's scope decisions) - nothing for a user to review first.
  */
 export class CacheMoverService {
   private engine = new FileMoveService();
@@ -43,10 +43,10 @@ export class CacheMoverService {
     if (!(await isMounted(config.cacheMountPoint))) throw new HttpError(409, 'Cache pool is not currently mounted.');
 
     const [mounts, shares] = await Promise.all([this.dataDiskMountpoints(), this.shareStore.list()]);
-    // Mirrors RealShareApplier.usesCacheBranch()'s own single-disk exclusion — those shares never
+    // Mirrors RealShareApplier.usesCacheBranch()'s own single-disk exclusion - those shares never
     // write to cache in the first place, so there's nothing of theirs to drain. cache-only shares
     // are excluded too, but for the opposite reason: their data belongs on cache permanently and
-    // must never be moved to the array — that's the entire point of the allocation method.
+    // must never be moved to the array - that's the entire point of the allocation method.
     const relevantShares = shares.filter((s) => s.allocationMethod !== 'single-disk' && s.allocationMethod !== 'cache-only');
 
     const plan = await this.engine.plan({

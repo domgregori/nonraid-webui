@@ -15,7 +15,7 @@ type ConfigStep = 'idle' | 'confirm';
 type ImageStep = 'idle' | 'warn' | 'confirm';
 type SmartLoadState = 'loading' | 'ready' | 'error';
 
-/** No async mutation here to await, unlike the array disks' detail panel — the browser's own
+/** No async mutation here to await, unlike the array disks' detail panel - the browser's own
  *  download manager takes over completely once the link is clicked, so this just gates that link
  *  behind a confirm step rather than tracking running/done state. */
 export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
@@ -72,27 +72,27 @@ export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">Model</span>
-                <span className="detail-row__value">{boot.model ?? '—'}</span>
+                <span className="detail-row__value">{boot.model ?? '-'}</span>
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">Filesystem</span>
-                <span className="detail-row__value">{boot.filesystem ?? '—'}</span>
+                <span className="detail-row__value">{boot.filesystem ?? '-'}</span>
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">UUID</span>
-                <span className="detail-row__value">{boot.uuid ?? '—'}</span>
+                <span className="detail-row__value">{boot.uuid ?? '-'}</span>
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">Used</span>
                 <span className="detail-row__value">
                   {usedPct !== null && boot.usedBytes !== null && boot.totalBytes !== null
                     ? `${formatMemLabel(boot.usedBytes, boot.totalBytes)} (${usedPct}%)`
-                    : '—'}
+                    : '-'}
                 </span>
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">Temperature</span>
-                <span className="detail-row__value">{boot.tempCelsius !== null ? `${Math.round(boot.tempCelsius)}°C` : '—'}</span>
+                <span className="detail-row__value">{boot.tempCelsius !== null ? `${Math.round(boot.tempCelsius)}°C` : '-'}</span>
               </div>
             </div>
           </div>
@@ -114,7 +114,7 @@ export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
             <div className="eyebrow">Operations</div>
 
             <div className="status-note">
-              <strong>Config Backup</strong> — a small archive of Samba/NFS config, this app's own
+              <strong>Config Backup</strong> - a small archive of Samba/NFS config, this app's own
               settings/shares/users data, and the current array superblock. Does not include the OS
               itself.
             </div>
@@ -135,8 +135,8 @@ export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
             )}
 
             <div className="status-note status-note--error">
-              <strong>Full Disk Image</strong> — a complete byte-for-byte copy of this device
-              (compressed), read live while it's mounted and in use — not a guaranteed
+              <strong>Full Disk Image</strong> - a complete byte-for-byte copy of this device
+              (compressed), read live while it's mounted and in use - not a guaranteed
               filesystem-consistent snapshot. Can take a long time and produce a file up to the full
               device capacity.
             </div>

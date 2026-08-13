@@ -6,7 +6,7 @@ export interface NetTotals {
 }
 
 /**
- * Sums bytes across all non-virtual interfaces from /proc/net/dev — Linux-only,
+ * Sums bytes across all non-virtual interfaces from /proc/net/dev - Linux-only,
  * which matches this project's deployment target (the NAS host itself, or the
  * dev VM), same caveat SystemStatsService documents for os.cpus()/totalmem().
  * Excludes loopback and container-bridge/veth interfaces so container traffic
@@ -38,7 +38,7 @@ export interface NetRate {
 }
 
 /**
- * Turns successive readNetTotals() snapshots into a rate — shared shape between the 60s history
+ * Turns successive readNetTotals() snapshots into a rate - shared shape between the 60s history
  * sampler (sampler.ts) and the 3s live-poll route (routes/system.ts's /system/net-live), each
  * holding their own independent tracker instance so one's cadence never perturbs the other's
  * delta math.
@@ -47,7 +47,7 @@ export class NetRateTracker {
   private prev: (NetTotals & { ts: number }) | null = null;
 
   /** Null on the first call (nothing to diff against yet) or when the counters reset (interface
-   *  replaced/reset — a negative delta), same as sampler.ts always treated it. */
+   *  replaced/reset - a negative delta), same as sampler.ts always treated it. */
   async sample(): Promise<NetRate | null> {
     const now = Date.now();
     const totals = await readNetTotals();

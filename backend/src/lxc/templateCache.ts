@@ -15,13 +15,13 @@ async function dirSizeBytes(dirPath: string): Promise<number> {
     const { stdout } = await execFileAsync('du', ['-sb', dirPath]);
     return Number(stdout.split(/\s+/)[0]) || 0;
   } catch {
-    return 0; // doesn't exist yet — nothing cached
+    return 0; // doesn't exist yet - nothing cached
   }
 }
 
 /**
  * Clears lxc-create --template download's local cache
- * (/var/cache/lxc/download/<distro>/<release>/<arch>) — unlike Docker images, this is never "in
+ * (/var/cache/lxc/download/<distro>/<release>/<arch>) - unlike Docker images, this is never "in
  * use" by a live container: lxc-create extracts a full, independent rootfs copy into the
  * container's own directory at creation time, so the cache is purely a speed-up for future creates
  * of the same distro/release/arch, not something any existing container depends on. Safe to clear

@@ -57,10 +57,10 @@ export function deriveShareViewModel(share: ShareWithStats): ShareViewModel {
         : share.disks.length === 1
           ? `Disk ${share.disks[0]}`
           : `Disk ${share.disks.join(', ')}`,
-    usedLabel: usedBytes !== null ? formatBytesHuman(usedBytes) : '—',
-    totalLabel: totalBytes !== null ? formatBytesHuman(totalBytes) : '—',
+    usedLabel: usedBytes !== null ? formatBytesHuman(usedBytes) : '-',
+    totalLabel: totalBytes !== null ? formatBytesHuman(totalBytes) : '-',
     pct,
-    connectionsLabel: share.activeConnections > 0 ? `${share.activeConnections} connection${share.activeConnections === 1 ? '' : 's'}` : '—',
+    connectionsLabel: share.activeConnections > 0 ? `${share.activeConnections} connection${share.activeConnections === 1 ? '' : 's'}` : '-',
     accessLabel: deriveAccessLabel(share),
   };
 }

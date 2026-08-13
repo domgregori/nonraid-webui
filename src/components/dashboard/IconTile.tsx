@@ -9,11 +9,11 @@ interface IconTileProps {
 }
 
 /**
- * One entry in a Docker/LXC dashboard icon grid — real icon (or an
+ * One entry in a Docker/LXC dashboard icon grid - real icon (or an
  * initial-letter fallback) + name + status. Takes a pre-derived
  * statusLabel/statusColor rather than a running boolean so callers reuse
  * the same selectors (deriveContainerViewModel / deriveLxcContainerViewModel)
- * the full Docker/LXC pages use — LXC in particular has frozen/unknown
+ * the full Docker/LXC pages use - LXC in particular has frozen/unknown
  * states a plain running/stopped binary would misrepresent.
  */
 export function IconTile({ name, statusLabel, statusColor, iconUrl, webUiUrl }: IconTileProps) {

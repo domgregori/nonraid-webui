@@ -2,7 +2,7 @@ import { config } from '../config.js';
 
 export const COOKIE_NAME = 'nonraid_session';
 // Separate cookie name from the real session, purely for request-routing convenience (so a route
-// handler can read just the one it cares about without inspecting payload shape first) — the
+// handler can read just the one it cares about without inspecting payload shape first) - the
 // purpose discriminator in crypto.ts's signed payload is what actually prevents this from being
 // usable as a real session, not the distinct name by itself.
 export const TWO_FACTOR_PENDING_COOKIE_NAME = 'nonraid_2fa_pending';
@@ -27,7 +27,7 @@ export function parseCookies(header: string | undefined): Record<string, string>
 
 function attributes(maxAgeSec: number): string {
   const parts = [`Path=/`, `HttpOnly`, `SameSite=Lax`, `Max-Age=${maxAgeSec}`];
-  // Only correct once real TLS termination exists in front of this backend —
+  // Only correct once real TLS termination exists in front of this backend -
   // see config.ts's cookieSecure doc comment.
   if (config.cookieSecure) parts.push('Secure');
   return parts.join('; ');

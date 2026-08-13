@@ -16,7 +16,7 @@ export interface LxcClient {
   restartContainer(name: string): Promise<LxcCommandResult>;
   destroyContainer(name: string): Promise<LxcCommandResult>;
   createContainer(options: CreateLxcContainerOptions, onProgress?: CreateLxcProgressCallback): Promise<LxcCommandResult>;
-  // Raw read/write of the container's actual on-disk `config` file — backs
+  // Raw read/write of the container's actual on-disk `config` file - backs
   // the LXC page's "Edit" dialog. Editing the real file directly (rather
   // than a curated subset of fields) fits LXC better than Docker's
   // create/recreate model: an LXC container isn't immutable, so its config
@@ -24,22 +24,22 @@ export interface LxcClient {
   getConfigText(name: string): Promise<string>;
   setConfigText(name: string, content: string): Promise<LxcCommandResult>;
   // Host bridge/veth-parent interfaces a new container's network can attach
-  // to — see the "Networking note" in the LXC handoff.
+  // to - see the "Networking note" in the LXC handoff.
   listBridges(): Promise<string[]>;
   // Physical NICs (e.g. eno0) a new container's network can ride directly on via macvlan, getting
   // its own DHCP-assigned LAN IP instead of going through a host bridge.
   listPhysicalInterfaces(): Promise<string[]>;
-  // Distribution/release combos the create form can offer — fetched live
+  // Distribution/release combos the create form can offer - fetched live
   // from the image server via the download template's own `--list`.
   listDistros(): Promise<{ distros: LxcDistroOption[]; defaultArch: string }>;
-  // Snapshots — only meaningfully cheap for overlayfs-backed containers (createContainer's
+  // Snapshots - only meaningfully cheap for overlayfs-backed containers (createContainer's
   // default since this was added), but lxc-snapshot itself works against any backend.
   listSnapshots(name: string): Promise<LxcSnapshot[]>;
   createSnapshot(name: string, comment: string): Promise<LxcCommandResult>;
-  // newName must always be provided and is exactly what the resulting container is named — same
+  // newName must always be provided and is exactly what the resulting container is named - same
   // name as the original replaces it in place (destroying current state), any other name creates
   // a new, independent container. This app's own UI treats those as two clearly distinct actions
-  // rather than one field with implicit special-casing — see SnapshotsDialog.tsx.
+  // rather than one field with implicit special-casing - see SnapshotsDialog.tsx.
   restoreSnapshot(name: string, snapshotName: string, newName: string): Promise<LxcCommandResult>;
   deleteSnapshot(name: string, snapshotName: string): Promise<LxcCommandResult>;
 }

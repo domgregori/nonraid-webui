@@ -29,7 +29,7 @@ export function LogsDialog({ containerId, containerName, onClose }: LogsDialogPr
   const [tail, setTail] = useState(500);
   const [live, setLive] = useState(false);
   const logRef = useRef<HTMLPreElement>(null);
-  // Cursor for the next live-tail poll, and the last line already shown — since's exact boundary
+  // Cursor for the next live-tail poll, and the last line already shown - since's exact boundary
   // behavior (inclusive vs exclusive of that timestamp) isn't relied on; a poll response whose first
   // line matches lastLineRef just gets that one line dropped before appending.
   const sinceRef = useRef<number | null>(null);

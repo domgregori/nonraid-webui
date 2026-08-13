@@ -29,7 +29,7 @@ const ALL_METRICS: MetricName[] = [
   'disk_usage_pct',
 ];
 
-// Rotates for however many disks the array has — COLORS only has 4 semantic
+// Rotates for however many disks the array has - COLORS only has 4 semantic
 // colors (blue/green/amber/red), so a per-disk chart with 5+ disks needs a
 // few extra swatches beyond those.
 const DISK_PALETTE = [
@@ -82,7 +82,7 @@ export function HistoryPage() {
           <div className="page-title">History</div>
           <div className="history-header__desc">
             {isLive
-              ? 'Live — updating as new data arrives, last 10 minutes'
+              ? 'Live - updating as new data arrives, last 10 minutes'
               : 'CPU, memory, network, and per-disk temperature/read-write/usage over time'}
           </div>
         </div>

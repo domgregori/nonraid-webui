@@ -4,7 +4,7 @@ import { deriveLxcContainerViewModel } from '../../selectors/lxcContainers';
 import { Card } from '../shared/Card';
 import { IconTile } from './IconTile';
 
-// Read-only tile — no action buttons rendered, so these are inert.
+// Read-only tile - no action buttons rendered, so these are inert.
 const NOOP_ACTIONS = { isPending: false, onToggle: () => {}, onRestart: () => {}, onDestroy: () => {}, onEdit: () => {}, onSnapshots: () => {} };
 
 export function LxcWidgetCard() {
@@ -25,7 +25,7 @@ export function LxcWidgetCard() {
         <div className="icon-grid">
           {containers.map((c) => {
             const view = deriveLxcContainerViewModel(c, NOOP_ACTIONS);
-            // LXC containers have no icon convention (they're OS templates, not app images) — always falls back to the initial-letter avatar.
+            // LXC containers have no icon convention (they're OS templates, not app images) - always falls back to the initial-letter avatar.
             return <IconTile key={c.name} name={view.name} statusLabel={view.statusLabel} statusColor={view.statusColor} webUiUrl={view.webUiUrl} />;
           })}
         </div>

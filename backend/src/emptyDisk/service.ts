@@ -10,12 +10,12 @@ const slotFromSourceId = (id: string | null) => (id?.startsWith(SOURCE_PREFIX) ?
 
 /**
  * Moves a disk's real files off onto the array's other disks, so the disk can
- * then be safely unassigned via the existing Unassign/Restore/Replace flow —
+ * then be safely unassigned via the existing Unassign/Restore/Replace flow -
  * this service only ever handles the data-movement half. Thin wrapper around
  * the generic FileMoveService (shared with the cache mover): resolves "slot N"
  * to a mountpoint + relevant shares + destination candidates (every other
  * mounted data disk), and translates between the engine's generic
- * sourceId-shaped types and this module's slot-shaped public API — the routes
+ * sourceId-shaped types and this module's slot-shaped public API - the routes
  * and frontend consume EmptyDiskPlanSummary/EmptyDiskJobState directly and
  * are unchanged by this refactor.
  */

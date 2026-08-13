@@ -12,7 +12,7 @@ const WINDOW_OPTIONS: Array<{ id: string; label: string }> = [
 ];
 const LIVE_POLL_MS = 2000;
 
-// A line that looks like an error/failure or a warning gets picked out visually — the one bit of
+// A line that looks like an error/failure or a warning gets picked out visually - the one bit of
 // interpretation this viewer adds over a raw `journalctl` dump, since a wall of monospace text is
 // exactly the failure mode this page exists to avoid.
 const ERROR_RE = /\b(error|err|fail(?:ed|ure)?|critical|crit|panic|fatal|denied|refused)\b/i;
@@ -39,7 +39,7 @@ function isNearBottom(el: HTMLElement): boolean {
 interface LogsSectionProps {
   /** Whether the "System Logs" Settings tab is the one currently on screen. Settings sections stay
    *  mounted (hidden via CSS) rather than unmounting on tab switch, so live-tail polling is gated on
-   *  this instead of on mount/unmount — otherwise leaving Live on and switching tabs would keep
+   *  this instead of on mount/unmount - otherwise leaving Live on and switching tabs would keep
    *  spawning `journalctl` every 2s in the background indefinitely. */
   active: boolean;
 }
@@ -55,7 +55,7 @@ export function LogsSection({ active }: LogsSectionProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const outputRef = useRef<HTMLDivElement>(null);
-  // Cursor for the next live-tail poll, and the last line already shown — same scheme as the
+  // Cursor for the next live-tail poll, and the last line already shown - same scheme as the
   // Docker logs dialog: a poll response whose first line matches lastLineRef just gets that one
   // line dropped before appending, rather than relying on --since's exact inclusive/exclusive edge.
   const sinceRef = useRef<number | null>(null);

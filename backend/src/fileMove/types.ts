@@ -1,6 +1,6 @@
 export type FileMoveJobStatus = 'planning' | 'planned' | 'running' | 'done' | 'failed' | 'cancelled';
 
-/** A handful of representative files that don't fit anywhere — enough to explain why, not the full list. */
+/** A handful of representative files that don't fit anywhere - enough to explain why, not the full list. */
 export interface FileMoveUnfitExample {
   share: string;
   path: string;
@@ -8,7 +8,7 @@ export interface FileMoveUnfitExample {
 }
 
 export interface FileMovePlanSummary {
-  /** Opaque label for the source this plan was built for (e.g. "disk:3", "cache") — display/logging
+  /** Opaque label for the source this plan was built for (e.g. "disk:3", "cache") - display/logging
    *  only, callers own their own identifier scheme. */
   sourceId: string;
   fits: boolean;
@@ -16,10 +16,10 @@ export interface FileMovePlanSummary {
   totalBytes: number;
   /** Bytes each destination disk would receive, keyed by array slot. */
   perDestinationBytes: Record<number, number>;
-  /** Present only when fits is false — a sample of files with nowhere to go, and why. */
+  /** Present only when fits is false - a sample of files with nowhere to go, and why. */
   unfitExamples: FileMoveUnfitExample[];
   unfitReason: string | null;
-  /** Real files on the source that aren't under any share configured to draw from it — not moved
+  /** Real files on the source that aren't under any share configured to draw from it - not moved
    *  by this plan at all; the caller needs to know they're being left behind. */
   unmanagedBytes: number;
 }

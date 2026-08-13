@@ -6,7 +6,7 @@ import { generateSecret, verifySecret } from './crypto.js';
 import type { AuthRecord, PasskeyCredential, TotpBackupCode } from './types.js';
 
 /**
- * Owns auth.json — same pattern as settings/store.ts (in-memory cache,
+ * Owns auth.json - same pattern as settings/store.ts (in-memory cache,
  * writes serialized through one promise chain, atomic write-then-rename):
  * there's no external system authoritative for this, so the file is the only
  * source of truth. `cache` has three states: undefined (not loaded yet),
@@ -16,7 +16,7 @@ import type { AuthRecord, PasskeyCredential, TotpBackupCode } from './types.js';
  * that method's queued closure never throws, but create() here must (409 if
  * already configured) to serialize concurrent setup attempts. Letting a
  * rejection become the new writeQueue would poison every later write forever
- * (any .then() chained onto an already-rejected promise short-circuits) — so
+ * (any .then() chained onto an already-rejected promise short-circuits) - so
  * the promise returned to the caller and the one stored as the next
  * writeQueue are kept separate, and the stored one is always normalized to
  * resolve.
@@ -54,7 +54,7 @@ export class AuthStore {
       if (!current) {
         throw new HttpError(409, 'No admin account is configured yet.');
       }
-      // Regenerating the secret invalidates every existing session cookie —
+      // Regenerating the secret invalidates every existing session cookie -
       // this is what makes a password change also mean "log out everywhere",
       // the only revocation mechanism this stateless-cookie design has.
       const record: AuthRecord = { ...current, passwordHash, sessionSecret: generateSecret() };
@@ -133,7 +133,7 @@ export class AuthStore {
   }
 
   // Verify-and-mark-used happen inside this one queued closure, not as a separate read-then-write
-  // from the service layer — doing it in two steps would let two concurrent requests both pass
+  // from the service layer - doing it in two steps would let two concurrent requests both pass
   // verification against the same still-unused code before either write lands, double-spending a
   // single-use code. Serializing through writeQueue (the same mechanism every other mutation here
   // already uses) closes that race for free.
@@ -197,7 +197,7 @@ export class AuthStore {
     return result;
   }
 
-  // Bumped after every successful authentication — WebAuthn's own clone-detection mechanism.
+  // Bumped after every successful authentication - WebAuthn's own clone-detection mechanism.
   updatePasskeyCounter(id: string, counter: number): Promise<AuthRecord> {
     const result = this.writeQueue.then(async () => {
       const current = await this.load();

@@ -27,7 +27,7 @@ export const SERVICE_DEFS: ServiceDef[] = [
     label: 'SMB Sharing',
     // winbind is deliberately not included: it's only relevant for AD-domain-joined Samba, which
     // this app never sets up (install-webui.sh only enables smbd/nmbd, see its own systemctl
-    // enable --now line) — with it included here, a fully healthy standalone install permanently
+    // enable --now line) - with it included here, a fully healthy standalone install permanently
     // reported 'mixed' ("Partially running") since winbind.service is never active.
     statusUnits: ['smbd.service', 'nmbd.service'],
     stopArgs: ['smbd.service', 'nmbd.service'],
@@ -38,8 +38,8 @@ export const SERVICE_DEFS: ServiceDef[] = [
 ];
 
 /**
- * `systemctl is-active` exits non-zero for inactive/failed units — an expected, normal outcome
- * here, not a real failure — so this collects stdout itself instead of using runSudoMaybe (which
+ * `systemctl is-active` exits non-zero for inactive/failed units - an expected, normal outcome
+ * here, not a real failure - so this collects stdout itself instead of using runSudoMaybe (which
  * would discard stdout and reject on that exit code).
  */
 function isActive(units: string[], useSudo: boolean): Promise<string[]> {

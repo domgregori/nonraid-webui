@@ -10,7 +10,7 @@ import type { BrowseCommandResult, BrowseEntry, BrowseListing } from './types.js
 
 const execFileAsync = promisify(execFile);
 
-/** Browses the whole /mnt tree (config.browseRoot), not a single share — see
+/** Browses the whole /mnt tree (config.browseRoot), not a single share - see
  * paths.ts for the traversal-ceiling enforcement every method here relies on. */
 export class BrowseService {
   constructor(private shares: ShareService) {}
@@ -38,7 +38,7 @@ export class BrowseService {
     });
 
     // Inside a user share, mergerfs can blend more than one physical disk into this one
-    // directory listing — annotate each entry with which disk(s) it's really on. Left
+    // directory listing - annotate each entry with which disk(s) it's really on. Left
     // undefined outside a share (e.g. /mnt root, or a raw /mnt/diskN) since the question
     // doesn't apply there.
     const shareMountPrefix = `${config.shareMountRoot}/`;
@@ -56,7 +56,7 @@ export class BrowseService {
     return { root, path: absPath, entries };
   }
 
-  /** Recursive directory size, computed on demand — not part of list() since a full `du` on every
+  /** Recursive directory size, computed on demand - not part of list() since a full `du` on every
    *  directory in a listing would make browsing large shares painfully slow. Same technique as
    *  fileMove/service.ts's private duBytes(). */
   async size(requestPath: string): Promise<number> {
@@ -88,7 +88,7 @@ export class BrowseService {
     const { root, absPath } = await resolveExisting(requestPath);
     if (absPath === root) throw new HttpError(400, 'Cannot rename the browse root.');
     if (await isMountPoint(absPath)) {
-      throw new HttpError(400, `"${path.basename(absPath)}" is a mount point (a share, or an array disk) — rename it from the Sharing page instead.`);
+      throw new HttpError(400, `"${path.basename(absPath)}" is a mount point (a share, or an array disk) - rename it from the Sharing page instead.`);
     }
 
     const parentPath = path.dirname(absPath);
@@ -106,7 +106,7 @@ export class BrowseService {
     const { root, absPath } = await resolveExisting(requestPath);
     if (absPath === root) throw new HttpError(400, 'Cannot move the browse root.');
     if (await isMountPoint(absPath)) {
-      throw new HttpError(400, `"${path.basename(absPath)}" is a mount point (a share, or an array disk) — it can't be moved.`);
+      throw new HttpError(400, `"${path.basename(absPath)}" is a mount point (a share, or an array disk) - it can't be moved.`);
     }
 
     const name = path.basename(absPath);
@@ -123,7 +123,7 @@ export class BrowseService {
     } catch {
       // Cross-device rename normally fails with EXDEV, but FUSE-backed mounts like mergerfs
       // return ENOTCONN instead when source and destination land on different physical
-      // branches — same reason saveUpload() below falls back to copy+remove. cp's recursive
+      // branches - same reason saveUpload() below falls back to copy+remove. cp's recursive
       // option handles both files and directories in one call.
       await cp(absPath, destAbs, { recursive: true });
       await rm(absPath, { recursive: true });
@@ -152,7 +152,7 @@ export class BrowseService {
     const { root, absPath } = await resolveExisting(requestPath);
     if (absPath === root) throw new HttpError(400, 'Cannot delete the browse root.');
 
-    // A share's own mount point can't be rmdir'd directly (EBUSY — it's
+    // A share's own mount point can't be rmdir'd directly (EBUSY - it's
     // active). If that's what this is, delete the share properly instead:
     // unmount it and wipe its real data from every backing disk.
     const removedShare = await this.shares.removeMountPointWithData(absPath);
@@ -161,7 +161,7 @@ export class BrowseService {
     }
 
     if (await isMountPoint(absPath)) {
-      throw new HttpError(400, `"${path.basename(absPath)}" is a mount point (e.g. an array disk) — it can't be deleted from here.`);
+      throw new HttpError(400, `"${path.basename(absPath)}" is a mount point (e.g. an array disk) - it can't be deleted from here.`);
     }
     await rm(absPath, { recursive: true });
     return { ok: true, message: `Deleted "${path.basename(absPath)}"` };
@@ -182,7 +182,7 @@ export class BrowseService {
       } catch {
         // Cross-device rename normally fails with EXDEV, but FUSE-backed mounts like
         // mergerfs return ENOTCONN instead when the source (our OS temp dir) lives
-        // outside the union — so fall back to copy+unlink on any rename failure here;
+        // outside the union - so fall back to copy+unlink on any rename failure here;
         // a genuine destination problem (permissions, no space) will surface from copyFile.
         await copyFile(tempPath, absPath);
         await unlink(tempPath).catch(() => {});

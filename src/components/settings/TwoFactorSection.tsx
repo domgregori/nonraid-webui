@@ -91,7 +91,7 @@ export function TwoFactorSection() {
       <div className="settings-field">
         <div className="toggle-row__title">Save your backup codes</div>
         <div className="toggle-row__desc">
-          Each code works once, if you lose access to your authenticator app. They're shown only this one time — save
+          Each code works once, if you lose access to your authenticator app. They're shown only this one time - save
           them somewhere safe before continuing.
         </div>
         <div className="backup-codes-grid">
@@ -149,7 +149,7 @@ export function TwoFactorSection() {
       <div className="toggle-row__title">Authenticator app (TOTP)</div>
       <div className="toggle-row__desc">
         {status.totpEnabled
-          ? `Enabled — ${status.backupCodesRemaining} backup code${status.backupCodesRemaining === 1 ? '' : 's'} remaining.`
+          ? `Enabled - ${status.backupCodesRemaining} backup code${status.backupCodesRemaining === 1 ? '' : 's'} remaining.`
           : 'Not enabled. Adds a code from an authenticator app as a second step after your password.'}
       </div>
       {enrollError && enrollStep === 'idle' && <div className="status-note status-note--error">{enrollError}</div>}

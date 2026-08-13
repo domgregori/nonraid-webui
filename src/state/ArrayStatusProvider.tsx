@@ -49,7 +49,7 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
       if (!mounted.current) return;
       setTemps(t);
     } catch {
-      // temperature reads are best-effort — leave the last-known values on failure
+      // temperature reads are best-effort - leave the last-known values on failure
     }
   }, []);
 
@@ -59,7 +59,7 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
       if (!mounted.current) return;
       setDiskHealths(h);
     } catch {
-      // best-effort, same as temps — leave the last-known values on failure
+      // best-effort, same as temps - leave the last-known values on failure
     }
   }, []);
 
@@ -68,7 +68,7 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
     refreshStatus();
     refreshTemps();
     refreshHealth();
-    // Rotational type never changes at runtime — fetched once, not on an interval.
+    // Rotational type never changes at runtime - fetched once, not on an interval.
     smartApi
       .getDiskTypes()
       .then((t) => mounted.current && setDiskTypes(t))

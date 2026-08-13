@@ -18,7 +18,7 @@ export function DashboardPage() {
     <div className="dashboard">
       <div className="dashboard__main">
         {loadState === 'loading' && !status && <div className="status-note">Loading array status…</div>}
-        {/* 'not-configured' (no array ever created) is expected on a fresh install — OnboardingGate
+        {/* 'not-configured' (no array ever created) is expected on a fresh install - OnboardingGate
             covers this with the setup wizard instead of a scary error banner. */}
         {loadState === 'error' && error && <div className="status-note status-note--error">{error}</div>}
         {actionError && <div className="status-note status-note--error">{actionError}</div>}

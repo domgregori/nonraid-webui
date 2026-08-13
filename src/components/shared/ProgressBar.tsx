@@ -3,7 +3,7 @@ interface ProgressBarProps {
   color: string;
   height?: number;
   className?: string;
-  /** Unknown duration/progress (e.g. a benchmark run with no total to measure against) — an
+  /** Unknown duration/progress (e.g. a benchmark run with no total to measure against) - an
    *  animated sweep instead of a stalled bar sitting at some arbitrary width. `pct` is ignored. */
   indeterminate?: boolean;
 }

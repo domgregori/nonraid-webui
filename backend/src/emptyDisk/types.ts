@@ -1,6 +1,6 @@
 export type EmptyDiskJobStatus = 'planning' | 'planned' | 'running' | 'done' | 'failed' | 'cancelled';
 
-/** A handful of representative files that don't fit anywhere — enough to explain why, not the full list. */
+/** A handful of representative files that don't fit anywhere - enough to explain why, not the full list. */
 export interface UnfitExample {
   share: string;
   path: string;
@@ -14,11 +14,11 @@ export interface EmptyDiskPlanSummary {
   totalBytes: number;
   /** Bytes each destination disk would receive, keyed by slot. */
   perDestinationBytes: Record<number, number>;
-  /** Present only when fits is false — a sample of files with nowhere to go, and why. */
+  /** Present only when fits is false - a sample of files with nowhere to go, and why. */
   unfitExamples: UnfitExample[];
   unfitReason: string | null;
   /** Real files on this disk that aren't under any share configured to include this
-   *  slot — not moved by this plan at all; the caller needs to know they're being left behind. */
+   *  slot - not moved by this plan at all; the caller needs to know they're being left behind. */
   unmanagedBytes: number;
 }
 

@@ -32,7 +32,7 @@ export function BulkProgressDialog({ job, onCancel, onDismiss }: BulkProgressDia
                 <div className="progress-track__fill" style={{ width: `${pct}%` }} />
               </div>
               <div className="toggle-row__desc">
-                {job.progress ? `${job.progress.index + 1} of ${job.total} — ${job.progress.name}` : `0 of ${job.total}`}
+                {job.progress ? `${job.progress.index + 1} of ${job.total} - ${job.progress.name}` : `0 of ${job.total}`}
               </div>
               <div className="dialog__actions">
                 <button type="button" className="btn btn--danger" onClick={onCancel}>
@@ -44,7 +44,7 @@ export function BulkProgressDialog({ job, onCancel, onDismiss }: BulkProgressDia
 
           {job.error && <div className="status-note status-note--error">{job.error}</div>}
 
-          {job.aborted && <div className="status-note">Cancelled — some items may have completed before it stopped. The listing has been refreshed.</div>}
+          {job.aborted && <div className="status-note">Cancelled - some items may have completed before it stopped. The listing has been refreshed.</div>}
 
           {job.result && (
             <>

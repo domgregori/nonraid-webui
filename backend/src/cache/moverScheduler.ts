@@ -10,18 +10,18 @@ import type { CacheMoverService } from './mover.js';
  * Fires the mover on the configured schedule, same self-unref'd tick shape as
  * ParityScheduler/BackupScheduler. Also doubles as the mover job's own completion watcher: unlike
  * parity (whose completion nmdctl reports natively, see ActivityWatcher.checkParitySync()), the
- * mover job's state lives only in CacheMoverService's own in-memory FileMoveService — nothing
- * external to poll for a "did it finish" signal — so this scheduler's own recurring tick doubles
+ * mover job's state lives only in CacheMoverService's own in-memory FileMoveService - nothing
+ * external to poll for a "did it finish" signal - so this scheduler's own recurring tick doubles
  * as that watcher, tracking status() transitions regardless of whether the run was scheduled or
  * triggered manually via POST /cache/mover/run.
  */
 export class CacheMoverScheduler {
   private timer: NodeJS.Timeout;
   private lastFiredDateKey: string | null = null;
-  // undefined means "not observed yet" — seeded silently on the first tick so a backend restart
+  // undefined means "not observed yet" - seeded silently on the first tick so a backend restart
   // mid-run (or right after one finished) never produces a false completion notification. Tracking
   // finishedAt itself, not just status, matters: a move that completes in well under one tick
-  // interval (confirmed live — a small single-file move finished in under a second) can go
+  // interval (confirmed live - a small single-file move finished in under a second) can go
   // idle -> running -> done between two polls with neither ever observing "running", so a plain
   // status-transition diff silently misses it. finishedAt changes exactly once per run regardless
   // of how fast that run was, so diffing it catches every completion, not just slow ones.
@@ -42,7 +42,7 @@ export class CacheMoverScheduler {
     const job = this.mover.status();
     const prevFinishedAt = this.lastFinishedAt;
     this.lastFinishedAt = job.finishedAt;
-    if (prevFinishedAt === undefined) return; // first tick ever — seed silently
+    if (prevFinishedAt === undefined) return; // first tick ever - seed silently
     if (job.finishedAt === null || job.finishedAt === prevFinishedAt) return; // still running/idle, or already reported
 
     if (job.status === 'done') {
@@ -76,7 +76,7 @@ export class CacheMoverScheduler {
     try {
       status = await this.nmd.getStatus();
     } catch {
-      return; // driver unreachable this tick — try again next time
+      return; // driver unreachable this tick - try again next time
     }
     if (status.array.state !== 'STARTED' || status.resync.active) return;
 

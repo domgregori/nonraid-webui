@@ -11,7 +11,7 @@ import { formatFileSize } from '../utils/format';
 
 function formatModified(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 export function BrowsePage() {
@@ -158,7 +158,7 @@ export function BrowsePage() {
                 )}
               </div>
               <div className="browse-row__modified">{formatModified(entry.modifiedAt)}</div>
-              <div className="browse-row__location">{entry.locations && entry.locations.length > 0 ? entry.locations.join(', ') : '—'}</div>
+              <div className="browse-row__location">{entry.locations && entry.locations.length > 0 ? entry.locations.join(', ') : '-'}</div>
               <div className="browse-row__actions" onClick={(e) => e.stopPropagation()}>
                 {entry.type === 'file' && (
                   <a className="btn" href={browse.downloadUrl(entry)} download={entry.name}>
@@ -183,7 +183,7 @@ export function BrowsePage() {
         })}
 
         {browse.status === 'ready' && entries.length === 0 && (
-          <div className="browse-dropzone-hint">This folder is empty — drag files here, or use Upload.</div>
+          <div className="browse-dropzone-hint">This folder is empty - drag files here, or use Upload.</div>
         )}
       </div>
 

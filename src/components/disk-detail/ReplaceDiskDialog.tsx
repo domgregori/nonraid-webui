@@ -15,7 +15,7 @@ type Step = 'confirm' | 'select' | 'result';
 
 /**
  * Guided flow for swapping in a different physical disk. Deliberately does
- * nothing to the array until the final step, where the new device is known —
+ * nothing to the array until the final step, where the new device is known -
  * at that point it's one atomic backend call (nmd.replaceDisk) that unassigns,
  * commits, adds the new disk, and starts the rebuild, so the user never sees
  * a half-done state through this dialog. That's different from clicking the
@@ -59,10 +59,10 @@ export function ReplaceDiskDialog({ slot, label, onClose, onDone }: ReplaceDiskD
           {step === 'confirm' && (
             <>
               <div className="status-note status-note--error">
-                This is for swapping in a genuinely different physical disk — not for temporarily detaching this one.
+                This is for swapping in a genuinely different physical disk - not for temporarily detaching this one.
                 Once you pick a replacement disk on the next step, this slot's current identity is cleared and the
                 array runs degraded until the new disk finishes rebuilding from parity. There's no undo past that
-                point. If you just clicked here by accident, close this dialog — nothing has happened yet.
+                point. If you just clicked here by accident, close this dialog - nothing has happened yet.
               </div>
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>

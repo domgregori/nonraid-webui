@@ -1,4 +1,4 @@
-// Long/narrow schema — one row per (metric, key, timestamp) — so adding a
+// Long/narrow schema - one row per (metric, key, timestamp) - so adding a
 // new metric later never needs a migration, just a new MetricName value.
 export type MetricName =
   | 'cpu_percent'

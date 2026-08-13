@@ -28,7 +28,7 @@ import type { SystemStatsService } from '../system/service.js';
 import { restartService, SERVICE_DEFS } from '../system/services.js';
 
 // Config backups are small text files plus the 4KB superblock, but a long-lived activity log or
-// many shares' worth of config could add up — generous but bounded, matching the same "don't
+// many shares' worth of config could add up - generous but bounded, matching the same "don't
 // silently truncate, reject clearly" intent as array.ts's own superblock upload limit.
 const restoreUpload = multer({ dest: os.tmpdir(), limits: { fileSize: 200 * 1024 * 1024 } });
 
@@ -46,7 +46,7 @@ export function systemRouter(
   });
 
   // Own NetRateTracker instance, independent of the 60s history sampler's (see metrics/sampler.ts)
-  // — the History page's Live mode polls this every 3s while open, so it needs its own delta
+  // - the History page's Live mode polls this every 3s while open, so it needs its own delta
   // cadence rather than sharing/perturbing the sampler's. Stateless per request otherwise: no DB
   // writes, just a read of /proc/net/dev and a diff against the last call.
   const liveNetRate = new NetRateTracker();
@@ -82,7 +82,7 @@ export function systemRouter(
   });
 
   // Runs the exact same backup the schedule would, on demand, against the already-saved
-  // destination directory in Settings -> Backups — save the destination there first. Distinct
+  // destination directory in Settings -> Backups - save the destination there first. Distinct
   // from /system/boot-disk/backup/config above: that one streams a one-off download straight to
   // the browser and never touches the array; this one writes to the array like every scheduled
   // run, so it's covered by the same retention pruning.
@@ -96,10 +96,10 @@ export function systemRouter(
   });
 
   // Uploads a config backup archive (same format streamConfigBackup/writeConfigBackupToFile
-  // produce) and lists what's in it — nothing is extracted here, same "preview reads only, commit
+  // produce) and lists what's in it - nothing is extracted here, same "preview reads only, commit
   // acts" shape as /array/import/preview. Flags which member (if any) is the array superblock and
   // whether restoring it is currently allowed: only when the array has nothing assigned yet (see
-  // configRestore.ts's isArrayBlank doc comment) — restoring an already-configured array's
+  // configRestore.ts's isArrayBlank doc comment) - restoring an already-configured array's
   // superblock from a raw file, with no disk-matching preview the way ImportArrayWizard has, is a
   // different and much riskier operation than this endpoint is meant for.
   router.post('/system/backup/restore/preview', restoreUpload.single('file'), async (req, res) => {
@@ -121,7 +121,7 @@ export function systemRouter(
 
       const categories = await resolveBackupCategories(nmd);
       // Directory members (e.g. "etc/nonraid/") are counted in their category's totals below but
-      // dropped from the flat `entries` shown per-member — same reasoning restoreArchiveMembers()
+      // dropped from the flat `entries` shown per-member - same reasoning restoreArchiveMembers()
       // itself already has for not extracting them: a bare directory carries nothing the file
       // members inside it don't already imply.
       const categoryPreviews = categories
@@ -153,14 +153,14 @@ export function systemRouter(
     }
   });
 
-  // Re-validates everything fresh against live state rather than trusting the preview response —
-  // same discipline as /array/import/commit — since time may have passed (the array could have
+  // Re-validates everything fresh against live state rather than trusting the preview response -
+  // same discipline as /array/import/commit - since time may have passed (the array could have
   // been started, or gained a disk) between preview and this call.
   router.post('/system/backup/restore/commit', async (req, res) => {
     const token = typeof req.body?.token === 'string' ? req.body.token : '';
     const staged = token ? getStagedRestore(token) : undefined;
     if (!staged) {
-      res.status(400).json({ error: 'This restore has expired or was already used — upload the file again.' });
+      res.status(400).json({ error: 'This restore has expired or was already used - upload the file again.' });
       return;
     }
     try {
@@ -176,7 +176,7 @@ export function systemRouter(
       const categories = await resolveBackupCategories(nmd);
 
       // Missing/malformed `categories` means "everything" (the field didn't exist before this
-      // selection feature — old clients, or a plain re-POST of a preview response, still restore
+      // selection feature - old clients, or a plain re-POST of a preview response, still restore
       // the full archive rather than silently restoring nothing).
       const requestedCategories = Array.isArray(req.body?.categories) ? (req.body.categories as unknown[]) : null;
       const selected: Set<BackupCategoryId> = requestedCategories
@@ -190,7 +190,7 @@ export function systemRouter(
       });
       const skippedSuperblock = members.includes(superblockMember) && !arrayIsBlank;
       // restoreArchiveMembers() itself drops bare directory members before extracting (see its own
-      // doc comment) — mirrored here so the reported count matches what was actually written, not
+      // doc comment) - mirrored here so the reported count matches what was actually written, not
       // what was merely requested.
       const restoredCount = toRestore.filter((m) => !m.endsWith('/')).length;
 
@@ -199,12 +199,12 @@ export function systemRouter(
       await unlink(staged.filePath).catch(() => {});
 
       // The archived metrics.db is a complete, checkpointed snapshot on its own (see
-      // MetricsService.checkpointForBackup) — but the *current* database this just overwrote may
+      // MetricsService.checkpointForBackup) - but the *current* database this just overwrote may
       // still have its own -wal/-shm sidecars sitting next to it from live activity since the last
       // checkpoint. Left in place, SQLite would try to replay that leftover WAL against the freshly
       // restored (unrelated) .db file the next time it's opened, misapplying old transactions onto
       // data from a different point in time entirely. Only the restored .db file itself should be
-      // trusted going forward — nonraid-webui's own restart (part of Restart Services) is what
+      // trusted going forward - nonraid-webui's own restart (part of Restart Services) is what
       // actually reopens the connection and needs these gone before that happens.
       const graphHistoryMember = config.metricsDbPath.replace(/^\//, '');
       if (toRestore.includes(graphHistoryMember)) {
@@ -212,21 +212,21 @@ export function systemRouter(
         await unlink(`${config.metricsDbPath}-shm`).catch(() => {});
       }
 
-      // Docker only reads daemon.json at startup — a restored data-root relocation is inert until
+      // Docker only reads daemon.json at startup - a restored data-root relocation is inert until
       // the daemon restarts, and restarting Docker stops every running container, so this is only
       // ever done when the archive actually had this member (see restart-services below, which
       // takes this as an explicit opt-in rather than restarting Docker on every restore).
       const dockerConfigMember = DAEMON_JSON_PATH.replace(/^\//, '');
       const dockerConfigRestored = toRestore.includes(dockerConfigMember);
 
-      // restoreArchiveMembers() only writes the file — the already-running kernel module has no
+      // restoreArchiveMembers() only writes the file - the already-running kernel module has no
       // way to know its superblock file changed underneath it (confirmed live: the array stayed
       // reporting blank, and the onboarding wizard kept bouncing back to its very first screen,
       // no matter how many times status was re-fetched, since that was genuinely accurate live
       // driver state, not stale frontend data). Only needed when the superblock was actually
       // restored (skippedSuperblock covers "wasn't in the archive" and "already had disks" both);
       // a reload failure doesn't undo the file restore, so it's reported alongside success rather
-      // than turned into a 502 — the files are safely on disk either way, only the running
+      // than turned into a 502 - the files are safely on disk either way, only the running
       // module's own state needs a retry (or a reboot) to catch up.
       const superblockRestored = toRestore.includes(superblockMember);
       let superblockReloadError: string | null = null;
@@ -238,7 +238,7 @@ export function systemRouter(
         }
       }
 
-      const text = `Config restored (${restoredCount} item${restoredCount === 1 ? '' : 's'}${skippedSuperblock ? ', array superblock skipped — array already has disks assigned' : ''})`;
+      const text = `Config restored (${restoredCount} item${restoredCount === 1 ? '' : 's'}${skippedSuperblock ? ', array superblock skipped - array already has disks assigned' : ''})`;
       activity.log(text, 'blue').catch(() => {});
       if (superblockReloadError) {
         activity.log(`Config restore's superblock reload failed: ${superblockReloadError}`, 'red').catch(() => {});
@@ -257,7 +257,7 @@ export function systemRouter(
   });
 
   // Manual retry for the reload restoreArchiveMembers's superblock member above already attempts
-  // automatically — same operation, exposed on its own so a failed auto-reload (or any other case
+  // automatically - same operation, exposed on its own so a failed auto-reload (or any other case
   // where the superblock file on disk changed without the running module knowing, e.g. this route
   // itself only ever half-succeeding earlier) can be retried without redoing the whole restore.
   router.post('/system/reload-driver', async (_req, res) => {
@@ -272,12 +272,12 @@ export function systemRouter(
     }
   });
 
-  // The config-restore result screen's single "make everything take effect" action — SMB, NFS,
+  // The config-restore result screen's single "make everything take effect" action - SMB, NFS,
   // driver reload, and nonraid-webui itself, instead of four separate buttons for what's really
   // one "apply what was just restored" step. Order matters: SMB/NFS/driver run first so their own
   // outcomes can still be reported in this response; the webui restart runs last (self-exit, same
   // pattern as /services/webui/restart) since it drops this connection. Each step is independent
-  // and best-effort — one failing doesn't skip the rest, since e.g. a driver reload failure
+  // and best-effort - one failing doesn't skip the rest, since e.g. a driver reload failure
   // shouldn't leave Samba serving a stale smb.conf just because it ran second.
   router.post('/system/restart-services', async (req, res) => {
     const runStep = async (label: string, step: () => Promise<string>): Promise<{ ok: boolean; message: string }> => {
@@ -306,7 +306,7 @@ export function systemRouter(
       const result = await nmd.reloadModuleAndImport();
       return `Driver reloaded, ${result.importedCount} disk(s) re-imported`;
     });
-    // Docker only reads daemon.json at startup, and restarting it stops every running container —
+    // Docker only reads daemon.json at startup, and restarting it stops every running container -
     // an explicit opt-in from the caller, not run by default, so a restore that never touched
     // daemon.json (or a click of this button outside a restore) doesn't bounce Docker for no
     // reason. The config-restore wizard sets this from commitResult.dockerConfigRestored.
@@ -324,7 +324,7 @@ export function systemRouter(
       nfs,
       driverReload,
       docker,
-      message: 'Restarting nonraid-webui — this page will reconnect automatically in a few seconds.',
+      message: 'Restarting nonraid-webui - this page will reconnect automatically in a few seconds.',
     });
     // Same self-exit pattern as /services/webui/restart: this unit's own Restart=on-failure
     // brings it back, and routing through `systemctl restart` here would just get killed by
@@ -348,7 +348,7 @@ export function systemRouter(
     try {
       const status = await nmd.getStatus();
       if (status.resync.active) {
-        res.status(409).json({ error: 'A parity check or clear is in progress — refusing to benchmark mid-operation.' });
+        res.status(409).json({ error: 'A parity check or clear is in progress - refusing to benchmark mid-operation.' });
         return;
       }
       const result = await benchmarkRead(device, durationMs);
@@ -368,10 +368,10 @@ export function systemRouter(
     try {
       const status = await nmd.getStatus();
       if (status.resync.active) {
-        res.status(409).json({ error: 'A parity check or clear is in progress — refusing to benchmark mid-operation.' });
+        res.status(409).json({ error: 'A parity check or clear is in progress - refusing to benchmark mid-operation.' });
         return;
       }
-      // The boot disk's mountpoint is always `/` — no lookup needed, unlike an array disk.
+      // The boot disk's mountpoint is always `/` - no lookup needed, unlike an array disk.
       const result = await benchmarkWrite('/', durationMs);
       activity.log(`Write benchmark on boot disk: ${result.mbPerSecond.toFixed(1)} MB/s`, 'blue').catch(() => {});
       res.json(result);
@@ -422,7 +422,7 @@ export function systemRouter(
     try {
       await rebootHost(config.systemUseSudo);
       activity.log('System reboot requested', 'amber').catch(() => {});
-      res.json({ ok: true, message: 'Rebooting now — this page will reconnect automatically once the host is back up.' });
+      res.json({ ok: true, message: 'Rebooting now - this page will reconnect automatically once the host is back up.' });
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

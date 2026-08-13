@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import type { Share } from './types.js';
 
 /**
- * Owns shares.json — the source of truth for what shares should exist (there's
+ * Owns shares.json - the source of truth for what shares should exist (there's
  * no external system to treat as authoritative here, unlike nmd/docker/smart).
  * Writes are serialized through one promise chain so
  * concurrent requests can't interleave and corrupt the file, and each write is

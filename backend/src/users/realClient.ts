@@ -88,13 +88,13 @@ function parseGetentGroup(stdout: string): { name: string; gid: number; members:
 /**
  * Shells out to real useradd/usermod/userdel/groupadd/groupdel/chpasswd/smbpasswd.
  * The host's /etc/passwd + /etc/group (via getent, which also covers NSS sources
- * like LDAP if configured) are the source of truth for who exists — no separate
+ * like LDAP if configured) are the source of truth for who exists - no separate
  * JSON cache to drift out of sync with. Only accounts with uid/gid in
  * [config.usersUidRangeStart, config.usersUidRangeEnd] are considered "managed"
  * (listed, editable, deletable) so this can never touch real host system
  * accounts. The upper bound matters: without it, reserved accounts like
  * `nobody`/`nogroup` (uid/gid 65534 on Linux) satisfy a plain ">= start" check
- * and get misidentified as app-managed — confirmed live on a real host.
+ * and get misidentified as app-managed - confirmed live on a real host.
  */
 export class RealUsersClient implements UsersClient {
 
@@ -138,7 +138,7 @@ export class RealUsersClient implements UsersClient {
 
     const uid = await this.nextUid();
     // -N: don't auto-create a same-name private group. Without this, useradd creates
-    // one with a gid that often lands inside our managed range (confirmed live — it
+    // one with a gid that often lands inside our managed range (confirmed live - it
     // frequently matches the new uid), making it indistinguishable from a real
     // app-created group and cluttering the group list with one-off noise per user.
     await run('useradd', ['-u', String(uid), '-N', '-M', '-s', config.usersShellPath, input.username]);
@@ -165,7 +165,7 @@ export class RealUsersClient implements UsersClient {
 
     let groups = existing.groups;
     if (input.groups !== undefined) {
-      // Only replace membership in managed (webui-created) groups — preserve any
+      // Only replace membership in managed (webui-created) groups - preserve any
       // other secondary group membership the account happens to have.
       const allGroups = await this.allGroups();
       const managedNames = new Set((await this.managedGroups()).map((g) => g.name));

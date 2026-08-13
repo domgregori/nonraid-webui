@@ -11,7 +11,7 @@ export interface UseAvailableDevices {
   refresh: () => void;
 }
 
-/** On-demand, not polled — scanning for unassigned devices shells out to lsblk/udevadm per candidate, not cheap enough to poll continuously like array status. */
+/** On-demand, not polled - scanning for unassigned devices shells out to lsblk/udevadm per candidate, not cheap enough to poll continuously like array status. */
 export function useAvailableDevices(): UseAvailableDevices {
   const [devices, setDevices] = useState<AvailableDevice[]>([]);
   const [status, setStatus] = useState<AvailableDevicesStatus>('loading');

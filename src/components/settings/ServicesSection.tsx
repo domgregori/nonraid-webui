@@ -38,7 +38,7 @@ export function ServicesSection() {
     try {
       setServices(await servicesApi.list());
     } catch {
-      // best-effort — rows simply keep their last known state
+      // best-effort - rows simply keep their last known state
     }
   };
 
@@ -48,7 +48,7 @@ export function ServicesSection() {
     try {
       if (id === 'webui' && action === 'restart') {
         await servicesApi.restart(id).catch(() => {
-          // the backend may exit before the response fully arrives — that's expected here
+          // the backend may exit before the response fully arrives - that's expected here
         });
         setWebuiReconnecting(true);
         setWebuiReconnectFailed(false);
@@ -85,9 +85,9 @@ export function ServicesSection() {
   return (
     <div>
       {actionError && <div className="status-note status-note--error">{actionError}</div>}
-      {webuiReconnecting && <div className="status-note">Restarting — reconnecting…</div>}
+      {webuiReconnecting && <div className="status-note">Restarting - reconnecting…</div>}
       {webuiReconnectFailed && (
-        <div className="status-note status-note--error">Still not back after 30s — check the backend on the host, or reload this page.</div>
+        <div className="status-note status-note--error">Still not back after 30s - check the backend on the host, or reload this page.</div>
       )}
       {services.map((service) => {
         const view = deriveServiceStatusView(service.state);

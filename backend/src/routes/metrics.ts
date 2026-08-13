@@ -16,7 +16,7 @@ export function metricsRouter(metrics: MetricsService): Router {
   const router = Router();
 
   // GET /metrics?metrics=cpu_percent,mem_used_bytes&range=24h
-  // Batches multiple metrics in one request — the History page loads several charts at once.
+  // Batches multiple metrics in one request - the History page loads several charts at once.
   router.get('/metrics', (req, res) => {
     const range = typeof req.query.range === 'string' ? req.query.range : '24h';
     const rangeMs = RANGE_MS[range];

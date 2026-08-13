@@ -9,13 +9,13 @@ import { VERSION } from '../version.js';
 import { readCpuTempCelsius } from './cpuTemp.js';
 import type { BootDiskInfo, NetworkInterfaceInfo, SystemStats } from './types.js';
 
-// Virtual bridges created by this app's own Docker/LXC support — not
+// Virtual bridges created by this app's own Docker/LXC support - not
 // something an admin cares about seeing alongside their real network
 // interfaces. `os.networkInterfaces()` already excludes loopback addresses
 // via their own `internal: true` flag, so 'lo' needs no special-casing here.
 const EXCLUDED_INTERFACES = new Set(['docker0', 'lxcbr0']);
 
-/** Built entirely from Node's own os.networkInterfaces() — no subprocess, no sudo, and
+/** Built entirely from Node's own os.networkInterfaces() - no subprocess, no sudo, and
  *  deliberately read-only (see the networkInterfaces doc comment on SystemStats). */
 function getNetworkInterfaces(): NetworkInterfaceInfo[] {
   const all = os.networkInterfaces();
@@ -45,7 +45,7 @@ function readBuildVersion(): string | null {
       .toString()
       .trim();
   } catch {
-    return null; // not a git checkout (e.g. a packaged deployment with no .git) — fine, just omit it
+    return null; // not a git checkout (e.g. a packaged deployment with no .git) - fine, just omit it
   }
 }
 
@@ -55,15 +55,15 @@ interface BootDiskIdentity {
 }
 
 /**
- * Resolves the physical disk backing `/` — not part of the array, so nothing
+ * Resolves the physical disk backing `/` - not part of the array, so nothing
  * else in this app already knows this. Run once at construction (this
  * identity never changes at runtime), same pattern as readBuildVersion()
- * above. Never throws — a packaged/unusual environment (no lsblk, root on
+ * above. Never throws - a packaged/unusual environment (no lsblk, root on
  * something exotic) just means no boot disk info, not a broken /api/system.
  */
 function resolveBootDiskIdentity(): BootDiskIdentity | null {
   try {
-    // argv arrays only, never shell strings — same discipline as every other
+    // argv arrays only, never shell strings - same discipline as every other
     // command execution in this codebase (see e.g. nmd/realClient.ts).
     const partition = execFileSync('df', ['-k', '--output=source', '/'], { stdio: ['ignore', 'pipe', 'ignore'] })
       .toString()
@@ -111,7 +111,7 @@ function cpuSnapshot(): CpuSnapshot {
  * computed value, same "don't add latency to every request" reasoning as
  * SmartService's caching.
  *
- * Caveat: os.cpus()/totalmem()/freemem() are container-oblivious — inside a
+ * Caveat: os.cpus()/totalmem()/freemem() are container-oblivious - inside a
  * Docker container they'd report the HOST's stats, not the container's own
  * cgroup limits. Not an issue for this project's actual deployment target
  * (running directly on the NAS host or in the dev VM, both of which have
@@ -134,7 +134,7 @@ export class SystemStatsService {
     this.timer.unref();
 
     if (this.bootDiskIdentity) {
-      this.refreshBootDisk(); // fire-and-forget — getStats() serves null until this resolves
+      this.refreshBootDisk(); // fire-and-forget - getStats() serves null until this resolves
       this.bootDiskTimer = setInterval(() => this.refreshBootDisk(), BOOT_DISK_REFRESH_MS);
       this.bootDiskTimer.unref();
     }
@@ -149,7 +149,7 @@ export class SystemStatsService {
   }
 
   /**
-   * Capacity + temperature change over time, unlike device/model identity —
+   * Capacity + temperature change over time, unlike device/model identity -
    * refreshed on its own slower cadence (not tied to the CPU-sampling
    * interval), same "don't hammer external tools on every poll" reasoning as
    * SmartService's own TTL cache. Temperature is read through SmartService
@@ -192,7 +192,7 @@ export class SystemStatsService {
     }
   }
 
-  /** Parent whole-disk device backing `/` (e.g. `/dev/sda`, not a partition) — used by the boot
+  /** Parent whole-disk device backing `/` (e.g. `/dev/sda`, not a partition) - used by the boot
    *  disk backup routes. `null` when detection failed, same as bootDisk in getStats(). */
   getBootDiskDevice(): string | null {
     return this.bootDiskIdentity?.device ?? null;

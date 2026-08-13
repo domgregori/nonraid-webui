@@ -26,20 +26,20 @@ export function disksRouter(
 ): Router {
   const router = Router();
 
-  const QUEUE_BUSY_MESSAGE = 'A queued disk operation is in progress — wait for it to finish.';
+  const QUEUE_BUSY_MESSAGE = 'A queued disk operation is in progress - wait for it to finish.';
 
   router.get('/disks/available', async (_req, res) => {
     try {
       const devices = await nmd.listAvailableDevices();
-      // A cache mirror member is claimed by btrfs, not nmdctl — nmd.listAvailableDevices() has no
+      // A cache mirror member is claimed by btrfs, not nmdctl - nmd.listAvailableDevices() has no
       // way to know about it (cache is a higher-level feature built on top of nmd, not the other
       // way around), so it still lists these as free. The device-level exclusive-open check already
       // marks them `locked` (btrfs holds them at the kernel level), which stops Add/Replace Disk
-      // from actually succeeding against one — but leaving them in this list at all is misleading,
+      // from actually succeeding against one - but leaving them in this list at all is misleading,
       // confirmed live: both mirror members still showed up in Unassigned Devices as if addable.
       const cacheStatus = await cache.getStatus().catch(() => null);
       const cacheDevicePaths = new Set((cacheStatus?.devices ?? []).map((d) => d.path).filter((p): p is string => p !== null));
-      // Same reasoning for a disk already sitting in the disk-add queue — nmdctl has no idea it's
+      // Same reasoning for a disk already sitting in the disk-add queue - nmdctl has no idea it's
       // "claimed" until the queue actually gets around to running its add, so without this it
       // could be queued a second time while the first item was still waiting its turn.
       const queuedDevicePaths = diskQueue.queuedDevicePaths();
@@ -62,7 +62,7 @@ export function disksRouter(
     }
     try {
       // Validate against a fresh scan rather than trusting a raw client-supplied
-      // path — this shells out with `device`, so it must be a real, currently
+      // path - this shells out with `device`, so it must be a real, currently
       // available device, not attacker-controlled input.
       const available = await nmd.listAvailableDevices();
       const match = available.find((d) => d.device === device);
@@ -70,12 +70,12 @@ export function disksRouter(
         res.status(400).json({ error: `${device} is not a currently available device.` });
         return;
       }
-      // Use the specific free partition when the scan found one — never the
+      // Use the specific free partition when the scan found one - never the
       // whole parent device in that case. Only fall back to the whole
       // device when the disk genuinely has no partitions at all (a blank
       // disk with nothing else on it). Passing the whole device for a disk
       // that has *other* partitions (even unmounted ones don't imply the
-      // rest of the disk is safe — see the mounted-sibling check this is
+      // rest of the disk is safe - see the mounted-sibling check this is
       // paired with in NmdClient.addDisk itself) is exactly the bug that
       // zeroed this project's own test VM's root filesystem once already.
       const target = match.partition ?? match.device;
@@ -106,7 +106,7 @@ export function disksRouter(
       return;
     }
     try {
-      // Same fresh-scan validation addDisk uses — see the comment there for why.
+      // Same fresh-scan validation addDisk uses - see the comment there for why.
       const available = await nmd.listAvailableDevices();
       const match = available.find((d) => d.device === device);
       if (!match) {
@@ -171,7 +171,7 @@ export function disksRouter(
       return;
     }
     try {
-      // nmdctl has no per-slot mount subcommand — this mounts every currently-unmounted disk in
+      // nmdctl has no per-slot mount subcommand - this mounts every currently-unmounted disk in
       // one pass (confirmed live: skips disks with no filesystem rather than erroring), then
       // reports specifically whether the requested slot ended up mounted.
       await nmd.mountDisks();
@@ -181,7 +181,7 @@ export function disksRouter(
       if (!mountpoint || mountpoint === 'unmounted') {
         res
           .status(502)
-          .json({ error: `Disk ${slot} is still unmounted — it may have no filesystem yet, or nmdctl couldn't mount it.` });
+          .json({ error: `Disk ${slot} is still unmounted - it may have no filesystem yet, or nmdctl couldn't mount it.` });
         return;
       }
       activity.log(`Disk ${slot} mounted at ${mountpoint}`, 'blue').catch(() => {});
@@ -219,7 +219,7 @@ export function disksRouter(
     try {
       const status = await nmd.getStatus();
       if (status.resync.active) {
-        res.status(409).json({ error: 'A parity check or clear is in progress — refusing to spin down a disk mid-operation.' });
+        res.status(409).json({ error: 'A parity check or clear is in progress - refusing to spin down a disk mid-operation.' });
         return;
       }
       const disk = status.disks.find((d) => d.slot === slot);
@@ -268,7 +268,7 @@ export function disksRouter(
       return;
     }
     try {
-      // Same fresh-scan validation addDisk uses — this shells out with `device`, so it must be a
+      // Same fresh-scan validation addDisk uses - this shells out with `device`, so it must be a
       // real, currently available device, not attacker-controlled input.
       const available = await nmd.listAvailableDevices();
       if (!available.some((d) => d.device === device)) {
@@ -297,7 +297,7 @@ export function disksRouter(
     try {
       const status = await nmd.getStatus();
       if (status.resync.active) {
-        res.status(409).json({ error: 'A parity check or clear is in progress — refusing to benchmark mid-operation.' });
+        res.status(409).json({ error: 'A parity check or clear is in progress - refusing to benchmark mid-operation.' });
         return;
       }
       const disk = status.disks.find((d) => d.slot === slot);
@@ -329,7 +329,7 @@ export function disksRouter(
     try {
       const status = await nmd.getStatus();
       if (status.resync.active) {
-        res.status(409).json({ error: 'A parity check or clear is in progress — refusing to benchmark mid-operation.' });
+        res.status(409).json({ error: 'A parity check or clear is in progress - refusing to benchmark mid-operation.' });
         return;
       }
       const disk = status.disks.find((d) => d.slot === slot);
@@ -339,7 +339,7 @@ export function disksRouter(
       }
       const mountpoint = disk.filesystem?.mountpoint;
       if (!mountpoint || mountpoint === 'unmounted') {
-        res.status(400).json({ error: `Disk ${slot} isn't currently mounted — write benchmark needs an existing mount.` });
+        res.status(400).json({ error: `Disk ${slot} isn't currently mounted - write benchmark needs an existing mount.` });
         return;
       }
       const result = await benchmarkWrite(mountpoint, durationMs);
@@ -384,7 +384,7 @@ export function disksRouter(
       return;
     }
     try {
-      // Device comes from the real disk list for this slot, never straight from the request body —
+      // Device comes from the real disk list for this slot, never straight from the request body -
       // this shells out to smartctl with it, so it must not be attacker-controlled input.
       const status = await nmd.getStatus();
       const disk = status.disks.find((d) => d.slot === slot);

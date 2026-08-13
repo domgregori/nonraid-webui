@@ -8,11 +8,11 @@ export interface PullLogLine {
 
 /**
  * Shared install/recreate progress state for the Apps install dialog and the
- * Docker tab's Add/Edit Container dialog — both stream the same
+ * Docker tab's Add/Edit Container dialog - both stream the same
  * `CreateContainerProgress` protocol (see api/progressStream.ts). One
  * persistent line per image layer, updated in place as its status changes
  * (mirrors `docker pull`'s own multi-layer rendering), rather than a
- * scrolling firehose of every single tick — a real pull can emit well over a
+ * scrolling firehose of every single tick - a real pull can emit well over a
  * hundred of those for one small image.
  */
 export function useInstallProgress() {

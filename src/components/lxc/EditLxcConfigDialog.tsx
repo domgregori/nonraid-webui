@@ -9,7 +9,7 @@ interface EditLxcConfigDialogProps {
 
 /**
  * Edits the container's actual on-disk `config` file directly, not a
- * curated subset of fields — fits LXC better than Docker's create/recreate
+ * curated subset of fields - fits LXC better than Docker's create/recreate
  * model, since an LXC container isn't immutable: its config can be changed
  * in place (a restart picks up most changes; LXC only reads this file at
  * start). See backend/src/lxc/configFile.ts for the file this reads/writes.

@@ -15,7 +15,7 @@ const ACTIVITY_MESSAGE: Record<ParityCheckAction, { text: string; color: 'blue' 
   CANCEL: { text: 'Parity check cancelled', color: 'amber' },
 };
 
-// Only the actions that actually begin a check — not pause/resume/cancel — count as "started" for
+// Only the actions that actually begin a check - not pause/resume/cancel - count as "started" for
 // notification purposes.
 const START_ACTIONS = new Set<ParityCheckAction>(['CORRECT', 'NOCORRECT']);
 

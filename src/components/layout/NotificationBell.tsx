@@ -7,7 +7,7 @@ import { ActivityHistoryDialog } from '../activity/ActivityHistoryDialog';
 const DROPDOWN_LIMIT = 10;
 
 /**
- * Bell icon in the header — the one place "things worth knowing about" now lives, replacing the
+ * Bell icon in the header - the one place "things worth knowing about" now lives, replacing the
  * old Dashboard-only Activity card. Reuses the same feed (useNotifications, backed by
  * activity.json) and the same row markup the old card used, plus ActivityHistoryDialog unchanged
  * for "View all" (still the best full-history view: limit picker, refresh, scroll).

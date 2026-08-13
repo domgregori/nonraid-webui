@@ -8,18 +8,18 @@ export interface HostDevice {
 
 /**
  * Most of /dev is irrelevant noise for container passthrough (loop*, tty*,
- * null, zero, random, ptmx, ...) — confirmed live against a real host: 186
+ * null, zero, random, ptmx, ...) - confirmed live against a real host: 186
  * top-level entries, almost none of them a sane passthrough target. The
  * devices actually worth offering live one level down in a handful of known
  * subdirectories, so this walks exactly those rather than dumping all of
- * /dev. USB (/dev/bus/usb/<bus>/<dev>) is deliberately excluded — those
+ * /dev. USB (/dev/bus/usb/<bus>/<dev>) is deliberately excluded - those
  * numbers renumber on replug/reboot, making them a poor passthrough target
  * to suggest as if it were stable.
  */
 const CURATED_SUBDIRS: { dir: string; label: (name: string) => string }[] = [
-  { dir: '/dev/dri', label: (n) => `GPU — ${n}` },
-  { dir: '/dev/snd', label: (n) => `Audio — ${n}` },
-  { dir: '/dev/serial/by-id', label: (n) => `Serial — ${n}` },
+  { dir: '/dev/dri', label: (n) => `GPU - ${n}` },
+  { dir: '/dev/snd', label: (n) => `Audio - ${n}` },
+  { dir: '/dev/serial/by-id', label: (n) => `Serial - ${n}` },
 ];
 
 async function listDeviceNodes(dir: string, label: (name: string) => string): Promise<HostDevice[]> {
@@ -42,7 +42,7 @@ async function listDeviceNodes(dir: string, label: (name: string) => string): Pr
         results.push({ path: full, label: label(entry.name) });
       }
     } catch {
-      // broken symlink or a race with device removal — skip it
+      // broken symlink or a race with device removal - skip it
     }
   }
   return results;

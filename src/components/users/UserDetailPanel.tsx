@@ -108,7 +108,7 @@ export function UserDetailPanel({ user, groups, pending, onClose, onUpdateGroups
 
           <div className="detail-card">
             <div className="eyebrow">Groups</div>
-            {groups.length === 0 && <div className="status-note">No groups yet — create one from the Groups panel.</div>}
+            {groups.length === 0 && <div className="status-note">No groups yet - create one from the Groups panel.</div>}
             <div className="disk-checkbox-grid">
               {groups.map((g) => (
                 <label key={g.name} className="disk-checkbox">

@@ -58,7 +58,7 @@ export function AppsPage() {
         <div>
           <div className="page-title">Apps</div>
           <div className="eyebrow apps-eyebrow">
-            {meta ? `${meta.appCount.toLocaleString()} templates` : '—'}
+            {meta ? `${meta.appCount.toLocaleString()} templates` : '-'}
             {meta && ` · updated ${formatLastUpdated(meta)}`}
           </div>
         </div>
@@ -141,7 +141,7 @@ export function AppsPage() {
               Community Applications
             </a>
             , an independent, community-curated template repository for Unraid. Templates are not vetted by this
-            project — review the container's ports, volumes, and image before installing.
+            project - review the container's ports, volumes, and image before installing.
           </div>
         </div>
       </div>

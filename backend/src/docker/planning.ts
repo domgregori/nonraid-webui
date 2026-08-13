@@ -3,7 +3,7 @@ import { realpath } from 'node:fs/promises';
 
 /**
  * Resolves an absolute host path against the allowed root directories.
- * Uses path.resolve('/', ...) so `..` segments can't climb out of a root —
+ * Uses path.resolve('/', ...) so `..` segments can't climb out of a root -
  * caller-supplied paths (a CA template's defaults, or a manually-typed
  * volume) are treated as untrusted input, not just UX hints.
  *
@@ -11,7 +11,7 @@ import { realpath } from 'node:fs/promises';
  * (e.g. `/mnt/user/someshare/escape -> /etc`) can look compliant while its
  * real mount target is outside every root, and Docker's bind mounts follow
  * host-side symlinks at mount time. So once the string check passes, walk up
- * to the nearest existing ancestor (the target may not exist yet — Docker
+ * to the nearest existing ancestor (the target may not exist yet - Docker
  * creates missing bind sources), resolve it through `realpath`, and re-check
  * containment on the real path. Mirrors `browse/paths.ts`'s `resolveExisting`,
  * which does the same thing for file-browser paths.
@@ -53,7 +53,7 @@ export function sanitizeContainerName(raw: string, fallback: string): string {
 
 /**
  * Privileged mode, host networking, and raw device passthrough are all
- * host-isolation escapes of comparable severity — each needs the same
+ * host-isolation escapes of comparable severity - each needs the same
  * explicit human confirmation before install/create proceeds, not just a
  * silent pass through the narrower checks above (path allow-list, /dev/
  * prefix). `subject` lets callers phrase it for what's actually being

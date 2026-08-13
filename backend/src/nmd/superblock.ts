@@ -4,12 +4,12 @@ import type { AvailableDevice } from './types.js';
 /**
  * Layout confirmed directly against `mdp_superblock_s`/`mdp_disk_t` in
  * md_nonraid's md_unraid.h (the sibling nonraid repo): a fixed 4096-byte,
- * native-endian binary struct — 32 "common" words (128 bytes), then 30
+ * native-endian binary struct - 32 "common" words (128 bytes), then 30
  * fixed-size 128-byte disk descriptors, then one reserved descriptor
  * (128 + 30*128 + 128 = 4096). No serialization layer, so this reads it
  * directly with Buffer offsets rather than any parsing library.
  *
- * Deliberately doesn't verify sb_csum — the exact checksum algorithm isn't
+ * Deliberately doesn't verify sb_csum - the exact checksum algorithm isn't
  * confirmed precisely enough to safely reimplement, and it isn't needed for
  * safety here: the kernel re-validates it authoritatively at actual load
  * time in the commit step, so a subtly-wrong reimplementation here would
@@ -58,11 +58,11 @@ function roleForSlot(slot: number): SuperblockDiskRole {
 
 export function parseSuperblock(buf: Buffer): ParsedSuperblock {
   if (buf.length !== MD_SB_BYTES) {
-    throw new HttpError(400, `Not a valid superblock file — expected exactly ${MD_SB_BYTES} bytes, got ${buf.length}.`);
+    throw new HttpError(400, `Not a valid superblock file - expected exactly ${MD_SB_BYTES} bytes, got ${buf.length}.`);
   }
   const magic = buf.readUInt32LE(0);
   if (magic !== MD_SB_MAGIC) {
-    throw new HttpError(400, 'Not a valid superblock file — magic number mismatch. Pick the original super.dat copied from the Unraid host.');
+    throw new HttpError(400, 'Not a valid superblock file - magic number mismatch. Pick the original super.dat copied from the Unraid host.');
   }
 
   const label = readCString(buf, LABEL_OFFSET, LABEL_BYTES);
@@ -80,7 +80,7 @@ export function parseSuperblock(buf: Buffer): ParsedSuperblock {
   return { label, diskCount: slots.length, slots };
 }
 
-/** The "serial number" half of a udev-style `Model_Serial` id string — the
+/** The "serial number" half of a udev-style `Model_Serial` id string - the
  * substring after the last underscore, or the whole string if there is none.
  * Mirrors same_disk_info()'s non-strict comparison in md_unraid.c exactly:
  * both sides of a match get this same transform applied independently. */
@@ -99,7 +99,7 @@ export interface DiskMatch {
 /**
  * Predicts what the kernel's own same_disk_info() (md_unraid.c) would decide
  * at real import time: exact match on the serial-number portion of the id
- * string (not a substring/contains check — confirmed from source, strcmp on
+ * string (not a substring/contains check - confirmed from source, strcmp on
  * the derived serial), and an exact size match. Both failing the same way
  * (DISK_WRONG) at the kernel level, but distinguished here for a clearer
  * preview: a size mismatch is the one this app hard-blocks on.

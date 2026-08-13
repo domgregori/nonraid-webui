@@ -6,18 +6,18 @@ import { useArrayStatus } from '../../state/useArrayStatus';
 import { OnboardingWizard } from './OnboardingWizard';
 
 /**
- * Sits between ArrayStatusProvider and App (see ../../AuthGate.tsx) — the one place that decides
+ * Sits between ArrayStatusProvider and App (see ../../AuthGate.tsx) - the one place that decides
  * whether a freshly-logged-in user sees the real dashboard or the first-run setup wizard first.
  * App is always mounted underneath, wizard or not: closing/finishing the wizard needs nothing
  * more than hiding it, since the dashboard is already there and already reflects live state.
  *
  * Auto-opens at most once per page load, the moment the array status settles and turns out to be
- * genuinely unconfigured — either `loadState === 'ready'` with total_slots === 0 (see
- * OnboardingWizard's deriveStartStep — that's the real "nothing assigned yet" signal, not
+ * genuinely unconfigured - either `loadState === 'ready'` with total_slots === 0 (see
+ * OnboardingWizard's deriveStartStep - that's the real "nothing assigned yet" signal, not
  * array.state), or `loadState === 'not-configured'` (a genuinely fresh install: nmdctl reports no
  * array has ever been created, so getStatus() never even returns a status object to check
- * total_slots on — confirmed live, restoring a pre-install snapshot and running an install end to
- * end left the dashboard stuck on this exact state with the wizard never opening) — and the wizard
+ * total_slots on - confirmed live, restoring a pre-install snapshot and running an install end to
+ * end left the dashboard stuck on this exact state with the wizard never opening) - and the wizard
  * hasn't been dismissed before. "Replay setup tour" (Settings → About) reopens it manually any
  * time after that via the same OnboardingContext this provides to the rest of the app.
  */

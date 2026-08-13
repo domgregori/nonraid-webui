@@ -2,17 +2,17 @@ import { useState } from 'react';
 import { nmdApi } from '../../api/nmdApi';
 
 interface ReloadDriverPromptProps {
-  /** Context-specific explanation of why *this* card is offering a reload — the confirm step's
+  /** Context-specific explanation of why *this* card is offering a reload - the confirm step's
    *  own risk/behavior text (stop-containers checkbox, "doesn't change array config") stays fixed. */
   description: string;
   onReloaded?: () => void;
 }
 
-/** Two-step "Reload Driver" control for stale driver-side counters — counters that accumulate
+/** Two-step "Reload Driver" control for stale driver-side counters - counters that accumulate
  *  across import calls within one loaded module session (num_new, num_invalid, etc. in
  *  md_unraid.c's status_resync()) and are only ever reset by a fresh module load, not a plain
  *  stop/start. Shared by ArrayErrorBanner (an ERROR:* array state) and ParityCheckCard (a
- *  clear/recon stuck pending with no real disk behind it) — same underlying driver quirk, two
+ *  clear/recon stuck pending with no real disk behind it) - same underlying driver quirk, two
  *  different symptoms.
  */
 export function ReloadDriverPrompt({ description, onReloaded }: ReloadDriverPromptProps) {
@@ -49,7 +49,7 @@ export function ReloadDriverPrompt({ description, onReloaded }: ReloadDriverProm
       <label style={{ display: 'block', marginBottom: 8 }}>
         <input type="checkbox" checked={stopContainers} onChange={(e) => setStopContainers(e.target.checked)} disabled={running} />{' '}
         Stop Docker and running LXC containers first, if needed (e.g. a container's storage is on an array disk and
-        blocking the reload) — they're started again automatically right after.
+        blocking the reload) - they're started again automatically right after.
       </label>
       {error && <div style={{ marginBottom: 8 }}>{error}</div>}
       <button type="button" className="btn" disabled={running} onClick={() => setConfirming(false)}>

@@ -8,7 +8,7 @@ import type { MetricsLoadStatus, UseMetrics } from './useMetrics';
 const NET_POLL_MS = 3000;
 const DEFAULT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes of rolling history
 
-const BYTES_PER_IO_UNIT = 4096; // see backend/src/metrics/sampler.ts's own comment — same driver convention
+const BYTES_PER_IO_UNIT = 4096; // see backend/src/metrics/sampler.ts's own comment - same driver convention
 
 interface DiskIoPrev {
   reads: number;
@@ -18,12 +18,12 @@ interface DiskIoPrev {
 
 /**
  * Same shape as useMetrics(), but sourced entirely from data this app already polls for other
- * screens — no new fast server-side sampling loop. CPU/mem ride useSystemStats()'s existing 3s
+ * screens - no new fast server-side sampling loop. CPU/mem ride useSystemStats()'s existing 3s
  * poll; disk temp/usage/read/write ride useArrayStatus()'s existing 2s (status) and 15s (temps)
  * polls, with read/write throughput computed client-side from the same cumulative counters the
- * 60s history sampler itself diffs (see sampler.ts) — just at a finer grain here. Network
+ * 60s history sampler itself diffs (see sampler.ts) - just at a finer grain here. Network
  * throughput is the one metric with no existing fast source, so this is the only thing that
- * opens its own poll (GET /system/net-live, only while `enabled`, stopped otherwise) — see
+ * opens its own poll (GET /system/net-live, only while `enabled`, stopped otherwise) - see
  * backend/src/routes/system.ts.
  *
  * Points are kept in a ref-backed ring buffer (not React state) so appends are cheap; a snapshot
@@ -121,7 +121,7 @@ export function useLiveMetrics(enabled: boolean, windowMs: number = DEFAULT_WIND
           if (typeof r.txKbS === 'number') appendPoint('net_tx_kb_s', 'total', ts, r.txKbS);
           publish();
         })
-        .catch(() => {}); // best-effort — a transient failure just leaves the network chart's window a beat stale
+        .catch(() => {}); // best-effort - a transient failure just leaves the network chart's window a beat stale
     };
     poll();
     const id = setInterval(poll, NET_POLL_MS);

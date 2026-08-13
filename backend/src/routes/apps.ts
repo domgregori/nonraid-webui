@@ -78,7 +78,7 @@ export function appsRouter(apps: AppsService): Router {
   });
 
   // Streams newline-delimited JSON events instead of a single response, so the
-  // client can show real pull/create/start progress — a plain install can take
+  // client can show real pull/create/start progress - a plain install can take
   // long enough (pulling a multi-hundred-MB image) that a silent blocking POST
   // reads as hung. Errors are reported as a `{type:"error"}` event rather than
   // an HTTP error status, since the response has already started streaming by

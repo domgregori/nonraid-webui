@@ -10,9 +10,9 @@ import { ProgressBar } from '../shared/ProgressBar';
 
 // Exact text of the one error DiskQueueService.runAddDiskItem() throws when it declines to stop
 // the array because a resync is already active outside the queue's own bookkeeping (see that
-// method's doc comment in backend/src/diskQueue/service.ts) — matched below so the failed-item
+// method's doc comment in backend/src/diskQueue/service.ts) - matched below so the failed-item
 // block can show live progress instead of leaving the reader to guess where to look.
-const EXTERNAL_RESYNC_ERROR = 'A parity check or resync is already active outside the queue — wait for it to finish, then retry.';
+const EXTERNAL_RESYNC_ERROR = 'A parity check or resync is already active outside the queue - wait for it to finish, then retry.';
 
 function typeLabel(type: DiskQueueItemType): string {
   switch (type) {
@@ -39,13 +39,13 @@ function phaseText(phase: DiskQueueItemPhase): string {
 }
 
 function formatEta(seconds: number): string {
-  if (!seconds || seconds <= 0) return '—';
+  if (!seconds || seconds <= 0) return '-';
   const mins = Math.round(seconds / 60);
   if (mins < 60) return `${mins} min remaining`;
   return `${Math.floor(mins / 60)}h ${mins % 60}m remaining`;
 }
 
-/** Shared live percent/speed/ETA readout for an active resync — used by both the running item's
+/** Shared live percent/speed/ETA readout for an active resync - used by both the running item's
  *  'awaiting-resync' phase and the failed item's "blocked by an external resync" case below. */
 function ResyncProgress({ resync }: { resync: NmdResyncStatus }) {
   return (
@@ -61,13 +61,13 @@ function ResyncProgress({ resync }: { resync: NmdResyncStatus }) {
 }
 
 /**
- * Sits on the Disks page next to Unassigned Devices — see DiskQueueService's own doc comment for
+ * Sits on the Disks page next to Unassigned Devices - see DiskQueueService's own doc comment for
  * the backend engine this displays. Modeled on EmptyDiskProgressCard: renders nothing while the
  * queue is empty (no queued/running/recent-done/failed items), stays out of the way otherwise.
  *
  * For phase 'awaiting-resync' the progress readout comes straight from useArrayStatus()'s live
- * status.resync — the same data source ParityCheckCard/ArrayDisks already read for a parity
- * check or a new-disk clear (see that hook's own users) — this is a lightweight text/bar readout
+ * status.resync - the same data source ParityCheckCard/ArrayDisks already read for a parity
+ * check or a new-disk clear (see that hook's own users) - this is a lightweight text/bar readout
  * of the same numbers, not a duplicate full progress card. 'committing'/'formatting' have no
  * percentage available yet, so those just show an indeterminate bar.
  */
@@ -110,7 +110,7 @@ export function DiskQueueCard() {
       {running && (
         <>
           <div className="status-note">
-            {typeLabel(running.type)} — {running.label}: {phaseText(running.phase)}
+            {typeLabel(running.type)} - {running.label}: {phaseText(running.phase)}
           </div>
           {running.phase === 'awaiting-resync' && resync ? (
             <ResyncProgress resync={resync} />
@@ -123,11 +123,11 @@ export function DiskQueueCard() {
       {failed && (
         <div style={{ marginTop: running ? 'var(--space-md)' : 0 }}>
           <div className="status-note status-note--error">
-            {typeLabel(failed.type)} — {failed.label} failed: {failed.error ?? 'unknown error'}
+            {typeLabel(failed.type)} - {failed.label} failed: {failed.error ?? 'unknown error'}
           </div>
           {failed.error === EXTERNAL_RESYNC_ERROR && resync?.active && (
             <div style={{ marginTop: 'var(--space-sm)' }}>
-              <div className="status-note">Waiting on an external parity operation to finish — it'll resolve on its own.</div>
+              <div className="status-note">Waiting on an external parity operation to finish - it'll resolve on its own.</div>
               <ResyncProgress resync={resync} />
             </div>
           )}

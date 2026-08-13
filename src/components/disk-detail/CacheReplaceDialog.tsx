@@ -24,7 +24,7 @@ export function CacheReplaceDialog({ onClose, onDone }: CacheReplaceDialogProps)
       const s = await cacheApi.getReplaceStatus();
       if (mounted.current) setReplaceStatus(s);
     } catch {
-      // transient — next poll tries again
+      // transient - next poll tries again
     }
   }, []);
 
@@ -73,7 +73,7 @@ export function CacheReplaceDialog({ onClose, onDone }: CacheReplaceDialogProps)
           {!started && (
             <>
               <div className="status-note status-note--error">
-                Runs btrfs's own online replace against the missing mirror member — any data on the new device is
+                Runs btrfs's own online replace against the missing mirror member - any data on the new device is
                 destroyed. The cache stays usable (single-disk, no redundancy) while this runs.
               </div>
 
@@ -121,10 +121,10 @@ export function CacheReplaceDialog({ onClose, onDone }: CacheReplaceDialogProps)
             <>
               {!finished ? (
                 <div className="status-note">
-                  Replacement in progress{replaceStatus?.progressPercent != null ? ` — ${replaceStatus.progressPercent}% done` : '…'}
+                  Replacement in progress{replaceStatus?.progressPercent != null ? ` - ${replaceStatus.progressPercent}% done` : '…'}
                 </div>
               ) : (
-                <div className="status-note">Replacement finished — the mirror should be healthy again.</div>
+                <div className="status-note">Replacement finished - the mirror should be healthy again.</div>
               )}
               {replaceStatus?.message && <pre className="import-raw-output">{replaceStatus.message}</pre>}
               <div className="dialog__actions">

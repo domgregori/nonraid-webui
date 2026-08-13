@@ -23,7 +23,7 @@ function handleError(err: unknown, res: Response) {
 }
 
 // The WebAuthn ceremony response objects from @simplewebauthn/browser are large, nested, and
-// entirely re-validated by @simplewebauthn/server's own verify functions — this just guards
+// entirely re-validated by @simplewebauthn/server's own verify functions - this just guards
 // against a missing/wrong-shaped body reaching those functions as something they'd choke on
 // unhelpfully, not a full schema check.
 function requireResponseField(input: unknown): unknown {

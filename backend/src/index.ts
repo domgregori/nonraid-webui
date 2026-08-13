@@ -70,7 +70,7 @@ async function main() {
   const tlsStore = new TlsStore();
   const tlsRecord = await tlsStore.get(); // fail fast at boot on a corrupt tls.json
   if (config.serveFrontend && !existsSync(path.join(config.frontendDistPath, 'index.html'))) {
-    throw new Error(`serveFrontend is true but no index.html at ${config.frontendDistPath} — did the frontend build run?`);
+    throw new Error(`serveFrontend is true but no index.html at ${config.frontendDistPath} - did the frontend build run?`);
   }
   const shareApplier = createShareApplier();
   const shareStore = new ShareStore();
@@ -91,7 +91,7 @@ async function main() {
 
   // The driver has no readback for write method (see nmd/client.ts), so on a
   // fresh backend start (independent of whether the array/driver itself was
-  // just started), reapply whatever was last persisted — best-effort, since
+  // just started), reapply whatever was last persisted - best-effort, since
   // the array might not be started yet, in which case there's nothing to
   // apply until /array/start does it.
   const persistedSettings = await settingsStore.get();
@@ -100,23 +100,23 @@ async function main() {
   }
 
   // config.lxcDefaultPath (the -P flag every lxc-* call gets) has no other source of truth, unlike
-  // Docker's own daemon.json — reapply a persisted relocation now, before anything handles a
+  // Docker's own daemon.json - reapply a persisted relocation now, before anything handles a
   // request, so it survives this app's own restart (see lxc/storagePath.ts). Safe to set even
-  // when mode is 'cache' before cache.remountIfConfigured() below actually mounts it — this only
+  // when mode is 'cache' before cache.remountIfConfigured() below actually mounts it - this only
   // becomes a real path once an lxc-* call runs, well after startup finishes.
   if (persistedSettings.lxcStorage.mode !== 'boot') {
     config.lxcDefaultPath = resolveLxcPath(persistedSettings.lxcStorage);
   }
 
   // Same "nothing survives a backend restart on its own" reasoning as the
-  // share remount below — mount the cache mirror (if one's been set up)
+  // share remount below - mount the cache mirror (if one's been set up)
   // before shares come back up, so a cache-aware share mount (once
-  // realApplier.ts's branchPaths() knows about cache — see the cache pool
+  // realApplier.ts's branchPaths() knows about cache - see the cache pool
   // plan) sees it already mounted rather than racing it.
   await cache.remountIfConfigured();
 
   // Share mounts live in the OS mount table, not shares.json, so they don't
-  // survive a backend restart/reboot on their own — reapply them now so
+  // survive a backend restart/reboot on their own - reapply them now so
   // /mnt/user/<name> reflects real disk data again instead of staying an
   // empty leftover directory. Best-effort (see ShareService.remountAll):
   // never block startup on one share's mount failing.
@@ -131,7 +131,7 @@ async function main() {
   });
 
   // Auth routes handle their own access rules (setup/login/status/logout are
-  // public by design, password-change checks the session itself) — mounted
+  // public by design, password-change checks the session itself) - mounted
   // before the gate below so none of them get blocked by it.
   app.use('/api', authRouter(authService, activity));
 
@@ -143,7 +143,7 @@ async function main() {
   // route like /disks. Must stay before the requireAuth gate below for
   // exactly that reason. Both handlers are bare app.use()/app.get() with no
   // path scoping of their own, so they'd otherwise see every request
-  // including ones meant for the /api/* routers mounted after the gate —
+  // including ones meant for the /api/* routers mounted after the gate -
   // isApiPath keeps this scoped to non-API paths only. Relies on
   // express.static's default { fallthrough: true }; if that's ever
   // overridden, a missing static file 404s directly instead of falling
@@ -186,11 +186,11 @@ async function main() {
   app.use('/api', tlsRouter(tlsStore, activity, authService));
 
   // Protocol is chosen once at boot from the persisted TLS config, same "config changes need a
-  // restart" model as everything else in this app — see backend/src/tls/. Falls open to plain
+  // restart" model as everything else in this app - see backend/src/tls/. Falls open to plain
   // HTTP if the configured cert/key can't be read, rather than crashing: a bad cert combined with
   // a crash-on-boot would brick the admin's only path back into Settings to fix it (systemd would
   // just crash-loop into the same broken tls.json forever). cookieSecure/WebAuthn config is only
-  // flipped inside the success branch below — flipping it unconditionally on tlsRecord.enabled
+  // flipped inside the success branch below - flipping it unconditionally on tlsRecord.enabled
   // would force Secure cookies even on the HTTP fallback, silently breaking login (see
   // config.ts's cookieSecure doc comment).
   let server: http.Server | https.Server = http.createServer(app);
@@ -203,9 +203,9 @@ async function main() {
       if (!config.webauthnOrigin) config.webauthnOrigin = `https://${tlsRecord.commonName}${config.port === 443 ? '' : `:${config.port}`}`;
     } catch (err) {
       console.error(
-        `TLS is enabled but the cert/key at ${tlsRecord.certPath}/${tlsRecord.keyPath} could not be read (${(err as Error).message}) — falling back to plain HTTP. Fix or regenerate the certificate in Settings.`,
+        `TLS is enabled but the cert/key at ${tlsRecord.certPath}/${tlsRecord.keyPath} could not be read (${(err as Error).message}) - falling back to plain HTTP. Fix or regenerate the certificate in Settings.`,
       );
-      activity.log('TLS is enabled but the cert/key could not be read — falling back to plain HTTP', 'red').catch(() => {});
+      activity.log('TLS is enabled but the cert/key could not be read - falling back to plain HTTP', 'red').catch(() => {});
     }
   }
 

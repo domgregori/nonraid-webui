@@ -7,7 +7,7 @@ interface ShareExportModalProps {
   onSubmit: (input: ShareInput) => Promise<boolean>;
 }
 
-/** Turns SMB/NFS network access on or off for an existing pool — the counterpart to
+/** Turns SMB/NFS network access on or off for an existing pool - the counterpart to
  *  ShareFormModal, which no longer edits this. Submits the full ShareInput (name/disks/
  *  allocationMethod/description unchanged) since the update route replaces, not patches. */
 export function ShareExportModal({ share, onCancel, onSubmit }: ShareExportModalProps) {
@@ -39,7 +39,7 @@ export function ShareExportModal({ share, onCancel, onSubmit }: ShareExportModal
     setSubmitting(true);
     const ok = await onSubmit(input);
     setSubmitting(false);
-    if (!ok) setError('Request failed — see the page error banner for details.');
+    if (!ok) setError('Request failed - see the page error banner for details.');
   };
 
   return (
@@ -85,7 +85,7 @@ export function ShareExportModal({ share, onCancel, onSubmit }: ShareExportModal
           </div>
 
           {!smbEnabled && !nfsEnabled && (
-            <div className="status-note">Not shared — this pool won't be reachable over the network until SMB or NFS is turned on.</div>
+            <div className="status-note">Not shared - this pool won't be reachable over the network until SMB or NFS is turned on.</div>
           )}
 
           {error && <div className="status-note status-note--error">{error}</div>}

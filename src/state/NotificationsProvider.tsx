@@ -13,7 +13,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [lastSeenId, setLastSeenId] = useState<string | null>(() => localStorage.getItem(LAST_SEEN_KEY));
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const mounted = useRef(true);
-  // Ids already seen across polls, purely to detect what's *new* since the last poll — distinct
+  // Ids already seen across polls, purely to detect what's *new* since the last poll - distinct
   // from lastSeenId, which tracks what the user has actually looked at (for the unread badge).
   const knownIds = useRef<Set<string> | null>(null);
   const toastTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -32,14 +32,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     try {
       fresh = await activityApi.list(LIST_LIMIT);
     } catch {
-      return; // best-effort, same as every other poller in this app — keep last-known state
+      return; // best-effort, same as every other poller in this app - keep last-known state
     }
     if (!mounted.current) return;
     setEntries(fresh);
 
     if (knownIds.current === null) {
       // First poll after mount: seed silently. Without this, every backend restart (or just
-      // opening the app) would toast the app's entire recent history at once — same "seed, don't
+      // opening the app) would toast the app's entire recent history at once - same "seed, don't
       // log" idiom ActivityWatcher itself uses for its own edge-triggered checks.
       knownIds.current = new Set(fresh.map((e) => e.id));
       return;
@@ -49,7 +49,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     knownIds.current = new Set(fresh.map((e) => e.id));
     if (newOnes.length === 0) return;
 
-    // Toast only warnings/errors — routine blue/green completions still land in the bell
+    // Toast only warnings/errors - routine blue/green completions still land in the bell
     // dropdown/history, just without interrupting whatever the user's doing.
     const toastWorthy = newOnes.filter((e) => e.color === 'amber' || e.color === 'red');
     if (toastWorthy.length === 0) return;
@@ -84,7 +84,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     if (lastSeenId === null) return entries.length;
     const idx = entries.findIndex((e) => e.id === lastSeenId);
     // Not found means everything currently loaded is newer than the last-seen entry (it aged out
-    // of this LIST_LIMIT-sized window) — treat the whole visible window as unread rather than 0.
+    // of this LIST_LIMIT-sized window) - treat the whole visible window as unread rather than 0.
     return idx === -1 ? entries.length : idx;
   })();
 

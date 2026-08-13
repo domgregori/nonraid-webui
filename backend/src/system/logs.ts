@@ -10,7 +10,7 @@ export interface LogSourceDef {
 }
 
 // Unit names mirror SERVICE_DEFS in services.ts (nfs/smb/ssh/docker/lxc) rather than inventing a
-// second mapping — same units the Services section already starts/stops/monitors. `kernel` reads
+// second mapping - same units the Services section already starts/stops/monitors. `kernel` reads
 // via journald's kernel ring buffer (`-k`) instead of raw `dmesg`: it survives reboots (this rig
 // has persistent journal storage, confirmed via systemd-journal-flush.service) and supports
 // `--since`, which a wrapping ring buffer does not. `smart` is included because SMART daemon
@@ -58,7 +58,7 @@ function formatSince(date: Date): string {
 const LEADING_TIMESTAMP_RE = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2})\s/;
 
 /** Mirrors nextSinceFromLogText in docker/realClient.ts: pull the timestamp off the last log
- *  line to use as the next poll's cursor, rather than "now" — avoids a gap between the last
+ *  line to use as the next poll's cursor, rather than "now" - avoids a gap between the last
  *  line's real time and whenever this request happened to complete. */
 function nextSinceFromLogText(text: string, fallback: number | null): number | null {
   const lines = text.split('\n').filter((l) => l.length > 0);
@@ -75,7 +75,7 @@ function nextSinceFromLogText(text: string, fallback: number | null): number | n
 export interface LogQueryOptions {
   tail?: number;
   windowMs?: number | null;
-  /** Epoch ms cursor for a live-tail poll — supersedes tail/windowMs, same rationale as Docker's
+  /** Epoch ms cursor for a live-tail poll - supersedes tail/windowMs, same rationale as Docker's
    *  getContainerLogs: a poll wants everything new since last time, not just the last N lines. */
   sinceCursor?: number;
 }

@@ -8,7 +8,7 @@ import { ProgressBar } from '../shared/ProgressBar';
 
 const TERMINAL_STATUSES = ['done', 'failed', 'cancelled'];
 
-/** Same "only show while relevant, client-dismissible" shape as EmptyDiskProgressCard — the mover
+/** Same "only show while relevant, client-dismissible" shape as EmptyDiskProgressCard - the mover
  *  can run in the background for a while (scheduled or manual), independent of any one dialog. */
 export function CacheMoverProgressCard() {
   const job = useCacheMoverStatus();
@@ -25,9 +25,9 @@ export function CacheMoverProgressCard() {
       : job.status === 'done'
         ? nothingMoved
           ? 'Cache mover: nothing to move'
-          : `Cache mover finished${job.error ? ` — ${job.error}` : ''}`
+          : `Cache mover finished${job.error ? ` - ${job.error}` : ''}`
         : job.status === 'cancelled'
-          ? `Cache mover cancelled — ${job.movedFiles}/${job.totalFiles} files moved before stopping`
+          ? `Cache mover cancelled - ${job.movedFiles}/${job.totalFiles} files moved before stopping`
           : job.status === 'failed'
             ? `Cache mover failed: ${job.error ?? 'unknown error'}`
             : '';

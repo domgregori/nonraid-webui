@@ -20,7 +20,7 @@ export interface LxcStorageInfo extends StorageLocation {
   path: string;
 }
 
-// Mirrors backend/src/docker/storagePath.ts's DockerStorageInfo — 'custom' covers a data-root this
+// Mirrors backend/src/docker/storagePath.ts's DockerStorageInfo - 'custom' covers a data-root this
 // app didn't set (e.g. hand-edited outside the boot/array/cache convention).
 export interface DockerStorageInfo {
   mode: 'boot' | 'array' | 'cache' | 'custom';

@@ -19,7 +19,7 @@ export function AddUserModal({ existingUsernames, onCancel, onSubmit }: AddUserM
 
   const validate = (): string | null => {
     if (!USERNAME_RE.test(username)) {
-      return 'Username must be lowercase letters, numbers, dash, underscore — starting with a letter or underscore.';
+      return 'Username must be lowercase letters, numbers, dash, underscore - starting with a letter or underscore.';
     }
     if (existingUsernames.includes(username)) return `User "${username}" already exists.`;
     if (password.length < MIN_PASSWORD_LENGTH) return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
@@ -39,7 +39,7 @@ export function AddUserModal({ existingUsernames, onCancel, onSubmit }: AddUserM
     setError(null);
     const ok = await onSubmit({ username, password, groups: [] });
     setSubmitting(false);
-    if (!ok) setError('Request failed — see the page error banner for details.');
+    if (!ok) setError('Request failed - see the page error banner for details.');
   };
 
   return (

@@ -2,7 +2,7 @@
  * Live references into tokens.css's custom properties, for selectors/components
  * that need a color as a plain string (inline styles, SVG fill/stroke) rather
  * than through a CSS class. Using var() rather than literal values means these
- * automatically follow the active theme (light/dark/system) — no separate
+ * automatically follow the active theme (light/dark/system) - no separate
  * light-mode copy to keep in sync.
  */
 export const COLORS = {

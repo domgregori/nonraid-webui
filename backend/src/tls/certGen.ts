@@ -8,9 +8,9 @@ import { runSudoMaybe } from '../system/procUtil.js';
 import { parseCertInfo } from './certInspect.js';
 import type { TlsRecord } from './types.js';
 
-// No slashes/control characters — avoids a CN value like "foo/CN=evil" injecting extra RDNs into
+// No slashes/control characters - avoids a CN value like "foo/CN=evil" injecting extra RDNs into
 // openssl's -subj parsing (this is passed as a real argv entry, not through a shell, so there's
-// no command-injection risk either way — this guard is purely about keeping the subject DN sane).
+// no command-injection risk either way - this guard is purely about keeping the subject DN sane).
 const NAME_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,253}[A-Za-z0-9])?$/;
 
 export function suggestCommonName(): string {

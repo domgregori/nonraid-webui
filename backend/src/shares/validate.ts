@@ -19,11 +19,11 @@ export function validateShareInput(input: unknown): ShareInput {
   }
   const allocationMethod = i.allocationMethod as AllocationMethod;
 
-  // cache-only shares live entirely on the cache pool — the opposite of every other method,
+  // cache-only shares live entirely on the cache pool - the opposite of every other method,
   // which needs at least one array disk slot.
   if (allocationMethod === 'cache-only') {
     if (!Array.isArray(i.disks) || i.disks.length !== 0) {
-      throw new HttpError(400, 'Cache-only allocation requires zero data disks — the share lives entirely on the cache pool.');
+      throw new HttpError(400, 'Cache-only allocation requires zero data disks - the share lives entirely on the cache pool.');
     }
   } else {
     if (!Array.isArray(i.disks) || i.disks.length === 0 || !i.disks.every((d) => Number.isInteger(d) && d >= 1 && d <= 28)) {
@@ -39,7 +39,7 @@ export function validateShareInput(input: unknown): ShareInput {
   if (i.allDisks === true && (allocationMethod === 'single-disk' || allocationMethod === 'cache-only')) {
     throw new HttpError(400, 'allDisks cannot be combined with single-disk or cache-only allocation.');
   }
-  // Empty is valid and normal now: a pool doesn't have to be exported over SMB/NFS at all —
+  // Empty is valid and normal now: a pool doesn't have to be exported over SMB/NFS at all -
   // that's configured separately (see routes/shares.ts callers on the Sharing page), not required
   // at pool-creation time the way it used to be.
   if (!Array.isArray(i.protocols) || !i.protocols.every((p) => PROTOCOLS.includes(p as ShareProtocol))) {

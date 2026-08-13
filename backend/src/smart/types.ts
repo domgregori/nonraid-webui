@@ -1,6 +1,6 @@
 export type SmartHealth = 'passed' | 'failed';
 
-/** Live power state, from smartctl's -n standby exit-status bit — see realClient.ts's run(). */
+/** Live power state, from smartctl's -n standby exit-status bit - see realClient.ts's run(). */
 export type SmartSpinState = 'active' | 'standby' | 'unknown';
 
 export type SelfTestType = 'short' | 'long' | 'conveyance';
@@ -25,7 +25,7 @@ export interface SelfTestHistoryEntry {
 export interface SmartRawAttribute {
   id: number;
   name: string;
-  /** e.g. "0x0032" — hex of the attribute's flags word. */
+  /** e.g. "0x0032" - hex of the attribute's flags word. */
   flagHex: string | null;
   value: number | null;
   worst: number | null;
@@ -61,13 +61,13 @@ export interface SmartAttributes {
   device: string;
   model: string | null;
   serial: string | null;
-  /** World Wide Name — a real, stable hardware identifier smartctl reports (`smartctl -x`'s "Logical
+  /** World Wide Name - a real, stable hardware identifier smartctl reports (`smartctl -x`'s "Logical
    *  Unit id"), used as this app's "UUID" for array-assigned disks since nmdctl itself has none. */
   wwn: string | null;
   capacityBytes: number | null;
   health: SmartHealth | null;
   temperature: number | null;
-  /** 0 or absent depending on the drive — see rotationRpm's own doc comment. Not itself a reliable
+  /** 0 or absent depending on the drive - see rotationRpm's own doc comment. Not itself a reliable
    *  SSD/HDD signal (some HDDs, like this project's own test WD Blue, don't report it at all); type
    *  detection uses lsblk's ROTA flag instead (system/diskType.ts). This is RPM-when-known only. */
   rotationRpm: number | null;

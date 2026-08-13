@@ -2,7 +2,7 @@ export function formatBytesAsMB(bytes: number): string {
   return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
-/** GB below 1024, otherwise TB — matches how disk sizes are shown elsewhere in the app. */
+/** GB below 1024, otherwise TB - matches how disk sizes are shown elsewhere in the app. */
 export function formatBytesHuman(bytes: number): string {
   const gb = bytes / (1024 * 1024 * 1024);
   if (gb >= 1024) {
@@ -12,7 +12,7 @@ export function formatBytesHuman(bytes: number): string {
   return `${gb >= 10 ? Math.round(gb) : gb.toFixed(1)} GB`;
 }
 
-/** Byte-scale size for file listings — unlike formatBytesHuman this covers B/KB/MB too. */
+/** Byte-scale size for file listings - unlike formatBytesHuman this covers B/KB/MB too. */
 export function formatFileSize(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let value = bytes;
@@ -38,7 +38,7 @@ export function formatMemLabel(usedBytes: number, totalBytes: number): string {
   return `${usedGb.toFixed(1)} / ${Math.round(totalGb)} GB`;
 }
 
-/** "just now" / "5m ago" / "3h ago" / "2d ago" — matches the activity feed's original mock copy. */
+/** "just now" / "5m ago" / "3h ago" / "2d ago" - matches the activity feed's original mock copy. */
 export function formatRelativeTime(timestampMs: number): string {
   const seconds = Math.max(0, Math.floor((Date.now() - timestampMs) / 1000));
   if (seconds < 60) return 'just now';

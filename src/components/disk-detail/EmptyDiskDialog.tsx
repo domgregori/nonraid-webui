@@ -14,7 +14,7 @@ interface EmptyDiskDialogProps {
 /**
  * Checks whether a disk's real files can all be relocated onto the array's
  * other disks (per each file's share's own configured disks and allocation
- * method), then — if so — kicks off the actual move as a background job.
+ * method), then - if so - kicks off the actual move as a background job.
  * Deliberately closes as soon as the move starts rather than tracking
  * progress itself: EmptyDiskProgressCard on the Disks page polls the same
  * global job and stays visible even after this dialog is gone, since a real
@@ -47,7 +47,7 @@ export function EmptyDiskDialog({ slot, label, onClose, onStarted }: EmptyDiskDi
   };
 
   // Nothing for Empty Disk to move (no share includes this disk, or the shares
-  // that do have no files here right now) — go straight to taking it out of the
+  // that do have no files here right now) - go straight to taking it out of the
   // array instead of leaving the user to find Unassign elsewhere. This only
   // detaches the slot; it never touches whatever bytes are actually on the
   // disk (including any unmanagedBytes reported above), so it's safe even
@@ -99,13 +99,13 @@ export function EmptyDiskDialog({ slot, label, onClose, onStarted }: EmptyDiskDi
               {plan.fileCount === 0 ? (
                 <>
                   <div className="status-note status-note--error">
-                    Nothing to move — this disk isn't part of any configured share, so there's no file this tool knows
+                    Nothing to move - this disk isn't part of any configured share, so there's no file this tool knows
                     how to relocate.
                     {plan.unmanagedBytes > 0 && (
                       <>
                         {' '}
                         It still has {formatBytesHuman(plan.unmanagedBytes)} of real data on it. Removing it from the
-                        array only detaches the slot — that data stays on the physical disk, it just won't be reachable
+                        array only detaches the slot - that data stays on the physical disk, it just won't be reachable
                         through the array anymore.
                       </>
                     )}
@@ -118,7 +118,7 @@ export function EmptyDiskDialog({ slot, label, onClose, onStarted }: EmptyDiskDi
               ) : plan.fits ? (
                 <>
                   <div className="status-note">
-                    Fits — will be redistributed onto:{' '}
+                    Fits - will be redistributed onto:{' '}
                     {Object.entries(plan.perDestinationBytes)
                       .map(([destSlot, bytes]) => `slot ${destSlot} (${formatBytesHuman(bytes)})`)
                       .join(', ')}
@@ -126,12 +126,12 @@ export function EmptyDiskDialog({ slot, label, onClose, onStarted }: EmptyDiskDi
                   </div>
                   {plan.unmanagedBytes > 0 && (
                     <div className="status-note status-note--error">
-                      {formatBytesHuman(plan.unmanagedBytes)} on this disk isn't under any share configured for it — this
+                      {formatBytesHuman(plan.unmanagedBytes)} on this disk isn't under any share configured for it - this
                       won't be moved, and needs handling manually (see Browse) before this disk is truly empty.
                     </div>
                   )}
                   <div className="status-note status-note--error">
-                    This copies every file to its new disk, verifies it, then removes the original — it can take a long
+                    This copies every file to its new disk, verifies it, then removes the original - it can take a long
                     time for real data and runs in the background. Watch progress on the Empty Disk card.
                   </div>
                 </>

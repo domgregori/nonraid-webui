@@ -6,7 +6,7 @@ interface BootDiskCardProps {
   onClick: () => void;
 }
 
-/** The disk nonraid-webui itself boots from — not part of the array, so it doesn't fit the
+/** The disk nonraid-webui itself boots from - not part of the array, so it doesn't fit the
  *  parity/data disk model ArrayDisks uses. Driven by the same polling hook SystemCard already
  *  uses; returns null when detection failed, same soft-fail behavior as that card. */
 export function BootDiskCard({ onClick }: BootDiskCardProps) {
@@ -34,8 +34,8 @@ export function BootDiskCard({ onClick }: BootDiskCardProps) {
         </>
       )}
       <div className="disk-card__row--sub">
-        <span>{boot.filesystem ?? '—'}</span>
-        <span>{boot.tempCelsius !== null ? `${Math.round(boot.tempCelsius)}°C` : '—'}</span>
+        <span>{boot.filesystem ?? '-'}</span>
+        <span>{boot.tempCelsius !== null ? `${Math.round(boot.tempCelsius)}°C` : '-'}</span>
       </div>
     </div>
   );

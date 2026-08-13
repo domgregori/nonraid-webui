@@ -27,7 +27,7 @@ export interface NotificationEventDef {
   label: string;
   severity: NotificationSeverity;
   defaultEnabled: boolean;
-  // Consecutive events sharing the same group render together inside one bordered box — see
+  // Consecutive events sharing the same group render together inside one bordered box - see
   // NotificationEventToggles.
   group?: string;
 }
@@ -41,9 +41,9 @@ export interface NotificationSettings {
 export interface RecurringSchedule {
   enabled: boolean;
   frequency: 'daily' | 'weekly' | 'monthly';
-  dayOfWeek: number; // 0 (Sun) – 6 (Sat), server local time — used when frequency is 'weekly'
-  dayOfMonth: number; // 1–28, server local time — used when frequency is 'monthly'
-  hour: number; // 0–23, server local time — the only field that matters when frequency is 'daily'
+  dayOfWeek: number; // 0 (Sun) - 6 (Sat), server local time - used when frequency is 'weekly'
+  dayOfMonth: number; // 1-28, server local time - used when frequency is 'monthly'
+  hour: number; // 0-23, server local time - the only field that matters when frequency is 'daily'
 }
 
 export type ParitySchedule = RecurringSchedule;
@@ -65,7 +65,7 @@ export interface CacheSettings {
   fsUuid: string | null;
 }
 
-// Whether the first-run setup wizard has been dismissed/completed — see OnboardingGate.
+// Whether the first-run setup wizard has been dismissed/completed - see OnboardingGate.
 export interface OnboardingSettings {
   dismissed: boolean;
 }

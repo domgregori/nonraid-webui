@@ -1,5 +1,5 @@
 /**
- * Normalized shape — NOT a passthrough of the raw Docker Engine API (unlike
+ * Normalized shape - NOT a passthrough of the raw Docker Engine API (unlike
  * nmd/types.ts, which mirrors nmdctl's JSON verbatim). The raw container
  * inspect/stats payloads are large and stats require a derived CPU% calc,
  * so both DockerClient implementations produce this shape directly.
@@ -15,15 +15,15 @@ export interface DockerContainerSummary {
   cpuPercent: number | null; // null when stopped (no stats available)
   memUsedBytes: number | null;
   memLimitBytes: number | null;
-  ports: string; // e.g. "8096:8096" or "8096:8096, 8920:8920" or "—"
+  ports: string; // e.g. "8096:8096" or "8096:8096, 8920:8920" or "-"
   portMappings: ContainerPortMapping[]; // structured form of the above, published ports only
   labels: Record<string, string>;
-  // Resolved by routes/docker.ts (not DockerClient itself — the Docker layer
+  // Resolved by routes/docker.ts (not DockerClient itself - the Docker layer
   // has no knowledge of CA templates), using the container's actual current
   // portMappings against its CA app's WebUI field, when it has one. Always
   // null coming out of a DockerClient implementation directly.
   webUiUrl: string | null;
-  // Read straight off the container's `net.unraid.docker.icon` label — the
+  // Read straight off the container's `net.unraid.docker.icon` label - the
   // de facto convention CA templates (and many upstream images) use, so this
   // works for any container carrying it, not just ones installed through
   // this app's own Apps feature.
@@ -61,8 +61,8 @@ export interface CreateContainerOptions {
 export interface CreateContainerProgress {
   phase: 'pulling' | 'removing' | 'creating' | 'starting';
   message: string;
-  percent: number | null; // 0-100, or null when not (yet) knowable — e.g. image already cached, or a phase with no byte-level progress
-  // A pull downloads/extracts each image layer independently and in parallel —
+  percent: number | null; // 0-100, or null when not (yet) knowable - e.g. image already cached, or a phase with no byte-level progress
+  // A pull downloads/extracts each image layer independently and in parallel -
   // `layerId` ties this specific tick to one layer (Docker's own short layer
   // digest) so the client can render one persistent line per layer, the way
   // `docker pull` itself does, rather than a firehose of hundreds of ticks.
@@ -74,7 +74,7 @@ export interface CreateContainerProgress {
 
 export type CreateContainerProgressCallback = (progress: CreateContainerProgress) => void;
 
-// Full detail for one container — used to populate an edit form from what's
+// Full detail for one container - used to populate an edit form from what's
 // actually running, rather than DockerContainerSummary's list-view-only shape.
 export interface ContainerEnvVar {
   name: string;

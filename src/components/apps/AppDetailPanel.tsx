@@ -24,12 +24,12 @@ function namespaceOf(repository: string): string {
 
 /**
  * Catalog fields typed as `string` aren't actually guaranteed to be one at
- * runtime — the feed is converted from community-maintained XML templates,
+ * runtime - the feed is converted from community-maintained XML templates,
  * and some genuinely nest a field instead of using plain text (e.g. one real
  * template has `Maintainer: { WebPage: "https://..." }`). Rendering an
  * object directly as a React child throws an uncaught error with no error
- * boundary around it, which unmounts the *entire* page — not just this
- * panel — so every catalog value shown as text or used as a link goes
+ * boundary around it, which unmounts the *entire* page - not just this
+ * panel - so every catalog value shown as text or used as a link goes
  * through this first rather than trusting the declared type.
  */
 function asText(value: unknown): string | null {
@@ -212,7 +212,7 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
             </div>
 
             <div className="apps-detail__note">
-              Catalog data from Community Applications — not vetted by this project. Review ports, volumes, and the
+              Catalog data from Community Applications - not vetted by this project. Review ports, volumes, and the
               image before installing.
             </div>
           </>

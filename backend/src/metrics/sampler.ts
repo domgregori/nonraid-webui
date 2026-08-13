@@ -6,14 +6,14 @@ import { NetRateTracker } from './net.js';
 import { MetricsService } from './service.js';
 import type { MetricName } from './types.js';
 
-// The driver counts I/O in 8-sector units — see calculate_disk_io_rates() in
+// The driver counts I/O in 8-sector units - see calculate_disk_io_rates() in
 // tools/nmdctl (the main nonraid repo): "Driver writes and reads are in
 // 8-sector units = 4kB". nmdctl's own JSON output never computes a rate from
 // this (that math is text-monitor-only, not part of `status -o json`), so
 // the sampler has to diff successive cumulative counts itself.
 const BYTES_PER_IO_UNIT = 4096;
 
-// Prune is a full-ish scan (indexed on ts, but still O(rows below cutoff)) —
+// Prune is a full-ish scan (indexed on ts, but still O(rows below cutoff)) -
 // running it every tick would be wasteful at a 60s sample interval, so only
 // do it once an hour's worth of ticks have passed.
 const PRUNE_EVERY_N_TICKS = 60;
@@ -91,7 +91,7 @@ export class MetricsSampler {
         this.diskIoPrev.set(disk.slot, { reads: disk.reads, writes: disk.writes, ts: now });
       }
     } catch {
-      // Array not started, or the driver call failed — skip disk metrics this tick; cpu/mem/net are still recorded above.
+      // Array not started, or the driver call failed - skip disk metrics this tick; cpu/mem/net are still recorded above.
     }
 
     this.metrics.recordBatch(samples, now);

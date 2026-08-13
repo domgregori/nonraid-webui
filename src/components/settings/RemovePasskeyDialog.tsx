@@ -8,7 +8,7 @@ interface RemovePasskeyDialogProps {
   onDone: () => void;
 }
 
-/** Same bespoke two-step confirm shape as Disable2faDialog.tsx — session-gated only, no password
+/** Same bespoke two-step confirm shape as Disable2faDialog.tsx - session-gated only, no password
  *  re-entry, since removing one of possibly several factors is lower-stakes than dropping all TOTP. */
 export function RemovePasskeyDialog({ passkey, onClose, onDone }: RemovePasskeyDialogProps) {
   const [confirming, setConfirming] = useState(false);

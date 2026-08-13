@@ -42,7 +42,7 @@ export function dockerRouter(
     }
   });
 
-  // Streams newline-delimited JSON progress events, same protocol as container creation below —
+  // Streams newline-delimited JSON progress events, same protocol as container creation below -
   // stopping the Docker service, copying potentially many GB, and restarting it can take a while.
   router.post('/docker/storage', async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' });
@@ -61,12 +61,12 @@ export function dockerRouter(
   });
 
   // The Docker layer itself has no notion of CA templates (kept as a clean
-  // dependency direction — Apps depends on Docker, not the reverse), so a
+  // dependency direction - Apps depends on Docker, not the reverse), so a
   // container's real WebUI link, when it has a resolvable one, is filled in
   // here at the route boundary instead: look up the CA app the labels point
   // to, and resolve its WebUI field against this container's *actual*
   // current port mappings (not whatever the template's install-time default
-  // was — ports may have changed since via an edit). Containers without CA
+  // was - ports may have changed since via an edit). Containers without CA
   // labels, or whose CA app can no longer be found in the feed (e.g.
   // delisted), just keep the client-side "first published port" fallback.
   async function withWebUiUrl(container: DockerContainerSummary): Promise<DockerContainerSummary> {
@@ -80,7 +80,7 @@ export function dockerRouter(
     }
   }
 
-  // start/stop/restart only get an id from the client, not a name — fetch it
+  // start/stop/restart only get an id from the client, not a name - fetch it
   // first purely so the activity entry reads like "jellyfin stopped" instead
   // of a container id. Best-effort: falls back to the id if inspect fails.
   async function containerName(id: string): Promise<string> {
@@ -99,7 +99,7 @@ export function dockerRouter(
   });
 
   // Curated /dev subdirectories (GPU, audio, stable-named serial) for the
-  // create/edit dialog's Device picker — see docker/devices.ts for why this
+  // create/edit dialog's Device picker - see docker/devices.ts for why this
   // isn't a flat dump of all of /dev. Also used by the Apps install dialog
   // for Config entries of Type="Device".
   router.get('/docker/devices', async (_req, res) => {
@@ -168,7 +168,7 @@ export function dockerRouter(
     try {
       const name = await containerName(req.params.id);
       const result = await docker.destroyContainer(req.params.id);
-      activity.log(`Container "${name}" destroyed — ${result.message}`, 'red').catch(() => {});
+      activity.log(`Container "${name}" destroyed - ${result.message}`, 'red').catch(() => {});
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
@@ -195,7 +195,7 @@ export function dockerRouter(
   });
 
   // Streams newline-delimited JSON progress events, same protocol as the Apps
-  // install endpoint — see backend/src/routes/apps.ts for why (a plain image
+  // install endpoint - see backend/src/routes/apps.ts for why (a plain image
   // pull can take long enough that a silent blocking response reads as hung).
   router.post('/docker/containers', async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' });
@@ -230,7 +230,7 @@ export function dockerRouter(
     }
   });
 
-  // Docker containers are immutable once created — "editing" one means
+  // Docker containers are immutable once created - "editing" one means
   // stopping and removing the old container, then creating a new one with
   // the requested config. The old container's labels are carried over onto
   // the new one (not caller-suppliable) so a Community-Applications-installed

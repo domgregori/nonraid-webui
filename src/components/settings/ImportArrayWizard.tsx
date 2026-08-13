@@ -5,7 +5,7 @@ import { formatBytesHuman } from '../../utils/format';
 
 interface ImportArrayWizardProps {
   onClose: () => void;
-  // Fires once, right when a commit succeeds — before the result screen renders and before
+  // Fires once, right when a commit succeeds - before the result screen renders and before
   // onClose. The onboarding wizard uses this to know its "Import" step actually finished (vs.
   // the dialog being cancelled or backdrop-closed before ever committing), without changing
   // what onClose itself means for this component's original standalone use in Settings.
@@ -14,7 +14,7 @@ interface ImportArrayWizardProps {
 
 type Step = 'upload' | 'review' | 'confirm' | 'result';
 // Where the .dat came from: a browser upload, or a path located directly on this host's own
-// root filesystem (see backend/src/routes/array.ts's /array/import/browse-root — this rig, like
+// root filesystem (see backend/src/routes/array.ts's /array/import/browse-root - this rig, like
 // most nonraid installs, has no separate boot flash drive the way Unraid does; the boot/OS disk
 // is the same filesystem the backend itself runs on and already reads /nonraid.dat from).
 type Source = 'upload' | 'locate';
@@ -32,7 +32,7 @@ const ROLE_LABEL = { parity: 'Parity (P)', parity2: 'Parity 2 (Q)', data: 'Data'
  * superblock file, see exactly what it expects and how that lines up
  * against what's physically connected, then explicitly commit. The preview
  * step (uploading and parsing the file) never touches nmdctl or the kernel
- * module — see backend/src/nmd/superblock.ts — so nothing real happens
+ * module - see backend/src/nmd/superblock.ts - so nothing real happens
  * until Confirm. Size mismatches hard-block with no override: starting the
  * array with one can corrupt filesystems and lose data (see the migration
  * guide linked below), so this app doesn't offer a way around it.
@@ -59,7 +59,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Checked once up front so the default path can be offered as a one-click option before the
-  // user even looks at upload vs. browse — best-effort, a failure here just means that shortcut
+  // user even looks at upload vs. browse - best-effort, a failure here just means that shortcut
   // doesn't show and the user falls back to upload/browse normally.
   useEffect(() => {
     nmdApi
@@ -161,11 +161,11 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
             <>
               <div className="toggle-row__desc">
                 Migrating from Unraid, or bringing back a previous nonraid array? Both save the same superblock
-                format — follow{' '}
+                format - follow{' '}
                 <a href="https://github.com/qvr/nonraid#migrating-an-existing-unraid-array" target="_blank" rel="noreferrer">
                   the migration guide
                 </a>{' '}
-                if you're coming from Unraid (move the disks over first), then pick the original file below — usually
+                if you're coming from Unraid (move the disks over first), then pick the original file below - usually
                 named <code>super.dat</code> on an Unraid flash drive, or <code>nonraid.dat</code> from a previous
                 install. This only reads the file to show what it expects; nothing on this host changes until you
                 confirm on the last step.
@@ -175,7 +175,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
                 <button type="button" className="import-source-pick" onClick={() => handlePathSelected(defaultPath.path)} disabled={previewing}>
                   <span className="import-source-pick__body">
                     <span className="import-source-pick__title">Use {defaultPath.path}</span>
-                    <span className="import-source-pick__desc">Found on this system's own boot disk — the array's current superblock file.</span>
+                    <span className="import-source-pick__desc">Found on this system's own boot disk - the array's current superblock file.</span>
                   </span>
                   <span className="import-source-pick__action">Use this file</span>
                 </button>
@@ -220,7 +220,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
               {source === 'locate' && (
                 <div className="import-browser">
                   <div className="toggle-row__desc">
-                    Browsing this host's own root filesystem, read-only — useful if a <code>.dat</code> backup is
+                    Browsing this host's own root filesystem, read-only - useful if a <code>.dat</code> backup is
                     already sitting somewhere on this same boot disk.
                   </div>
                   {browseLoading && <div className="status-note">Reading directory…</div>}
@@ -270,7 +270,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
           {step === 'review' && preview && (
             <>
               <div className="toggle-row__desc">
-                <strong>{preview.label || 'Unlabeled array'}</strong> — {preview.slots.length} disk(s) recorded in this
+                <strong>{preview.label || 'Unlabeled array'}</strong> - {preview.slots.length} disk(s) recorded in this
                 superblock{preview.sourcePath ? <> (from {preview.sourcePath})</> : null}.
               </div>
 
@@ -279,7 +279,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
                   <div className="import-warning__title">This will replace the currently active array</div>
                   <div className="import-warning__desc">
                     Continuing stops the array, unloads the driver, and reloads it with this superblock instead. The
-                    array's current configuration is not deleted — the existing superblock file is backed up first.
+                    array's current configuration is not deleted - the existing superblock file is backed up first.
                   </div>
                 </div>
               )}
@@ -296,7 +296,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
 
               {preview.hasSizeMismatch && (
                 <div className="import-warning import-warning--danger">
-                  <div className="import-warning__title">Size mismatch — import is blocked</div>
+                  <div className="import-warning__title">Size mismatch - import is blocked</div>
                   <div className="import-warning__desc">
                     One or more disks below don't match the size recorded in the superblock. Importing anyway can
                     corrupt filesystems and lose data (see the migration guide), so this app won't do it. Reconnect
@@ -344,7 +344,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
                 {preview.currentArrayActive
                   ? 'This stops the currently running array, backs up its superblock, and loads this one instead.'
                   : 'This loads this superblock and imports the disks that match it.'}{' '}
-                The array is not started automatically — review its status afterward and start it from the Dashboard
+                The array is not started automatically - review its status afterward and start it from the Dashboard
                 when ready.
               </div>
 
@@ -355,7 +355,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
 
               {preview.hasSizeMismatch && (
                 <div className="status-note status-note--error">
-                  Import is blocked — see the size mismatch above. Go back and resolve it before continuing.
+                  Import is blocked - see the size mismatch above. Go back and resolve it before continuing.
                 </div>
               )}
 

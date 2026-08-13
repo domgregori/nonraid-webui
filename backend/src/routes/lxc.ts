@@ -12,20 +12,20 @@ import type { StorageLocation } from '../settings/types.js';
 
 // Container names become directory names under lxcDefaultPath
 // (`<lxcDefaultPath>/<name>/`) and are interpolated into config-file paths
-// on disk — reject anything that isn't a safe, plain identifier before it
+// on disk - reject anything that isn't a safe, plain identifier before it
 // ever reaches path.join, so a name like "../../etc" can't escape the
 // container storage root.
 const NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
 
 function requireValidName(name: string): string {
   if (!NAME_RE.test(name)) {
-    throw new HttpError(400, `Invalid container name "${name}" — use letters, numbers, "_", "-", "." only`);
+    throw new HttpError(400, `Invalid container name "${name}" - use letters, numbers, "_", "-", "." only`);
   }
   return name;
 }
 
 // These end up as lines in the container's real LXC config file (see
-// backend/src/lxc/configFile.ts) — a line break here would let one field's
+// backend/src/lxc/configFile.ts) - a line break here would let one field's
 // value inject arbitrary extra lxc.* directives, so reject it up front
 // rather than relying solely on configFile.ts's own check.
 function requireNoLineBreaks(field: string, value: string): string {
@@ -36,7 +36,7 @@ function requireNoLineBreaks(field: string, value: string): string {
 }
 
 // Snapshot names are passed as standalone execFile args (never through a shell), so this isn't
-// about injection — it's to stop a value like "-P" or "--help" from being misread as a flag by
+// about injection - it's to stop a value like "-P" or "--help" from being misread as a flag by
 // lxc-snapshot itself, and to keep names sane before they're shown back in the UI.
 const SNAPSHOT_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/;
 
@@ -71,7 +71,7 @@ export function lxcRouter(lxc: LxcClient, activity: ActivityStore, nmd: NmdClien
     }
   });
 
-  // Streams newline-delimited JSON progress events, same protocol as container creation below —
+  // Streams newline-delimited JSON progress events, same protocol as container creation below -
   // stopping containers, copying potentially many GB, and restarting them can take a while.
   router.post('/lxc/storage', async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' });
@@ -264,7 +264,7 @@ export function lxcRouter(lxc: LxcClient, activity: ActivityStore, nmd: NmdClien
     }
   });
 
-  // Streams newline-delimited JSON progress events — same protocol as the
+  // Streams newline-delimited JSON progress events - same protocol as the
   // Docker/Apps create endpoints (see backend/src/routes/docker.ts), since
   // a rootfs download can take long enough for a silent blocking response
   // to read as hung.
@@ -297,7 +297,7 @@ export function lxcRouter(lxc: LxcClient, activity: ActivityStore, nmd: NmdClien
       const validLinks = networkType === 'macvlan' ? await lxc.listPhysicalInterfaces() : await lxc.listBridges();
       if (!validLinks.includes(options.bridge)) {
         const noun = networkType === 'macvlan' ? 'network interface' : 'bridge';
-        throw new HttpError(400, `Invalid ${noun} "${options.bridge}" — must be one of: ${validLinks.join(', ')}`);
+        throw new HttpError(400, `Invalid ${noun} "${options.bridge}" - must be one of: ${validLinks.join(', ')}`);
       }
 
       const result = await lxc.createContainer(options, (progress) => send({ type: 'progress', ...progress }));

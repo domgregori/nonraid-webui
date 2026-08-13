@@ -8,7 +8,7 @@ interface TransferModalProps {
   entries: BrowseEntry[];
   currentPath: string;
   onCancel: () => void;
-  // Just collects the destination and hands off — the actual transfer is async, tracked by
+  // Just collects the destination and hands off - the actual transfer is async, tracked by
   // bulkJob/BulkProgressDialog rather than this modal's own submitting/error state.
   onStart: (destPath: string) => void;
 }

@@ -2,7 +2,7 @@ import { computeElevatedAccessReasons, isAllowedBindPath, isAllowedDevicePath, s
 import type { ManualContainerPlan, ManualContainerRequest, ManualPlanBind, ManualPlanDevice } from './types.js';
 
 /**
- * Validates a manually-configured container (Docker tab's Add/Edit dialog) —
+ * Validates a manually-configured container (Docker tab's Add/Edit dialog) -
  * same shape of checks as Apps' resolvePlan, minus the CA Config-schema
  * resolution step, since a manual container has no template to resolve
  * against: every field is already the literal value the user typed.

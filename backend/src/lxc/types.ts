@@ -1,5 +1,5 @@
 /**
- * Normalized shape, same reasoning as backend/src/docker/types.ts — not a
+ * Normalized shape, same reasoning as backend/src/docker/types.ts - not a
  * passthrough of raw `lxc-info`/config-file text. `frozen` covers
  * lxc-freeze/lxc-unfreeze even though Phase 1 doesn't expose those actions,
  * since `lxc-info` can still report a container in that state.
@@ -7,7 +7,7 @@
 export type LxcRuntimeState = 'running' | 'stopped' | 'frozen' | 'unknown';
 
 export interface LxcSnapshot {
-  name: string; // e.g. "snap0" — lxc-snapshot's own auto-generated name, not user-editable
+  name: string; // e.g. "snap0" - lxc-snapshot's own auto-generated name, not user-editable
   timestamp: string; // raw "YYYY:MM:DD HH:MM:SS" as lxc-snapshot -L prints it
   comment: string | null;
 }
@@ -18,7 +18,7 @@ export interface LxcContainerSummary {
   autostart: boolean;
   description: string | null;
   webUiUrl: string | null;
-  // Filled in by the stats poller (see statsPoller.ts) — null when stopped
+  // Filled in by the stats poller (see statsPoller.ts) - null when stopped
   // or when no sample has landed yet.
   cpuPercent: number | null;
   memUsedBytes: number | null;
@@ -50,9 +50,9 @@ export interface CreateLxcContainerOptions {
   distribution: string;
   release: string;
   arch: string;
-  // For 'bridge' (default), this is a host bridge the container's veth attaches to — the
+  // For 'bridge' (default), this is a host bridge the container's veth attaches to - the
   // container gets an IP on whatever subnet that bridge serves. For 'macvlan', this is a physical
-  // NIC (e.g. eno0) the container's own virtual interface rides directly on — the container gets
+  // NIC (e.g. eno0) the container's own virtual interface rides directly on - the container gets
   // its own IP straight from the LAN's DHCP server, indistinguishable from a separate physical
   // device on the network. Host-to-container traffic doesn't work over a macvlan link (a kernel
   // limitation, not a bug); container-to-LAN and container-to-container both work fine.
@@ -68,14 +68,14 @@ export interface CreateLxcProgress {
   message: string;
   // The download template's own output is plain progress text, not a
   // byte-counted protocol like Docker's registry API, so there's no reliable
-  // percent to report — unlike CreateContainerProgress's docker equivalent.
+  // percent to report - unlike CreateContainerProgress's docker equivalent.
   percent: null;
 }
 
 export type CreateLxcProgressCallback = (progress: CreateLxcProgress) => void;
 
 // A curated, known-good subset of the linuxcontainers.org image server's
-// catalog — the full index is large and mostly irrelevant noise (dozens of
+// catalog - the full index is large and mostly irrelevant noise (dozens of
 // EOL releases/arches per distro). Phase 1 ships a fixed list rather than
 // fetching+parsing the live index; revisit if users need something outside it.
 export interface LxcDistroOption {

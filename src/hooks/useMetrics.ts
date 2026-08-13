@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { metricsApi } from '../api/metricsApi';
 import type { MetricName, MetricRange, MetricSeries } from '../types/metricsApi';
 
-// Matches the backend's sample interval (config.metricsSampleIntervalMs) —
+// Matches the backend's sample interval (config.metricsSampleIntervalMs) -
 // polling faster wouldn't surface anything new, the DB only gets a new row this often.
 const POLL_MS = 60_000;
 
@@ -15,8 +15,8 @@ export interface UseMetrics {
 }
 
 /**
- * `metrics` should be a stable array reference (module-level constant) — it's a dependency via
- * its joined string, not by identity. `enabled` (default true) skips fetching/polling entirely —
+ * `metrics` should be a stable array reference (module-level constant) - it's a dependency via
+ * its joined string, not by identity. `enabled` (default true) skips fetching/polling entirely -
  * for HistoryPage's Live mode, which sources its data from useLiveMetrics() instead and has no
  * use for this hook's normal 60s DB-backed poll running in the background at the same time.
  */

@@ -41,7 +41,7 @@ export class UsersService {
   }
 
   /**
-   * Group names pass regex validation on shape alone, which isn't a privilege check — a
+   * Group names pass regex validation on shape alone, which isn't a privilege check - a
    * request could otherwise name a real pre-existing system group (docker, sudo, disk, ...)
    * and get a managed user added to it via usermod, which is effectively privilege escalation
    * (docker-group membership is root-equivalent). Only groups this app itself created
@@ -119,7 +119,7 @@ export class UsersService {
       throw new HttpError(404, `${principalType === 'users' ? 'User' : 'Group'} "${principal}" not found.`);
     }
 
-    // 'none' is stored explicitly, not treated as "no entry" — on a public share, an unset
+    // 'none' is stored explicitly, not treated as "no entry" - on a public share, an unset
     // entry defaults to the share's normal guest-open access, which is not the same thing as
     // an explicit deny. Entries are only ever cleared via removePrincipal, on user/group delete.
     await this.aclStore.setEntry(shareName, principalType, principal, permission);

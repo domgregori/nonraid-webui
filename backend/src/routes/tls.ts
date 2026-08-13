@@ -12,7 +12,7 @@ import { generateSelfSigned, suggestCommonName, suggestSans } from '../tls/certG
 import { checkKeyMatchesCert, parseCertInfo } from '../tls/certInspect.js';
 import type { TlsRecord, TlsStore } from '../tls/index.js';
 
-// PEM cert/key files are typically a few KB each — 64KB/file is generous headroom, same limit
+// PEM cert/key files are typically a few KB each - 64KB/file is generous headroom, same limit
 // array.ts's import flow uses for its own fixed-size upload.
 const importUpload = multer({ dest: os.tmpdir(), limits: { fileSize: 64 * 1024 } });
 
@@ -23,7 +23,7 @@ interface StagedTlsImport {
 }
 
 // Same reasoning as array.ts's stagedImports: single-admin, upload-then-immediately-decide flow,
-// no need for a persisted store — just an in-memory map local to this route module, swept lazily.
+// no need for a persisted store - just an in-memory map local to this route module, swept lazily.
 const stagedTlsImports = new Map<string, StagedTlsImport>();
 const TLS_STAGING_TTL_MS = 30 * 60 * 1000;
 
@@ -52,7 +52,7 @@ function originFor(scheme: 'http' | 'https', hostname: string): string {
 }
 
 // Best-effort CN extraction from an openssl subject string ("CN = nonraid.lan" or
-// "CN=nonraid.lan,O=Org", format varies by openssl version) — falls back to the full subject
+// "CN=nonraid.lan,O=Org", format varies by openssl version) - falls back to the full subject
 // string if no CN component is found, so an unusual subject still gets *some* display name rather
 // than an empty one.
 function extractCommonName(subject: string): string {
@@ -78,7 +78,7 @@ function statusPayload(record: TlsRecord | null) {
 
 // Self-restart, exactly mirroring routes/services.ts's webui-restart branch: this backend can't
 // route its own restart through `systemctl restart` (that would spawn a child inside the unit's
-// own cgroup, which systemd's stop phase would kill before the start phase ever ran) — instead it
+// own cgroup, which systemd's stop phase would kill before the start phase ever ran) - instead it
 // exits non-zero and lets the unit's Restart=on-failure/RestartSec=5 bring it back with the
 // newly-persisted TLS config.
 function scheduleSelfRestart(res: Response): void {
@@ -171,18 +171,18 @@ export function tlsRouter(tlsStore: TlsStore, activity: ActivityStore, authServi
     const token = typeof req.body?.token === 'string' ? req.body.token : '';
     const staged = token ? stagedTlsImports.get(token) : undefined;
     if (!staged) {
-      res.status(400).json({ error: 'This import preview has expired or was already used — upload the files again.' });
+      res.status(400).json({ error: 'This import preview has expired or was already used - upload the files again.' });
       return;
     }
     stagedTlsImports.delete(token);
 
     try {
       // Re-checked against the live files rather than trusting whatever the client remembers from
-      // the preview response — same reasoning as array.ts's import/commit.
+      // the preview response - same reasoning as array.ts's import/commit.
       const info = await parseCertInfo(staged.certPath);
       const { keyValid, keyMatchesCert } = await checkKeyMatchesCert(staged.certPath, staged.keyPath);
       if (!keyValid) throw new HttpError(400, "That doesn't look like a valid, unencrypted PEM private key.");
-      if (!keyMatchesCert) throw new HttpError(400, "This certificate and private key don't match — make sure you uploaded the correct pair.");
+      if (!keyMatchesCert) throw new HttpError(400, "This certificate and private key don't match - make sure you uploaded the correct pair.");
       if (info.notAfter.getTime() < Date.now()) throw new HttpError(400, `This certificate expired on ${info.notAfter.toDateString()}.`);
 
       await mkdir(config.tlsCertDir, { recursive: true });
@@ -216,8 +216,8 @@ export function tlsRouter(tlsStore: TlsStore, activity: ActivityStore, authServi
     try {
       const record = await tlsStore.setEnabled(true);
       const newOrigin = originFor('https', record.commonName);
-      activity.log('Enabling HTTPS — nonraid-webui is restarting', 'amber').catch(() => {});
-      res.json({ ok: true, message: 'Restarting with HTTPS enabled — you will be redirected shortly.', newOrigin });
+      activity.log('Enabling HTTPS - nonraid-webui is restarting', 'amber').catch(() => {});
+      res.json({ ok: true, message: 'Restarting with HTTPS enabled - you will be redirected shortly.', newOrigin });
       scheduleSelfRestart(res);
     } catch (err) {
       handleError(err, res);
@@ -228,19 +228,19 @@ export function tlsRouter(tlsStore: TlsStore, activity: ActivityStore, authServi
     try {
       await tlsStore.setEnabled(false);
       // Flip before reissuing below so the fresh cookie is built non-Secure. Without this, the
-      // browser keeps carrying the old Secure cookie — which it silently withholds on the
-      // plain-HTTP page redirected to next — with no in-app way back in, since passkey login also
+      // browser keeps carrying the old Secure cookie - which it silently withholds on the
+      // plain-HTTP page redirected to next - with no in-app way back in, since passkey login also
       // needs a secure context. Live-reproduced this exact lockout before adding the fix.
       config.cookieSecure = false;
       const { cookie } = await authService.reissueSession(req.headers.cookie);
       res.append('Set-Cookie', cookie);
       // req.hostname (not record.commonName) so the redirect target's host matches the cookie
-      // above, which is host-only and bound to whatever host this request actually came in on —
+      // above, which is host-only and bound to whatever host this request actually came in on -
       // relevant if the admin reached the site via something other than the cert's CN (a LAN IP,
       // a different DNS alias, ...).
       const newOrigin = originFor('http', req.hostname);
-      activity.log('Disabling HTTPS — nonraid-webui is restarting', 'amber').catch(() => {});
-      res.json({ ok: true, message: 'Restarting with HTTPS disabled — you will be redirected shortly.', newOrigin });
+      activity.log('Disabling HTTPS - nonraid-webui is restarting', 'amber').catch(() => {});
+      res.json({ ok: true, message: 'Restarting with HTTPS disabled - you will be redirected shortly.', newOrigin });
       scheduleSelfRestart(res);
     } catch (err) {
       handleError(err, res);

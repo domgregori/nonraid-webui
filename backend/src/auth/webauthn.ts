@@ -20,7 +20,7 @@ interface PendingChallenge {
   expiresAt: number;
 }
 
-// Keyed by username — single-admin account, so effectively one slot. Deliberately not persisted
+// Keyed by username - single-admin account, so effectively one slot. Deliberately not persisted
 // to auth.json: these are one-attempt values, churning the file on every "Add Passkey" click would
 // be pointless, and a backend restart mid-ceremony just means the user retries, same as any other
 // interrupted multi-step flow in this app (e.g. ImportArrayWizard).
@@ -29,7 +29,7 @@ const pendingChallenges = new Map<string, PendingChallenge>();
 export function requireWebauthnConfig(): { rpID: string; origin: string } {
   const { webauthnRpId, webauthnOrigin } = config;
   if (!webauthnRpId || !webauthnOrigin) {
-    throw new HttpError(400, 'WebAuthn is not configured — set WEBAUTHN_RP_ID and WEBAUTHN_ORIGIN.');
+    throw new HttpError(400, 'WebAuthn is not configured - set WEBAUTHN_RP_ID and WEBAUTHN_ORIGIN.');
   }
   return { rpID: webauthnRpId, origin: webauthnOrigin };
 }
@@ -40,9 +40,9 @@ function setPendingChallenge(username: string, challenge: string): void {
 
 function takePendingChallenge(username: string): string {
   const entry = pendingChallenges.get(username);
-  pendingChallenges.delete(username); // one-shot — a challenge is only ever valid for a single attempt
+  pendingChallenges.delete(username); // one-shot - a challenge is only ever valid for a single attempt
   if (!entry || entry.expiresAt < Date.now()) {
-    throw new HttpError(400, 'No pending WebAuthn request — try again.');
+    throw new HttpError(400, 'No pending WebAuthn request - try again.');
   }
   return entry.challenge;
 }
@@ -90,7 +90,7 @@ export async function passkeyAuthenticationOptions(record: AuthRecord): Promise<
   const options = await generateAuthenticationOptions({
     rpID,
     allowCredentials: record.passkeys.map((p) => ({ id: p.id, transports: transports(p) })),
-    // Discouraged, not preferred/required — the password step already verified identity; this
+    // Discouraged, not preferred/required - the password step already verified identity; this
     // ceremony asserts possession of the enrolled authenticator as the second factor, matching
     // the library's own documented guidance for exactly this 2FA shape.
     userVerification: 'discouraged',

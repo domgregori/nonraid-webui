@@ -3,16 +3,16 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 /**
- * Line-based get/set against an LXC container's `config` file — this repo's
+ * Line-based get/set against an LXC container's `config` file - this repo's
  * equivalent of the reference plugin's `getVariable`/`setVariable` PHP
  * helpers (see the LXC handoff doc). Real LXC directives (`lxc.start.auto =
  * 1`) and this app's own comment-prefixed pseudo-metadata (`#container_
  * description = ...`) both use the same `key = value` line shape, so one
- * pair of functions handles both — the container's config file stays the
+ * pair of functions handles both - the container's config file stays the
  * only "database" for its app-level metadata, fully inspectable outside
  * this app, matching the reference plugin's design.
  *
- * Pure file I/O, no shell-out — unlike the PHP reference (which builds
+ * Pure file I/O, no shell-out - unlike the PHP reference (which builds
  * shell_exec strings from these same values), there is no injection surface
  * here.
  *
@@ -71,7 +71,7 @@ async function atomicWrite(configPath: string, content: string): Promise<void> {
   await fs.rename(tmpPath, configPath);
 }
 
-/** Raw read of the whole config file — backs the LXC page's "Edit config"
+/** Raw read of the whole config file - backs the LXC page's "Edit config"
  * dialog, where a user edits the actual on-disk file directly rather than
  * going through the curated autostart/description/webUiUrl fields. */
 export async function readRaw(configPath: string): Promise<string> {

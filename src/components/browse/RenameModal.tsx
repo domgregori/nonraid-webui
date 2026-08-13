@@ -15,14 +15,14 @@ export function RenameModal({ entry, onCancel, onSubmit }: RenameModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || name === '.' || name === '..' || name.includes('/') || name.includes('\\')) {
-      setError('Enter a valid name — no slashes.');
+      setError('Enter a valid name - no slashes.');
       return;
     }
     setSubmitting(true);
     setError(null);
     const ok = await onSubmit(name);
     setSubmitting(false);
-    if (!ok) setError('Rename failed — see the page error banner for details.');
+    if (!ok) setError('Rename failed - see the page error banner for details.');
   };
 
   return (

@@ -15,7 +15,7 @@ export interface DockerContainerSummary {
   labels: Record<string, string>;
   // Resolved server-side from the CA app's WebUI field against this
   // container's actual ports, when it's a CA-installed container with one.
-  // [IP] is left unresolved for us to fill in — see resolveContainerWebUi.
+  // [IP] is left unresolved for us to fill in - see resolveContainerWebUi.
   // Null for custom containers, or CA ones with no WebUI/unresolvable app.
   webUiUrl: string | null;
   icon: string | null;
@@ -114,7 +114,7 @@ export interface ManualContainerPlan {
 }
 
 // Labels stamped by the Apps (Community Applications) feature at install
-// time — mirrors backend/src/apps/service.ts's APP_NAME_LABEL/
+// time - mirrors backend/src/apps/service.ts's APP_NAME_LABEL/
 // APP_REPOSITORY_LABEL. A container carrying these came from installing a
 // CA template rather than the Docker tab's manual Add Container flow.
 export const CA_APP_NAME_LABEL = 'com.nonraid.apps.name';

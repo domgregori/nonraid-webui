@@ -12,10 +12,10 @@ interface ShrinkArrayDialogProps {
  * The one genuinely riskier operation in this app: reconfiguring the array's
  * own topology to drop a permanently-disabled slot for good. Unlike every
  * other disk action here, the backend has to reload the kernel module partway
- * through — if that specific step fails, the array is left down needing a
+ * through - if that specific step fails, the array is left down needing a
  * manual command to bring back (the error message from the backend spells
  * out exactly what to run, same as the real recovery used to build this
- * feature). Real data on the disks being *kept* is never touched — only the
+ * feature). Real data on the disks being *kept* is never touched - only the
  * array's own metadata changes, and parity gets rebuilt from scratch after.
  */
 export function ShrinkArrayDialog({ slot, label, onClose, onDone }: ShrinkArrayDialogProps) {
@@ -51,15 +51,15 @@ export function ShrinkArrayDialog({ slot, label, onClose, onDone }: ShrinkArrayD
 
         <div className="dialog__body">
           {done ? (
-            <div className="status-note">Array reconfigured — slot {slot} no longer exists in the array. Parity is rebuilding.</div>
+            <div className="status-note">Array reconfigured - slot {slot} no longer exists in the array. Parity is rebuilding.</div>
           ) : (
             <>
               <div className="status-note status-note--error">
                 This stops the array, reloads the storage driver, and rebuilds the array's configuration without slot{' '}
-                {slot} — then rebuilds parity from scratch. It does not touch real files on any disk you're keeping.
+                {slot} - then rebuilds parity from scratch. It does not touch real files on any disk you're keeping.
               </div>
               <div className="status-note status-note--error">
-                The driver reload step can leave the array briefly down if interrupted — this can take a while and
+                The driver reload step can leave the array briefly down if interrupted - this can take a while and
                 shouldn't be cancelled partway. If it fails, the error will include the exact command to recover
                 manually.
               </div>

@@ -4,13 +4,13 @@ import path from 'node:path';
 import { config } from '../config.js';
 import type { ActivityColor, ActivityEntry } from './types.js';
 
-// Keeps the file bounded — this is a rolling recent-activity feed, not an
+// Keeps the file bounded - this is a rolling recent-activity feed, not an
 // audit log; nothing currently reads or needs entries past this.
 const MAX_ENTRIES = 500;
 const DEFAULT_LIST_LIMIT = 20;
 
 /**
- * Owns activity.json — mirrors shares/store.ts and settings/store.ts's
+ * Owns activity.json - mirrors shares/store.ts and settings/store.ts's
  * pattern (in-memory cache, writes serialized through one promise chain,
  * atomic write-then-rename) for the same reason: nothing else is
  * authoritative for "what happened recently," so this file is the only
@@ -28,7 +28,7 @@ export class ActivityStore {
   }
 
   /**
-   * Fire-and-forget from every call site's point of view — logging a real
+   * Fire-and-forget from every call site's point of view - logging a real
    * action's outcome should never be the reason that action's own request
    * fails, so callers are expected to `.catch(() => {})` this rather than
    * let a rare disk-write failure mask a successful array start/share

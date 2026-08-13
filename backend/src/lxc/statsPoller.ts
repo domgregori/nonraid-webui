@@ -5,7 +5,7 @@ import { config } from '../config.js';
 
 const execFileAsync = promisify(execFile);
 
-// sysconf(_SC_CLK_TCK) — 100 on effectively every Linux target this runs on
+// sysconf(_SC_CLK_TCK) - 100 on effectively every Linux target this runs on
 // (x86/arm, glibc and musl); there is no portable way to read it from Node
 // without a native addon, so this is a documented assumption rather than a
 // detected value.
@@ -85,7 +85,7 @@ async function readRssBytes(pid: number): Promise<number> {
 
 /**
  * Poll-and-cache worker for per-container CPU%/memory/IPs, same shape as
- * system/service.ts's SystemStatsService — not the reference plugin's own
+ * system/service.ts's SystemStatsService - not the reference plugin's own
  * `/tmp/lxc/containers/<name>` INI files, which are written by a separate
  * PHP-plugin-specific worker script this backend has no equivalent of.
  *
@@ -94,7 +94,7 @@ async function readRssBytes(pid: number): Promise<number> {
  * the container's init process. This undercounts CPU for a container whose
  * real workload runs in child processes that get their own host PIDs
  * (namespaced, but still visible and separately accounted for on the host)
- * — reading the actual cgroup accounting files would be exact, but their
+ * - reading the actual cgroup accounting files would be exact, but their
  * path varies by cgroup v1 vs v2 and by distro mount layout in a way
  * /proc/<pid> doesn't. Accepted approximation for Phase 1.
  */

@@ -16,7 +16,7 @@ const BACKUP_SUFFIX = '.tar.gz';
  * Writes an unattended config backup at the configured weekly/monthly day/hour, in the server's
  * own local time. Same self-unref'd ticker shape as ParityScheduler, sharing its day/hour match
  * logic (settings/scheduleMatch.ts). Prunes older backups down to the configured retain count
- * after each successful run — this is a background job nobody's watching, so it must not be left
+ * after each successful run - this is a background job nobody's watching, so it must not be left
  * to slowly fill the destination disk on its own.
  *
  * Same lastFiredDateKey caveat as ParityScheduler: in-memory only, so a backend restart during the
@@ -49,7 +49,7 @@ export class BackupScheduler {
     if (this.lastFiredDateKey === dateKey) return;
     this.lastFiredDateKey = dateKey;
 
-    // runNow() already logs/notifies on every failure path — this is only here so a skip/failure
+    // runNow() already logs/notifies on every failure path - this is only here so a skip/failure
     // doesn't become an unhandled rejection from the un-awaited setInterval callback in the
     // constructor above.
     await this.runNow('Scheduled backup').catch(() => {});
@@ -57,7 +57,7 @@ export class BackupScheduler {
 
   /**
    * The actual backup+prune work, shared by the schedule ticker above and the manual "Back up
-   * now" route (routes/system.ts) — same destDir/retain from saved settings either way, since a
+   * now" route (routes/system.ts) - same destDir/retain from saved settings either way, since a
    * manual run against an unsaved draft destination would back up to a place the next scheduled
    * run (or a later manual run) wouldn't agree on. `label` only changes the activity-log/
    * notification wording ("Scheduled backup" vs "Manual backup") so the two are distinguishable
@@ -68,14 +68,14 @@ export class BackupScheduler {
     const schedule = settings.backupSchedule;
 
     if (!schedule.destDir) {
-      const msg = `${label} skipped — no destination directory configured`;
+      const msg = `${label} skipped - no destination directory configured`;
       this.activity.log(msg, 'amber').catch(() => {});
-      throw new Error('No destination directory configured — set one below and save first.');
+      throw new Error('No destination directory configured - set one below and save first.');
     }
     try {
       await access(schedule.destDir, constants.W_OK);
     } catch {
-      const msg = `${label} skipped — destination "${schedule.destDir}" doesn't exist or isn't writable`;
+      const msg = `${label} skipped - destination "${schedule.destDir}" doesn't exist or isn't writable`;
       this.activity.log(msg, 'amber').catch(() => {});
       throw new Error(`Destination "${schedule.destDir}" doesn't exist or isn't writable.`);
     }
@@ -84,7 +84,7 @@ export class BackupScheduler {
       this.metrics.checkpointForBackup();
       const paths = await resolveConfigBackupPaths(this.nmd);
       if (paths.length === 0) {
-        const msg = `${label} skipped — no config files found to back up`;
+        const msg = `${label} skipped - no config files found to back up`;
         this.activity.log(msg, 'amber').catch(() => {});
         throw new Error('No config files found to back up.');
       }
@@ -105,7 +105,7 @@ export class BackupScheduler {
   }
 
   /** Deletes the oldest backups in destDir beyond `retain`, identified by this scheduler's own
-   *  filename prefix — never touches files it didn't create. */
+   *  filename prefix - never touches files it didn't create. */
   private async prune(destDir: string, retain: number): Promise<void> {
     let entries: string[];
     try {

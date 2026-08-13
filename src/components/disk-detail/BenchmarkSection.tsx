@@ -6,7 +6,7 @@ import { TimeSeriesChart, type TimeSeriesChartSeries } from '../shared/TimeSerie
 
 interface BenchmarkSectionProps {
   onRead: (durationSeconds: number) => Promise<BenchmarkResult>;
-  /** Omitted entirely — the test runs read-only — for disks with no real mountpoint to write
+  /** Omitted entirely - the test runs read-only - for disks with no real mountpoint to write
    *  through (parity disks, unassigned devices). */
   onWrite?: (durationSeconds: number) => Promise<BenchmarkResult>;
 }
@@ -30,10 +30,10 @@ function formatMbPerSecond(v: number): string {
   return `${v.toFixed(0)} MB/s`;
 }
 
-/** Shared by the array-disk, unassigned-device, and boot-disk detail panels — same "one component,
+/** Shared by the array-disk, unassigned-device, and boot-disk detail panels - same "one component,
  *  reused everywhere" approach as SmartOverviewRows. No client-side pre-disabling for an in-progress
  *  resync: the server already guards it (409), surfaced here the same way every other mutating
- *  action in this codebase reports a server-side rejection — via catch, after the fact. */
+ *  action in this codebase reports a server-side rejection - via catch, after the fact. */
 export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
   const [durationSeconds, setDurationSeconds] = useState(DURATION_PRESETS[0].seconds);
   const [phase, setPhase] = useState<RunPhase>('idle');
@@ -64,8 +64,8 @@ export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
 
   // Both series share the same 0-based elapsed-time axis (read and write each start counting from
   // their own start, even though write runs after read finishes) so the two curves overlap and can
-  // be compared directly — e.g. "at 2s into its run, was read faster than write was at 2s into
-  // its own run" — rather than reading as a single chronological timeline of the whole test.
+  // be compared directly - e.g. "at 2s into its run, was read faster than write was at 2s into
+  // its own run" - rather than reading as a single chronological timeline of the whole test.
   const series: TimeSeriesChartSeries[] = [];
   if (readResult && readResult.samples.length > 1) {
     series.push({

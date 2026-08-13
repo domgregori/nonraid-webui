@@ -4,7 +4,7 @@ import type { BrowseEntry, BrowseListing, BulkOp, BulkOpProgress, BulkOpResult }
 
 export type BrowseLoadStatus = 'loading' | 'ready' | 'error';
 
-// Mirrors backend/src/config.ts's browseDefaultPath default — the page's
+// Mirrors backend/src/config.ts's browseDefaultPath default - the page's
 // starting point, /mnt/user, before any listing has come back from the server.
 const DEFAULT_PATH = '/mnt/user';
 
@@ -21,11 +21,11 @@ export interface BulkJobState {
   op: BulkOp;
   total: number;
   progress: BulkOpProgress | null;
-  /** Set once the server reports a clean completion — including a server-observed cancel (the
+  /** Set once the server reports a clean completion - including a server-observed cancel (the
    *  request stayed connected long enough for req.on('close') to report back what had actually
    *  succeeded before stopping). */
   result: BulkOpResult | null;
-  /** Set when the client itself severed the connection before any server response arrived — the
+  /** Set when the client itself severed the connection before any server response arrived - the
    *  exact succeeded/failed split in that case is unknowable client-side, so this is tracked
    *  separately rather than faking an empty BulkOpResult. */
   aborted: boolean;
@@ -83,7 +83,7 @@ export function useBrowse(): UseBrowse {
     };
   }, []);
 
-  // Calculated sizes are keyed by absolute path, which already encodes the directory — they only
+  // Calculated sizes are keyed by absolute path, which already encodes the directory - they only
   // go stale on a real navigation, not on a same-directory refresh (e.g. after New Folder).
   useEffect(() => {
     setSizes({});
@@ -202,7 +202,7 @@ export function useBrowse(): UseBrowse {
           if (!mounted.current) return;
           if ((err as Error).name === 'AbortError') {
             setBulkJob((prev) => (prev ? { ...prev, aborted: true } : prev));
-            refresh(); // some items likely completed before the abort landed — worth reloading
+            refresh(); // some items likely completed before the abort landed - worth reloading
           } else {
             setBulkJob((prev) => (prev ? { ...prev, error: (err as Error).message } : prev));
           }

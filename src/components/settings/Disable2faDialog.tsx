@@ -7,7 +7,7 @@ interface Disable2faDialogProps {
 }
 
 /**
- * Disabling two-factor is a real security downgrade — same two-step confirm shape as
+ * Disabling two-factor is a real security downgrade - same two-step confirm shape as
  * ShrinkArrayDialog.tsx (this app's other genuinely-risky action), plus a required current-password
  * re-entry before the danger action even enables, matching the disable-TOTP backend route's own
  * requirement.
@@ -50,7 +50,7 @@ export function Disable2faDialog({ onClose, onDone }: Disable2faDialogProps) {
           ) : (
             <>
               <div className="status-note status-note--error">
-                Signing in will no longer require a code from your authenticator app — just your password. Your
+                Signing in will no longer require a code from your authenticator app - just your password. Your
                 existing backup codes will also stop working.
               </div>
               {!confirming ? (

@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 
 // A single path segment for something not yet on disk (upload filename, rename
-// target, mkdir name) — never a separator or a traversal token.
+// target, mkdir name) - never a separator or a traversal token.
 function assertValidSegmentName(name: unknown): asserts name is string {
   if (
     typeof name !== 'string' ||
@@ -23,7 +23,7 @@ function withinRoot(root: string, candidate: string): boolean {
   return candidate === root || candidate.startsWith(root + path.sep);
 }
 
-// Resolved once and cached — /mnt isn't expected to move during the process's
+// Resolved once and cached - /mnt isn't expected to move during the process's
 // lifetime. Not cached on failure, so a backend started before disks are
 // mounted will pick it up on a later request rather than staying broken.
 let cachedRoot: string | null = null;
@@ -44,7 +44,7 @@ export interface ResolvedPath {
 }
 
 /**
- * A directory whose device id differs from its parent's is a mount point —
+ * A directory whose device id differs from its parent's is a mount point -
  * a share's own root (bind-mounted or mergerfs-pooled, see
  * shares/applier/realApplier.ts) or an array disk's own filesystem
  * (/mnt/disk1, etc). The OS refuses to rmdir/rename over an active mount
@@ -59,14 +59,14 @@ export async function isMountPoint(absPath: string): Promise<boolean> {
 /**
  * Resolves an untrusted path against the fixed browse root (config.browseRoot,
  * "/mnt" by default) and verifies the fully-resolved (symlink-followed) target
- * is still inside that root — "/mnt" is the highest directory reachable from
+ * is still inside that root - "/mnt" is the highest directory reachable from
  * here, matching the file browser's own traversal ceiling. This is the only
- * function that should ever turn a request path into a filesystem path — every
+ * function that should ever turn a request path into a filesystem path - every
  * browse operation (list, download, rename, move, delete, upload) goes through
  * here or `resolveForCreate`, so a crafted "/etc" or an in-tree symlink
  * pointing outside /mnt can't reach anything beyond the browse root.
  *
- * An empty/missing path resolves to config.browseDefaultPath ("/mnt/user") —
+ * An empty/missing path resolves to config.browseDefaultPath ("/mnt/user") -
  * the file browser's starting point.
  */
 export async function resolveExisting(requestPath: string): Promise<ResolvedPath> {

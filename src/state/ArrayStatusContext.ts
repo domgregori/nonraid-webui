@@ -1,7 +1,7 @@
 import { createContext } from 'react';
 import type { NmdStatusResponse, ParityCheckAction } from '../types/nmdApi';
 
-/** 'not-configured' means a genuinely fresh install — nmdctl reports no array has ever been
+/** 'not-configured' means a genuinely fresh install - nmdctl reports no array has ever been
  *  created yet. Distinct from 'error' (a real failure) so OnboardingGate can route into setup
  *  instead of the dashboard showing a scary error banner. */
 export type LoadState = 'loading' | 'ready' | 'error' | 'not-configured';
@@ -9,15 +9,15 @@ export type LoadState = 'loading' | 'ready' | 'error' | 'not-configured';
 export interface ArrayStatusContextValue {
   status: NmdStatusResponse | null;
   loadState: LoadState;
-  /** Connectivity/poll error — cleared automatically the next time a poll succeeds. */
+  /** Connectivity/poll error - cleared automatically the next time a poll succeeds. */
   error: string | null;
   /** Result of the last start/stop/parity action, e.g. a rejection like "can't stop while checking".
-   *  Does NOT get cleared by background polling — only by the next action attempt — so it stays
+   *  Does NOT get cleared by background polling - only by the next action attempt - so it stays
    *  visible long enough to actually read. */
   actionError: string | null;
   temps: Record<string, number | null>;
   diskHealths: Record<string, 'passed' | 'failed' | null>;
-  /** SSD/HDD per array disk device — fetched once (not polled), since a disk's rotational type
+  /** SSD/HDD per array disk device - fetched once (not polled), since a disk's rotational type
    *  never changes at runtime. */
   diskTypes: Record<string, boolean | null>;
   selectedDiskId: string | null;
@@ -27,7 +27,7 @@ export interface ArrayStatusContextValue {
   unassignPending: boolean;
   restorePending: boolean;
   /** Forces an immediate status re-fetch instead of waiting for the next poll tick (up to
-   *  STATUS_POLL_MS stale), returning the freshly-fetched status directly (or null on failure) —
+   *  STATUS_POLL_MS stale), returning the freshly-fetched status directly (or null on failure) -
    *  for callers that need to read fresh data right after an action this context doesn't already
    *  know about (e.g. a config restore or array import completing), since every *other* action
    *  here already refreshes itself internally. Returns the value directly rather than relying on
@@ -39,9 +39,9 @@ export interface ArrayStatusContextValue {
   parityAction: (action: ParityCheckAction) => void;
   selectDisk: (id: string) => void;
   closeDetail: () => void;
-  /** Real — calls the backend, which writes directly to /proc/nmdcmd (see backend/README.md). */
+  /** Real - calls the backend, which writes directly to /proc/nmdcmd (see backend/README.md). */
   unassignDisk: (slot: number) => void;
-  /** Undoes an *uncommitted* unassign (DISK_NP_MISSING, identity still intact) — only
+  /** Undoes an *uncommitted* unassign (DISK_NP_MISSING, identity still intact) - only
    *  applies before the array has been started since. See ReplaceDiskDialog for the
    *  guided "swap in a different disk" flow, which is a separate, deliberately atomic
    *  backend call rather than a context action. */

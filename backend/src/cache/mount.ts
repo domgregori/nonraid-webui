@@ -24,7 +24,7 @@ export interface ResolvedCacheDevice {
 
 /**
  * The mirror is always created from exactly two devices (see cache/service.ts's
- * setup() — the feature's whole premise is "a mirrored pair", never more or
+ * setup() - the feature's whole premise is "a mirrored pair", never more or
  * fewer), so `btrfs filesystem show` not listing one of devid 1/2 unambiguously
  * identifies which one is missing without needing the mounted-only `btrfs
  * device stats`/`device usage` output to spell it out. `btrfs device scan` is
@@ -32,11 +32,11 @@ export interface ResolvedCacheDevice {
  * boot, before udev's own scan has necessarily settled) is picked up.
  */
 export async function resolveCacheDevicePaths(fsUuid: string): Promise<ResolvedCacheDevice[]> {
-  await run('btrfs', ['device', 'scan']).catch(() => {}); // best-effort — a missing device is a valid outcome, not a failure
+  await run('btrfs', ['device', 'scan']).catch(() => {}); // best-effort - a missing device is a valid outcome, not a failure
   const { stdout } = await run('btrfs', ['filesystem', 'show', fsUuid]).catch(() => ({ stdout: '' }));
   const devices: ResolvedCacheDevice[] = [];
   for (const line of stdout.split('\n')) {
-    // A missing member still gets a `devid N size 0 used 0 path /dev/sdX MISSING` line — same shape
+    // A missing member still gets a `devid N size 0 used 0 path /dev/sdX MISSING` line - same shape
     // as a present device's line, just with a trailing MISSING marker and zeroed size/used. Confirmed
     // live: without this check, a missing device was parsed as present at its last-known path.
     if (/\bMISSING\b/.test(line)) continue;
@@ -63,7 +63,7 @@ export async function isMounted(mountPoint: string): Promise<boolean> {
   }
 }
 
-/** Same udevadm property lookup scanDevice() (nmd/realClient.ts) uses for AvailableDevice.model — duplicated in miniature here since a cache member is no longer an "available" device once claimed, so it never appears in listAvailableDevices() again for CacheService.getStatus() to read a cached model off of. */
+/** Same udevadm property lookup scanDevice() (nmd/realClient.ts) uses for AvailableDevice.model - duplicated in miniature here since a cache member is no longer an "available" device once claimed, so it never appears in listAvailableDevices() again for CacheService.getStatus() to read a cached model off of. */
 export async function getDeviceModel(devicePath: string): Promise<string | null> {
   try {
     const { stdout } = await run('udevadm', ['info', '--query=property', `--name=${devicePath}`], 5_000);
@@ -74,7 +74,7 @@ export async function getDeviceModel(devicePath: string): Promise<string | null>
   }
 }
 
-/** Raw byte size of a still-mounted mirror member — used by CacheService.replaceDevice() to enforce
+/** Raw byte size of a still-mounted mirror member - used by CacheService.replaceDevice() to enforce
  *  btrfs's own same-size-or-larger requirement for a replacement, up front with a clear message
  *  rather than letting `btrfs replace start` fail deep into the operation. */
 export async function getDeviceSizeBytes(devicePath: string): Promise<number | null> {
@@ -88,12 +88,12 @@ export async function getDeviceSizeBytes(devicePath: string): Promise<number | n
 }
 
 /**
- * Idempotent — safe to call at every backend startup regardless of whether
+ * Idempotent - safe to call at every backend startup regardless of whether
  * the mirror is already mounted (this app has no fstab/systemd .mount unit
  * anywhere, see the plan's scope decisions; every mount is re-established
  * imperatively like this, the same as ShareService.remountAll()). Mounts
  * degraded automatically when only one member is present, rather than
- * failing outright — a missing mirror half shouldn't take the whole cache
+ * failing outright - a missing mirror half shouldn't take the whole cache
  * offline, see CacheService.getStatus()'s health reporting for the visible
  * degraded state this produces.
  */

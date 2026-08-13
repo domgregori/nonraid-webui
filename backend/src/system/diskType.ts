@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 /**
- * NmdDisk.device (from nmdctl status) is a bare name like "sdb1" — every other caller in this
+ * NmdDisk.device (from nmdctl status) is a bare name like "sdb1" - every other caller in this
  * codebase that needs a real path prepends /dev/ itself (see smart/realClient.ts's own
  * devicePath() and its doc comment about the exact same bug this fixes: lsblk failing with "not a
  * block device" on a bare name, confirmed live). Idempotent so it stays correct for callers that
@@ -15,7 +15,7 @@ function devicePath(device: string): string {
 }
 
 /**
- * lsblk's ROTA flag (0 = non-rotational/SSD, 1 = rotational/HDD) — the kernel's own signal,
+ * lsblk's ROTA flag (0 = non-rotational/SSD, 1 = rotational/HDD) - the kernel's own signal,
  * always present regardless of what the drive itself reports over SMART. Preferred over
  * smartctl's `rotation_rate` field, which some drives simply don't report at all (confirmed live
  * against this project's own test rig: present and 0 on a real SSD, absent entirely on a real

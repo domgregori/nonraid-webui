@@ -5,10 +5,10 @@ import { HttpError } from '../httpError.js';
 import type { TlsRecord } from './types.js';
 
 /**
- * Owns tls.json — same pattern as auth/store.ts (in-memory cache with three states: undefined
+ * Owns tls.json - same pattern as auth/store.ts (in-memory cache with three states: undefined
  * not loaded yet, null loaded with no cert configured yet, or a record; writes serialized
  * through one promise chain; atomic write-then-rename). The cert/key PEM files themselves live
- * on disk under config.tlsCertDir — this store only tracks metadata/paths, never key material.
+ * on disk under config.tlsCertDir - this store only tracks metadata/paths, never key material.
  */
 export class TlsStore {
   private cache: TlsRecord | null | undefined;
@@ -20,10 +20,10 @@ export class TlsStore {
     return this.load();
   }
 
-  // Called after generating or importing a certificate — replaces the cert/key material and
+  // Called after generating or importing a certificate - replaces the cert/key material and
   // metadata, but deliberately preserves whatever `enabled` was already set to (a re-generated
   // or re-imported cert shouldn't silently flip TLS on, nor silently turn off a currently-enabled
-  // deployment — both are separate, explicit actions via setEnabled).
+  // deployment - both are separate, explicit actions via setEnabled).
   setCert(fields: Omit<TlsRecord, 'enabled'>): Promise<TlsRecord> {
     const result = this.writeQueue.then(async () => {
       const current = await this.load();

@@ -3,7 +3,7 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
   value: h,
   label: h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`,
 }));
-// 1–28 only — every month has at least 28 days, so this sidesteps "the 30th
+// 1-28 only - every month has at least 28 days, so this sidesteps "the 30th
 // doesn't exist in February" without needing month-length logic, matching
 // backend/src/settings/types.ts's WeeklyOrMonthlySchedule.dayOfMonth.
 const DAY_OF_MONTH_OPTIONS = Array.from({ length: 28 }, (_, i) => i + 1);
@@ -21,7 +21,7 @@ interface ScheduleFieldsProps {
 }
 
 /** Daily/weekly/monthly + day + hour picker shared by the Parity, Backups, and Cache mover schedule
- *  cards. Daily has no day picker at all — only the hour matters. */
+ *  cards. Daily has no day picker at all - only the hour matters. */
 export function ScheduleFields({
   frequency,
   onFrequencyChange,
@@ -72,7 +72,7 @@ export function ScheduleFields({
           ))}
         </select>
       </div>
-      {frequency === 'monthly' && <div className="toggle-row__desc">Only days 1–28 are offered, so every month always has a matching date.</div>}
+      {frequency === 'monthly' && <div className="toggle-row__desc">Only days 1-28 are offered, so every month always has a matching date.</div>}
     </>
   );
 }

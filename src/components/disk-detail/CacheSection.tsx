@@ -38,7 +38,7 @@ export function CacheSection() {
       {status.health === 'not-configured' ? (
         <Card>
           <div className="toggle-row__desc">
-            No cache mirror set up. A cache pool is a mirrored pair of disks that share writes land on first — a
+            No cache mirror set up. A cache pool is a mirrored pair of disks that share writes land on first - a
             scheduled mover then drains them onto the parity-protected array. Requires exactly two disks; a single
             disk can't be used as cache since it would have zero parity protection.
           </div>
@@ -73,7 +73,7 @@ export function CacheSection() {
                 <div className="disk-card__head">
                   <span className="disk-card__label">{d.missing ? `Missing (devid ${d.devid})` : (d.model ?? `Device ${d.devid}`)}</span>
                 </div>
-                <div className="disk-card__device">{d.path ?? '—'}</div>
+                <div className="disk-card__device">{d.path ?? '-'}</div>
               </div>
             ))}
           </div>

@@ -52,7 +52,7 @@ export function cacheRouter(
       return;
     }
     if (diskQueue.isBusy()) {
-      res.status(409).json({ error: 'A queued disk operation is in progress — wait for it to finish.' });
+      res.status(409).json({ error: 'A queued disk operation is in progress - wait for it to finish.' });
       return;
     }
     try {

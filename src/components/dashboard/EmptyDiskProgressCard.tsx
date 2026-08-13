@@ -8,9 +8,9 @@ import { ProgressBar } from '../shared/ProgressBar';
 
 const TERMINAL_STATUSES = ['done', 'failed', 'cancelled'];
 
-/** Only renders while a job is active/finished, and not dismissed — stays out of the way
+/** Only renders while a job is active/finished, and not dismissed - stays out of the way
  *  otherwise. Outlives any one EmptyDiskDialog instance, since a real move can run for
- *  hours in the background. Dismissal is client-side only (no backend "clear" — the job
+ *  hours in the background. Dismissal is client-side only (no backend "clear" - the job
  *  history itself is harmless to keep, this just stops re-showing an already-read result). */
 export function EmptyDiskProgressCard() {
   const job = useEmptyDiskStatus();
@@ -26,10 +26,10 @@ export function EmptyDiskProgressCard() {
       ? `Emptying slot ${job.slot}: ${job.movedFiles}/${job.totalFiles} files`
       : job.status === 'done'
         ? nothingMoved
-          ? `Slot ${job.slot}: nothing to move — it isn't part of any configured share`
-          : `Slot ${job.slot} emptied${job.error ? ` — ${job.error}` : ''}`
+          ? `Slot ${job.slot}: nothing to move - it isn't part of any configured share`
+          : `Slot ${job.slot} emptied${job.error ? ` - ${job.error}` : ''}`
         : job.status === 'cancelled'
-          ? `Emptying slot ${job.slot} cancelled — ${job.movedFiles}/${job.totalFiles} files moved before stopping`
+          ? `Emptying slot ${job.slot} cancelled - ${job.movedFiles}/${job.totalFiles} files moved before stopping`
           : job.status === 'failed'
             ? `Emptying slot ${job.slot} failed: ${job.error ?? 'unknown error'}`
             : '';

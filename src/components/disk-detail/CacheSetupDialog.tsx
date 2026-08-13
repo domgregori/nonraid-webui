@@ -9,11 +9,11 @@ interface CacheSetupDialogProps {
 }
 
 /**
- * Picks two devices for the mirror from the same pool AddDiskDialog draws from — refusing to let
+ * Picks two devices for the mirror from the same pool AddDiskDialog draws from - refusing to let
  * both picks be the same device is the only extra rule beyond what a single-device picker needs,
  * since cache setup runs mkfs.btrfs across exactly two devices, never one.
  *
- * This dialog's job is just "enqueue and close" — it no longer runs mkfs.btrfs itself. The actual
+ * This dialog's job is just "enqueue and close" - it no longer runs mkfs.btrfs itself. The actual
  * formatting (including the auto-retry-with-force-on-existing-filesystem behavior this dialog
  * used to handle inline, see commit dc2248e) now happens in DiskQueueService.runItem, with its
  * outcome visible on the Disk Queue card / activity log instead of here.
@@ -38,8 +38,8 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
       const item = await diskQueueApi.enqueueCacheMirror(deviceA, deviceB);
       setResult(
         item.status === 'running'
-          ? 'Added to the queue — starting now.'
-          : 'Added to the queue — will start once the current operation finishes.',
+          ? 'Added to the queue - starting now.'
+          : 'Added to the queue - will start once the current operation finishes.',
       );
       onDone();
     } catch (err) {
@@ -64,7 +64,7 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
           {!result && (
             <>
               <div className="status-note status-note--error">
-                This formats both devices as a single btrfs RAID1 filesystem — any existing data on either device is
+                This formats both devices as a single btrfs RAID1 filesystem - any existing data on either device is
                 destroyed. Only devices with no recognized filesystem or mounted partition are offered below.
               </div>
 
@@ -79,7 +79,7 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
               {devicesError && <div className="status-note status-note--error">{devicesError}</div>}
               {devicesStatus === 'ready' && devices.length < 2 && (
                 <div className="status-note">
-                  {devices.length === 0 ? 'No unassigned devices found.' : 'Only one unassigned device found — a mirror needs two.'}
+                  {devices.length === 0 ? 'No unassigned devices found.' : 'Only one unassigned device found - a mirror needs two.'}
                 </div>
               )}
 
@@ -95,7 +95,7 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
                     ))}
                   </select>
                   {selectedA?.locked && (
-                    <div className="status-note status-note--error">This device appears to be locked/in use — setup may fail.</div>
+                    <div className="status-note status-note--error">This device appears to be locked/in use - setup may fail.</div>
                   )}
 
                   <div className="toggle-row__title" style={{ marginTop: 10 }}>
@@ -110,7 +110,7 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
                     ))}
                   </select>
                   {selectedB?.locked && (
-                    <div className="status-note status-note--error">This device appears to be locked/in use — setup may fail.</div>
+                    <div className="status-note status-note--error">This device appears to be locked/in use - setup may fail.</div>
                   )}
                   {sameDevice && <div className="status-note status-note--error">Pick two different devices.</div>}
                 </div>

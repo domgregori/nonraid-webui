@@ -25,16 +25,16 @@ interface StoredPlan {
 }
 
 export interface PlanParams {
-  /** Opaque label for this source — display/logging only (e.g. "disk:3", "cache"). */
+  /** Opaque label for this source - display/logging only (e.g. "disk:3", "cache"). */
   sourceId: string;
   sourceMountpoint: string;
-  /** Shares to draw files from — caller filters this to whatever's relevant for the source
+  /** Shares to draw files from - caller filters this to whatever's relevant for the source
    *  (e.g. EmptyDiskService: shares whose disks include the slot being emptied; the cache mover:
    *  every cache-eligible share). */
   shares: Share[];
   /** Valid destination array disks, slot -> mountpoint. */
   destMounts: Map<number, string>;
-  /** Excluded from destination candidates — set by EmptyDiskService to the slot being emptied
+  /** Excluded from destination candidates - set by EmptyDiskService to the slot being emptied
    *  (its own disk can't be a destination for its own files); left undefined for sources that
    *  aren't themselves an array slot, like the cache mount. */
   excludeDestSlot?: number;
@@ -72,7 +72,7 @@ async function listFilesUnder(dir: string): Promise<string[]> {
     return stdout.split('\0').filter(Boolean);
   } catch (err) {
     // find exits non-zero if e.g. a subdirectory disappears mid-walk (race with
-    // something else touching the disk) — best-effort, whatever it printed
+    // something else touching the disk) - best-effort, whatever it printed
     // before failing is still useful, so only hard-fail if it printed nothing.
     const e = err as { stdout?: string };
     if (e.stdout) return e.stdout.split('\0').filter(Boolean);
@@ -111,7 +111,7 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
   return results;
 }
 
-/** Candidate destination disk order/pick for one file, per the share's own allocation method — see realApplier.ts's mergerfsPolicy for the mount-time equivalent this mirrors. */
+/** Candidate destination disk order/pick for one file, per the share's own allocation method - see realApplier.ts's mergerfsPolicy for the mount-time equivalent this mirrors. */
 function pickDestination(
   candidates: number[],
   simulatedFree: Map<number, number>,
@@ -121,10 +121,10 @@ function pickDestination(
   const fitting = candidates.filter((slot) => (simulatedFree.get(slot) ?? 0) >= sizeBytes);
   if (fitting.length === 0) return null;
   if (method === 'fill-up') {
-    // mergerfs "ff": first branch, in configured order, with enough room — fills one disk before the next.
+    // mergerfs "ff": first branch, in configured order, with enough room - fills one disk before the next.
     return fitting[0]!;
   }
-  // most-free / high-water / single-disk: most-free is a reasonable stand-in for all three here —
+  // most-free / high-water / single-disk: most-free is a reasonable stand-in for all three here -
   // true high-water semantics depend on mergerfs's live capacity-fraction math, not worth
   // reproducing exactly for a planning simulation (see realApplier.ts's own comment on this).
   return fitting.reduce((best, slot) => ((simulatedFree.get(slot) ?? 0) > (simulatedFree.get(best) ?? 0) ? slot : best));
@@ -132,17 +132,17 @@ function pickDestination(
 
 /**
  * Generic engine behind both "empty this disk onto the rest of the array" (emptyDisk/service.ts)
- * and "drain the cache mirror onto the array" (the cache mover) — moving a disk's real files onto
+ * and "drain the cache mirror onto the array" (the cache mover) - moving a disk's real files onto
  * some other disks, bin-packed per each share's own allocation policy, is the same operation
  * whether the source is an array slot being retired or the cache pool being drained on a schedule.
  * Simulates the whole move first (plan()) and refuses to start if anything doesn't fit anywhere,
  * rather than discovering that mid-move with the source half emptied. Runs the real move as a
- * background job (start()/status()/cancel()) since real data can take hours — each file is copied
+ * background job (start()/status()/cancel()) since real data can take hours - each file is copied
  * and size-verified before its source is ever unlinked, so an interrupted job just leaves both a
  * valid copy and a valid original for whatever it hadn't gotten to yet, safely resumable by
  * planning and starting again.
  *
- * Each owner (EmptyDiskService, the cache mover) constructs its own instance — single-flight is
+ * Each owner (EmptyDiskService, the cache mover) constructs its own instance - single-flight is
  * per-instance, not global, so an empty-disk job and a mover run don't block each other.
  */
 export class FileMoveService {
@@ -169,12 +169,12 @@ export class FileMoveService {
       const files = await listFilesUnder(shareDir);
       const stats = await mapWithConcurrency(files, STAT_CONCURRENCY, async (f) => ({ f, st: await stat(f).catch(() => null) }));
       for (const { f, st } of stats) {
-        if (!st) continue; // vanished between find and stat — skip, not this plan's problem
+        if (!st) continue; // vanished between find and stat - skip, not this plan's problem
         items.push({ share: share.name, relativePath: path.relative(shareDir, f), absSource: f, sizeBytes: st.size, destSlot: -1 });
       }
     }
 
-    // Anything on the source NOT under a configured share for it — left behind, the caller needs to know.
+    // Anything on the source NOT under a configured share for it - left behind, the caller needs to know.
     const shareNames = new Set(shares.map((s) => s.name));
     const topLevel = await listTopLevelDirs(sourceMountpoint);
     const unmanagedDirs = topLevel.filter((name) => !shareNames.has(name));
@@ -239,7 +239,7 @@ export class FileMoveService {
     }
     const plan = this.plan_;
     if (!plan || plan.sourceId !== sourceId || !plan.fits) {
-      throw new HttpError(400, `No valid plan for "${sourceId}" — run the check again first.`);
+      throw new HttpError(400, `No valid plan for "${sourceId}" - run the check again first.`);
     }
 
     this.cancelRequested = false;
@@ -256,7 +256,7 @@ export class FileMoveService {
       finishedAt: null,
     };
 
-    // Deliberately not awaited — this can run for hours against real data;
+    // Deliberately not awaited - this can run for hours against real data;
     // the caller polls status() instead, same pattern as nmdctl's resync.
     this.run(plan, destMounts).catch((err) => {
       this.job = { ...this.job, status: 'failed', error: (err as Error).message, finishedAt: Date.now() };
@@ -289,10 +289,10 @@ export class FileMoveService {
           await copyFile(item.absSource, destPath);
           const verify = await stat(destPath);
           if (verify.size !== item.sizeBytes) {
-            throw new Error(`Size mismatch after copy (source ${item.sizeBytes}, destination ${verify.size}) — leaving source in place.`);
+            throw new Error(`Size mismatch after copy (source ${item.sizeBytes}, destination ${verify.size}) - leaving source in place.`);
           }
         }
-        // Copy verified (or a prior partial run already got here) — now safe to remove the source.
+        // Copy verified (or a prior partial run already got here) - now safe to remove the source.
         await unlink(item.absSource);
 
         this.job = {
@@ -310,7 +310,7 @@ export class FileMoveService {
       ...this.job,
       status: 'done',
       currentFile: null,
-      error: errors.length > 0 ? `${errors.length} file(s) failed to move — see server log.` : null,
+      error: errors.length > 0 ? `${errors.length} file(s) failed to move - see server log.` : null,
       finishedAt: Date.now(),
     };
     if (errors.length > 0) console.error('FileMoveService: file errors:\n' + errors.join('\n'));

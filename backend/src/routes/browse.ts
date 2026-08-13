@@ -19,7 +19,7 @@ function queryPath(req: { query: Record<string, unknown> }): string {
   return typeof req.query.path === 'string' ? req.query.path : '';
 }
 
-// Files land in the OS temp dir first (streamed, not buffered in memory) — the
+// Files land in the OS temp dir first (streamed, not buffered in memory) - the
 // service validates the destination and moves each one into place afterwards.
 const upload = multer({
   dest: os.tmpdir(),
@@ -27,7 +27,7 @@ const upload = multer({
 });
 
 /** Browses the whole /mnt tree (see backend/src/browse/paths.ts for the
- * traversal ceiling), not one route per share — paths are absolute, passed
+ * traversal ceiling), not one route per share - paths are absolute, passed
  * as a `path` query/body param rather than a `:share` route segment. */
 export function browseRouter(browse: BrowseService): Router {
   const router = Router();
@@ -41,11 +41,11 @@ export function browseRouter(browse: BrowseService): Router {
   });
 
   // Directory-name completion for any host-path textbox site-wide. `scope`
-  // picks which root set the caller is actually allowed to write into later —
+  // picks which root set the caller is actually allowed to write into later -
   // "binds" (config.appsBindRoots, /mnt/user by default) for Docker/Apps bind
   // mounts, "browse" (config.browseRoot, /mnt) for anything reachable from
   // the file browser itself (backup destination, Browse page's move dialog).
-  // Never a client-supplied root — only these two known-safe scopes.
+  // Never a client-supplied root - only these two known-safe scopes.
   router.get('/browse/suggest', async (req, res) => {
     try {
       const roots = req.query.scope === 'binds' ? config.appsBindRoots : [config.browseRoot];
@@ -56,7 +56,7 @@ export function browseRouter(browse: BrowseService): Router {
     }
   });
 
-  // On-demand only (not part of list()) — a full `du` on every directory in a listing would make
+  // On-demand only (not part of list()) - a full `du` on every directory in a listing would make
   // browsing large shares painfully slow.
   router.get('/browse/size', async (req, res) => {
     try {
@@ -94,7 +94,7 @@ export function browseRouter(browse: BrowseService): Router {
   });
 
   // Streamed NDJSON, same protocol as /docker/containers etc. (see progressStream.ts on the
-  // frontend) — copy/move/delete over one or more paths, reporting progress per item so a large
+  // frontend) - copy/move/delete over one or more paths, reporting progress per item so a large
   // transfer doesn't read as a hung request. Cancel works by the client aborting its fetch; that
   // closes the connection, which req.on('close') below turns into a checked flag rather than
   // needing a separate cancel endpoint or a background job registry (this request stays open for

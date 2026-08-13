@@ -30,16 +30,16 @@ export function resolveLxcPath(location: StorageLocation): string {
 async function requireCacheUsable(cache: CacheService): Promise<void> {
   const status = await cache.getStatus();
   if (status.health === 'not-configured' || status.health === 'unavailable') {
-    throw new HttpError(400, `Cache pool isn't available (${status.health}) — set it up on the Disks page first.`);
+    throw new HttpError(400, `Cache pool isn't available (${status.health}) - set it up on the Disks page first.`);
   }
 }
 
-// One storage move at a time, system-wide — concurrent moves (or a move racing a benchmark's own
+// One storage move at a time, system-wide - concurrent moves (or a move racing a benchmark's own
 // heavy I/O) would contend for bandwidth and leave things in a confusing half-done state.
 let running = false;
 
 async function withLock<T>(fn: () => Promise<T>): Promise<T> {
-  if (running) throw new Error('A storage move is already running — wait for it to finish first.');
+  if (running) throw new Error('A storage move is already running - wait for it to finish first.');
   running = true;
   try {
     return await fn();
@@ -76,8 +76,8 @@ export async function getCurrentLxcStorage(settingsStore: SettingsStore): Promis
 
 /**
  * Stops any running containers, rsyncs the container directory tree to the new location, switches
- * config.lxcDefaultPath (read fresh by every lxc-* call in realClient.ts — no restart needed) and
- * persists the choice, then restarts whatever was running. Never deletes the old data — leaves it
+ * config.lxcDefaultPath (read fresh by every lxc-* call in realClient.ts - no restart needed) and
+ * persists the choice, then restarts whatever was running. Never deletes the old data - leaves it
  * in place so a failed verification doesn't mean lost containers, at the cost of temporary double
  * disk usage until the admin removes it by hand.
  */
@@ -95,7 +95,7 @@ export async function migrateLxcStorage(
 
     const status = await deps.nmd.getStatus();
     if (status.resync.active) {
-      throw new Error('A parity check or clear is in progress — refusing to move storage mid-operation.');
+      throw new Error('A parity check or clear is in progress - refusing to move storage mid-operation.');
     }
     if (target.mode === 'array') {
       const disk = status.disks.find((d) => d.slot === target.diskSlot);
@@ -112,7 +112,7 @@ export async function migrateLxcStorage(
     const targetMount = target.mode === 'array' ? `/mnt/disk${target.diskSlot}` : target.mode === 'cache' ? config.cacheMountPoint : '/';
     const available = await freeSpaceBytes(targetMount);
     if (sourceSize > 0 && available < sourceSize * 1.1) {
-      throw new Error(`Not enough free space at the target — needs about ${Math.ceil((sourceSize * 1.1) / 1024 / 1024)} MB.`);
+      throw new Error(`Not enough free space at the target - needs about ${Math.ceil((sourceSize * 1.1) / 1024 / 1024)} MB.`);
     }
 
     onProgress({ phase: 'stopping', message: 'Stopping running LXC containers…' });
@@ -141,7 +141,7 @@ export async function migrateLxcStorage(
 
     onProgress({
       phase: 'done',
-      message: `Done. Old data is still at ${currentPath} — remove it manually once you've verified everything works.`,
+      message: `Done. Old data is still at ${currentPath} - remove it manually once you've verified everything works.`,
     });
     return { path: targetPath };
   });

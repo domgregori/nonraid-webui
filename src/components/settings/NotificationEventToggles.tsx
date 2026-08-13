@@ -10,14 +10,14 @@ interface NotificationEventTogglesProps {
   eventTypes: Record<NotificationEventType, boolean>;
   onChange: (eventType: NotificationEventType, enabled: boolean) => void;
   disabled?: boolean;
-  // Slot for an event-specific subsection rendered below that event's own row — e.g. the CPU/disk
+  // Slot for an event-specific subsection rendered below that event's own row - e.g. the CPU/disk
   // temperature thresholds under "Temperature alert". Keeps this component's own catalog-driven
   // genericness intact rather than hardcoding one event's UI here.
   renderExtra?: (eventId: NotificationEventType) => ReactNode;
 }
 
 /** Grouped High/Medium/Low toggle list for which array/storage-health events trigger a
- *  notification — the catalog (labels, severities, defaults) is fetched from the backend so this
+ *  notification - the catalog (labels, severities, defaults) is fetched from the backend so this
  *  never hand-duplicates that list and can't drift from what the server actually understands. */
 export function NotificationEventToggles({ eventTypes, onChange, disabled, renderExtra }: NotificationEventTogglesProps) {
   const [events, setEvents] = useState<NotificationEventDef[] | null>(null);

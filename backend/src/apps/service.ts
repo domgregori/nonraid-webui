@@ -23,7 +23,7 @@ import { resolveWebUiTemplate } from './webUi.js';
 const OVERVIEW_SUMMARY_LENGTH = 220;
 
 // Labels stamped on every container this feature creates, so a later catalog
-// load can recognize "this container came from installing that template" —
+// load can recognize "this container came from installing that template" -
 // matching by image string alone would be ambiguous (shared base images,
 // registry-prefix differences) and wouldn't survive the user renaming the
 // container. Exported so routes/docker.ts can recognize the same containers
@@ -34,7 +34,7 @@ export const APP_REPOSITORY_LABEL = 'com.nonraid.apps.repository';
 
 function toSummary(app: CaApp, installedContainer: DockerContainerSummary | undefined): AppSummary {
   // Fields typed as string on CaApp aren't actually guaranteed to be one at
-  // runtime — the feed is converted from community-maintained XML, and some
+  // runtime - the feed is converted from community-maintained XML, and some
   // templates genuinely nest a field instead of using plain text (e.g. a
   // real one has Maintainer: { WebPage: "..." } instead of a string). This
   // runs once per catalog entry for every /apps list request, so a `string`
@@ -72,7 +72,7 @@ function buildInstalledIndex(containers: DockerContainerSummary[]): Map<string, 
   return index;
 }
 
-/** Missing values sort last, not first — an app the feed has no signal for isn't "trending"/"new". */
+/** Missing values sort last, not first - an app the feed has no signal for isn't "trending"/"new". */
 function sortApps(apps: CaApp[], sort: AppSort): void {
   if (sort === 'trending') {
     apps.sort((a, b) => (b.trending ?? -Infinity) - (a.trending ?? -Infinity));
@@ -94,10 +94,10 @@ export class AppsService {
 
   /**
    * The feed mixes real Docker apps with actual Unraid *plugins* (.plg/.txz
-   * packages installed outside Docker entirely — their `Repository` is a
+   * packages installed outside Docker entirely - their `Repository` is a
    * .plg URL, not an image). There's no framework in this project for
    * installing plugins, so they're excluded here, once, rather than filtered
-   * ad hoc in each caller — every other method reads the feed through this.
+   * ad hoc in each caller - every other method reads the feed through this.
    */
   private async applications(): Promise<CaApp[]> {
     const feed = await this.feedStore.getFeed();
@@ -135,7 +135,7 @@ export class AppsService {
 
   /**
    * `Name` alone isn't a unique key in the real feed (~150 names are shared by
-   * more than one template, mostly genuinely different apps) — when `repository`
+   * more than one template, mostly genuinely different apps) - when `repository`
    * is given, prefer the entry matching both so a duplicate-named card can't
    * silently resolve to the wrong template.
    */
@@ -167,7 +167,7 @@ export class AppsService {
   /**
    * Rebuilds the plan from `request` (never trusts a client-echoed plan
    * object) so the container that actually gets created always matches what
-   * server-side validation just checked — a client can't review one plan and
+   * server-side validation just checked - a client can't review one plan and
    * submit a tampered one.
    */
   async install(
@@ -201,7 +201,7 @@ export class AppsService {
           [APP_NAME_LABEL]: app.Name,
           [APP_REPOSITORY_LABEL]: app.Repository,
           // Same label convention real Unraid's dashboard reads directly off any
-          // container — stamping it here means our own catalog installs show a
+          // container - stamping it here means our own catalog installs show a
           // real icon on the dashboard without needing a runtime catalog lookup.
           ...(app.Icon ? { 'net.unraid.docker.icon': app.Icon } : {}),
         },
@@ -305,7 +305,7 @@ export class AppsService {
           break;
         }
         case 'Label':
-          break; // informational only — not honored as a container label for v1
+          break; // informational only - not honored as a container label for v1
       }
     }
 

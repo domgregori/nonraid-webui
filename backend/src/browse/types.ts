@@ -5,13 +5,13 @@ export interface BrowseEntry {
   type: BrowseEntryType;
   size: number;
   modifiedAt: string;
-  /** Physical disk branch(es) backing this entry — present only when the listing is inside a
+  /** Physical disk branch(es) backing this entry - present only when the listing is inside a
    *  user share (config.shareMountRoot), where mergerfs can blend more than one disk together. */
   locations?: string[];
 }
 
 export interface BrowseListing {
-  /** The browse ceiling ("/mnt" by default) — clients compare `path` against
+  /** The browse ceiling ("/mnt" by default) - clients compare `path` against
    * this to know when they've reached the top and should hide/disable "up". */
   root: string;
   path: string;

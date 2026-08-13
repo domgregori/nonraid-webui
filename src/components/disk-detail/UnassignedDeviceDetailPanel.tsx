@@ -15,7 +15,7 @@ interface UnassignedDeviceDetailPanelProps {
 
 type SmartLoadState = 'loading' | 'ready' | 'error';
 
-/** Same info shape as the array-disk detail panel (DiskDetailPanel.tsx) — an unassigned device has
+/** Same info shape as the array-disk detail panel (DiskDetailPanel.tsx) - an unassigned device has
  *  no array slot, so this fetches SMART by raw device path instead, same route the boot disk panel
  *  uses. */
 export function UnassignedDeviceDetailPanel({ device, onClose, onAddToArray }: UnassignedDeviceDetailPanelProps) {
@@ -63,7 +63,7 @@ export function UnassignedDeviceDetailPanel({ device, onClose, onAddToArray }: U
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">Size</span>
-                <span className="detail-row__value">{device.sizeKb != null ? formatBytesHuman(device.sizeKb * 1024) : '—'}</span>
+                <span className="detail-row__value">{device.sizeKb != null ? formatBytesHuman(device.sizeKb * 1024) : '-'}</span>
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">Filesystem UUID</span>
@@ -71,11 +71,11 @@ export function UnassignedDeviceDetailPanel({ device, onClose, onAddToArray }: U
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">Serial</span>
-                <span className="detail-row__value">{device.diskId ?? '—'}</span>
+                <span className="detail-row__value">{device.diskId ?? '-'}</span>
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">Locked</span>
-                <span className="detail-row__value">{device.locked ? 'Yes — likely in use elsewhere' : 'No'}</span>
+                <span className="detail-row__value">{device.locked ? 'Yes - likely in use elsewhere' : 'No'}</span>
               </div>
             </div>
           </div>

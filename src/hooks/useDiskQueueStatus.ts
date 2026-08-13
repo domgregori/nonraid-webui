@@ -4,7 +4,7 @@ import type { DiskQueueState } from '../types/diskQueue';
 
 const POLL_MS = 2000;
 
-/** Polls the single global disk-add queue — same shape as useEmptyDiskStatus/useCacheMoverStatus.
+/** Polls the single global disk-add queue - same shape as useEmptyDiskStatus/useCacheMoverStatus.
  *  Plain hook, not a Context: today the queue only has one real consumer (DiskQueueCard), unlike
  *  ArrayStatusProvider's multi-consumer shared-action-pending-flags need. Promote to a Context
  *  later only if a second consumer (e.g. a nav badge) shows up. */

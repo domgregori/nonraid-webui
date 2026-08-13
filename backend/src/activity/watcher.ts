@@ -11,7 +11,7 @@ import { readCpuTempCelsius } from '../system/cpuTemp.js';
 import type { ActivityStore } from './store.js';
 
 // Statuses that mean something has actually gone wrong with an assigned
-// disk. DISK_NP_DSBL (no disk present, disabled) is deliberately excluded —
+// disk. DISK_NP_DSBL (no disk present, disabled) is deliberately excluded -
 // that's the normal resting state of a slot someone unassigned on purpose,
 // which routes/disks.ts already logs at the point of the action.
 const BAD_DISK_STATUSES = new Set<DiskStatus>(['DISK_INVALID', 'DISK_WRONG', 'DISK_DSBL', 'DISK_NP_MISSING', 'DISK_DSBL_NEW']);
@@ -20,7 +20,7 @@ function diskLabel(disk: NmdDisk): string {
   return disk.disk_name || (disk.device !== 'none' ? disk.device : `slot ${disk.slot}`);
 }
 
-/** Mirrors the frontend's selectors/disks.ts:diskNeedsFormat exactly — a data disk (never
+/** Mirrors the frontend's selectors/disks.ts:diskNeedsFormat exactly - a data disk (never
  *  parity/Q) that's DISK_OK but has no recognized filesystem yet. "unknown" is nmdctl's own
  *  sentinel for that (see get_fs_type() in tools/nmdctl), not an error. */
 function diskNeedsFormat(disk: NmdDisk): boolean {
@@ -38,7 +38,7 @@ interface DiskSnapshot {
  * via an explicit user action, which routes/parity.ts already logs), a
  * disk's error count climbing or its status turning bad, and a disk's SMART
  * health flipping from passing to failing. Everything here is a *passive*
- * observation — it never issues driver commands, only reads status and logs.
+ * observation - it never issues driver commands, only reads status and logs.
  *
  * Same background-interval shape as SystemStatsService: a self-unref'd
  * timer so it never keeps the process alive on its own.
@@ -46,13 +46,13 @@ interface DiskSnapshot {
 export class ActivityWatcher {
   private timer: NodeJS.Timeout;
 
-  // `null`/unset means "not observed yet" — the first tick after startup
+  // `null`/unset means "not observed yet" - the first tick after startup
   // seeds these without logging anything, so restarting the backend never
   // produces a wall of false "just changed" events for pre-existing state.
   private lastSyncTimestamp: number | null = null;
   private diskSnapshots = new Map<number, DiskSnapshot>();
   private healthSnapshots = new Map<string, SmartHealth | null>();
-  // Keyed by 'cpu' or a disk device path — tracks whether that source was
+  // Keyed by 'cpu' or a disk device path - tracks whether that source was
   // already over the threshold, so a sustained high temp logs/notifies once
   // on the crossing rather than every tick.
   private overTemp = new Map<string, boolean>();
@@ -60,7 +60,7 @@ export class ActivityWatcher {
   // undefined = not observed yet (seed silently, same reasoning as every other snapshot above);
   // null = confirmed not currently erroring.
   private lastErrorState: string | null | undefined = undefined;
-  // Map, not a Set, so a slot's *first* observation can be seeded without logging — same
+  // Map, not a Set, so a slot's *first* observation can be seeded without logging - same
   // undefined-means-unseen idiom as diskSnapshots/healthSnapshots above.
   private needsFormatSnapshots = new Map<number, boolean>();
 
@@ -81,7 +81,7 @@ export class ActivityWatcher {
     try {
       status = await this.nmd.getStatus();
     } catch {
-      return; // driver unreachable this round — try again next tick
+      return; // driver unreachable this round - try again next tick
     }
 
     this.checkArrayError(status.array.state);
@@ -93,16 +93,16 @@ export class ActivityWatcher {
     await this.checkCacheMirror();
   }
 
-  /** Edge-triggered on the array entering (or changing) an ERROR:* state — see isArrayError()'s
+  /** Edge-triggered on the array entering (or changing) an ERROR:* state - see isArrayError()'s
    *  own reasoning in selectors/status.ts for why this means something genuinely needs a look,
    *  not just a normal stopped/degraded array. Deliberately doesn't log on *recovery* (state
-   *  leaving ERROR:*), same "only log getting worse" reasoning as checkCacheMirror below — the
+   *  leaving ERROR:*), same "only log getting worse" reasoning as checkCacheMirror below - the
    *  dashboard's own ArrayErrorCard disappearing already communicates that. */
   private checkArrayError(state: string): void {
     const prev = this.lastErrorState;
     const isError = state.startsWith('ERROR:');
     this.lastErrorState = isError ? state : null;
-    if (prev === undefined) return; // first tick — seed only, don't log pre-existing state
+    if (prev === undefined) return; // first tick - seed only, don't log pre-existing state
 
     if (isError && state !== prev) {
       const text = `Array error: ${state}`;
@@ -112,17 +112,17 @@ export class ActivityWatcher {
   }
 
   /** Edge-triggered per slot, same seed-then-diff idiom as checkDisks above. Only logs a slot
-   *  newly *needing* format — a slot that gets formatted (leaves the set) is silent, same
+   *  newly *needing* format - a slot that gets formatted (leaves the set) is silent, same
    *  no-recovery-event reasoning as checkCacheMirror. */
   private checkNeedsFormat(disks: NmdDisk[]): void {
     for (const disk of disks) {
       const prev = this.needsFormatSnapshots.get(disk.slot);
       const needsFormat = diskNeedsFormat(disk);
       this.needsFormatSnapshots.set(disk.slot, needsFormat);
-      if (prev === undefined) continue; // first observation of this slot — seed only
+      if (prev === undefined) continue; // first observation of this slot - seed only
 
       if (needsFormat && !prev) {
-        const text = `Disk ${disk.slot} (${diskLabel(disk)}) needs formatting — no filesystem detected`;
+        const text = `Disk ${disk.slot} (${diskLabel(disk)}) needs formatting - no filesystem detected`;
         this.activity.log(text, 'amber').catch(() => {});
         notifyEvent(this.settings, 'diskNeedsFormat', 'NonRAID: disk needs formatting', text);
       }
@@ -130,9 +130,9 @@ export class ActivityWatcher {
   }
 
   /**
-   * Same seed-silently-then-diff idiom as checkSmartHealth — only fires on a transition to a
+   * Same seed-silently-then-diff idiom as checkSmartHealth - only fires on a transition to a
    * *worse* state (healthy -> degraded/unavailable, degraded -> unavailable), not on every tick a
-   * degraded mirror stays degraded, and not on recovery (no "cacheMirrorHealthy" event exists —
+   * degraded mirror stays degraded, and not on recovery (no "cacheMirrorHealthy" event exists -
    * the Dashboard/Disks page already show recovery the moment it happens, same reasoning
    * notificationCatalog.ts gives for keeping this scoped to passive health events).
    */
@@ -141,7 +141,7 @@ export class ActivityWatcher {
     try {
       status = await this.cache.getStatus();
     } catch {
-      return; // unreachable this round — try again next tick
+      return; // unreachable this round - try again next tick
     }
 
     const prev = this.lastCacheHealth;
@@ -155,8 +155,8 @@ export class ActivityWatcher {
 
     const text =
       status.health === 'unavailable'
-        ? 'Cache mirror is unavailable — both members appear to be missing or unmountable.'
-        : 'Cache mirror is degraded — one member is missing. It still works with zero redundancy until replaced.';
+        ? 'Cache mirror is unavailable - both members appear to be missing or unmountable.'
+        : 'Cache mirror is degraded - one member is missing. It still works with zero redundancy until replaced.';
     this.activity.log(text, 'red').catch(() => {});
     notifyEvent(this.settings, 'cacheMirrorDegraded', 'NonRAID: cache mirror degraded', text);
   }
@@ -181,10 +181,10 @@ export class ActivityWatcher {
     for (const disk of disks) {
       const prev = this.diskSnapshots.get(disk.slot);
       this.diskSnapshots.set(disk.slot, { status: disk.status, errors: disk.errors });
-      if (!prev) continue; // first observation of this slot — seed only
+      if (!prev) continue; // first observation of this slot - seed only
 
       if (disk.errors > prev.errors) {
-        const text = `Disk ${disk.slot} (${diskLabel(disk)}) reported new errors — total now ${disk.errors}`;
+        const text = `Disk ${disk.slot} (${diskLabel(disk)}) reported new errors - total now ${disk.errors}`;
         this.activity.log(text, 'red').catch(() => {});
         notifyEvent(this.settings, 'diskErrors', 'NonRAID: disk errors', text);
         continue; // one log line per tick per disk is plenty
@@ -208,7 +208,7 @@ export class ActivityWatcher {
     try {
       healths = await this.smart.getHealthStatuses(devices);
     } catch {
-      return; // SMART unreachable this round — try again next tick
+      return; // SMART unreachable this round - try again next tick
     }
 
     for (const disk of disks) {
@@ -239,7 +239,7 @@ export class ActivityWatcher {
 
   private async checkTemperatures(disks: NmdDisk[]): Promise<void> {
     const settings = await this.settings.get();
-    // Deliberately no separate "is temp watching on" gate — this always evaluates, same as every
+    // Deliberately no separate "is temp watching on" gate - this always evaluates, same as every
     // other monitored condition here (parity, SMART, etc). notifyEvent's own eventTypes.tempAlertCpu/
     // tempAlertDisk checks are the on/off switches, matching how every other event in the catalog works.
     const { cpuWarnAboveCelsius, diskWarnAboveCelsius } = settings.tempAlerts;
@@ -252,7 +252,7 @@ export class ActivityWatcher {
     try {
       temps = await this.smart.getTemperatures(devices);
     } catch {
-      return; // SMART unreachable this round — try again next tick
+      return; // SMART unreachable this round - try again next tick
     }
     for (const disk of disks) {
       if (!disk.device || disk.device === 'none') continue;

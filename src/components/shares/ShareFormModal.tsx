@@ -22,7 +22,7 @@ const ALLOCATION_OPTIONS: { value: AllocationMethod; label: string }[] = [
 export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: ShareFormModalProps) {
   const { status } = useArrayStatus();
   // A cache pool must actually be set up (fsUuid persisted, even if currently degraded) before
-  // "Cache only" can be picked at all — configuring a share that can never mount is worse than
+  // "Cache only" can be picked at all - configuring a share that can never mount is worse than
   // just not offering the option yet. Mirrors the /cache/enabled route's own fsUuid gate.
   const { status: cacheStatus } = useCacheStatus();
   const cacheConfigured = cacheStatus !== null && cacheStatus.health !== 'not-configured';
@@ -35,7 +35,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
   const [disks, setDisks] = useState<number[]>(initial?.disks ?? allDiskSlots);
   const [allocationMethod, setAllocationMethod] = useState<AllocationMethod>(initial?.allocationMethod ?? 'most-free');
   // Default to "all drives" on create. On edit, trust the share's own persisted
-  // allDisks flag when present — falls back to inferring from the current disk
+  // allDisks flag when present - falls back to inferring from the current disk
   // list only for shares saved before that flag existed.
   const [useAllDisks, setUseAllDisks] = useState<boolean>(() => {
     if (initial?.allocationMethod === 'single-disk') return false;
@@ -68,11 +68,11 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
   const handleAllocationChange = (value: AllocationMethod) => {
     setAllocationMethod(value);
     if (value === 'single-disk') {
-      // "All drives" doesn't apply to a single-disk share — fall back to manual selection.
+      // "All drives" doesn't apply to a single-disk share - fall back to manual selection.
       setUseAllDisks(false);
       if (disks.length > 1) setDisks(disks.slice(0, 1));
     } else if (value === 'cache-only') {
-      // A cache-only share has no array disks at all — the picker is hidden entirely below.
+      // A cache-only share has no array disks at all - the picker is hidden entirely below.
       setUseAllDisks(false);
       setDisks([]);
     }
@@ -98,7 +98,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
       return;
     }
 
-    // SMB/NFS export settings aren't edited here — see the Sharing tab — so an edit passes them
+    // SMB/NFS export settings aren't edited here - see the Sharing tab - so an edit passes them
     // through unchanged, and a new pool starts with none at all (not shared anywhere yet).
     const input: ShareInput = {
       name,
@@ -115,7 +115,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
     setError(null);
     const ok = await onSubmit(input);
     setSubmitting(false);
-    if (!ok) setError('Request failed — see the page error banner for details.');
+    if (!ok) setError('Request failed - see the page error banner for details.');
   };
 
   return (
@@ -148,7 +148,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
           </label>
 
           {allocationMethod === 'cache-only' ? (
-            <div className="status-note">This pool lives entirely on the cache disks — no array disk is used, and the mover never touches it.</div>
+            <div className="status-note">This pool lives entirely on the cache disks - no array disk is used, and the mover never touches it.</div>
           ) : (
             <div className="form-field">
               <div className="toggle-row" style={{ padding: 0 }}>
@@ -156,7 +156,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
                   <div className="toggle-row__title">Use all drives</div>
                   <div className="toggle-row__desc">
                     {useAllDisks
-                      ? `Using all ${allDiskSlots.length} data disk(s) — new disks are added automatically`
+                      ? `Using all ${allDiskSlots.length} data disk(s) - new disks are added automatically`
                       : 'Choose specific disks below'}
                   </div>
                 </div>
@@ -204,7 +204,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
 
           {!isEdit && (
             <div className="status-note">
-              Not shared anywhere yet — turn on SMB or NFS access for this pool from the Sharing tab once it's
+              Not shared anywhere yet - turn on SMB or NFS access for this pool from the Sharing tab once it's
               created.
             </div>
           )}

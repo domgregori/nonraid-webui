@@ -1,11 +1,11 @@
 import { HttpError } from '../httpError.js';
 
-// This admin credential has nothing to do with the OS — unlike
+// This admin credential has nothing to do with the OS - unlike
 // users/validate.ts's NAME_RE, which exists because those become real
 // useradd/smbpasswd accounts. Printable ASCII only, trimmed, no Linux
 // username constraints.
 const USERNAME_RE = /^[\x20-\x7e]{3,64}$/;
-const MIN_PASSWORD_LENGTH = 10; // higher than the Samba path's 8 — this credential
+const MIN_PASSWORD_LENGTH = 10; // higher than the Samba path's 8 - this credential
 // gates the whole API, not one share's worth of access. Length over
 // character-class complexity, matching current NIST 800-63B guidance.
 const MAX_PASSWORD_LENGTH = 256;
@@ -32,7 +32,7 @@ export function validateSetupInput(input: unknown): Credentials {
   return { username, password: i.password };
 }
 
-// Deliberately loose — a bad guess should fail as a generic 401 on the login
+// Deliberately loose - a bad guess should fail as a generic 401 on the login
 // route, not leak which specific rule it violated.
 export function validateLoginInput(input: unknown): Credentials {
   if (typeof input !== 'object' || input === null) {
@@ -72,7 +72,7 @@ export function validatePasswordChangeInput(input: unknown): PasswordChange {
   return { currentPassword, newPassword: i.newPassword };
 }
 
-// Loose on purpose — the verify endpoint tries the input as a TOTP code, then falls back to
+// Loose on purpose - the verify endpoint tries the input as a TOTP code, then falls back to
 // treating it as a backup code, rather than the client declaring which kind it's sending. Covers
 // both a bare 6-digit code and a dash-grouped backup code (e.g. "A3F9-K2M8-XQ7Z").
 const TWO_FACTOR_CODE_RE = /^[A-Za-z0-9-]{6,24}$/;
@@ -89,7 +89,7 @@ export function validateTwoFactorCodeInput(input: unknown): string {
   return code;
 }
 
-// Same style as USERNAME_RE above — a user-facing label ("YubiKey", "MacBook Touch ID"), not an
+// Same style as USERNAME_RE above - a user-facing label ("YubiKey", "MacBook Touch ID"), not an
 // OS identifier of any kind.
 const PASSKEY_NAME_RE = /^[\x20-\x7e]{1,64}$/;
 

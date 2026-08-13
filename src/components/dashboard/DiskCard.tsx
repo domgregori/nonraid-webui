@@ -9,7 +9,7 @@ interface DiskCardProps {
 }
 
 interface DataDiskCardProps extends DiskCardProps {
-  /** Set only on the one disk currently being cleared — see ArrayDisks. Swaps this card's normal
+  /** Set only on the one disk currently being cleared - see ArrayDisks. Swaps this card's normal
    *  used-space display for clear progress + pause/resume/cancel controls. */
   clearing?: ParityViewModel;
 }
@@ -88,7 +88,7 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
       <div className="disk-card__device">{disk.device}</div>
       {disk.needsFormat && (
         <div className="disk-card__row--sub" style={{ color: COLORS.amber }}>
-          Needs formatting — no filesystem yet
+          Needs formatting - no filesystem yet
         </div>
       )}
       <div className="progress-track">

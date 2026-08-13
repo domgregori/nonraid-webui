@@ -50,14 +50,14 @@ export function servicesRouter(activity: ActivityStore): Router {
   });
 
   router.post('/services/:id/restart', async (req, res) => {
-    // nonraid-webui.service is this backend's own unit — routing its restart through
+    // nonraid-webui.service is this backend's own unit - routing its restart through
     // `systemctl restart` would spawn a child process inside the unit's own cgroup, which
     // systemd's stop phase would kill before it could ever trigger the start phase. The unit has
     // Restart=on-failure (RestartSec=5), so a clean self-restart instead just exits non-zero and
     // lets systemd bring it back up.
     if (req.params.id === 'webui') {
       activity.log('Restarting nonraid-webui backend', 'amber').catch(() => {});
-      res.json({ ok: true, message: 'Restarting — this page will reconnect automatically in a few seconds.' });
+      res.json({ ok: true, message: 'Restarting - this page will reconnect automatically in a few seconds.' });
       res.on('finish', () => {
         setTimeout(() => process.exit(1), 200);
       });

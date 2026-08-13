@@ -5,7 +5,7 @@ export interface AuthStatusResponse {
 
 export type TwoFactorMethod = 'totp' | 'passkey';
 
-// login() returns this instead of the plain AuthStatusResponse — additive, so setup()/logout()/
+// login() returns this instead of the plain AuthStatusResponse - additive, so setup()/logout()/
 // status() keep their existing plain shape untouched.
 export interface LoginResponse extends AuthStatusResponse {
   twoFactorRequired?: boolean;

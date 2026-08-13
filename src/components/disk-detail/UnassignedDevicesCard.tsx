@@ -8,9 +8,9 @@ import { Card } from '../shared/Card';
 import { AddDiskDialog } from './AddDiskDialog';
 import { UnassignedDeviceDetailPanel } from './UnassignedDeviceDetailPanel';
 
-/** Fetched per row on mount — unassigned devices have no array-wide poll to piggyback on, and
+/** Fetched per row on mount - unassigned devices have no array-wide poll to piggyback on, and
  *  there are normally only a handful of them, so one on-demand call each is cheap enough. Drives
- *  the row's top-border color (see the .disk-card__health-dot doc comment history — a dot read as
+ *  the row's top-border color (see the .disk-card__health-dot doc comment history - a dot read as
  *  too easy to miss, so health is now a border color instead). */
 function useDeviceHealth(device: string): 'passed' | 'failed' | null {
   const [health, setHealth] = useState<'passed' | 'failed' | null>(null);

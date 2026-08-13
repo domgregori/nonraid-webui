@@ -7,7 +7,7 @@ import { Card } from '../shared/Card';
 
 // nmdctl's own slot numbering (see backend/src/nmd/superblock.ts's MD_SB_P_IDX): slot 0 is
 // always Parity 1, 1-28 are data. A second parity disk, more data disks, and a cache mirror can
-// all be added later from the Disks page — see this component's own doc comment for why this
+// all be added later from the Disks page - see this component's own doc comment for why this
 // stays a plain pair of picks instead of trying to plan all of that up front.
 const PARITY_SLOT = 0;
 const FIRST_DATA_SLOT = 1;
@@ -18,7 +18,7 @@ interface ArrayBuilderProps {
 }
 
 /**
- * Deliberately just two picks — a parity disk and a data disk — not a full multi-disk plan.
+ * Deliberately just two picks - a parity disk and a data disk - not a full multi-disk plan.
  * Confirmed live against nmdctl that anything more ambitious here doesn't actually pay off:
  *
  * - Its own `add` command hard-refuses once the array has any uncommitted data disk (mdState
@@ -26,12 +26,12 @@ interface ArrayBuilderProps {
  * - A stop→add→start cycle for a second data disk doesn't work either: `start` after the first
  *   data disk only marks the initial parity build pending, it doesn't run it, and nmdctl then
  *   refuses further adds (ERROR:INVALID_EXPANSION) until that reconstruction has actually
- *   completed — minutes to hours on real disks, not something to await inside one click.
+ *   completed - minutes to hours on real disks, not something to await inside one click.
  * - A second parity disk and a cache mirror have no such hard blocker, but folding them in here
- *   just adds more decisions to a screen whose only job is "get the array running" — they're one
+ *   just adds more decisions to a screen whose only job is "get the array running" - they're one
  *   click away on the Disks page (and Settings → Cache) once this screen is done.
  *
- * Nothing is sent to nmdctl until "Build Array" — the two picks are local state until then.
+ * Nothing is sent to nmdctl until "Build Array" - the two picks are local state until then.
  */
 export function ArrayBuilder({ onBuilt }: ArrayBuilderProps) {
   const { devices, status: devicesStatus, error: devicesError, refresh } = useAvailableDevices();
@@ -42,7 +42,7 @@ export function ArrayBuilder({ onBuilt }: ArrayBuilderProps) {
   const [buildError, setBuildError] = useState<string | null>(null);
   const [buildLog, setBuildLog] = useState<string[]>([]);
 
-  // Reopening this screen after parity alone was already committed (e.g. picked up mid-setup) —
+  // Reopening this screen after parity alone was already committed (e.g. picked up mid-setup) -
   // only the data disk is still needed then, so the parity picker is replaced with a plain note.
   const existingParity = (status?.disks ?? []).find((d) => d.disk_id && d.type === 'P');
 
@@ -74,12 +74,12 @@ export function ArrayBuilder({ onBuilt }: ArrayBuilderProps) {
 
       appendLog('Starting the array…');
       await nmdApi.startArray();
-      // start alone only marks the initial parity build pending (resync.pending) — it doesn't run
+      // start alone only marks the initial parity build pending (resync.pending) - it doesn't run
       // it. parityCheck('CORRECT') is the same action the dashboard's own Parity Check card sends;
       // RealNmdClient.parityCheck() already substitutes in the pending build's own action word for
       // this exact case (confirmed live: without this, parity sits at 0% indefinitely and nmdctl
       // later refuses to add another disk at all).
-      appendLog('Starting the initial parity build — this continues in the background…');
+      appendLog('Starting the initial parity build - this continues in the background…');
       await nmdApi.parityCheck('CORRECT');
 
       refresh();
@@ -102,7 +102,7 @@ export function ArrayBuilder({ onBuilt }: ArrayBuilderProps) {
           {existingParity ? (
             <div className="settings-field">
               <div className="toggle-row__title">Parity disk</div>
-              <div className="status-note">Already assigned — {existingParity.disk_id}.</div>
+              <div className="status-note">Already assigned - {existingParity.disk_id}.</div>
             </div>
           ) : (
             <div className="settings-field">
@@ -124,7 +124,7 @@ export function ArrayBuilder({ onBuilt }: ArrayBuilderProps) {
                     </option>
                   ))}
               </select>
-              {parity?.locked && <div className="status-note status-note--error">This disk appears to be locked/in use — this may fail.</div>}
+              {parity?.locked && <div className="status-note status-note--error">This disk appears to be locked/in use - this may fail.</div>}
             </div>
           )}
 
@@ -147,19 +147,19 @@ export function ArrayBuilder({ onBuilt }: ArrayBuilderProps) {
                   </option>
                 ))}
             </select>
-            {data?.locked && <div className="status-note status-note--error">This disk appears to be locked/in use — this may fail.</div>}
+            {data?.locked && <div className="status-note status-note--error">This disk appears to be locked/in use - this may fail.</div>}
           </div>
         </>
       )}
 
       {parityTooSmall && (
         <div className="status-note status-note--error">
-          The parity disk is smaller than the data disk ({data ? formatBytesHuman(data.sizeKb! * 1024) : ''}) — pick a bigger parity disk, or
+          The parity disk is smaller than the data disk ({data ? formatBytesHuman(data.sizeKb! * 1024) : ''}) - pick a bigger parity disk, or
           a smaller data disk.
         </div>
       )}
       {status?.array.state === 'STARTED' && (dataDevice || parityDevice) && (
-        <div className="status-note">The array is currently running — building this will stop and restart it.</div>
+        <div className="status-note">The array is currently running - building this will stop and restart it.</div>
       )}
       {buildError && <div className="status-note status-note--error">{buildError}</div>}
 

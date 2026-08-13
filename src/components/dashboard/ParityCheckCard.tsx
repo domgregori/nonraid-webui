@@ -9,15 +9,15 @@ export function ParityCheckCard() {
   if (!status) return null;
 
   const parity = deriveParityViewModel(status, parityPending, parityAction);
-  // A new-disk clear reuses this same resync status but isn't a parity check — once it's actually
+  // A new-disk clear reuses this same resync status but isn't a parity check - once it's actually
   // running, its progress shows on the clearing disk's own card instead (see ArrayDisks). But
-  // resync.action is set the moment a clear is *queued*, before it's active — hiding this card for
+  // resync.action is set the moment a clear is *queued*, before it's active - hiding this card for
   // that pending state too left no "Start" button reachable anywhere (DataDiskCard's clearing view
-  // only has Pause/Cancel, which assume something's already running) — confirmed live: the pill
+  // only has Pause/Cancel, which assume something's already running) - confirmed live: the pill
   // read "CLEARING PENDING" with nmdctl itself saying to run `nmdctl check` to start it, and
   // nothing in the UI could trigger that. parityCheck('CORRECT') already substitutes the right
   // nmdctl subcommand for a pending clear (see realClient.ts), so this button works correctly for
-  // that case too — it just needed to stay visible.
+  // that case too - it just needed to stay visible.
   if (parity.isClearing && parity.isRunning) return null;
 
   return (
@@ -53,7 +53,7 @@ export function ParityCheckCard() {
 
       {parity.needsDriverReload && (
         <ReloadDriverPrompt
-          description="A clear/rebuild is stuck pending from before a disk was unassigned, with no real disk behind it anymore — Start would just fail. Reloading the driver resets this; it doesn't change which disks are in the array, only refreshes its live state."
+          description="A clear/rebuild is stuck pending from before a disk was unassigned, with no real disk behind it anymore - Start would just fail. Reloading the driver resets this; it doesn't change which disks are in the array, only refreshes its live state."
           onReloaded={refresh}
         />
       )}

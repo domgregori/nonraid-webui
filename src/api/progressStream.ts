@@ -1,7 +1,7 @@
 import { API_BASE_URL } from './config';
 
 /**
- * Reads a newline-delimited JSON progress stream — the protocol shared by
+ * Reads a newline-delimited JSON progress stream - the protocol shared by
  * the Apps install endpoint, the Docker tab's create/recreate endpoints, and
  * the LXC tab's create endpoint (see backend/src/routes/apps.ts,
  * backend/src/routes/docker.ts, backend/src/routes/lxc.ts). A pull/download

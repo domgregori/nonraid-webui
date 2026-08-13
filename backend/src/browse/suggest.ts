@@ -2,7 +2,7 @@ import { readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 
 /**
- * Resolves `dir` against one of `roots`, symlink-safe — a string-prefix check
+ * Resolves `dir` against one of `roots`, symlink-safe - a string-prefix check
  * alone can't catch an in-tree symlink pointing outside every allowed root
  * (same reasoning as docker/planning.ts's isAllowedBindPath). Returns the
  * pre-realpath absolute form, once the real target is confirmed safe, so
@@ -26,7 +26,7 @@ async function resolveDirWithinRoots(dir: string, roots: string[]): Promise<stri
 
 /**
  * Directory-only path completion for a host-path textbox (Docker/Apps bind
- * mounts, backup destination, Browse page's move dialog) — never files, since
+ * mounts, backup destination, Browse page's move dialog) - never files, since
  * every current caller is choosing a destination *directory*, not a file.
  * Purely a UX hint: the real safety check happens again at submit time
  * (isAllowedBindPath for binds, resolveExisting for browse), so a suggestion

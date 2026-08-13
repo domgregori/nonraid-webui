@@ -13,12 +13,12 @@ export interface ContainerActions {
 }
 
 /**
- * `ports` is a formatted display string like "8080:80, 9000/tcp" — entries
+ * `ports` is a formatted display string like "8080:80, 9000/tcp" - entries
  * with a host:container pair are published (reachable from outside the
  * container), entries with just "port/proto" are container-internal only.
  * There's no per-app metadata saying which published port is "the" web UI
  * (that only exists for CA templates, and only during install), so this
- * picks the first published one as a best-effort guess — matches what most
+ * picks the first published one as a best-effort guess - matches what most
  * container dashboards default to.
  */
 function firstPublishedHostPort(ports: string): number | null {
@@ -29,7 +29,7 @@ function firstPublishedHostPort(ports: string): number | null {
 
 /**
  * `webUiUrl`, when present, is the backend's real resolution of the CA
- * template's WebUI field against this container's actual ports — prefer it.
+ * template's WebUI field against this container's actual ports - prefer it.
  * `[IP]` is left unresolved by the backend (it has no reliable way to know
  * which address the browser reaches it on), so fill it in here the same way
  * the Apps install dialog does.
@@ -49,8 +49,8 @@ export function deriveContainerViewModel(container: DockerContainerSummary, acti
     ports: container.ports,
     statusLabel: running ? 'Running' : 'Stopped',
     statusColor: running ? COLORS.green : COLORS.textDim,
-    cpuLabel: container.cpuPercent === null ? '—' : `${Math.round(container.cpuPercent)}%`,
-    memLabel: container.memUsedBytes === null ? '—' : formatBytesAsMB(container.memUsedBytes),
+    cpuLabel: container.cpuPercent === null ? '-' : `${Math.round(container.cpuPercent)}%`,
+    memLabel: container.memUsedBytes === null ? '-' : formatBytesAsMB(container.memUsedBytes),
     toggleLabel: running ? 'Stop' : 'Start',
     toggleBorder: running ? COLORS.red : COLORS.green,
     toggleBg: running ? 'transparent' : tint(COLORS.green, 15),

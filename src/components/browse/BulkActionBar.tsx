@@ -8,7 +8,7 @@ interface BulkActionBarProps {
   onDelete: () => void;
 }
 
-/** Replaces the normal New Folder/Upload toolbar row whenever there's an active selection —
+/** Replaces the normal New Folder/Upload toolbar row whenever there's an active selection -
  *  reads as "you're in selection mode" rather than just another static toolbar. */
 export function BulkActionBar({ count, onClear, onCopy, onMove, onDelete }: BulkActionBarProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);

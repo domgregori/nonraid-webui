@@ -206,8 +206,8 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
                 value={networkType}
                 onChange={(e) => handleNetworkTypeChange(e.target.value as 'bridge' | 'macvlan')}
               >
-                <option value="bridge">Bridge — IP on the bridge's own subnet</option>
-                <option value="macvlan">Direct on a network interface — real IP from your LAN's DHCP</option>
+                <option value="bridge">Bridge - IP on the bridge's own subnet</option>
+                <option value="macvlan">Direct on a network interface - real IP from your LAN's DHCP</option>
               </select>
             </label>
 
@@ -233,7 +233,7 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
               )}
               <span className="apps-field__hint">
                 {networkType === 'macvlan'
-                  ? "The container's interface rides directly on this NIC and gets its own LAN IP via DHCP. The host itself can't reach the container over this interface — that's a macvlan limitation, not a bug."
+                  ? "The container's interface rides directly on this NIC and gets its own LAN IP via DHCP. The host itself can't reach the container over this interface - that's a macvlan limitation, not a bug."
                   : "Host bridge the container's veth attaches to"}
               </span>
             </label>

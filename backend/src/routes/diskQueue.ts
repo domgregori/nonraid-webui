@@ -23,7 +23,7 @@ export function diskQueueRouter(diskQueue: DiskQueueService, nmd: NmdClient): Ro
       return;
     }
     try {
-      // Same fresh-scan validation the old direct /disks/:slot/add route used — purely for
+      // Same fresh-scan validation the old direct /disks/:slot/add route used - purely for
       // immediate UI feedback here; runItem() re-validates again for real once this item's turn
       // actually comes up (see DiskQueueService's doc comment on why enqueue-time validation
       // isn't a substitute for that).

@@ -10,7 +10,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  // AuthGate itself needs no new state for this — the whole 2FA sub-flow lives here. A second
+  // AuthGate itself needs no new state for this - the whole 2FA sub-flow lives here. A second
   // factor isn't a failure, it's an expected step, so it's tracked separately from `error`.
   const [step, setStep] = useState<'password' | 'twofactor'>('password');
   const [twoFactorMethods, setTwoFactorMethods] = useState<TwoFactorMethod[]>([]);
@@ -26,7 +26,7 @@ export function LoginPage() {
         setStep('twofactor');
       }
     } catch (err) {
-      // request() throws a bare UnauthorizedError (no body) on any 401 — the backend's real
+      // request() throws a bare UnauthorizedError (no body) on any 401 - the backend's real
       // "Invalid username or password." message never reaches here.
       setError(err instanceof UnauthorizedError ? 'Invalid username or password.' : (err as Error).message);
     } finally {

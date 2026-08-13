@@ -14,7 +14,7 @@ interface SampleRow {
   value: number;
 }
 
-/** Owns metrics.db (see db.ts) — the sampler writes through this, the /metrics route reads through this. */
+/** Owns metrics.db (see db.ts) - the sampler writes through this, the /metrics route reads through this. */
 export class MetricsService {
   private insertStmt: Database.Statement;
   private queryStmt: Database.Statement;
@@ -30,18 +30,18 @@ export class MetricsService {
     });
   }
 
-  /** One write transaction per sampler tick, not one per metric — keeps a multi-metric tick to a single fsync. */
+  /** One write transaction per sampler tick, not one per metric - keeps a multi-metric tick to a single fsync. */
   recordBatch(samples: SampleInput[], ts: number = Date.now()): void {
     if (samples.length === 0) return;
     this.insertTx(samples, ts);
   }
 
   /** WAL mode (see db.ts) means recent writes can sit in metrics.db-wal, not yet folded into
-   *  metrics.db itself — a backup that only archives metrics.db would silently miss them, and a
+   *  metrics.db itself - a backup that only archives metrics.db would silently miss them, and a
    *  restore has no sane way to bring back matching -wal/-shm sidecars for a *different* database
    *  transplanted from another point in time anyway. TRUNCATE folds everything in and drops the
    *  WAL file back to empty, so the plain .db file is a complete, self-contained snapshot on its
-   *  own — called right before every backup (system.ts's manual route, BackupScheduler's runs). */
+   *  own - called right before every backup (system.ts's manual route, BackupScheduler's runs). */
   checkpointForBackup(): void {
     this.db.pragma('wal_checkpoint(TRUNCATE)');
   }

@@ -13,7 +13,7 @@ export interface UseCacheStatus {
   refresh: () => Promise<void>;
 }
 
-/** Polls like useDockerContainers — cheap enough (one status read) to keep the Dashboard card and
+/** Polls like useDockerContainers - cheap enough (one status read) to keep the Dashboard card and
  *  Disks page section both live without any push mechanism. */
 export function useCacheStatus(): UseCacheStatus {
   const [status, setStatus] = useState<CacheStatus | null>(null);

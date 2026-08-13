@@ -11,7 +11,7 @@ interface CacheEntry<T> {
  * time per call (even more with -n standby's early-exit check), so we don't
  * want every /api/status poll to shell out to it for every disk. Serves
  * cached values immediately and refreshes in the background once stale
- * (stale-while-revalidate) — except on first request for a device, which
+ * (stale-while-revalidate) - except on first request for a device, which
  * waits for the real read so callers don't get a wall of nulls on cold start.
  */
 export class SmartService {
@@ -49,7 +49,7 @@ export class SmartService {
     this.attrCache.delete(device);
   }
 
-  /** Stale-while-revalidate fetch, shared by temperature/health/attribute reads — see SmartService's doc comment. */
+  /** Stale-while-revalidate fetch, shared by temperature/health/attribute reads - see SmartService's doc comment. */
   private async getCached<T>(
     devices: string[],
     cache: Map<string, CacheEntry<T>>,
@@ -84,7 +84,7 @@ export class SmartService {
         });
 
       inFlight.set(device, refresh);
-      if (!entry) toAwait.push(refresh); // no cached value yet — must wait
+      if (!entry) toAwait.push(refresh); // no cached value yet - must wait
     }
 
     if (toAwait.length > 0) await Promise.all(toAwait);

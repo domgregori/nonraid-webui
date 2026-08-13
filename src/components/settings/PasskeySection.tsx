@@ -90,7 +90,7 @@ export function PasskeySection() {
         </>
       ) : (
         <div className="status-note">
-          Passkeys need a secure connection (HTTPS, or "localhost") — this page is loaded over plain HTTP, so adding
+          Passkeys need a secure connection (HTTPS, or "localhost") - this page is loaded over plain HTTP, so adding
           one isn't available here.
         </div>
       )}
