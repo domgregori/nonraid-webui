@@ -11,6 +11,7 @@ import {
   TWO_FACTOR_PENDING_COOKIE_NAME,
 } from './cookies.js';
 import { hashPassword, verifyPassword, signSession, verifySession, signTwoFactorPending, verifyTwoFactorPending, hashSecret, generateBackupCode } from './crypto.js';
+import type { RequestOrigin } from './requestOrigin.js';
 import { generateTotpSecret, totpProvisioningUri, totpQrDataUri, verifyTotpCode } from './totp.js';
 import type { AuthRecord, AuthStatus, TotpBackupCode, TwoFactorMethod } from './types.js';
 import { passkeyAuthenticationOptions, passkeyRegistrationOptions, verifyPasskeyAuthentication, verifyPasskeyRegistration } from './webauthn.js';
@@ -65,13 +66,13 @@ export class AuthService {
     return { configured: true, authenticated };
   }
 
-  async setup(username: string, password: string): Promise<AuthResult> {
+  async setup(username: string, password: string, origin: RequestOrigin): Promise<AuthResult> {
     const passwordHash = await hashPassword(password);
     const record = await this.store.create(username, passwordHash);
-    return this.issueSession(record.sessionSecret);
+    return this.issueSession(record.sessionSecret, origin);
   }
 
-  async login(username: string, password: string): Promise<AuthResult | TwoFactorRequiredResult> {
+  async login(username: string, password: string, origin: RequestOrigin): Promise<AuthResult | TwoFactorRequiredResult> {
     const record = await this.store.get();
     if (!record) {
       throw new HttpError(409, 'No admin account is configured yet.');
@@ -86,18 +87,18 @@ export class AuthService {
     }
     const methods = this.enrolledMethods(record);
     if (methods.length === 0) {
-      return this.issueSession(record.sessionSecret);
+      return this.issueSession(record.sessionSecret, origin);
     }
     const token = signTwoFactorPending(record.sessionSecret, config.twoFactorPendingTtlMs);
-    const cookie = serializeTwoFactorPendingCookie(token, Math.floor(config.twoFactorPendingTtlMs / 1000));
+    const cookie = serializeTwoFactorPendingCookie(token, Math.floor(config.twoFactorPendingTtlMs / 1000), origin);
     return { cookie, body: { configured: true, authenticated: false, twoFactorRequired: true, twoFactorMethods: methods } };
   }
 
-  logout(): { cookie: string } {
-    return { cookie: serializeClearCookie() };
+  logout(origin: RequestOrigin): { cookie: string } {
+    return { cookie: serializeClearCookie(origin) };
   }
 
-  async changePassword(cookieHeader: string | undefined, currentPassword: string, newPassword: string): Promise<AuthResult> {
+  async changePassword(cookieHeader: string | undefined, currentPassword: string, newPassword: string, origin: RequestOrigin): Promise<AuthResult> {
     const record = await this.requireSession(cookieHeader);
     if (!(await verifyPassword(currentPassword, record.passwordHash))) {
       throw new HttpError(401, 'Current password is incorrect.');
@@ -107,7 +108,7 @@ export class AuthService {
     // Regenerated secret invalidates the cookie that authenticated this very
     // request too - issue a fresh one against the new secret so this session
     // keeps working, while every other open session is now logged out.
-    return this.issueSession(updated.sessionSecret);
+    return this.issueSession(updated.sessionSecret, origin);
   }
 
   // --- Two-factor: TOTP ---
@@ -167,41 +168,41 @@ export class AuthService {
   // Pending-cookie gated - runs before a real session exists. Verifies the second factor and, on
   // success, issues the real session via the exact same path password-only login already uses, so
   // nothing downstream of this needs to know 2FA exists at all.
-  async verifyTwoFactor(cookieHeader: string | undefined, code: string): Promise<AuthResult> {
+  async verifyTwoFactor(cookieHeader: string | undefined, code: string, origin: RequestOrigin): Promise<AuthResult> {
     const record = await this.requirePendingTwoFactor(cookieHeader);
     const totpOk = record.totp ? await verifyTotpCode(record.totp.secret, code) : false;
     const backupOk = totpOk ? false : await this.store.consumeBackupCodeIfValid(code);
     if (!totpOk && !backupOk) {
       throw new HttpError(401, 'Incorrect code.');
     }
-    return this.issueSession(record.sessionSecret);
+    return this.issueSession(record.sessionSecret, origin);
   }
 
   // --- Two-factor: passkeys ---
 
-  async passkeyRegisterOptions(cookieHeader: string | undefined): Promise<PublicKeyCredentialCreationOptionsJSON> {
+  async passkeyRegisterOptions(cookieHeader: string | undefined, origin: RequestOrigin): Promise<PublicKeyCredentialCreationOptionsJSON> {
     const record = await this.requireSession(cookieHeader);
-    return passkeyRegistrationOptions(record);
+    return passkeyRegistrationOptions(record, origin);
   }
 
-  async passkeyRegisterVerify(cookieHeader: string | undefined, response: RegistrationResponseJSON, name: string): Promise<void> {
+  async passkeyRegisterVerify(cookieHeader: string | undefined, response: RegistrationResponseJSON, name: string, origin: RequestOrigin): Promise<void> {
     const record = await this.requireSession(cookieHeader);
-    const credential = await verifyPasskeyRegistration(record, response);
+    const credential = await verifyPasskeyRegistration(record, response, origin);
     await this.store.addPasskey({ ...credential, name });
   }
 
-  async passkeyAuthOptions(cookieHeader: string | undefined): Promise<PublicKeyCredentialRequestOptionsJSON> {
+  async passkeyAuthOptions(cookieHeader: string | undefined, origin: RequestOrigin): Promise<PublicKeyCredentialRequestOptionsJSON> {
     const record = await this.requirePendingTwoFactor(cookieHeader);
-    return passkeyAuthenticationOptions(record);
+    return passkeyAuthenticationOptions(record, origin);
   }
 
   // Pending-cookie gated, mirrors verifyTwoFactor above - issues the real session on success via
   // the same path every other login method uses.
-  async passkeyAuthVerify(cookieHeader: string | undefined, response: AuthenticationResponseJSON): Promise<AuthResult> {
+  async passkeyAuthVerify(cookieHeader: string | undefined, response: AuthenticationResponseJSON, origin: RequestOrigin): Promise<AuthResult> {
     const record = await this.requirePendingTwoFactor(cookieHeader);
-    const { credentialId, newCounter } = await verifyPasskeyAuthentication(record, response);
+    const { credentialId, newCounter } = await verifyPasskeyAuthentication(record, response, origin);
     await this.store.updatePasskeyCounter(credentialId, newCounter);
-    return this.issueSession(record.sessionSecret);
+    return this.issueSession(record.sessionSecret, origin);
   }
 
   async removePasskey(cookieHeader: string | undefined, id: string): Promise<void> {
@@ -214,9 +215,9 @@ export class AuthService {
   // false so the browser doesn't carry a now-unusable Secure cookie into the plain-HTTP page it's
   // about to be redirected to). Deliberately re-verifies rather than trusting the caller already
   // ran requireAuth, matching every other mutator here.
-  async reissueSession(cookieHeader: string | undefined): Promise<AuthResult> {
+  async reissueSession(cookieHeader: string | undefined, origin: RequestOrigin): Promise<AuthResult> {
     const record = await this.requireSession(cookieHeader);
-    return this.issueSession(record.sessionSecret);
+    return this.issueSession(record.sessionSecret, origin);
   }
 
   private enrolledMethods(record: AuthRecord): TwoFactorMethod[] {
@@ -252,9 +253,9 @@ export class AuthService {
     return record;
   }
 
-  private issueSession(secret: string): AuthResult {
+  private issueSession(secret: string, origin: RequestOrigin): AuthResult {
     const token = signSession(secret, config.sessionTtlMs);
-    const cookie = serializeSessionCookie(token, Math.floor(config.sessionTtlMs / 1000));
+    const cookie = serializeSessionCookie(token, Math.floor(config.sessionTtlMs / 1000), origin);
     return { cookie, body: { configured: true, authenticated: true } };
   }
 }

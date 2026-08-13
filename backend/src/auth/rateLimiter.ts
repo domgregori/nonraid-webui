@@ -1,11 +1,11 @@
 import type { NextFunction, Request, Response } from 'express';
 import { config } from '../config.js';
 
-// In-memory, keyed by req.ip - assumes no reverse proxy in front of this
-// backend today (no `trust proxy` is set anywhere in index.ts, so req.ip is
-// the real connecting address). If this ever sits behind a reverse proxy,
-// every client would appear as the proxy's single IP and this would throttle
-// everyone together - revisit `trust proxy` + X-Forwarded-For then.
+// In-memory, keyed by req.ip - the real connecting address by default. Behind a reverse proxy
+// without config.trustProxy enabled, every client appears as the proxy's single IP and this
+// throttles everyone together; enabling trustProxy (index.ts sets `trust proxy`) makes req.ip
+// trust X-Forwarded-For instead, fixing this the same way it fixes cookie/WebAuthn origin
+// detection (see requestOrigin.ts).
 //
 // Each limiter gets its own Map, not a shared one keyed by IP alone - login
 // attempts and TOTP-verify attempts are different actions, and an IP that's

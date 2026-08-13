@@ -6,6 +6,7 @@ import { Router, type Response } from 'express';
 import multer from 'multer';
 import type { ActivityStore } from '../activity/index.js';
 import type { AuthService } from '../auth/index.js';
+import { requestOrigin } from '../auth/requestOrigin.js';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import { generateSelfSigned, suggestCommonName, suggestSans } from '../tls/certGen.js';
@@ -232,7 +233,7 @@ export function tlsRouter(tlsStore: TlsStore, activity: ActivityStore, authServi
       // plain-HTTP page redirected to next - with no in-app way back in, since passkey login also
       // needs a secure context. Live-reproduced this exact lockout before adding the fix.
       config.cookieSecure = false;
-      const { cookie } = await authService.reissueSession(req.headers.cookie);
+      const { cookie } = await authService.reissueSession(req.headers.cookie, requestOrigin(req));
       res.append('Set-Cookie', cookie);
       // req.hostname (not record.commonName) so the redirect target's host matches the cookie
       // above, which is host-only and bound to whatever host this request actually came in on -

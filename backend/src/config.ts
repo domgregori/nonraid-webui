@@ -96,6 +96,14 @@ export const config = {
   // setup, where Vite's own dev server serves the frontend separately on
   // its own origin/port (see corsOrigin above).
   serveFrontend: bool('SERVE_FRONTEND', t('server', 'serve_frontend'), false),
+  // Only enable when a reverse proxy is the *sole* way to reach this backend (it's firewalled off
+  // from any other direct access) and that proxy always sets/overwrites X-Forwarded-Proto/Host/For
+  // itself - otherwise a direct client could spoof those headers to fake an HTTPS connection or
+  // dodge IP-based rate limiting. When true, Express trusts them (see index.ts's app.set('trust
+  // proxy', ...)), which lets cookieSecure/webauthnRpId/webauthnOrigin below be derived from the
+  // real request instead of requiring cookie_secure/webauthn_rp_id/webauthn_origin to be set by
+  // hand - see requestOrigin.ts.
+  trustProxy: bool('TRUST_PROXY', t('server', 'trust_proxy'), false),
   // Absolute path to the frontend's built dist/ output (`npm run build` at
   // the repo root - Vite's default outDir, see vite.config.ts). Only read
   // when serveFrontend is true.
@@ -108,8 +116,9 @@ export const config = {
   // simply dropped by the browser, silently breaking login. index.ts flips
   // this to true automatically at boot when this app's own built-in TLS
   // (backend/src/tls/) is enabled - this manual default only still matters
-  // for a non-default setup, e.g. TLS terminated by a reverse proxy in front
-  // of this app instead.
+  // for a reverse-proxy-terminated-TLS setup that also leaves trustProxy off;
+  // with trustProxy on, the real per-request protocol (via requestOrigin.ts)
+  // already covers this and this manual override becomes optional, not required.
   cookieSecure: bool('COOKIE_SECURE', t('auth', 'cookie_secure'), false),
   sessionTtlMs: num('SESSION_TTL_MS', t('auth', 'session_ttl_ms'), 30 * 24 * 60 * 60 * 1000),
   loginRateLimitWindowMs: num('LOGIN_RATE_LIMIT_WINDOW_MS', t('auth', 'login_rate_limit_window_ms'), 15 * 60 * 1000),
@@ -119,10 +128,13 @@ export const config = {
   twoFactorPendingTtlMs: num('TWO_FACTOR_PENDING_TTL_MS', t('auth', 'two_factor_pending_ttl_ms'), 5 * 60 * 1000),
   totpRateLimitWindowMs: num('TOTP_RATE_LIMIT_WINDOW_MS', t('auth', 'totp_rate_limit_window_ms'), 15 * 60 * 1000),
   totpRateLimitMax: num('TOTP_RATE_LIMIT_MAX', t('auth', 'totp_rate_limit_max'), 10),
-  // Unset by default - passkey routes 400 with a clear message until both are set. Unlike
-  // cookieSecure, there's no safe default to guess here: RP ID/origin are inherently
-  // per-deployment (bare domain vs full scheme+host+port), and guessing wrong doesn't just
-  // silently break a feature, it risks accepting assertions bound to the wrong origin.
+  // Unset by default - passkey routes 400 with a clear message until both are set, unless
+  // trustProxy is on, in which case requireWebauthnConfig() derives them from the request instead
+  // (see requestOrigin.ts). Unlike cookieSecure, there's no safe *static* default to guess here:
+  // RP ID/origin are inherently per-deployment (bare domain vs full scheme+host+port), and
+  // guessing wrong doesn't just silently break a feature, it risks accepting assertions bound to
+  // the wrong origin - that's why this stays a manual override rather than ever being inferred
+  // when trustProxy is off.
   webauthnRpId: optStr('WEBAUTHN_RP_ID', t('auth', 'webauthn_rp_id')),
   webauthnOrigin: optStr('WEBAUTHN_ORIGIN', t('auth', 'webauthn_origin')),
   // HTTPS termination - see backend/src/tls/. Metadata lives in tlsConfigPath, the actual PEM

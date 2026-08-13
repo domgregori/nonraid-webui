@@ -123,6 +123,12 @@ async function main() {
   await shares.remountAll();
 
   const app = express();
+  // Only set when config.trustProxy is explicitly opted into (see its doc comment in config.ts) -
+  // makes req.secure/req.hostname/req.ip trust X-Forwarded-Proto/Host/For, which cookies.ts and
+  // webauthn.ts rely on via requestOrigin.ts to auto-detect HTTPS behind a reverse proxy.
+  if (config.trustProxy) {
+    app.set('trust proxy', true);
+  }
   app.use(cors({ origin: config.corsOrigin, credentials: true }));
   app.use(express.json());
 

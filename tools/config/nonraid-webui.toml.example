@@ -28,15 +28,23 @@ serve_frontend = true
 # Absolute path to the frontend's built dist/ output (`npm run build` at the
 # nonraid-webui repo root). Only read when serve_frontend is true.
 frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
+# Only enable if a reverse proxy is the *sole* way to reach this backend (it's firewalled off from
+# any other direct access) and that proxy always sets/overwrites X-Forwarded-Proto/Host/For itself
+# — otherwise a direct client could spoof those headers to fake an HTTPS connection or dodge
+# login/TOTP rate limiting. Once enabled, cookie_secure and webauthn_rp_id/webauthn_origin below
+# become optional: HTTPS and the external hostname are detected from the request itself instead of
+# needing to be set by hand (they still take precedence if you do set them).
+#trust_proxy = false
 
 [auth]
 # Single admin account, created via the frontend's first-run setup screen —
 # not something you set here.
 #config_path = "./data/auth.json"
 # Whether the session cookie gets the Secure attribute (HTTPS-only). Flipped to true
-# automatically at boot when this app's own built-in TLS (see [tls] below) is enabled — only set
-# this by hand for a non-default setup, e.g. TLS terminated by a reverse proxy in front of this
-# app instead of this app's own built-in TLS.
+# automatically at boot when this app's own built-in TLS (see [tls] below) is enabled, or
+# per-request when trust_proxy above is on and the proxy reports HTTPS — only set this by hand if
+# neither of those applies to your setup (e.g. a reverse-proxy-terminated-TLS setup that leaves
+# trust_proxy off).
 #cookie_secure = false
 #session_ttl_ms = 2592000000
 #login_rate_limit_window_ms = 900000
@@ -45,10 +53,13 @@ frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
 #two_factor_pending_ttl_ms = 300000
 #totp_rate_limit_window_ms = 900000
 #totp_rate_limit_max = 10
-# Passkeys are disabled (routes return 400) until both of these are set. rp_id is the bare
-# domain (e.g. "nonraid.lan"); origin is the full scheme+host+port the browser sees (e.g.
-# "https://nonraid.lan"). Browsers refuse the WebAuthn ceremony outside a secure context — plain
-# HTTP only works for the literal "localhost" origin, not a LAN hostname/IP.
+# Passkeys are disabled (routes return 400) until both of these are set, *unless* trust_proxy above
+# is on, in which case they're derived from the request instead (the proxy's externally-visible
+# hostname, assumed to be on the standard HTTPS port 443). Set these by hand only if trust_proxy is
+# off, or your external port isn't 443. rp_id is the bare domain (e.g. "nonraid.lan"); origin is
+# the full scheme+host+port the browser sees (e.g. "https://nonraid.lan"). Browsers refuse the
+# WebAuthn ceremony outside a secure context — plain HTTP only works for the literal "localhost"
+# origin, not a LAN hostname/IP.
 #webauthn_rp_id = "nonraid.lan"
 #webauthn_origin = "https://nonraid.lan"
 

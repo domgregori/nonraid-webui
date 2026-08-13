@@ -4,6 +4,7 @@ import type { ActivityStore } from '../activity/index.js';
 import type { AuthService } from '../auth/index.js';
 import { loginRateLimiter, totpVerifyRateLimiter } from '../auth/index.js';
 import { serializeClearTwoFactorPendingCookie } from '../auth/cookies.js';
+import { requestOrigin } from '../auth/requestOrigin.js';
 import {
   validateCurrentPasswordInput,
   validateLoginInput,
@@ -47,7 +48,7 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
   router.post('/auth/setup', async (req, res) => {
     try {
       const { username, password } = validateSetupInput(req.body);
-      const { cookie, body } = await authService.setup(username, password);
+      const { cookie, body } = await authService.setup(username, password, requestOrigin(req));
       res.append('Set-Cookie', cookie);
       res.status(201).json(body);
     } catch (err) {
@@ -58,7 +59,7 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
   router.post('/auth/login', loginRateLimiter, async (req, res) => {
     try {
       const { username, password } = validateLoginInput(req.body);
-      const { cookie, body } = await authService.login(username, password);
+      const { cookie, body } = await authService.login(username, password, requestOrigin(req));
       res.append('Set-Cookie', cookie);
       res.json(body);
     } catch (err) {
@@ -66,8 +67,8 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
     }
   });
 
-  router.post('/auth/logout', (_req, res) => {
-    const { cookie } = authService.logout();
+  router.post('/auth/logout', (req, res) => {
+    const { cookie } = authService.logout(requestOrigin(req));
     res.append('Set-Cookie', cookie);
     res.json({ configured: true, authenticated: false });
   });
@@ -75,7 +76,7 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
   router.put('/auth/password', async (req, res) => {
     try {
       const { currentPassword, newPassword } = validatePasswordChangeInput(req.body);
-      const { cookie, body } = await authService.changePassword(req.headers.cookie, currentPassword, newPassword);
+      const { cookie, body } = await authService.changePassword(req.headers.cookie, currentPassword, newPassword, requestOrigin(req));
       res.append('Set-Cookie', cookie);
       res.json(body);
     } catch (err) {
@@ -88,11 +89,12 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
   router.post('/auth/2fa/totp/verify', totpVerifyRateLimiter, async (req, res) => {
     try {
       const code = validateTwoFactorCodeInput(req.body);
-      const { cookie, body } = await authService.verifyTwoFactor(req.headers.cookie, code);
+      const origin = requestOrigin(req);
+      const { cookie, body } = await authService.verifyTwoFactor(req.headers.cookie, code, origin);
       res.append('Set-Cookie', cookie);
       // Clears the now-consumed pending cookie so it can't be reused to request another session
       // without the second factor being checked again.
-      res.append('Set-Cookie', serializeClearTwoFactorPendingCookie());
+      res.append('Set-Cookie', serializeClearTwoFactorPendingCookie(origin));
       res.json(body);
     } catch (err) {
       handleError(err, res);
@@ -154,7 +156,7 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
 
   router.post('/auth/2fa/passkey/auth-options', async (req, res) => {
     try {
-      res.json(await authService.passkeyAuthOptions(req.headers.cookie));
+      res.json(await authService.passkeyAuthOptions(req.headers.cookie, requestOrigin(req)));
     } catch (err) {
       handleError(err, res);
     }
@@ -163,9 +165,10 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
   router.post('/auth/2fa/passkey/auth-verify', async (req, res) => {
     try {
       const response = requireResponseField(req.body) as AuthenticationResponseJSON;
-      const { cookie, body } = await authService.passkeyAuthVerify(req.headers.cookie, response);
+      const origin = requestOrigin(req);
+      const { cookie, body } = await authService.passkeyAuthVerify(req.headers.cookie, response, origin);
       res.append('Set-Cookie', cookie);
-      res.append('Set-Cookie', serializeClearTwoFactorPendingCookie());
+      res.append('Set-Cookie', serializeClearTwoFactorPendingCookie(origin));
       res.json(body);
     } catch (err) {
       handleError(err, res);
@@ -174,7 +177,7 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
 
   router.post('/auth/2fa/passkey/register-options', async (req, res) => {
     try {
-      res.json(await authService.passkeyRegisterOptions(req.headers.cookie));
+      res.json(await authService.passkeyRegisterOptions(req.headers.cookie, requestOrigin(req)));
     } catch (err) {
       handleError(err, res);
     }
@@ -184,7 +187,7 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
     try {
       const response = requireResponseField(req.body) as RegistrationResponseJSON;
       const name = validatePasskeyNameInput(req.body);
-      await authService.passkeyRegisterVerify(req.headers.cookie, response, name);
+      await authService.passkeyRegisterVerify(req.headers.cookie, response, name, requestOrigin(req));
       activity.log(`Passkey "${name}" added`, 'green').catch(() => {});
       res.json({ ok: true });
     } catch (err) {

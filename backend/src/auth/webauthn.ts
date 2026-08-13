@@ -8,6 +8,7 @@ import type {
 } from '@simplewebauthn/server';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
+import type { RequestOrigin } from './requestOrigin.js';
 import type { AuthRecord, PasskeyCredential } from './types.js';
 
 const RP_NAME = 'nonraid';
@@ -26,12 +27,23 @@ interface PendingChallenge {
 // interrupted multi-step flow in this app (e.g. ImportArrayWizard).
 const pendingChallenges = new Map<string, PendingChallenge>();
 
-export function requireWebauthnConfig(): { rpID: string; origin: string } {
-  const { webauthnRpId, webauthnOrigin } = config;
-  if (!webauthnRpId || !webauthnOrigin) {
-    throw new HttpError(400, 'WebAuthn is not configured - set WEBAUTHN_RP_ID and WEBAUTHN_ORIGIN.');
+export function requireWebauthnConfig(reqOrigin: RequestOrigin): { rpID: string; origin: string } {
+  const { webauthnRpId, webauthnOrigin, trustProxy } = config;
+  if (webauthnRpId && webauthnOrigin) {
+    return { rpID: webauthnRpId, origin: webauthnOrigin };
   }
-  return { rpID: webauthnRpId, origin: webauthnOrigin };
+  // Falls back to the request itself only when trustProxy is on (so hostname/secure are actually
+  // proxy-derived, not guessed from a directly-reachable connection) and the request is genuinely
+  // HTTPS - WebAuthn requires a secure context, so there's nothing valid to derive otherwise.
+  // Assumes the reverse proxy terminates on the standard 443 externally, matching the vast
+  // majority of such setups; a non-standard external port still needs the manual override below.
+  if (trustProxy && reqOrigin.secure) {
+    return { rpID: reqOrigin.hostname, origin: `https://${reqOrigin.hostname}` };
+  }
+  throw new HttpError(
+    400,
+    'WebAuthn is not configured - set WEBAUTHN_RP_ID and WEBAUTHN_ORIGIN, or enable trust_proxy if this is reached only through a TLS-terminating reverse proxy.',
+  );
 }
 
 function setPendingChallenge(username: string, challenge: string): void {
@@ -51,8 +63,8 @@ function transports(cred: PasskeyCredential): AuthenticatorTransportFuture[] | u
   return cred.transports as AuthenticatorTransportFuture[] | undefined;
 }
 
-export async function passkeyRegistrationOptions(record: AuthRecord): Promise<PublicKeyCredentialCreationOptionsJSON> {
-  const { rpID } = requireWebauthnConfig();
+export async function passkeyRegistrationOptions(record: AuthRecord, reqOrigin: RequestOrigin): Promise<PublicKeyCredentialCreationOptionsJSON> {
+  const { rpID } = requireWebauthnConfig(reqOrigin);
   const options = await generateRegistrationOptions({
     rpName: RP_NAME,
     rpID,
@@ -65,8 +77,12 @@ export async function passkeyRegistrationOptions(record: AuthRecord): Promise<Pu
   return options;
 }
 
-export async function verifyPasskeyRegistration(record: AuthRecord, response: RegistrationResponseJSON): Promise<Omit<PasskeyCredential, 'name'>> {
-  const { rpID, origin } = requireWebauthnConfig();
+export async function verifyPasskeyRegistration(
+  record: AuthRecord,
+  response: RegistrationResponseJSON,
+  reqOrigin: RequestOrigin,
+): Promise<Omit<PasskeyCredential, 'name'>> {
+  const { rpID, origin } = requireWebauthnConfig(reqOrigin);
   const expectedChallenge = takePendingChallenge(record.username);
   const verification = await verifyRegistrationResponse({ response, expectedChallenge, expectedOrigin: origin, expectedRPID: rpID });
   if (!verification.verified || !verification.registrationInfo) {
@@ -82,8 +98,8 @@ export async function verifyPasskeyRegistration(record: AuthRecord, response: Re
   };
 }
 
-export async function passkeyAuthenticationOptions(record: AuthRecord): Promise<PublicKeyCredentialRequestOptionsJSON> {
-  const { rpID } = requireWebauthnConfig();
+export async function passkeyAuthenticationOptions(record: AuthRecord, reqOrigin: RequestOrigin): Promise<PublicKeyCredentialRequestOptionsJSON> {
+  const { rpID } = requireWebauthnConfig(reqOrigin);
   if (!record.passkeys || record.passkeys.length === 0) {
     throw new HttpError(409, 'No passkeys enrolled.');
   }
@@ -99,8 +115,12 @@ export async function passkeyAuthenticationOptions(record: AuthRecord): Promise<
   return options;
 }
 
-export async function verifyPasskeyAuthentication(record: AuthRecord, response: AuthenticationResponseJSON): Promise<{ credentialId: string; newCounter: number }> {
-  const { rpID, origin } = requireWebauthnConfig();
+export async function verifyPasskeyAuthentication(
+  record: AuthRecord,
+  response: AuthenticationResponseJSON,
+  reqOrigin: RequestOrigin,
+): Promise<{ credentialId: string; newCounter: number }> {
+  const { rpID, origin } = requireWebauthnConfig(reqOrigin);
   const expectedChallenge = takePendingChallenge(record.username);
   const stored = (record.passkeys ?? []).find((p) => p.id === response.id);
   if (!stored) {
