@@ -89,8 +89,11 @@ export function deriveDisk(
     tempColor,
     barWidth: `${usedPct}%`,
     barColor: usedPct >= 90 ? COLORS.red : usedPct >= 75 ? COLORS.amber : COLORS.blue,
+    // The only status left once missing/needsFormat/standby are ruled out is 'active' with a real
+    // filesystem - a genuinely healthy disk, matching the green "Active" status dot instead of the
+    // same neutral borderLit every other card got regardless of health.
     borderColor:
-      status === 'missing' ? COLORS.red : needsFormat ? COLORS.amber : status === 'standby' ? COLORS.border : COLORS.borderLit,
+      status === 'missing' ? COLORS.red : needsFormat ? COLORS.amber : status === 'standby' ? COLORS.border : COLORS.green,
     health: health ?? null,
     healthColor: health === 'failed' ? COLORS.red : health === 'passed' ? COLORS.green : COLORS.textDim,
     healthLabel: health === 'failed' ? 'SMART Failing' : health === 'passed' ? 'SMART OK' : 'SMART -',
