@@ -28,16 +28,18 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
   const refreshStatus = useCallback(async () => {
     try {
       const s = await nmdApi.getStatus();
-      if (!mounted.current) return;
+      if (!mounted.current) return null;
       statusRef.current = s;
       setStatus(s);
       setLoadState('ready');
       setError(null);
+      return s;
     } catch (err) {
-      if (!mounted.current) return;
+      if (!mounted.current) return null;
       const notConfigured = err instanceof CodedError && err.code === 'ARRAY_NOT_CONFIGURED';
       setLoadState(notConfigured ? 'not-configured' : 'error');
       setError((err as Error).message);
+      return null;
     }
   }, []);
 
@@ -168,6 +170,7 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
         parityPending,
         unassignPending,
         restorePending,
+        refresh: refreshStatus,
         toggleArray,
         parityAction,
         selectDisk,

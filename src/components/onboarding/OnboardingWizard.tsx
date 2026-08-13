@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { systemApi } from '../../api/systemApi';
 import { useSystemStats } from '../../hooks/useSystemStats';
 import { useArrayStatus } from '../../state/useArrayStatus';
+import type { NmdStatusResponse } from '../../types/nmdApi';
 import { ConfigRestoreWizard } from '../settings/ConfigRestoreWizard';
 import { ImportArrayWizard } from '../settings/ImportArrayWizard';
 import { ArrayBuilder } from './ArrayBuilder';
@@ -42,6 +43,17 @@ function deriveStartStep(hasAnyDisk: boolean, hasDataDisk: boolean): Step {
   return 'info';
 }
 
+// Checked against status.disks directly, not array.total_slots — total_slots only reflects
+// *committed* data disks (see md_unraid.c's sb->num_disks update), staying 0 until a `start`
+// commits whatever's been add-ed so far, which ArrayBuilder's whole plan-then-build model
+// deliberately defers until the very end (see its own doc comment).
+function deriveHasDisks(status: NmdStatusResponse | null): { hasAnyDisk: boolean; hasDataDisk: boolean } {
+  return {
+    hasAnyDisk: status?.disks.some((d) => d.disk_id) ?? false,
+    hasDataDisk: (status?.disks ?? []).some((d) => d.disk_id && d.type === 'data'),
+  };
+}
+
 const INFO_SLIDES = [
   {
     eyebrow: 'Apps',
@@ -74,14 +86,9 @@ interface OnboardingWizardProps {
 }
 
 export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
-  const { status } = useArrayStatus();
+  const { status, refresh } = useArrayStatus();
   const stats = useSystemStats();
-  const hasAnyDisk = status?.disks.some((d) => d.disk_id) ?? false;
-  // Checked against status.disks directly, not array.total_slots — total_slots only reflects
-  // *committed* data disks (see md_unraid.c's sb->num_disks update), staying 0 until a `start`
-  // commits whatever's been add-ed so far, which ArrayBuilder's whole plan-then-build model
-  // deliberately defers until the very end (see its own doc comment).
-  const hasDataDisk = (status?.disks ?? []).some((d) => d.disk_id && d.type === 'data');
+  const { hasAnyDisk, hasDataDisk } = deriveHasDisks(status);
 
   const [step, setStep] = useState<Step>(() => deriveStartStep(hasAnyDisk, hasDataDisk));
   const [infoIndex, setInfoIndex] = useState(0);
@@ -135,8 +142,22 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
 
   const stage = stageForStep(step);
 
-  const handleImportClose = () => {
-    setStep(importedJustNow ? deriveStartStep(hasAnyDisk, hasDataDisk) : 'start');
+  // `status` (and hasAnyDisk/hasDataDisk derived from it) is only as fresh as the last poll tick
+  // — up to STATUS_POLL_MS old — so reading it immediately after the wizard just committed a real
+  // change would usually still see the pre-change array and wrongly resolve back to 'welcome'
+  // (confirmed live: closing a just-finished config restore reliably bounced back to the very
+  // start of the wizard instead of resuming past it). Deriving from refresh()'s own return value,
+  // not the hasAnyDisk/hasDataDisk already in scope: those were fixed by closure back when this
+  // function was created, so awaiting refresh() updates the *context* but can never change what
+  // this already-running call sees on its own next line — has to read the fresh value directly.
+  const handleImportClose = async () => {
+    if (!importedJustNow) {
+      setStep('start');
+      return;
+    }
+    const fresh = await refresh();
+    const { hasAnyDisk: freshHasAnyDisk, hasDataDisk: freshHasDataDisk } = deriveHasDisks(fresh);
+    setStep(deriveStartStep(freshHasAnyDisk, freshHasDataDisk));
   };
 
   // A successful restore can bring back a fully-configured array (superblock included, when the
@@ -144,12 +165,14 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
   // array import does covers both that case and the config-only case (superblock skipped, array
   // still blank) identically, since deriveStartStep would just land back on 'disks' for the latter
   // on next resolve anyway. Simplest to just re-derive live rather than special-case it here.
-  const handleRestoreClose = () => {
+  const handleRestoreClose = async () => {
     if (!restoredJustNow) {
       setStep('start');
       return;
     }
-    setStep(deriveStartStep(hasAnyDisk, hasDataDisk));
+    const fresh = await refresh();
+    const { hasAnyDisk: freshHasAnyDisk, hasDataDisk: freshHasDataDisk } = deriveHasDisks(fresh);
+    setStep(deriveStartStep(freshHasAnyDisk, freshHasDataDisk));
   };
 
   return (

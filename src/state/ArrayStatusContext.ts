@@ -26,6 +26,15 @@ export interface ArrayStatusContextValue {
   parityPending: boolean;
   unassignPending: boolean;
   restorePending: boolean;
+  /** Forces an immediate status re-fetch instead of waiting for the next poll tick (up to
+   *  STATUS_POLL_MS stale), returning the freshly-fetched status directly (or null on failure) —
+   *  for callers that need to read fresh data right after an action this context doesn't already
+   *  know about (e.g. a config restore or array import completing), since every *other* action
+   *  here already refreshes itself internally. Returns the value directly rather than relying on
+   *  the caller re-reading `status` afterward: a plain function's own local variables (e.g.
+   *  `hasAnyDisk` derived from `status` at render time) are fixed by closure and won't pick up a
+   *  state update that happens later in the same call, even after awaiting one. */
+  refresh: () => Promise<NmdStatusResponse | null>;
   toggleArray: () => void;
   parityAction: (action: ParityCheckAction) => void;
   selectDisk: (id: string) => void;
