@@ -83,12 +83,19 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
         }
       }
       if (patch.notifications?.eventTypes) {
-        for (const [key, value] of Object.entries(patch.notifications.eventTypes)) {
+        for (const [key, channels] of Object.entries(patch.notifications.eventTypes)) {
           if (!KNOWN_EVENT_TYPES.has(key)) {
             throw new Error(`Unknown notification event type "${key}".`);
           }
-          if (typeof value !== 'boolean') {
-            throw new Error(`notifications.eventTypes.${key} must be a boolean.`);
+          if (typeof channels !== 'object' || channels === null) {
+            throw new Error(`notifications.eventTypes.${key} must be an object with apprise/webui booleans.`);
+          }
+          const { apprise, webui } = channels as Record<string, unknown>;
+          if ('apprise' in channels && typeof apprise !== 'boolean') {
+            throw new Error(`notifications.eventTypes.${key}.apprise must be a boolean.`);
+          }
+          if ('webui' in channels && typeof webui !== 'boolean') {
+            throw new Error(`notifications.eventTypes.${key}.webui must be a boolean.`);
           }
         }
       }

@@ -2,6 +2,7 @@
 import type { StorageLocation } from './storagePath';
 
 export type NotificationEventType =
+  | 'arrayError'
   | 'diskFailed'
   | 'diskErrors'
   | 'smartFailed'
@@ -11,6 +12,7 @@ export type NotificationEventType =
   | 'tempAlertDisk'
   | 'diskAdded'
   | 'arrayReconfigured'
+  | 'diskNeedsFormat'
   | 'parityStarted'
   | 'parityCompleted'
   | 'backupCompleted'
@@ -32,10 +34,15 @@ export interface NotificationEventDef {
   group?: string;
 }
 
+export interface NotificationChannelToggle {
+  apprise: boolean;
+  webui: boolean;
+}
+
 export interface NotificationSettings {
   enabled: boolean;
   appriseUrls: string;
-  eventTypes: Record<NotificationEventType, boolean>;
+  eventTypes: Record<NotificationEventType, NotificationChannelToggle>;
 }
 
 export interface RecurringSchedule {
@@ -88,7 +95,7 @@ export type AppSettingsUpdate = Partial<{
   turboWrite: boolean;
   trustProxy: boolean;
   notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {
-    eventTypes?: Partial<Record<NotificationEventType, boolean>>;
+    eventTypes?: Partial<Record<NotificationEventType, Partial<NotificationChannelToggle>>>;
   };
   minFreeSpaceGb: number;
   paritySchedule: Partial<ParitySchedule>;

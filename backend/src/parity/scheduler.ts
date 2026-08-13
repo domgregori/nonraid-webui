@@ -53,7 +53,7 @@ export class ParityScheduler {
 
     try {
       await this.nmd.parityCheck('CORRECT');
-      this.activity.log('Parity check started automatically (scheduled)', 'blue').catch(() => {});
+      this.activity.log('Parity check started automatically (scheduled)', 'blue', 'parityStarted').catch(() => {});
       notifyEvent(this.settings, 'parityStarted', 'NonRAID: parity check started', 'Parity check started automatically (scheduled)');
     } catch (err) {
       this.activity.log(`Scheduled parity check failed to start: ${(err as Error).message}`, 'red').catch(() => {});

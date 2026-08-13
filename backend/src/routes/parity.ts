@@ -31,8 +31,9 @@ export function parityRouter(nmd: NmdClient, activity: ActivityStore, settingsSt
     try {
       const result = await nmd.parityCheck(action);
       const { text, color } = ACTIVITY_MESSAGE[action];
-      activity.log(text, color).catch(() => {});
-      if (START_ACTIONS.has(action)) {
+      const isStart = START_ACTIONS.has(action);
+      activity.log(text, color, isStart ? 'parityStarted' : undefined).catch(() => {});
+      if (isStart) {
         notifyEvent(settingsStore, 'parityStarted', 'NonRAID: parity check started', text);
       }
       res.json(result);

@@ -1,15 +1,18 @@
-import type { NotificationEventType } from './notificationCatalog.js';
+import type { NotificationChannelToggle, NotificationEventType } from './notificationCatalog.js';
 
 export interface NotificationSettings {
+  // Master switch for the apprise channel specifically - the webui channel (bell/toast) has no
+  // equivalent master switch, it's controlled purely per-event via eventTypes[type].webui below.
   enabled: boolean;
   // Apprise target URLs (https://github.com/caronc/apprise), space/newline
   // separated - e.g. "mailto://user:pass@gmail.com discord://webhook_id/token".
   // Stored as-is and passed straight through to the apprise CLI; this project
   // doesn't validate or understand individual service URL formats itself.
   appriseUrls: string;
-  // Per-event opt-in, gated behind `enabled` above - see notificationCatalog.ts
-  // for the full event list, severities, and defaults.
-  eventTypes: Record<NotificationEventType, boolean>;
+  // Per-event, per-channel opt-in - see notificationCatalog.ts for the full event list,
+  // severities, and defaults. .apprise is gated behind `enabled` above too (see notify.ts);
+  // .webui has no master gate.
+  eventTypes: Record<NotificationEventType, NotificationChannelToggle>;
 }
 
 export interface RecurringSchedule {
@@ -107,7 +110,7 @@ export type AppSettingsUpdate = Partial<{
   turboWrite: boolean;
   trustProxy: boolean;
   notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {
-    eventTypes?: Partial<Record<NotificationEventType, boolean>>;
+    eventTypes?: Partial<Record<NotificationEventType, Partial<NotificationChannelToggle>>>;
   };
   minFreeSpaceGb: number;
   paritySchedule: Partial<ParitySchedule>;

@@ -47,11 +47,11 @@ export class CacheMoverScheduler {
 
     if (job.status === 'done') {
       const text = job.error ? `Cache mover finished with errors: ${job.error}` : 'Cache mover finished moving everything off cache';
-      this.activity.log(text, job.error ? 'amber' : 'green').catch(() => {});
+      this.activity.log(text, job.error ? 'amber' : 'green', 'cacheMoverCompleted').catch(() => {});
       notifyEvent(this.settings, 'cacheMoverCompleted', 'NonRAID: cache mover finished', text);
     } else if (job.status === 'failed') {
       const text = `Cache mover failed: ${job.error ?? 'unknown error'}`;
-      this.activity.log(text, 'red').catch(() => {});
+      this.activity.log(text, 'red', 'cacheMoverFailed').catch(() => {});
       notifyEvent(this.settings, 'cacheMoverFailed', 'NonRAID: cache mover failed', text);
     }
   }

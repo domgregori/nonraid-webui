@@ -342,6 +342,81 @@
   padding: 6px 0;
 }
 
+.round-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-border-lit);
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.round-checkbox:checked {
+  background: var(--color-blue);
+  border-color: var(--color-blue);
+}
+
+.round-checkbox:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--color-bg);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.round-checkbox:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Column headers ("Apprise"/"Webui") above the two RoundCheckbox columns in
+   NotificationEventToggles - fixed widths matching the checkbox columns themselves. */
+.notification-channel-header {
+  display: flex;
+  justify-content: flex-end;
+  gap: 20px;
+  padding: 0 0 4px;
+}
+
+.notification-channel-header__col {
+  width: 18px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.notification-event-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.notification-event-row__channels {
+  display: flex;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+.notification-event-row__channel {
+  width: 18px;
+  display: flex;
+  justify-content: center;
+}
+
 /* One-time backup-codes reveal panel — see TwoFactorSection.tsx. */
 .backup-codes-grid {
   display: grid;

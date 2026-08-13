@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { activityApi } from '../api/activityApi';
+import { settingsApi } from '../api/settingsApi';
 import type { ActivityEntry } from '../types/activityApi';
+import type { NotificationChannelToggle, NotificationEventType } from '../types/settingsApi';
 import { NotificationsContext, type ToastItem } from './NotificationsContext';
 
 const POLL_MS = 8000;
@@ -15,8 +17,18 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const mounted = useRef(true);
   // Ids already seen across polls, purely to detect what's *new* since the last poll - distinct
   // from lastSeenId, which tracks what the user has actually looked at (for the unread badge).
+  // Always built from the *unfiltered* fetch (see refresh() below) so toggling an event's webui
+  // setting later doesn't retroactively make an already-seen entry look "new" again.
   const knownIds = useRef<Set<string> | null>(null);
   const toastTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  // Latest known per-event webui preference - null until the first successful settings fetch, in
+  // which case isWebuiMuted() below treats everything as unmuted (safer than hiding entries based
+  // on nothing).
+  const eventTypes = useRef<Record<NotificationEventType, NotificationChannelToggle> | null>(null);
+
+  const isWebuiMuted = useCallback((entry: ActivityEntry): boolean => {
+    return entry.eventType !== undefined && eventTypes.current?.[entry.eventType]?.webui === false;
+  }, []);
 
   const dismissToast = useCallback((id: string) => {
     const timer = toastTimers.current.get(id);
@@ -35,7 +47,20 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       return; // best-effort, same as every other poller in this app - keep last-known state
     }
     if (!mounted.current) return;
-    setEntries(fresh);
+
+    // Best-effort and independent of the activity fetch above - a settings hiccup should never
+    // block entries/toasts from updating, it just means filtering uses whatever eventTypes was
+    // last successfully fetched (or none yet, which isWebuiMuted() treats as "nothing muted").
+    settingsApi
+      .getSettings()
+      .then((s) => {
+        if (mounted.current) eventTypes.current = s.notifications.eventTypes;
+      })
+      .catch(() => {});
+
+    // Webui-muted entries never reach the bell dropdown/unread count - History (a separate
+    // fetch, see ActivityHistoryDialog) stays the complete, unfiltered record regardless.
+    setEntries(fresh.filter((e) => !isWebuiMuted(e)));
 
     if (knownIds.current === null) {
       // First poll after mount: seed silently. Without this, every backend restart (or just
@@ -50,8 +75,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     if (newOnes.length === 0) return;
 
     // Toast only warnings/errors - routine blue/green completions still land in the bell
-    // dropdown/history, just without interrupting whatever the user's doing.
-    const toastWorthy = newOnes.filter((e) => e.color === 'amber' || e.color === 'red');
+    // dropdown/history, just without interrupting whatever the user's doing. Webui-muted entries
+    // never toast either.
+    const toastWorthy = newOnes.filter((e) => (e.color === 'amber' || e.color === 'red') && !isWebuiMuted(e));
     if (toastWorthy.length === 0) return;
 
     setToasts((prev) => [...toastWorthy.map((entry) => ({ id: entry.id, entry })), ...prev]);
@@ -59,7 +85,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       const timer = setTimeout(() => dismissToast(entry.id), TOAST_DURATION_MS);
       toastTimers.current.set(entry.id, timer);
     }
-  }, [dismissToast]);
+  }, [dismissToast, isWebuiMuted]);
 
   useEffect(() => {
     mounted.current = true;

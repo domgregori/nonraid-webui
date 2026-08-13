@@ -42,7 +42,7 @@ export async function sendAppriseNotification(appriseUrls: string, title: string
 export async function notifyEvent(settingsStore: SettingsStore, eventType: NotificationEventType, title: string, body: string): Promise<void> {
   try {
     const settings = await settingsStore.get();
-    if (!settings.notifications.enabled || !settings.notifications.eventTypes[eventType] || !settings.notifications.appriseUrls.trim()) {
+    if (!settings.notifications.enabled || !settings.notifications.eventTypes[eventType]?.apprise || !settings.notifications.appriseUrls.trim()) {
       return;
     }
     await sendAppriseNotification(settings.notifications.appriseUrls, title, body);

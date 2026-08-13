@@ -106,7 +106,7 @@ export class ActivityWatcher {
 
     if (isError && state !== prev) {
       const text = `Array error: ${state}`;
-      this.activity.log(text, 'red').catch(() => {});
+      this.activity.log(text, 'red', 'arrayError').catch(() => {});
       notifyEvent(this.settings, 'arrayError', 'NonRAID: array error', text);
     }
   }
@@ -123,7 +123,7 @@ export class ActivityWatcher {
 
       if (needsFormat && !prev) {
         const text = `Disk ${disk.slot} (${diskLabel(disk)}) needs formatting - no filesystem detected`;
-        this.activity.log(text, 'amber').catch(() => {});
+        this.activity.log(text, 'amber', 'diskNeedsFormat').catch(() => {});
         notifyEvent(this.settings, 'diskNeedsFormat', 'NonRAID: disk needs formatting', text);
       }
     }
@@ -157,7 +157,7 @@ export class ActivityWatcher {
       status.health === 'unavailable'
         ? 'Cache mirror is unavailable - both members appear to be missing or unmountable.'
         : 'Cache mirror is degraded - one member is missing. It still works with zero redundancy until replaced.';
-    this.activity.log(text, 'red').catch(() => {});
+    this.activity.log(text, 'red', 'cacheMirrorDegraded').catch(() => {});
     notifyEvent(this.settings, 'cacheMirrorDegraded', 'NonRAID: cache mirror degraded', text);
   }
 
@@ -169,10 +169,10 @@ export class ActivityWatcher {
 
     if (lastSync.status === 'errors') {
       const text = `Parity check finished with ${syncErrors} sync error${syncErrors === 1 ? '' : 's'}`;
-      this.activity.log(text, 'red').catch(() => {});
+      this.activity.log(text, 'red', 'parityErrors').catch(() => {});
       notifyEvent(this.settings, 'parityErrors', 'NonRAID: parity errors', text);
     } else if (lastSync.status === 'completed') {
-      this.activity.log('Parity check finished with no errors', 'green').catch(() => {});
+      this.activity.log('Parity check finished with no errors', 'green', 'parityCompleted').catch(() => {});
       notifyEvent(this.settings, 'parityCompleted', 'NonRAID: parity check complete', 'Parity check finished with no errors');
     }
   }
@@ -185,7 +185,7 @@ export class ActivityWatcher {
 
       if (disk.errors > prev.errors) {
         const text = `Disk ${disk.slot} (${diskLabel(disk)}) reported new errors - total now ${disk.errors}`;
-        this.activity.log(text, 'red').catch(() => {});
+        this.activity.log(text, 'red', 'diskErrors').catch(() => {});
         notifyEvent(this.settings, 'diskErrors', 'NonRAID: disk errors', text);
         continue; // one log line per tick per disk is plenty
       }
@@ -194,7 +194,7 @@ export class ActivityWatcher {
       const isBad = BAD_DISK_STATUSES.has(disk.status);
       if (isBad && !wasBad) {
         const text = `Disk ${disk.slot} (${diskLabel(disk)}) status changed to ${disk.status}`;
-        this.activity.log(text, 'red').catch(() => {});
+        this.activity.log(text, 'red', 'diskFailed').catch(() => {});
         notifyEvent(this.settings, 'diskFailed', 'NonRAID: disk failed', text);
       }
     }
@@ -219,7 +219,7 @@ export class ActivityWatcher {
 
       if (prev === 'passed' && health === 'failed') {
         const text = `SMART health check failed for disk ${disk.slot} (${diskLabel(disk)})`;
-        this.activity.log(text, 'red').catch(() => {});
+        this.activity.log(text, 'red', 'smartFailed').catch(() => {});
         notifyEvent(this.settings, 'smartFailed', 'NonRAID: SMART health failed', text);
       }
     }
@@ -232,7 +232,7 @@ export class ActivityWatcher {
     this.overTemp.set(key, isOver);
     if (isOver && !wasOver) {
       const text = `${label} temperature is ${Math.round(celsius)}°C, at or above the ${threshold}°C alert threshold`;
-      this.activity.log(text, 'amber').catch(() => {});
+      this.activity.log(text, 'amber', eventType).catch(() => {});
       notifyEvent(this.settings, eventType, 'NonRAID: temperature alert', text);
     }
   }

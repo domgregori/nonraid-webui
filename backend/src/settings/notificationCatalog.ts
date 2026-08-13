@@ -31,6 +31,14 @@ export interface NotificationEventDef {
   group?: string;
 }
 
+// Two independent channels per event: apprise gates notifyEvent()'s external send (notify.ts),
+// webui gates whether the in-app bell/toast system surfaces it (NotificationsProvider.tsx) -
+// History (ActivityHistoryDialog) is never gated by either, it's always the complete record.
+export interface NotificationChannelToggle {
+  apprise: boolean;
+  webui: boolean;
+}
+
 /**
  * Single source of truth for which array/storage-health events can trigger a notification, their
  * severity grouping, and default on/off state. Scoped deliberately to passive health events, not
@@ -60,6 +68,10 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { id: 'cacheMoverCompleted', label: 'Cache mover completed', severity: 'low', defaultEnabled: false },
 ];
 
-export const DEFAULT_EVENT_TYPES: Record<NotificationEventType, boolean> = Object.fromEntries(
-  NOTIFICATION_EVENTS.map((e) => [e.id, e.defaultEnabled]),
-) as Record<NotificationEventType, boolean>;
+// webui defaults to true for every event regardless of defaultEnabled - the in-app activity feed
+// this fed into (activity.log()) was always unconditional/ungated before this toggle existed, so
+// defaulting webui off here would silently mute toasts/bell entries users are already used to
+// seeing. apprise keeps using the catalog's own defaultEnabled, unchanged from before this split.
+export const DEFAULT_EVENT_TYPES: Record<NotificationEventType, NotificationChannelToggle> = Object.fromEntries(
+  NOTIFICATION_EVENTS.map((e) => [e.id, { apprise: e.defaultEnabled, webui: true }]),
+) as Record<NotificationEventType, NotificationChannelToggle>;

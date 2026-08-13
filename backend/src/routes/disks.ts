@@ -82,7 +82,7 @@ export function disksRouter(
       const autoStart = req.body?.autoStart !== false;
       const result = await nmd.addDisk(slot, target, match.diskId ?? undefined, { autoStart });
       const text = `Disk ${device} added to slot ${slot}`;
-      activity.log(text, 'blue').catch(() => {});
+      activity.log(text, 'blue', 'diskAdded').catch(() => {});
       notifyEvent(settingsStore, 'diskAdded', 'NonRAID: disk added', text);
       res.json(result);
     } catch (err) {
@@ -116,7 +116,7 @@ export function disksRouter(
       const target = match.partition ?? match.device;
       const result = await nmd.replaceDisk(slot, target, match.diskId ?? undefined);
       const text = `Disk in slot ${slot} replaced with ${device}`;
-      activity.log(text, 'amber').catch(() => {});
+      activity.log(text, 'amber', 'diskAdded').catch(() => {});
       notifyEvent(settingsStore, 'diskAdded', 'NonRAID: disk replaced', text);
       res.json(result);
     } catch (err) {

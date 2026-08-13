@@ -24,7 +24,7 @@ import { type ThemePreference, useTheme } from '../hooks/useTheme';
 import { deriveProtection } from '../selectors/status';
 import { useOnboarding } from '../state/OnboardingContext';
 import { useArrayStatus } from '../state/useArrayStatus';
-import type { NotificationEventType } from '../types/settingsApi';
+import type { NotificationChannelToggle, NotificationEventType } from '../types/settingsApi';
 import { formatMemLabel, formatUptime } from '../utils/format';
 
 const SECTIONS = [
@@ -106,7 +106,9 @@ export function SettingsPage() {
   const [rebootError, setRebootError] = useState<string | null>(null);
 
   const [appriseDraft, setAppriseDraft] = useState('');
-  const [eventTypesDraft, setEventTypesDraft] = useState<Record<NotificationEventType, boolean>>({} as Record<NotificationEventType, boolean>);
+  const [eventTypesDraft, setEventTypesDraft] = useState<Record<NotificationEventType, NotificationChannelToggle>>(
+    {} as Record<NotificationEventType, NotificationChannelToggle>,
+  );
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
   const [testSending, setTestSending] = useState(false);
@@ -389,9 +391,9 @@ export function SettingsPage() {
 
   const saveNotifications = () => update({ notifications: { appriseUrls: appriseDraft, eventTypes: eventTypesDraft } });
 
-  const toggleEventType = (eventType: NotificationEventType, enabled: boolean) => {
-    setEventTypesDraft((prev) => ({ ...prev, [eventType]: enabled }));
-    update({ notifications: { eventTypes: { [eventType]: enabled } } });
+  const toggleEventChannel = (eventType: NotificationEventType, channel: keyof NotificationChannelToggle, enabled: boolean) => {
+    setEventTypesDraft((prev) => ({ ...prev, [eventType]: { ...prev[eventType], [channel]: enabled } }));
+    update({ notifications: { eventTypes: { [eventType]: { [channel]: enabled } } } });
   };
 
   const saveMinFreeSpace = async () => {
@@ -1058,15 +1060,16 @@ export function SettingsPage() {
         <div className="settings-card__title">Notifications</div>
         <div className="toggle-row">
           <div>
-            <div className="toggle-row__title">Event notifications</div>
+            <div className="toggle-row__title">Apprise notifications</div>
             <div className="toggle-row__desc">
-              Dispatch notifications via apprise
+              Master switch for the Apprise channel below - the in-app bell/toast (Webui column) has no master
+              switch of its own, it's controlled purely per-event.
             </div>
           </div>
           <ToggleSwitch
             on={settings?.notifications.enabled ?? false}
             onToggle={() => settings && update({ notifications: { enabled: !settings.notifications.enabled } })}
-            label="Event notifications"
+            label="Apprise notifications"
             disabled={!settings || saving}
           />
         </div>
@@ -1075,7 +1078,7 @@ export function SettingsPage() {
           <div className="toggle-row__title">Which events notify</div>
           <NotificationEventToggles
             eventTypes={eventTypesDraft}
-            onChange={toggleEventType}
+            onChange={toggleEventChannel}
             disabled={!settings}
             renderExtra={(eventId) => {
               if (eventId === 'tempAlertCpu') {

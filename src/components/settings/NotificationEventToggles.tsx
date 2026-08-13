@@ -1,14 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { settingsApi } from '../../api/settingsApi';
-import type { NotificationEventDef, NotificationEventType, NotificationSeverity } from '../../types/settingsApi';
-import { ToggleSwitch } from '../shared/ToggleSwitch';
+import type { NotificationChannelToggle, NotificationEventDef, NotificationEventType, NotificationSeverity } from '../../types/settingsApi';
+import { RoundCheckbox } from '../shared/RoundCheckbox';
 
 const SEVERITY_ORDER: NotificationSeverity[] = ['high', 'medium', 'low'];
 const SEVERITY_LABELS: Record<NotificationSeverity, string> = { high: 'High', medium: 'Medium', low: 'Low' };
 
 interface NotificationEventTogglesProps {
-  eventTypes: Record<NotificationEventType, boolean>;
-  onChange: (eventType: NotificationEventType, enabled: boolean) => void;
+  eventTypes: Record<NotificationEventType, NotificationChannelToggle>;
+  onChange: (eventType: NotificationEventType, channel: keyof NotificationChannelToggle, enabled: boolean) => void;
   disabled?: boolean;
   // Slot for an event-specific subsection rendered below that event's own row - e.g. the CPU/disk
   // temperature thresholds under "Temperature alert". Keeps this component's own catalog-driven
@@ -16,9 +16,10 @@ interface NotificationEventTogglesProps {
   renderExtra?: (eventId: NotificationEventType) => ReactNode;
 }
 
-/** Grouped High/Medium/Low toggle list for which array/storage-health events trigger a
- *  notification - the catalog (labels, severities, defaults) is fetched from the backend so this
- *  never hand-duplicates that list and can't drift from what the server actually understands. */
+/** Grouped High/Medium/Low toggle list for which array/storage-health events notify, and through
+ *  which channel(s) - Apprise (external) and/or Webui (this app's own bell/toast). The catalog
+ *  (labels, severities, defaults) is fetched from the backend so this never hand-duplicates that
+ *  list and can't drift from what the server actually understands. */
 export function NotificationEventToggles({ eventTypes, onChange, disabled, renderExtra }: NotificationEventTogglesProps) {
   const [events, setEvents] = useState<NotificationEventDef[] | null>(null);
 
@@ -28,23 +29,50 @@ export function NotificationEventToggles({ eventTypes, onChange, disabled, rende
 
   if (!events) return <div className="status-note">Loading event types…</div>;
 
-  const renderRow = (event: NotificationEventDef) => (
-    <div key={event.id}>
-      <div className="toggle-row" style={{ padding: '6px 0' }}>
-        <div className="toggle-row__title">{event.label}</div>
-        <ToggleSwitch
-          on={eventTypes[event.id] ?? event.defaultEnabled}
-          onToggle={() => onChange(event.id, !(eventTypes[event.id] ?? event.defaultEnabled))}
-          label={event.label}
-          disabled={disabled}
-        />
+  const channelsFor = (eventId: NotificationEventType): NotificationChannelToggle => {
+    const defaults = events.find((e) => e.id === eventId)?.defaultEnabled ?? true;
+    // webui defaults to true regardless of the catalog's apprise-oriented defaultEnabled - see
+    // backend's DEFAULT_EVENT_TYPES doc comment for why (the in-app feed was always ungated
+    // before this toggle existed).
+    return { apprise: eventTypes[eventId]?.apprise ?? defaults, webui: eventTypes[eventId]?.webui ?? true };
+  };
+
+  const renderRow = (event: NotificationEventDef) => {
+    const channels = channelsFor(event.id);
+    return (
+      <div key={event.id}>
+        <div className="notification-event-row">
+          <div className="toggle-row__title">{event.label}</div>
+          <div className="notification-event-row__channels">
+            <div className="notification-event-row__channel">
+              <RoundCheckbox
+                on={channels.apprise}
+                onToggle={() => onChange(event.id, 'apprise', !channels.apprise)}
+                label={`${event.label} - Apprise`}
+                disabled={disabled}
+              />
+            </div>
+            <div className="notification-event-row__channel">
+              <RoundCheckbox
+                on={channels.webui}
+                onToggle={() => onChange(event.id, 'webui', !channels.webui)}
+                label={`${event.label} - Webui`}
+                disabled={disabled}
+              />
+            </div>
+          </div>
+        </div>
+        {renderExtra?.(event.id)}
       </div>
-      {renderExtra?.(event.id)}
-    </div>
-  );
+    );
+  };
 
   return (
     <div>
+      <div className="notification-channel-header">
+        <div className="notification-channel-header__col">Apprise</div>
+        <div className="notification-channel-header__col">Webui</div>
+      </div>
       {SEVERITY_ORDER.map((severity) => {
         const group = events.filter((e) => e.severity === severity);
         if (group.length === 0) return null;

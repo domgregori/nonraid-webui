@@ -1,8 +1,44 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
-import { DEFAULT_EVENT_TYPES } from './notificationCatalog.js';
+import { DEFAULT_EVENT_TYPES, type NotificationChannelToggle, type NotificationEventType } from './notificationCatalog.js';
 import type { AppSettings, AppSettingsUpdate } from './types.js';
+
+// A per-key deep merge for eventTypes - a patch touching only one channel (e.g. { webui: false })
+// must not blow away the other channel's already-persisted value, unlike a shallow top-level
+// spread would do now that each value is an object instead of a bare boolean.
+function mergeEventTypes(
+  base: Record<NotificationEventType, NotificationChannelToggle>,
+  patch: Partial<Record<NotificationEventType, Partial<NotificationChannelToggle>>> | undefined,
+): Record<NotificationEventType, NotificationChannelToggle> {
+  if (!patch) return { ...base };
+  const merged = { ...base };
+  for (const key of Object.keys(patch) as NotificationEventType[]) {
+    merged[key] = { ...base[key], ...patch[key] };
+  }
+  return merged;
+}
+
+// Normalizes a possibly-legacy eventTypes record on load: a bare boolean (the pre-split shape)
+// becomes { apprise: <that boolean>, webui: true } - apprise carries over the old value exactly so
+// existing Apprise preferences survive the migration untouched; webui defaults to true because the
+// in-app activity feed it now gates was always unconditional before this toggle existed, so
+// defaulting it off would silently mute toasts/bell entries users are already used to seeing.
+// Already-object entries pass through unchanged.
+function normalizeEventTypes(
+  raw: Partial<Record<string, boolean | Partial<NotificationChannelToggle>>> | undefined,
+): Partial<Record<NotificationEventType, NotificationChannelToggle>> {
+  if (!raw) return {};
+  const normalized: Partial<Record<NotificationEventType, NotificationChannelToggle>> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === 'boolean') {
+      normalized[key as NotificationEventType] = { apprise: value, webui: true };
+    } else if (value) {
+      normalized[key as NotificationEventType] = value as NotificationChannelToggle;
+    }
+  }
+  return normalized;
+}
 
 const DEFAULTS: AppSettings = {
   turboWrite: false,
@@ -54,7 +90,7 @@ export class SettingsStore {
         notifications: {
           ...current.notifications,
           ...patch.notifications,
-          eventTypes: { ...current.notifications.eventTypes, ...patch.notifications?.eventTypes },
+          eventTypes: mergeEventTypes(current.notifications.eventTypes, patch.notifications?.eventTypes),
         },
         paritySchedule: { ...current.paritySchedule, ...patch.paritySchedule },
         backupSchedule: { ...current.backupSchedule, ...patch.backupSchedule },
@@ -89,7 +125,10 @@ export class SettingsStore {
       const legacyTempAlertEnabled = legacyEventTypes?.tempAlert;
       const migratedEventTypes =
         typeof legacyTempAlertEnabled === 'boolean'
-          ? { tempAlertCpu: legacyTempAlertEnabled, tempAlertDisk: legacyTempAlertEnabled }
+          ? {
+              tempAlertCpu: { apprise: legacyTempAlertEnabled, webui: true },
+              tempAlertDisk: { apprise: legacyTempAlertEnabled, webui: true },
+            }
           : undefined;
       this.cache = {
         ...DEFAULTS,
@@ -97,7 +136,11 @@ export class SettingsStore {
         notifications: {
           ...DEFAULTS.notifications,
           ...parsed.notifications,
-          eventTypes: { ...DEFAULTS.notifications.eventTypes, ...migratedEventTypes, ...parsed.notifications?.eventTypes },
+          eventTypes: {
+            ...DEFAULTS.notifications.eventTypes,
+            ...migratedEventTypes,
+            ...normalizeEventTypes(parsed.notifications?.eventTypes as Partial<Record<string, boolean | Partial<NotificationChannelToggle>>> | undefined),
+          },
         },
         paritySchedule: { ...DEFAULTS.paritySchedule, ...parsed.paritySchedule },
         backupSchedule: { ...DEFAULTS.backupSchedule, ...parsed.backupSchedule },

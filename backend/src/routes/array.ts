@@ -174,7 +174,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
         activity.log(`Array started, but mounting disks failed: ${(err as Error).message}`, 'amber').catch(() => {});
       }
 
-      activity.log('Array started', 'green').catch(() => {});
+      activity.log('Array started', 'green', 'arrayStarted').catch(() => {});
       notifyEvent(settingsStore, 'arrayStarted', 'NonRAID: array started', 'Array started');
       res.json(result);
     } catch (err) {
@@ -191,7 +191,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       await shares.unmountAll();
       await nmd.unmountDisks();
       const result = await nmd.stopArray();
-      activity.log('Array stopped', 'blue').catch(() => {});
+      activity.log('Array stopped', 'blue', 'arrayStopped').catch(() => {});
       notifyEvent(settingsStore, 'arrayStopped', 'NonRAID: array stopped', 'Array stopped');
       res.json(result);
     } catch (err) {
@@ -382,7 +382,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
         activity.log(`Array reconfigured, but remounting disks failed: ${(err as Error).message}`, 'amber').catch(() => {});
       }
       const text = `Array reconfigured, dropping slot(s) ${dropSlots.join(', ')}`;
-      activity.log(text, 'amber').catch(() => {});
+      activity.log(text, 'amber', 'arrayReconfigured').catch(() => {});
       notifyEvent(settingsStore, 'arrayReconfigured', 'NonRAID: array reconfigured', text);
       res.json(result);
     } catch (err) {

@@ -92,13 +92,13 @@ export class BackupScheduler {
       const bytes = await writeConfigBackupToFile(paths, config.systemUseSudo, destPath);
       const sizeLabel = bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
       const completedText = `${label} completed (${sizeLabel})`;
-      this.activity.log(completedText, 'blue').catch(() => {});
+      this.activity.log(completedText, 'blue', 'backupCompleted').catch(() => {});
       notifyEvent(this.settings, 'backupCompleted', 'NonRAID: backup completed', completedText);
       await this.prune(schedule.destDir, schedule.retain);
       return { bytes };
     } catch (err) {
       const failedText = `${label} failed: ${(err as Error).message}`;
-      this.activity.log(failedText, 'red').catch(() => {});
+      this.activity.log(failedText, 'red', 'backupFailed').catch(() => {});
       notifyEvent(this.settings, 'backupFailed', 'NonRAID: backup failed', failedText);
       throw err;
     }

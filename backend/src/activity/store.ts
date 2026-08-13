@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
+import type { NotificationEventType } from '../settings/notificationCatalog.js';
 import type { ActivityColor, ActivityEntry } from './types.js';
 
 // Keeps the file bounded - this is a rolling recent-activity feed, not an
@@ -34,8 +35,8 @@ export class ActivityStore {
    * let a rare disk-write failure mask a successful array start/share
    * create/etc. as an error.
    */
-  log(text: string, color: ActivityColor = 'blue'): Promise<void> {
-    const entry: ActivityEntry = { id: randomUUID(), timestamp: Date.now(), text, color };
+  log(text: string, color: ActivityColor = 'blue', eventType?: NotificationEventType): Promise<void> {
+    const entry: ActivityEntry = { id: randomUUID(), timestamp: Date.now(), text, color, ...(eventType ? { eventType } : {}) };
     this.writeQueue = this.writeQueue.then(async () => {
       const next = [entry, ...(await this.load())].slice(0, MAX_ENTRIES);
       await this.persistAtomic(next);
