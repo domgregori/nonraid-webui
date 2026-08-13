@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../../config.js';
 import { HttpError } from '../../httpError.js';
@@ -122,9 +124,16 @@ async function replaceManagedBlock(filePath: string, replacementLines: string[])
       ? `${content.trimEnd()}\n\n${replacement}\n`
       : content.slice(0, beginIdx) + replacement + content.slice(endIdx + MANAGED_END.length);
 
-  // best-effort backup before every rewrite - never touch anything outside the markers either way
-  await writeFile(`${filePath}.bak`, content, 'utf8').catch(() => {});
-  await writeFile(filePath, next, 'utf8');
+  // filePath (smb.conf/exports) is root-owned - same sudo escalation every other privileged
+  // operation in this file already gets via run(). The backup is a privileged copy of whatever's
+  // there *before* the rewrite (best-effort, never touch anything outside the markers either way);
+  // the new content is written to an unprivileged temp file and moved into place with sudo,
+  // mirroring docker/storagePath.ts's identical daemon.json-rewrite pattern - a plain overwrite
+  // would need sudo tee/dd wired up for stdin, which run()'s plain execFile wrapper doesn't support.
+  await run('cp', [filePath, `${filePath}.bak`]).catch(() => {});
+  const tmpPath = path.join(os.tmpdir(), `nonraid-webui-${path.basename(filePath)}-${process.pid}`);
+  await writeFile(tmpPath, next, 'utf8');
+  await run('mv', [tmpPath, filePath]);
 }
 
 /**
