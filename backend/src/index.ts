@@ -59,7 +59,15 @@ async function main() {
   const activity = new ActivityStore();
   const settingsStore = new SettingsStore();
   const cache = new CacheService(nmd, smart, settingsStore);
-  const diskQueue = new DiskQueueService(nmd, cache, activity);
+  // shares/shareStore/etc. are constructed here, ahead of their other former call site further
+  // down, purely so DiskQueueService can take a real ShareService - its own add-disk flow needs
+  // the same shares.unmountAll()/Docker-and-LXC-busy retry as /array/stop (see
+  // system/arrayLifecycle.ts), not just the bare nmdctl stop it used to call directly.
+  const shareApplier = createShareApplier();
+  const shareStore = new ShareStore();
+  const shareAccessStore = new ShareAccessStore();
+  const shares = new ShareService(shareStore, shareApplier, nmd, shareAccessStore, activity, settingsStore, cache);
+  const diskQueue = new DiskQueueService(nmd, cache, activity, shares, lxc);
   new ActivityWatcher(nmd, smart, activity, settingsStore, cache);
   new ParityScheduler(nmd, settingsStore, activity);
   const metrics = new MetricsService(openMetricsDb());
@@ -72,10 +80,6 @@ async function main() {
   if (config.serveFrontend && !existsSync(path.join(config.frontendDistPath, 'index.html'))) {
     throw new Error(`serveFrontend is true but no index.html at ${config.frontendDistPath} - did the frontend build run?`);
   }
-  const shareApplier = createShareApplier();
-  const shareStore = new ShareStore();
-  const shareAccessStore = new ShareAccessStore();
-  const shares = new ShareService(shareStore, shareApplier, nmd, shareAccessStore, activity, settingsStore, cache);
   const browse = new BrowseService(shares);
   const emptyDisk = new EmptyDiskService(nmd, shareStore);
   const cacheMover = new CacheMoverService(nmd, shareStore, settingsStore);

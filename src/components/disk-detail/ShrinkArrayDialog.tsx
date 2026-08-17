@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { nmdApi } from '../../api/nmdApi';
+import { ArrayActionErrorBanner } from '../shared/ArrayActionErrorBanner';
 
 interface ShrinkArrayDialogProps {
   slot: number;
@@ -23,16 +24,21 @@ export function ShrinkArrayDialog({ slot, label, onClose, onDone }: ShrinkArrayD
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // Only offered after a *first* failed attempt (see ArrayStatusProvider's toggleArray for the
+  // same reasoning) - a retry that already used stopContainers failing again is just a real error.
+  const [stopBlockedByContainers, setStopBlockedByContainers] = useState(false);
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (stopContainers = false) => {
     setRunning(true);
     setError(null);
+    setStopBlockedByContainers(false);
     try {
-      await nmdApi.shrinkArray([slot]);
+      await nmdApi.shrinkArray([slot], stopContainers);
       setDone(true);
       onDone();
     } catch (err) {
       setError((err as Error).message);
+      if (!stopContainers) setStopBlockedByContainers(true);
     } finally {
       setRunning(false);
     }
@@ -74,12 +80,19 @@ export function ShrinkArrayDialog({ slot, label, onClose, onDone }: ShrinkArrayD
                 </div>
               ) : (
                 <>
-                  {error && <div className="status-note status-note--error">{error}</div>}
+                  {error && (
+                    <ArrayActionErrorBanner
+                      actionError={error}
+                      stopBlockedByContainers={stopBlockedByContainers}
+                      arrayPending={running}
+                      onRetryWithStopContainers={() => handleConfirm(true)}
+                    />
+                  )}
                   <div className="dialog__actions">
                     <button type="button" className="btn" disabled={running} onClick={onClose}>
                       Cancel
                     </button>
-                    <button type="button" className="btn btn--danger" disabled={running} onClick={handleConfirm}>
+                    <button type="button" className="btn btn--danger" disabled={running} onClick={() => handleConfirm()}>
                       {running ? 'Reconfiguring…' : `Reconfigure Now`}
                     </button>
                   </div>

@@ -83,11 +83,11 @@ export const nmdApi = {
       body: JSON.stringify({ device }),
     }),
   restoreDisk: (slot: number) => request<NmdCommandResult>(`/api/disks/${slot}/restore`, { method: 'POST' }),
-  shrinkArray: (dropSlots: number[]) =>
+  shrinkArray: (dropSlots: number[], stopContainers = false) =>
     request<NmdCommandResult>('/api/array/shrink', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ dropSlots }),
+      body: JSON.stringify({ dropSlots, stopContainers }),
     }),
   reloadDriver: (stopContainers = false) =>
     request<NmdCommandResult>('/api/array/reload-driver', {

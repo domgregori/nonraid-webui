@@ -2,7 +2,16 @@ import { randomUUID } from 'node:crypto';
 import type { CacheService } from '../cache/service.js';
 import { HttpError } from '../httpError.js';
 import type { ActivityStore } from '../activity/index.js';
+import type { LxcClient } from '../lxc/index.js';
 import type { NmdClient, NmdStatusResponse } from '../nmd/index.js';
+import type { ShareService } from '../shares/index.js';
+import {
+  mountArrayDisksBestEffort,
+  restoreDockerAndAutostartLxc,
+  restoreStoppedContainers,
+  unmountArrayWithContainerRetry,
+  type StoppedContainers,
+} from '../system/arrayLifecycle.js';
 import type { DiskQueueItem, DiskQueueItemType, DiskQueueState } from './types.js';
 
 const RESYNC_POLL_MS = 5_000;
@@ -58,6 +67,8 @@ export class DiskQueueService {
     private nmd: NmdClient,
     private cache: CacheService,
     private activity: ActivityStore,
+    private shares: ShareService,
+    private lxc: LxcClient,
   ) {}
 
   list(): DiskQueueState {
@@ -266,10 +277,26 @@ export class DiskQueueService {
     if (status.resync.active) {
       throw new Error('A parity check or resync is already active outside the queue - wait for it to finish, then retry.');
     }
+    let stoppedContainers: StoppedContainers = { dockerStopped: false, stoppedLxcNames: [] };
     if (status.array.state === 'STARTED') {
       // The queue now owns this transition - unlike the old direct route, callers here never
-      // stopped the array themselves first.
-      await this.nmd.stopArray();
+      // stopped the array themselves first. This has the exact same busy-disk failure mode as a
+      // manual Stop Array click (most commonly Docker's own data root relocated onto an array
+      // disk) - unlike /array/stop's opt-in checkbox, there's no interactive confirmation step in
+      // this background flow, so stopContainers is always true here rather than failing outright
+      // on a conflict a human would just have to notice and retry manually anyway.
+      try {
+        stoppedContainers = await unmountArrayWithContainerRetry(
+          { nmd: this.nmd, shares: this.shares, lxc: this.lxc, activity: this.activity },
+          true,
+        );
+        await this.nmd.stopArray();
+      } catch (err) {
+        // The stop attempt failed outright - restore whatever got stopped along the way, since
+        // the array is still running and there's no reason for Docker/LXC to stay down.
+        await restoreStoppedContainers(this.lxc, stoppedContainers);
+        throw err;
+      }
     }
 
     await this.nmd.addDisk(input.slot, target, match.diskId ?? undefined, { autoStart: false });
@@ -290,6 +317,17 @@ export class DiskQueueService {
       }
       throw err;
     }
+
+    // startArray() alone only activates the array's md device - it doesn't mount each disk's own
+    // filesystem, same as /array/start's own nmdctl quirk. Mount them (and bring shares back up)
+    // before Docker/LXC try to use them.
+    await mountArrayDisksBestEffort({ nmd: this.nmd, shares: this.shares, activity: this.activity }, 'Array started');
+
+    // Array is back up - bring Docker's daemon and any autostart LXC containers back regardless
+    // of whether this specific run was the one that stopped them (self-healing, same reasoning
+    // and same shared helper as /array/start).
+    await restoreDockerAndAutostartLxc({ lxc: this.lxc, activity: this.activity });
+
     // start() alone only marks the pending clear/rebuild - parityCheck('CORRECT') is what
     // actually kicks it off running, same as ArrayBuilder.tsx and RealNmdClient.parityCheck()'s
     // own doc comments explain.
