@@ -104,6 +104,35 @@ apt-get install -y --no-install-recommends \
   curl git e2fsprogs \
   samba nfs-kernel-server
 
+log "Installing smb.conf"
+# samba's own postinst drops a stock sample smb.conf with [homes]/[printers]/[print$] shares
+# enabled by default - this app has no printer-sharing feature and no per-Unix-user
+# home-directory concept, so those just show up as unexplained noise ("nobody", "print$") in
+# network-browse tools alongside the shares actually configured through the app. Replace it with
+# nonraid-webui's own minimal smb.conf instead - same managed-shares markers
+# (backend/src/shares/applier/realApplier.ts), just without the unused stock sections above them.
+# If a smb.conf from a previous install already has shares written into those markers, preserve
+# that block rather than blowing it away - only the static [global] section actually needs
+# refreshing.
+SMB_CONF=/etc/samba/smb.conf
+SMB_TEMPLATE="$REPO_ROOT/tools/config/smb.conf"
+# One-time backup of whatever was there before nonraid-webui ever touched this file (normally
+# samba's own stock sample) - never overwritten on later reinstalls/upgrades, so it stays the
+# actual original rather than a snapshot of nonraid-webui's own previous template.
+if [ -f "$SMB_CONF" ] && [ ! -f "$SMB_CONF.orig" ]; then
+  cp "$SMB_CONF" "$SMB_CONF.orig"
+fi
+if [ -f "$SMB_CONF" ] && grep -q '# === nonraid-webui:managed-shares:begin ===' "$SMB_CONF"; then
+  smb_tmp="$(mktemp)"
+  sed -n '1,/# === nonraid-webui:managed-shares:begin ===/p' "$SMB_TEMPLATE" > "$smb_tmp"
+  sed -n '/# === nonraid-webui:managed-shares:begin ===/,/# === nonraid-webui:managed-shares:end ===/p' "$SMB_CONF" | sed '1d;$d' >> "$smb_tmp"
+  sed -n '/# === nonraid-webui:managed-shares:end ===/,$p' "$SMB_TEMPLATE" >> "$smb_tmp"
+  install -m 644 "$smb_tmp" "$SMB_CONF"
+  rm -f "$smb_tmp"
+else
+  install -m 644 "$SMB_TEMPLATE" "$SMB_CONF"
+fi
+
 log "Checking mergerfs (needs $MERGERFS_MIN+ — Debian's own repo package is older and accepts an invalid High-water policy setting that crashes on the first write, see REQUIREMENTS.md)"
 # Debian's repo package versions like "2.40.2-5"; the upstream release .deb versions like
 # "2.42.0~debian-trixie" — the "~" sorts *before* nothing in Debian's own version ordering, so
