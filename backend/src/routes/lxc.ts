@@ -190,6 +190,19 @@ export function lxcRouter(lxc: LxcClient, activity: ActivityStore, nmd: NmdClien
     }
   });
 
+  router.put('/lxc/containers/:name/autostart', async (req, res) => {
+    try {
+      const name = requireValidName(req.params.name);
+      const autostart = req.body?.autostart === true;
+      const result = await lxc.setContainerAutostart(name, autostart);
+      activity.log(`LXC container "${name}" autostart ${autostart ? 'enabled' : 'disabled'}`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 502;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
   router.get('/lxc/containers/:name/config', async (req, res) => {
     try {
       const name = requireValidName(req.params.name);

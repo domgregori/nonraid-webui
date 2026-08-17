@@ -15,6 +15,7 @@ export interface UseLxcContainers {
   stop: (name: string) => Promise<void>;
   restart: (name: string) => Promise<void>;
   destroy: (name: string) => Promise<void>;
+  setAutostart: (name: string, autostart: boolean) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -82,6 +83,7 @@ export function useLxcContainers(): UseLxcContainers {
     stop: (name) => runAction(name, (n) => lxcApi.stopContainer(n)),
     restart: (name) => runAction(name, lxcApi.restartContainer),
     destroy: (name) => runAction(name, lxcApi.destroyContainer),
+    setAutostart: (name, autostart) => runAction(name, (n) => lxcApi.setAutostart(n, autostart)),
     refresh,
   };
 }

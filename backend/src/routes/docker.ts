@@ -153,6 +153,18 @@ export function dockerRouter(
     }
   });
 
+  router.put('/docker/containers/:id/autostart', async (req, res) => {
+    try {
+      const name = await containerName(req.params.id);
+      const autostart = req.body?.autostart === true;
+      const result = await docker.updateContainerAutostart(req.params.id, autostart);
+      activity.log(`Container "${name}" autostart ${autostart ? 'enabled' : 'disabled'}`, 'blue').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   router.post('/docker/containers/:id/restart', async (req, res) => {
     try {
       const name = await containerName(req.params.id);

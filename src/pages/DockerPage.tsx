@@ -12,7 +12,7 @@ type DialogState =
   | null;
 
 export function DockerPage() {
-  const { containers, status, error, pendingIds, start, stop, restart, destroy, refresh } = useDockerContainers();
+  const { containers, status, error, pendingIds, start, stop, restart, destroy, setAutostart, refresh } = useDockerContainers();
   const [dialog, setDialog] = useState<DialogState>(null);
   const [confirmingDestroy, setConfirmingDestroy] = useState<string | null>(null);
 
@@ -33,6 +33,7 @@ export function DockerPage() {
       onEdit: () => setDialog({ mode: 'edit', containerId: c.id }),
       onViewLogs: () => setDialog({ mode: 'logs', containerId: c.id, containerName: c.name }),
       onDestroy: () => handleDestroyClick(c.id),
+      onToggleAutostart: () => setAutostart(c.id, !c.autostart),
     }),
   );
 
@@ -73,6 +74,10 @@ export function DockerPage() {
                   Web UI &#8599;
                 </a>
               )}
+              <label className="docker-card__autostart">
+                <input type="checkbox" checked={c.autostart} disabled={c.isPending} onChange={c.onToggleAutostart} />
+                Autostart
+              </label>
             </div>
             <div className="docker-card__stats">
               <span>CPU {c.cpuLabel}</span>

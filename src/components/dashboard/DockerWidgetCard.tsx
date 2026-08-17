@@ -12,6 +12,7 @@ const NOOP_ACTIONS = {
   onEdit: () => {},
   onViewLogs: () => {},
   onDestroy: () => {},
+  onToggleAutostart: () => {},
 };
 
 export function DockerWidgetCard() {

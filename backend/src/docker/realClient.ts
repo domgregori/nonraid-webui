@@ -177,6 +177,18 @@ export class RealDockerClient implements DockerClient {
           }
         }
 
+        // `/containers/json`'s own HostConfig is reduced to just NetworkMode - RestartPolicy needs
+        // a real inspect(), same as inspectContainerInner()'s own autostart derivation below. Worth
+        // the extra round trip per container at NAS-scale counts so the card's autostart toggle
+        // reflects real state, not just what this app itself set most recently.
+        let autostart = false;
+        try {
+          const info = await this.docker.getContainer(c.Id).inspect();
+          autostart = !!info.HostConfig.RestartPolicy?.Name && info.HostConfig.RestartPolicy.Name !== 'no';
+        } catch {
+          // container may have been removed between list and inspect calls - leave autostart false
+        }
+
         return {
           id: c.Id,
           name,
@@ -191,6 +203,7 @@ export class RealDockerClient implements DockerClient {
           labels: c.Labels ?? {},
           webUiUrl: null,
           icon: c.Labels?.['net.unraid.docker.icon'] ?? null,
+          autostart,
         };
       }),
     );
@@ -249,6 +262,13 @@ export class RealDockerClient implements DockerClient {
     return this.guard(async () => {
       await this.docker.getContainer(id).restart();
       return { ok: true, message: 'Container restarted' };
+    });
+  }
+
+  async updateContainerAutostart(id: string, autostart: boolean): Promise<DockerCommandResult> {
+    return this.guard(async () => {
+      await this.docker.getContainer(id).update({ RestartPolicy: { Name: autostart ? 'unless-stopped' : 'no' } });
+      return { ok: true, message: `Autostart ${autostart ? 'enabled' : 'disabled'}` };
     });
   }
 

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
 import type { LxcClient } from './client.js';
-import { getVariable, readRaw, setVariables, writeRaw } from './configFile.js';
+import { getVariable, readRaw, setVariable, setVariables, writeRaw } from './configFile.js';
 import { DEFAULT_ARCH, FALLBACK_DISTROS, labelFor } from './distros.js';
 import { LxcStatsPoller } from './statsPoller.js';
 import type {
@@ -88,17 +88,21 @@ export class RealLxcClient implements LxcClient {
   }
 
   /** Unlike `lxc-info`, this build's `lxc-ls` has no `-H`/`--no-humanize` - its
-   * `--fancy` output always prints a header row, so skip the first line. */
-  private async listNames(): Promise<{ name: string; state: LxcRuntimeState; autostart: boolean }[]> {
-    const { stdout } = await this.run('lxc-ls', ['-P', config.lxcDefaultPath, '--fancy', '--fancy-format=NAME,STATE,AUTOSTART']);
+   * `--fancy` output always prints a header row, so skip the first line. AUTOSTART isn't parsed
+   * out of this even though the column exists - readMetadata() below already reads lxc.start.auto
+   * straight off the container's config, the same source setContainerAutostart()/createContainer()
+   * write to, rather than trusting this build's --fancy AUTOSTART column format (observed as a
+   * bare "1"/"0" on this host, not the "YES"/"NO" some lxc-ls builds print). */
+  private async listNames(): Promise<{ name: string; state: LxcRuntimeState }[]> {
+    const { stdout } = await this.run('lxc-ls', ['-P', config.lxcDefaultPath, '--fancy', '--fancy-format=NAME,STATE']);
     return stdout
       .split('\n')
       .slice(1)
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => {
-        const [name, state, autostart] = line.split(/\s+/);
-        return { name: name ?? '', state: parseState(state ?? ''), autostart: (autostart ?? '').toUpperCase() === 'YES' };
+        const [name, state] = line.split(/\s+/);
+        return { name: name ?? '', state: parseState(state ?? '') };
       })
       .filter((entry) => entry.name !== '');
   }
@@ -138,13 +142,13 @@ export class RealLxcClient implements LxcClient {
   async listContainers(): Promise<LxcContainerSummary[]> {
     const entries = await this.listNames();
     return Promise.all(
-      entries.map(async ({ name, state, autostart }): Promise<LxcContainerSummary> => {
+      entries.map(async ({ name, state }): Promise<LxcContainerSummary> => {
         const meta = await this.readMetadata(name);
         const sample = state === 'running' ? this.stats.get(name) : null;
         return {
           name,
           state,
-          autostart,
+          autostart: meta.autostart,
           description: meta.description,
           webUiUrl: meta.webUiUrl,
           distribution: meta.distribution,
@@ -202,6 +206,11 @@ export class RealLxcClient implements LxcClient {
     await this.run('lxc-stop', ['-P', config.lxcDefaultPath, '-n', name, `--timeout=${config.lxcStopTimeoutSec}`]);
     await this.run('lxc-start', ['-P', config.lxcDefaultPath, '-n', name]);
     return { ok: true, message: `Container "${name}" restarted` };
+  }
+
+  async setContainerAutostart(name: string, autostart: boolean): Promise<LxcCommandResult> {
+    await setVariable(containerConfigPath(name), AUTOSTART_KEY, autostart ? '1' : '0');
+    return { ok: true, message: `Container "${name}" autostart ${autostart ? 'enabled' : 'disabled'}` };
   }
 
   async destroyContainer(name: string): Promise<LxcCommandResult> {

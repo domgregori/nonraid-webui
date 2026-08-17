@@ -15,6 +15,7 @@ export interface UseDockerContainers {
   stop: (id: string) => Promise<void>;
   restart: (id: string) => Promise<void>;
   destroy: (id: string) => Promise<void>;
+  setAutostart: (id: string, autostart: boolean) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -82,6 +83,7 @@ export function useDockerContainers(): UseDockerContainers {
     stop: (id) => runAction(id, dockerApi.stopContainer),
     restart: (id) => runAction(id, dockerApi.restartContainer),
     destroy: (id) => runAction(id, dockerApi.removeContainer),
+    setAutostart: (id, autostart) => runAction(id, (i) => dockerApi.setAutostart(i, autostart)),
     refresh,
   };
 }

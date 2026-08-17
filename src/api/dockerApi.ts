@@ -19,6 +19,12 @@ export const dockerApi = {
   stopContainer: (id: string) => request<DockerCommandResult>(`/api/docker/containers/${id}/stop`, { method: 'POST' }),
   restartContainer: (id: string) => request<DockerCommandResult>(`/api/docker/containers/${id}/restart`, { method: 'POST' }),
   removeContainer: (id: string) => request<DockerCommandResult>(`/api/docker/containers/${id}`, { method: 'DELETE' }),
+  setAutostart: (id: string, autostart: boolean) =>
+    request<DockerCommandResult>(`/api/docker/containers/${id}/autostart`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ autostart }),
+    }),
   planContainer: (body: ManualContainerRequest) =>
     request<ManualContainerPlan>('/api/docker/containers/plan', {
       method: 'POST',

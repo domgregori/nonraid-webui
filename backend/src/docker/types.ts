@@ -27,6 +27,10 @@ export interface DockerContainerSummary {
   // a de facto convention CA templates (and many upstream images) use, so this works for any
   // container carrying it, not just ones installed through this app's own Apps feature.
   icon: string | null;
+  // Docker's own `/containers/json` list API reduces HostConfig to just NetworkMode, so this
+  // needs a real inspect() per container to know its RestartPolicy - worth the extra round trip
+  // at NAS-scale container counts so the card's autostart toggle can show real state.
+  autostart: boolean;
 }
 
 export interface DockerCommandResult {

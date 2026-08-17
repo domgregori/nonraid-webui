@@ -19,6 +19,7 @@ export interface DockerContainerSummary {
   // Null for custom containers, or CA ones with no WebUI/unresolvable app.
   webUiUrl: string | null;
   icon: string | null;
+  autostart: boolean;
 }
 
 export interface DockerCommandResult {

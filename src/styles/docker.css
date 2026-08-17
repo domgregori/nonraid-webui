@@ -92,6 +92,53 @@
   background: var(--color-surface-elevated);
 }
 
+.docker-card__autostart {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-dim);
+  cursor: pointer;
+}
+
+.docker-card__autostart:has(input:checked) {
+  color: var(--color-blue);
+}
+
+.docker-card__autostart:has(input:disabled) {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.docker-card__autostart input[type='checkbox'] {
+  appearance: none;
+  margin: 0;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-border);
+  background: transparent;
+  cursor: inherit;
+  display: grid;
+  place-content: center;
+}
+
+.docker-card__autostart input[type='checkbox']:checked {
+  border-color: var(--color-blue);
+  background: var(--color-blue);
+}
+
+.docker-card__autostart input[type='checkbox']:checked::after {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-surface);
+}
+
 .docker-card__stats {
   margin-top: var(--space-md);
   display: flex;

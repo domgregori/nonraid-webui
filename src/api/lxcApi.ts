@@ -30,6 +30,12 @@ export const lxcApi = {
     request<LxcCommandResult>(`/api/lxc/containers/${encodeURIComponent(name)}/restart`, { method: 'POST' }),
   destroyContainer: (name: string) =>
     request<LxcCommandResult>(`/api/lxc/containers/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  setAutostart: (name: string, autostart: boolean) =>
+    request<LxcCommandResult>(`/api/lxc/containers/${encodeURIComponent(name)}/autostart`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ autostart }),
+    }),
   getConfigText: (name: string) =>
     request<{ content: string }>(`/api/lxc/containers/${encodeURIComponent(name)}/config`),
   setConfigText: (name: string, content: string) =>

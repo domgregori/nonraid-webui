@@ -9,7 +9,7 @@ import { deriveLxcContainerViewModel } from '../selectors/lxcContainers';
 type DialogState = { mode: 'add' } | { mode: 'edit'; name: string } | { mode: 'snapshots'; name: string } | null;
 
 export function LxcPage() {
-  const { containers, status, error, pendingNames, start, stop, restart, destroy, refresh } = useLxcContainers();
+  const { containers, status, error, pendingNames, start, stop, restart, destroy, setAutostart, refresh } = useLxcContainers();
   const [dialog, setDialog] = useState<DialogState>(null);
   const [confirmingDestroy, setConfirmingDestroy] = useState<string | null>(null);
 
@@ -30,6 +30,7 @@ export function LxcPage() {
       onDestroy: () => handleDestroyClick(c.name),
       onEdit: () => setDialog({ mode: 'edit', name: c.name }),
       onSnapshots: () => setDialog({ mode: 'snapshots', name: c.name }),
+      onToggleAutostart: () => setAutostart(c.name, !c.autostart),
     }),
   );
 
@@ -60,12 +61,15 @@ export function LxcPage() {
             </div>
             {c.description && <div className="docker-card__image">{c.description}</div>}
             <div className="docker-card__badges">
-              {c.autostart && <span className="docker-card__badge docker-card__badge--ca">Autostart</span>}
               {c.webUiUrl && (
                 <a className="docker-card__weburl" href={c.webUiUrl.replace('[IP]', window.location.hostname)} target="_blank" rel="noreferrer">
                   Web UI &#8599;
                 </a>
               )}
+              <label className="docker-card__autostart">
+                <input type="checkbox" checked={c.autostart} disabled={c.isPending} onChange={c.onToggleAutostart} />
+                Autostart
+              </label>
             </div>
             <div className="docker-card__stats">
               <span>CPU {c.cpuLabel}</span>

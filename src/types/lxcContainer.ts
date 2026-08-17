@@ -19,4 +19,5 @@ export interface LxcContainerViewModel {
   onDestroy: () => void;
   onEdit: () => void;
   onSnapshots: () => void;
+  onToggleAutostart: () => void;
 }

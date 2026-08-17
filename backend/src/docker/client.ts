@@ -12,6 +12,10 @@ export interface DockerClient {
   startContainer(id: string): Promise<DockerCommandResult>;
   stopContainer(id: string): Promise<DockerCommandResult>;
   restartContainer(id: string): Promise<DockerCommandResult>;
+  // Flips just the container's RestartPolicy via Docker Engine's own POST /containers/{id}/update -
+  // unlike editing every other field, this doesn't require stopping/removing/recreating the
+  // container, so the card's autostart toggle can do it in one cheap call.
+  updateContainerAutostart(id: string, autostart: boolean): Promise<DockerCommandResult>;
   removeContainer(id: string, options?: { force?: boolean }): Promise<DockerCommandResult>;
   // The user-facing "permanently delete this" action (unlike removeContainer, which is also used
   // internally by the edit/recreate flow, where the image must stay cached for immediate reuse) -

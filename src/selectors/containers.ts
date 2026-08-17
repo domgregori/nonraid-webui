@@ -10,6 +10,7 @@ export interface ContainerActions {
   onEdit: () => void;
   onViewLogs: () => void;
   onDestroy: () => void;
+  onToggleAutostart: () => void;
 }
 
 /**
@@ -59,10 +60,12 @@ export function deriveContainerViewModel(container: DockerContainerSummary, acti
     isPending: actions.isPending,
     caAppName: container.labels[CA_APP_NAME_LABEL] ?? null,
     webUiUrl: running ? resolveContainerWebUi(container) : null,
+    autostart: container.autostart,
     onToggle: actions.onToggle,
     onRestart: actions.onRestart,
     onEdit: actions.onEdit,
     onViewLogs: actions.onViewLogs,
     onDestroy: actions.onDestroy,
+    onToggleAutostart: actions.onToggleAutostart,
   };
 }
