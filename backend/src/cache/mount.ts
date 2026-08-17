@@ -5,9 +5,8 @@ import { config } from '../config.js';
 const execFileAsync = promisify(execFile);
 
 async function run(bin: string, args: string[], timeoutMs = config.cacheTimeoutMs): Promise<{ stdout: string; stderr: string }> {
-  const useSudo = config.cacheUseSudo;
   try {
-    return await execFileAsync(useSudo ? 'sudo' : bin, useSudo ? [bin, ...args] : args, {
+    return await execFileAsync(bin, args, {
       timeout: timeoutMs,
       maxBuffer: 4 * 1024 * 1024,
     });
@@ -108,14 +107,25 @@ export async function mountCache(fsUuid: string, mountPoint: string): Promise<{ 
 
   await run('mkdir', ['-p', mountPoint], 5_000);
   const devicePath = present[0]!.path;
+  let degraded = false;
   try {
     await run('mount', [devicePath, mountPoint], 30_000);
-    return { mounted: true, degraded: false };
   } catch {
-    if (present.length < 2) {
-      await run('mount', ['-o', 'degraded', devicePath, mountPoint], 30_000);
-      return { mounted: true, degraded: true };
-    }
-    throw new Error(`Failed to mount cache pool at ${mountPoint}.`);
+    if (present.length >= 2) throw new Error(`Failed to mount cache pool at ${mountPoint}.`);
+    await run('mount', ['-o', 'degraded', devicePath, mountPoint], 30_000);
+    degraded = true;
   }
+
+  // Applied after mounting, not before mkdir above - the pre-mount directory gets hidden once
+  // btrfs mounts on top of it, so chowning/ACL'ing it earlier would land on that hidden directory
+  // instead of the mounted filesystem's actual root. Same user:users (99:100) convention as
+  // shares/applier/realApplier.ts's provisionArrayDir() - setgid makes every subdirectory created
+  // afterward inherit group=users for free (including content this backend's own root process
+  // creates); the default ACL covers owner-side access the same way for everything else.
+  await run('chown', [`${config.arrayDataOwner}:${config.arrayDataGroup}`, mountPoint], 5_000);
+  await run('chmod', ['g+s', mountPoint], 5_000);
+  const acl = `u:${config.arrayDataOwner}:rwx,g:${config.arrayDataGroup}:rwx`;
+  await run('setfacl', ['-m', acl, '-d', '-m', acl, mountPoint], 5_000);
+
+  return { mounted: true, degraded };
 }

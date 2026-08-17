@@ -29,7 +29,7 @@ async function dirSizeBytes(dirPath: string): Promise<number> {
  */
 export async function pruneTemplateCache(): Promise<PruneTemplateCacheResult> {
   const spaceReclaimedBytes = await dirSizeBytes(CACHE_DIR);
-  await runSudoMaybe('rm', ['-rf', CACHE_DIR], config.lxcUseSudo);
-  await runSudoMaybe('mkdir', ['-p', CACHE_DIR], config.lxcUseSudo);
+  await runSudoMaybe('rm', ['-rf', CACHE_DIR]);
+  await runSudoMaybe('mkdir', ['-p', CACHE_DIR]);
   return { spaceReclaimedBytes };
 }

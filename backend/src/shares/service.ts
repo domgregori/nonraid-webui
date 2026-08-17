@@ -1,4 +1,4 @@
-import { readdir, stat } from 'node:fs/promises';
+import { readdir, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { ActivityStore } from '../activity/index.js';
 import type { CacheService } from '../cache/service.js';
@@ -6,7 +6,6 @@ import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
-import { runSudoMaybe } from '../system/procUtil.js';
 import type { ShareAccessStore } from './aclStore.js';
 import type { ApplyContext, ShareApplier } from './applier/client.js';
 import type { ShareStore } from './store.js';
@@ -171,20 +170,18 @@ export class ShareService {
 
     const ctx = await this.buildContext();
     await this.applier.unmountShare(name);
-    // Array disks (and /mnt itself) are root:root - deleting a share directory under one needs
-    // the same sudo escalation mountShare()'s own mkdir already gets (see realApplier.ts).
     for (const slot of share.disks) {
       const mp = ctx.diskMountpoints[slot];
       if (!mp) continue; // disk offline - nothing reachable to delete on it
-      await runSudoMaybe('rm', ['-rf', `${mp}/${name}`], config.sharesUseSudo);
+      await rm(`${mp}/${name}`, { recursive: true, force: true });
     }
     if (share.allocationMethod === 'cache-only' && ctx.cacheMountPoint) {
-      await runSudoMaybe('rm', ['-rf', `${ctx.cacheMountPoint}/${name}`], config.sharesUseSudo);
+      await rm(`${ctx.cacheMountPoint}/${name}`, { recursive: true, force: true });
     }
     // Now just a plain empty directory (unmounted), so this won't hit the
     // EBUSY that stopped a direct delete in the first place. Best-effort:
     // the share is already fully gone by this point either way.
-    await runSudoMaybe('rm', ['-rf', mountPath], config.sharesUseSudo).catch(() => {});
+    await rm(mountPath, { recursive: true, force: true }).catch(() => {});
 
     await this.store.remove(name);
     await this.aclStore.removeShare(name);
@@ -290,9 +287,8 @@ export class ShareService {
       // itself (e.g. /mnt/user/<old-name>) is left behind, since nothing else ever removes it.
       // Confirmed live: it lingers indefinitely, showing up as a stray empty folder in Browse,
       // accumulating with every further rename. Best-effort, matching removeMountPointWithData()'s
-      // own cleanup - the rename itself is already done by this point either way. /mnt itself is
-      // root:root, same sudo escalation as every other privileged path in this file.
-      await runSudoMaybe('rm', ['-rf', path.join(config.shareMountRoot, name)], config.sharesUseSudo).catch(() => {});
+      // own cleanup - the rename itself is already done by this point either way.
+      await rm(path.join(config.shareMountRoot, name), { recursive: true, force: true }).catch(() => {});
       await this.store.remove(name);
       await this.renameAccess(name, share.name);
     }
@@ -344,8 +340,6 @@ export class ShareService {
    * mounted (the exact same "don't strand data under the old name" reasoning
    * as an offline array disk).
    */
-  // Array disks and the cache pool's own mount root are root:root, same sudo escalation as every
-  // other privileged path in this file - a plain fs/promises rename() throws EACCES on either.
   private async moveShareData(oldShare: Share, newName: string, ctx: ApplyContext): Promise<void> {
     if (oldShare.allocationMethod === 'cache-only') {
       if (!ctx.cacheMountPoint) {
@@ -357,7 +351,7 @@ export class ShareService {
       const oldPath = `${ctx.cacheMountPoint}/${oldShare.name}`;
       const newPath = `${ctx.cacheMountPoint}/${newName}`;
       const exists = await stat(oldPath).then(() => true, () => false);
-      if (exists) await runSudoMaybe('mv', [oldPath, newPath], config.sharesUseSudo);
+      if (exists) await rename(oldPath, newPath);
       return;
     }
 
@@ -372,7 +366,7 @@ export class ShareService {
       const newPath = `${mountpoint}/${newName}`;
       const exists = await stat(oldPath).then(() => true, () => false);
       if (!exists) continue;
-      await runSudoMaybe('mv', [oldPath, newPath], config.sharesUseSudo);
+      await rename(oldPath, newPath);
     }
     if (skipped.length > 0) {
       throw new HttpError(

@@ -22,20 +22,46 @@ NODE_BIN=/usr/bin/node
 MERGERFS_MIN="2.42.0"
 NONRAID_REPO_URL="https://github.com/domgregori/nonraid.git"
 NONRAID_SRC_DIR=/usr/src/nonraid
-NONRAID_WEBUI_USER=nonraid
+ARRAY_DATA_GROUP=users
+ARRAY_DATA_GID=100
+ARRAY_DATA_USER=user
+ARRAY_DATA_UID=99
+LOG_DIR=/var/log/nonraid-webui
+LOG_FILE="$LOG_DIR/install-$(date +%Y%m%d-%H%M%S).log"
 
 log() { echo "==> $*"; }
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
 [ "$(id -u)" = 0 ] || fail "must be run as root (sudo tools/install-webui.sh)."
 
-log "Checking for the $NONRAID_WEBUI_USER system user"
-# Owns $INSTALL_ROOT and runs nonraid-webui.service (see the override further down) — a fixed,
-# dedicated account rather than whoever happens to invoke sudo, so this script produces the same
-# result regardless of which admin account runs it, and re-running it later doesn't depend on
-# still being logged in as the same person who ran it the first time.
-if ! id "$NONRAID_WEBUI_USER" >/dev/null 2>&1; then
-  useradd --system --create-home --shell /usr/sbin/nologin "$NONRAID_WEBUI_USER"
+# Every run's full output (this script's own `log`/`fail` lines plus every command it invokes)
+# is captured to $LOG_FILE, not just whatever's still visible in the terminal — useful after the
+# fact for a failed run, or one kicked off non-interactively. Still prints to stdout/stderr as
+# before via tee, so nothing about running it interactively changes.
+mkdir -p "$LOG_DIR"
+exec > >(tee -a "$LOG_FILE") 2>&1
+log "Logging this run to $LOG_FILE"
+
+log "Checking for the $ARRAY_DATA_USER:$ARRAY_DATA_GROUP ($ARRAY_DATA_UID:$ARRAY_DATA_GID) account"
+# nonraid-webui itself runs as root (see nonraid-webui.service — no User= override), the same way
+# Unraid's own single-appliance design works, so there's no separate service account to provision
+# here. What still needs a fixed identity is array/pool/cache data ownership: this app chowns and
+# sets a default ACL for $ARRAY_DATA_USER:$ARRAY_DATA_GROUP on that data (see
+# shares/applier/realApplier.ts's provisionArrayDir() and cache/mount.ts's mountCache()) — the
+# classic Unraid/linuxserver.io nobody:users (99:100) convention most Community-Apps containers
+# already default their own PUID/PGID to. Named "user" rather than "nobody" since Debian's own
+# nobody account is a fixed uid 65534, not 99 — that name's already taken.
+if ! getent group "$ARRAY_DATA_GROUP" >/dev/null 2>&1; then
+  groupadd -g "$ARRAY_DATA_GID" "$ARRAY_DATA_GROUP"
+else
+  existing_gid="$(getent group "$ARRAY_DATA_GROUP" | cut -d: -f3)"
+  [ "$existing_gid" = "$ARRAY_DATA_GID" ] || fail "group '$ARRAY_DATA_GROUP' already exists with gid $existing_gid, not the expected $ARRAY_DATA_GID."
+fi
+if ! id "$ARRAY_DATA_USER" >/dev/null 2>&1; then
+  useradd -u "$ARRAY_DATA_UID" -g "$ARRAY_DATA_GID" -M -s /usr/sbin/nologin "$ARRAY_DATA_USER"
+else
+  existing_uid="$(id -u "$ARRAY_DATA_USER")"
+  [ "$existing_uid" = "$ARRAY_DATA_UID" ] || fail "user '$ARRAY_DATA_USER' already exists with uid $existing_uid, not the expected $ARRAY_DATA_UID."
 fi
 
 log "Updating package lists"
@@ -53,7 +79,7 @@ log "Installing system dependencies"
 apt-get install -y \
   rsync openssl gpg dkms build-essential \
   smartmontools hdparm \
-  xfsprogs btrfs-progs parted \
+  xfsprogs btrfs-progs parted acl \
   apprise \
   docker.io \
   lxc lxc-templates \
@@ -76,13 +102,6 @@ apt-get install -y \
 apt-get install -y --no-install-recommends \
   curl git e2fsprogs \
   samba nfs-kernel-server
-
-# docker.sock is root:docker mode 660 (created by the docker.io package just installed above) —
-# dockerode (backend/src/docker/realClient.ts) connects to it directly, no sudo wrapper exists for
-# Docker the way there is for nmdctl/smartctl/etc (see SUDO_BINS further down), so the service user
-# needs real group membership, not just a sudoers rule. usermod -aG is idempotent, safe to re-run
-# even when already a member.
-usermod -aG docker "$NONRAID_WEBUI_USER"
 
 log "Checking mergerfs (needs $MERGERFS_MIN+ — Debian's own repo package is older and accepts an invalid High-water policy setting that crashes on the first write, see REQUIREMENTS.md)"
 # Debian's repo package versions like "2.40.2-5"; the upstream release .deb versions like
@@ -209,118 +228,8 @@ cp "$BACKEND_DIR/package.json" "$BACKEND_DIR/package-lock.json" "$INSTALL_ROOT/b
 
 rsync -a --delete "$REPO_ROOT/dist/" "$INSTALL_ROOT/frontend-dist/"
 
-# This whole script runs as root (see the check at the top), so every file staged above — including
-# rsync -a's ownership, preserved from $BACKEND_DIR/$REPO_ROOT's own build output — ends up
-# root:root. Handing the staged tree to $NONRAID_WEBUI_USER means a later update can be rsynced
-# into place directly — confirmed live: a plain non-root rsync deploy after a fresh install failed
-# with a wall of "Permission denied"/"Operation not permitted" errors.
-log "Handing $INSTALL_ROOT to $NONRAID_WEBUI_USER (so future updates can be rsynced without sudo)"
-chown -R "$NONRAID_WEBUI_USER:$(id -gn "$NONRAID_WEBUI_USER")" "$INSTALL_ROOT"
-# StateDirectory=nonraid-webui (see the systemd unit) makes systemd create+chown
-# /var/lib/nonraid-webui to the service's User/Group automatically — but only the first time it's
-# created. An already-existing one (e.g. from before this script started running the service
-# non-root) is left as-is by systemd, so it needs the same explicit fix-up as $INSTALL_ROOT above
-# — confirmed live, restoring a pre-install snapshot and re-running an already-once-root install.
-[ -d /var/lib/nonraid-webui ] && chown -R "$NONRAID_WEBUI_USER:$(id -gn "$NONRAID_WEBUI_USER")" /var/lib/nonraid-webui
-
 log "Installing systemd unit"
 install -m 644 "$REPO_ROOT/tools/systemd/nonraid-webui.service" /etc/systemd/system/nonraid-webui.service
-
-# nonraid-webui shells out to nmdctl/docker/mount/useradd/and more as root — the base unit above
-# has no User=, so with nothing else it'd run the whole Node process (and by extension, every HTTP
-# request it ever handles) as root. Instead, run it as $NONRAID_WEBUI_USER, the same account the
-# deployed tree above now belongs to, and let it reach root only through a sudoers rule scoped to
-# exactly the commands it actually needs (installed below) — so a bug or vulnerability in this
-# backend can't act as root outside that narrow allowlist. A drop-in override (not editing the
-# unit file itself) keeps the checked-in unit portable.
-log "Configuring nonraid-webui.service to run as $NONRAID_WEBUI_USER instead of root"
-mkdir -p /etc/systemd/system/nonraid-webui.service.d
-{
-  echo "[Service]"
-  echo "User=$NONRAID_WEBUI_USER"
-  echo "Group=$(id -gn "$NONRAID_WEBUI_USER")"
-  # One per backend/src/config.ts *_use_sudo flag — see the sudoers generation right below for
-  # exactly which commands each of these actually unlocks.
-  for flag in NMD SMART HDPARM TLS SHARES SYSTEM USERS LXC CACHE BROWSE FILE_MOVE; do
-    echo "Environment=${flag}_USE_SUDO=true"
-  done
-} > /etc/systemd/system/nonraid-webui.service.d/override.conf
-
-log "Restricting $NONRAID_WEBUI_USER's sudo to exactly what nonraid-webui shells out to as root"
-# Every plain binary the backend can sudo to (see every *_use_sudo call site in backend/src) —
-# resolved to an absolute path here since sudoers requires one and won't fall back to a PATH
-# lookup. No argument restriction on these: each one's arguments are either inherently dynamic
-# app data (usernames, hostnames, container names, disk/device paths) that can't be pinned down
-# ahead of time, or just not dangerous enough as a bare grant to be worth the added fragility.
-# tee/modprobe/systemctl are the exception — bare, those would themselves be generic
-# arbitrary-file-write / arbitrary-kernel-module-load / arbitrary-service-control primitives, so
-# they're pinned below to the exact invocations nmd/realClient.ts, system/services.ts, and
-# routes/array.ts actually make instead of granted as plain binaries.
-SUDO_BINS=(
-  nmdctl mv cp rm test mkfs.xfs
-  smartctl
-  hdparm dd
-  mount umount mergerfs exportfs smbstatus smbcontrol smbd
-  tar hostnamectl timedatectl journalctl
-  getent useradd usermod userdel groupadd groupdel chpasswd smbpasswd
-  lxc-ls lxc-info lxc-start lxc-stop lxc-destroy lxc-snapshot lxc-create
-  btrfs mkfs.btrfs mkdir mountpoint lsblk blkid udevadm blockdev
-  openssl chmod rmdir touch chown
-)
-SUDOERS_TMP="$(mktemp)"
-{
-  echo "# Managed by nonraid-webui's tools/install-webui.sh — re-run the script to update this"
-  echo "# rather than hand-editing it. Scopes $NONRAID_WEBUI_USER's sudo to exactly what"
-  echo "# nonraid-webui's backend shells out to as root (see every *_use_sudo flag in"
-  echo "# backend/src/config.ts) and nothing else."
-  for bin in "${SUDO_BINS[@]}"; do
-    # type -P, not command -v: `test` (and potentially others) is a shell builtin that shadows
-    # the real /usr/bin binary — command -v reports the builtin (just the bare word, not a path,
-    # which visudo then rejects outright), type -P forces a PATH-only lookup regardless.
-    bin_path="$(type -P "$bin" 2>/dev/null || true)"
-    if [ -z "$bin_path" ]; then
-      echo "WARNING: '$bin' not found on PATH — skipping its sudoers entry (a feature needing it may not work as $NONRAID_WEBUI_USER)" >&2
-      continue
-    fi
-    echo "$NONRAID_WEBUI_USER ALL=(root) NOPASSWD: $bin_path"
-  done
-
-  tee_path="$(type -P tee 2>/dev/null || true)"
-  modprobe_path="$(type -P modprobe 2>/dev/null || true)"
-  systemctl_path="$(type -P systemctl 2>/dev/null || true)"
-  # nmdctl's own `unassign` has no unattended-mode bypass for its confirm prompt, so unassign
-  # writes this one driver command straight to /proc/nmdcmd instead (see nmd/realClient.ts's
-  # writeNmdCmd) — the only file this backend ever needs `tee` for.
-  [ -n "$tee_path" ] && echo "$NONRAID_WEBUI_USER ALL=(root) NOPASSWD: $tee_path /proc/nmdcmd"
-  if [ -n "$modprobe_path" ]; then
-    echo "$NONRAID_WEBUI_USER ALL=(root) NOPASSWD: $modprobe_path -r nonraid"
-    echo "$NONRAID_WEBUI_USER ALL=(root) NOPASSWD: $modprobe_path nonraid super=*"
-  fi
-  if [ -n "$systemctl_path" ]; then
-    # The complete, closed set from system/services.ts's SERVICE_DEFS (Docker/LXC/SMB/NFS/SSH
-    # start/stop/is-active), routes/array.ts's driver-reload Docker stop/start, and
-    # routes/system.ts's Settings -> About reboot action.
-    for args in \
-      "is-active docker.service" "is-active lxc.service" \
-      "is-active smbd.service nmbd.service" \
-      "is-active nfs-server.service" "is-active ssh.service" \
-      "stop docker.socket docker.service" "start docker" \
-      "stop lxc" "start lxc" \
-      "stop smbd.service nmbd.service" "start smbd.service nmbd.service" \
-      "stop nfs-server" "start nfs-server" \
-      "stop ssh" "start ssh" \
-      "reboot"; do
-      echo "$NONRAID_WEBUI_USER ALL=(root) NOPASSWD: $systemctl_path $args"
-    done
-  fi
-} > "$SUDOERS_TMP"
-
-if visudo -c -f "$SUDOERS_TMP" >/dev/null; then
-  install -m 0440 -o root -g root "$SUDOERS_TMP" /etc/sudoers.d/nonraid-webui
-  rm -f "$SUDOERS_TMP"
-else
-  fail "Generated sudoers rules failed validation (visudo -c) — not installed, left at $SUDOERS_TMP for inspection."
-fi
 
 if [ ! -e /etc/nonraid/config.toml ]; then
   log "Installing default config (/etc/nonraid/config.toml)"

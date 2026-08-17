@@ -146,17 +146,14 @@ export const config = {
   // admin isn't nagged to regenerate one every year.
   tlsSelfSignedDays: num('TLS_SELF_SIGNED_DAYS', t('tls', 'self_signed_days'), 3650),
   opensslBin: str('OPENSSL_BIN', t('tls', 'openssl_bin'), 'openssl'),
-  tlsUseSudo: bool('TLS_USE_SUDO', t('tls', 'use_sudo'), false),
   nmdBin: str('NMD_BIN', t('nmd', 'bin'), 'nmdctl'),
   nmdSuperblock: optStr('NMD_SUPERBLOCK', t('nmd', 'superblock')), // optional -s override, undefined = nmdctl default
-  nmdUseSudo: bool('NMD_USE_SUDO', t('nmd', 'use_sudo'), false),
   nmdTimeoutMs: num('NMD_TIMEOUT_MS', t('nmd', 'timeout_ms'), 15_000),
   // nmdctl's own `unassign` has an unconditional interactive confirm prompt with
   // no unattended bypass, so unassign writes this driver command directly instead
   // (see docs/manual-management.md in the main nonraid repo).
   nmdCmdPath: str('NMD_CMD_PATH', t('nmd', 'cmd_path'), '/proc/nmdcmd'),
   smartctlBin: str('SMARTCTL_BIN', t('smart', 'bin'), 'smartctl'),
-  smartUseSudo: bool('SMART_USE_SUDO', t('smart', 'use_sudo'), false),
   smartTimeoutMs: num('SMART_TIMEOUT_MS', t('smart', 'timeout_ms'), 10_000),
   smartCacheTtlMs: num('SMART_CACHE_TTL_MS', t('smart', 'cache_ttl_ms'), 60_000),
   // Attribute/self-test reads are on-demand (a disk's detail panel open), not
@@ -166,7 +163,6 @@ export const config = {
   // Spin up/down actions (backend/src/system/hdparm.ts) - not bundled with this project, same
   // "clear error if missing" treatment appriseBin/smartctlBin get rather than a hard crash.
   hdparmBin: str('HDPARM_BIN', t('hdparm', 'bin'), 'hdparm'),
-  hdparmUseSudo: bool('HDPARM_USE_SUDO', t('hdparm', 'use_sudo'), false),
   sharesConfigPath: str('SHARES_CONFIG_PATH', t('shares', 'config_path'), path.join(process.cwd(), 'data', 'shares.json')),
   shareMountRoot,
   // The file Browse page's own ceiling/starting point - independent of
@@ -175,21 +171,10 @@ export const config = {
   // disks, cache, etc.), not just one share, so it needs a wider root.
   browseRoot: str('BROWSE_ROOT', t('browse', 'root'), '/mnt'),
   browseDefaultPath: str('BROWSE_DEFAULT_PATH', t('browse', 'default_path'), '/mnt/user'),
-  // Create/move/copy/delete/upload all write directly under browseRoot - array disks, cache, and
-  // /mnt itself are root:root, same "this process may not itself have permission" reasoning as
-  // every other *UseSudo flag here.
-  browseUseSudo: bool('BROWSE_USE_SUDO', t('browse', 'use_sudo'), false),
   smbConfPath: str('SMB_CONF_PATH', t('shares', 'smb_conf_path'), '/etc/samba/smb.conf'),
   exportsPath: str('EXPORTS_PATH', t('shares', 'exports_path'), '/etc/exports'),
-  sharesUseSudo: bool('SHARES_USE_SUDO', t('shares', 'use_sudo'), false),
   shareAccessConfigPath: str('SHARE_ACCESS_CONFIG_PATH', t('shares', 'access_config_path'), path.join(process.cwd(), 'data', 'share-access.json')),
   systemStatsIntervalMs: num('SYSTEM_STATS_INTERVAL_MS', t('system', 'stats_interval_ms'), 2_000),
-  // Boot disk backups (backend/src/system/backupStream.ts) shell out to dd/tar
-  // to read raw block devices and root-owned config files - same "this
-  // process may not itself have permission, only sudo does" reasoning as
-  // nmdUseSudo/sharesUseSudo/usersUseSudo.
-  systemUseSudo: bool('SYSTEM_USE_SUDO', t('system', 'use_sudo'), false),
-  usersUseSudo: bool('USERS_USE_SUDO', t('users', 'use_sudo'), false),
   // Managed users/groups live in [start, end], so they're clearly distinguishable
   // from real host system accounts (never touches anything outside this range).
   // The upper bound matters as much as the lower one: 65534/65535 are the
@@ -239,7 +224,6 @@ export const config = {
   // passed as `-P` to every lxc-* call, matching that plugin's configurable
   // storage root (analogous to appsBindRoots above).
   lxcDefaultPath: str('LXC_DEFAULT_PATH', t('lxc', 'default_path'), '/var/lib/lxc'),
-  lxcUseSudo: bool('LXC_USE_SUDO', t('lxc', 'use_sudo'), false),
   lxcTimeoutMs: num('LXC_TIMEOUT_MS', t('lxc', 'timeout_ms'), 15_000),
   // lxc-create --template download fetches a rootfs tarball from
   // images.linuxcontainers.org - needs much longer than other lxc-* calls.
@@ -263,13 +247,22 @@ export const config = {
   // mountpoint, unlike shareMountRoot/browseRoot which are roots for many
   // per-name paths underneath them.
   cacheMountPoint: str('CACHE_MOUNT_POINT', t('cache', 'mount_point'), '/mnt/cache'),
-  cacheUseSudo: bool('CACHE_USE_SUDO', t('cache', 'use_sudo'), false),
   cacheTimeoutMs: num('CACHE_TIMEOUT_MS', t('cache', 'timeout_ms'), 15_000),
   // mkfs.btrfs against a real multi-TB disk pair can take a while - longer
   // than every other privileged command in this app, none of which format a
   // filesystem from scratch.
   cacheMkfsTimeoutMs: num('CACHE_MKFS_TIMEOUT_MS', t('cache', 'mkfs_timeout_ms'), 5 * 60 * 1000),
-  // fileMove/service.ts - the shared engine behind Empty Disk and the cache mover, moving real
-  // files between array disks and the cache pool (root:root, same as every other *UseSudo flag).
-  fileMoveUseSudo: bool('FILE_MOVE_USE_SUDO', t('fileMove', 'use_sudo'), false),
+  // Array/pool/cache data ownership (see shares/applier/realApplier.ts's mountShare(),
+  // cache/mount.ts's mountCache(), and writeSmbBlock()/writeExportsBlock()'s force
+  // user/group and anonuid/anongid) - the classic Unraid/linuxserver.io nobody:users
+  // (99:100) convention most Community-Apps containers already default their own
+  // PUID/PGID to. Named "user" rather than "nobody" here since Debian's own nobody
+  // account is a fixed uid 65534, not 99 - that name's already taken, so this app
+  // provisions its own account for the 99 slot instead (see tools/install-webui.sh).
+  // The numeric uid/gid are kept alongside the names since NFS's anonuid/anongid
+  // export options only accept numbers, not account names.
+  arrayDataOwner: 'user',
+  arrayDataGroup: 'users',
+  arrayDataUid: 99,
+  arrayDataGid: 100,
 };

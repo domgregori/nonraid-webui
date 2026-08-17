@@ -12,9 +12,8 @@ import type { CacheDeviceStatus, CacheHealth, CacheReplaceStatus, CacheStatus } 
 const execFileAsync = promisify(execFile);
 
 async function run(bin: string, args: string[], timeoutMs = config.cacheTimeoutMs): Promise<{ stdout: string; stderr: string }> {
-  const useSudo = config.cacheUseSudo;
   try {
-    return await execFileAsync(useSudo ? 'sudo' : bin, useSudo ? [bin, ...args] : args, {
+    return await execFileAsync(bin, args, {
       timeout: timeoutMs,
       maxBuffer: 4 * 1024 * 1024,
     });

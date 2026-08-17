@@ -1,15 +1,27 @@
 import { execFile } from 'node:child_process';
-import { readdir, stat, unlink } from 'node:fs/promises';
+import { copyFile, cp, mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { ShareService } from '../shares/index.js';
-import { runSudoMaybe } from '../system/procUtil.js';
 import { isMountPoint, resolveExisting, resolveForCreate } from './paths.js';
 import type { BrowseCommandResult, BrowseEntry, BrowseListing } from './types.js';
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * New content this backend's own root process creates directly (as opposed to a Docker container,
+ * Samba, or NFS client writing through their own uid) would otherwise land owned root:root -
+ * shares/applier/realApplier.ts's provisionArrayDir() only covers a share/pool directory itself,
+ * not files created later inside it. group is already correct for free via the setgid bit
+ * provisionArrayDir() sets (Linux propagates it to every new subdirectory automatically), so this
+ * only needs to fix the owner.
+ */
+async function chownArrayOwner(absPath: string, recursive = false): Promise<void> {
+  const args = recursive ? ['-R', config.arrayDataOwner, absPath] : [config.arrayDataOwner, absPath];
+  await execFileAsync('chown', args);
+}
 
 /** Browses the whole /mnt tree (config.browseRoot), not a single share - see
  * paths.ts for the traversal-ceiling enforcement every method here relies on. */
@@ -81,9 +93,8 @@ export class BrowseService {
     const exists = await stat(absPath).then(() => true).catch(() => false);
     if (exists) throw new HttpError(409, `"${name}" already exists.`);
 
-    // Array disks, cache, and /mnt itself are root:root - same sudo escalation every other
-    // privileged path in this app already gets (see shares/service.ts).
-    await runSudoMaybe('mkdir', [absPath], config.browseUseSudo);
+    await mkdir(absPath);
+    await chownArrayOwner(absPath);
     return { ok: true, message: `Created folder "${name}"` };
   }
 
@@ -101,7 +112,7 @@ export class BrowseService {
     const destExists = await stat(destAbs).then(() => true).catch(() => false);
     if (destExists) throw new HttpError(409, `"${newName}" already exists.`);
 
-    await runSudoMaybe('mv', [absPath, destAbs], config.browseUseSudo);
+    await rename(absPath, destAbs);
     return { ok: true, message: `Renamed to "${newName}"` };
   }
 
@@ -122,14 +133,15 @@ export class BrowseService {
     if (destExists) throw new HttpError(409, `"${name}" already exists at the destination.`);
 
     try {
-      await runSudoMaybe('mv', [absPath, destAbs], config.browseUseSudo);
+      await rename(absPath, destAbs);
     } catch {
       // Cross-device rename normally fails with EXDEV, but FUSE-backed mounts like mergerfs
       // return ENOTCONN instead when source and destination land on different physical
       // branches - same reason saveUpload() below falls back to copy+remove. cp's recursive
       // option handles both files and directories in one call.
-      await runSudoMaybe('cp', ['-r', absPath, destAbs], config.browseUseSudo);
-      await runSudoMaybe('rm', ['-rf', absPath], config.browseUseSudo);
+      await cp(absPath, destAbs, { recursive: true });
+      await chownArrayOwner(destAbs, true);
+      await rm(absPath, { recursive: true });
     }
     return { ok: true, message: `Moved "${name}"` };
   }
@@ -147,7 +159,8 @@ export class BrowseService {
     const destExists = await stat(destAbs).then(() => true).catch(() => false);
     if (destExists) throw new HttpError(409, `"${name}" already exists at the destination.`);
 
-    await runSudoMaybe('cp', ['-r', absPath, destAbs], config.browseUseSudo);
+    await cp(absPath, destAbs, { recursive: true });
+    await chownArrayOwner(destAbs, true);
     return { ok: true, message: `Copied "${name}"` };
   }
 
@@ -166,7 +179,7 @@ export class BrowseService {
     if (await isMountPoint(absPath)) {
       throw new HttpError(400, `"${path.basename(absPath)}" is a mount point (e.g. an array disk) - it can't be deleted from here.`);
     }
-    await runSudoMaybe('rm', ['-rf', absPath], config.browseUseSudo);
+    await rm(absPath, { recursive: true });
     return { ok: true, message: `Deleted "${path.basename(absPath)}"` };
   }
 
@@ -181,15 +194,16 @@ export class BrowseService {
       if (exists) throw new HttpError(409, `"${safeName}" already exists.`);
 
       try {
-        await runSudoMaybe('mv', [tempPath, absPath], config.browseUseSudo);
+        await rename(tempPath, absPath);
       } catch {
         // Cross-device rename normally fails with EXDEV, but FUSE-backed mounts like
         // mergerfs return ENOTCONN instead when the source (our OS temp dir) lives
         // outside the union - so fall back to copy+unlink on any rename failure here;
-        // a genuine destination problem (permissions, no space) will surface from the copy.
-        await runSudoMaybe('cp', [tempPath, absPath], config.browseUseSudo);
+        // a genuine destination problem (permissions, no space) will surface from copyFile.
+        await copyFile(tempPath, absPath);
         await unlink(tempPath).catch(() => {});
       }
+      await chownArrayOwner(absPath);
       return { ok: true, message: `Uploaded "${safeName}"` };
     } catch (err) {
       await unlink(tempPath).catch(() => {});

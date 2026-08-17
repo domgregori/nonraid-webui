@@ -19,8 +19,8 @@ function describeExit(code: number | null, signal: NodeJS.Signals | null): strin
  * filesystem-consistent snapshot; the caller (route) is responsible for surfacing that caveat to
  * the user before triggering this.
  */
-export function streamBootDiskImage(device: string, useSudo: boolean, res: Response, activity: ActivityStore): void {
-  const child = spawnMaybeSudo('dd', [`if=${device}`, 'bs=4M', 'status=none'], useSudo);
+export function streamBootDiskImage(device: string, res: Response, activity: ActivityStore): void {
+  const child = spawnMaybeSudo('dd', [`if=${device}`, 'bs=4M', 'status=none']);
   const filename = `boot-disk-${path.basename(device)}-${Date.now()}.img.gz`;
   let headersSent = false;
   let bytes = 0;
@@ -82,8 +82,8 @@ export function streamBootDiskImage(device: string, useSudo: boolean, res: Respo
  * straight to the response. `--ignore-failed-read` tolerates a path disappearing or losing
  * permission between the caller's existence check and tar actually reading it.
  */
-export function streamConfigBackup(paths: string[], useSudo: boolean, res: Response, activity: ActivityStore): void {
-  const child = spawnMaybeSudo('tar', ['--ignore-failed-read', '-czf', '-', ...paths], useSudo);
+export function streamConfigBackup(paths: string[], res: Response, activity: ActivityStore): void {
+  const child = spawnMaybeSudo('tar', ['--ignore-failed-read', '-czf', '-', ...paths]);
   const filename = `nonraid-config-backup-${Date.now()}.tar.gz`;
   let headersSent = false;
   let stderrTail = '';
@@ -135,9 +135,9 @@ export { resolveConfigBackupPaths } from './backupCatalog.js';
  * disk instead of an HTTP response, for BackupScheduler's unattended runs. Resolves with the byte
  * count written, rejects with a message built the same way streamConfigBackup's error paths are.
  */
-export function writeConfigBackupToFile(paths: string[], useSudo: boolean, destPath: string): Promise<number> {
+export function writeConfigBackupToFile(paths: string[], destPath: string): Promise<number> {
   return new Promise((resolve, reject) => {
-    const child = spawnMaybeSudo('tar', ['--ignore-failed-read', '-czf', '-', ...paths], useSudo);
+    const child = spawnMaybeSudo('tar', ['--ignore-failed-read', '-czf', '-', ...paths]);
     const out = createWriteStream(destPath);
     let stderrTail = '';
     let bytes = 0;

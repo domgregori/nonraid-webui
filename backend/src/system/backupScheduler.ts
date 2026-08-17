@@ -89,7 +89,7 @@ export class BackupScheduler {
         throw new Error('No config files found to back up.');
       }
       const destPath = path.join(schedule.destDir, `${BACKUP_PREFIX}${Date.now()}${BACKUP_SUFFIX}`);
-      const bytes = await writeConfigBackupToFile(paths, config.systemUseSudo, destPath);
+      const bytes = await writeConfigBackupToFile(paths, destPath);
       const sizeLabel = bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
       const completedText = `${label} completed (${sizeLabel})`;
       this.activity.log(completedText, 'blue', 'backupCompleted').catch(() => {});

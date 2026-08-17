@@ -1,11 +1,10 @@
 import { execFile } from 'node:child_process';
-import { stat } from 'node:fs/promises';
+import { copyFile, mkdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { AllocationMethod, Share } from '../shares/types.js';
-import { runSudoMaybe } from '../system/procUtil.js';
 import type { FileMoveJobState, FileMovePlanSummary, FileMoveUnfitExample } from './types.js';
 
 const execFileAsync = promisify(execFile);
@@ -98,6 +97,15 @@ async function duBytes(dir: string): Promise<number> {
   } catch {
     return 0;
   }
+}
+
+/** Same reasoning as browse/service.ts's chownArrayOwner() - a file this backend's own root
+ *  process writes directly onto an array disk (Empty Disk, the Cache Mover) would otherwise land
+ *  owned root:root; group is already correct for free via the setgid bit
+ *  shares/applier/realApplier.ts's provisionArrayDir() sets on every share directory. */
+async function chownArrayOwner(absPath: string, recursive = false): Promise<void> {
+  const args = recursive ? ['-R', config.arrayDataOwner, absPath] : [config.arrayDataOwner, absPath];
+  await execFileAsync('chown', args);
 }
 
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -284,20 +292,23 @@ export class FileMoveService {
         const destMount = destMounts.get(item.destSlot);
         if (!destMount) throw new Error(`Destination disk (slot ${item.destSlot}) is no longer mounted.`);
         const destPath = `${destMount}/${item.share}/${item.relativePath}`;
-        // Array disks and the cache pool are root:root - same sudo escalation every other
-        // privileged path in this app already gets (see shares/service.ts).
-        await runSudoMaybe('mkdir', ['-p', path.dirname(destPath)], config.fileMoveUseSudo);
+        // mkdir's recursive:true resolves to the first directory it actually had to create (or
+        // undefined if the whole chain already existed) - capturing it lets the chown below cover
+        // exactly the newly created directories, not re-chown an entire share tree per file moved.
+        const createdDir = await mkdir(path.dirname(destPath), { recursive: true });
 
         const destExists = await stat(destPath).then((s) => s.size, () => null);
         if (destExists !== item.sizeBytes) {
-          await runSudoMaybe('cp', [item.absSource, destPath], config.fileMoveUseSudo);
+          await copyFile(item.absSource, destPath);
           const verify = await stat(destPath);
           if (verify.size !== item.sizeBytes) {
             throw new Error(`Size mismatch after copy (source ${item.sizeBytes}, destination ${verify.size}) - leaving source in place.`);
           }
         }
+        await chownArrayOwner(destPath);
+        if (createdDir) await chownArrayOwner(createdDir, true);
         // Copy verified (or a prior partial run already got here) - now safe to remove the source.
-        await runSudoMaybe('rm', ['-f', item.absSource], config.fileMoveUseSudo);
+        await unlink(item.absSource);
 
         this.job = {
           ...this.job,

@@ -19,11 +19,7 @@ function parseDateLine(line: string): Date {
 }
 
 export async function parseCertInfo(certPath: string): Promise<CertInfo> {
-  const { stdout } = await runSudoMaybe(
-    config.opensslBin,
-    ['x509', '-in', certPath, '-noout', '-subject', '-issuer', '-startdate', '-enddate'],
-    config.tlsUseSudo,
-  );
+  const { stdout } = await runSudoMaybe(config.opensslBin, ['x509', '-in', certPath, '-noout', '-subject', '-issuer', '-startdate', '-enddate']);
   const lines = stdout.split('\n').map((l) => l.trim()).filter(Boolean);
   const subjectLine = lines.find((l) => l.startsWith('subject='));
   const issuerLine = lines.find((l) => l.startsWith('issuer='));
@@ -38,7 +34,7 @@ export async function parseCertInfo(certPath: string): Promise<CertInfo> {
   // externally-supplied import) shouldn't fail the whole parse.
   let sans: string[] = [];
   try {
-    const { stdout: extOut } = await runSudoMaybe(config.opensslBin, ['x509', '-in', certPath, '-noout', '-ext', 'subjectAltName'], config.tlsUseSudo);
+    const { stdout: extOut } = await runSudoMaybe(config.opensslBin, ['x509', '-in', certPath, '-noout', '-ext', 'subjectAltName']);
     sans = extOut
       .split('\n')
       .map((l) => l.trim())
@@ -72,14 +68,14 @@ export interface KeyMatchResult {
 // rather than an RSA-modulus-only check, so it works for any key algorithm too.
 export async function checkKeyMatchesCert(certPath: string, keyPath: string): Promise<KeyMatchResult> {
   try {
-    await runSudoMaybe(config.opensslBin, ['pkey', '-in', keyPath, '-noout', '-check'], config.tlsUseSudo);
+    await runSudoMaybe(config.opensslBin, ['pkey', '-in', keyPath, '-noout', '-check']);
   } catch {
     return { keyValid: false, keyMatchesCert: false };
   }
 
   const [certPub, keyPub] = await Promise.all([
-    runSudoMaybe(config.opensslBin, ['x509', '-in', certPath, '-noout', '-pubkey'], config.tlsUseSudo),
-    runSudoMaybe(config.opensslBin, ['pkey', '-in', keyPath, '-pubout'], config.tlsUseSudo),
+    runSudoMaybe(config.opensslBin, ['x509', '-in', certPath, '-noout', '-pubkey']),
+    runSudoMaybe(config.opensslBin, ['pkey', '-in', keyPath, '-pubout']),
   ]);
   return { keyValid: true, keyMatchesCert: certPub.stdout.trim() === keyPub.stdout.trim() };
 }

@@ -8,9 +8,8 @@ import type { Group, GroupInput, User, UserCommandResult, UserInput, UserUpdateI
 const execFileAsync = promisify(execFile);
 
 async function run(bin: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
-  const useSudo = config.usersUseSudo;
   try {
-    return await execFileAsync(useSudo ? 'sudo' : bin, useSudo ? [bin, ...args] : args, {
+    return await execFileAsync(bin, args, {
       timeout: config.usersTimeoutMs,
       maxBuffer: 4 * 1024 * 1024,
     });
@@ -25,12 +24,8 @@ async function run(bin: string, args: string[]): Promise<{ stdout: string; stder
  * any other process via `ps`), so chpasswd/smbpasswd take them on stdin instead.
  */
 async function runWithStdin(bin: string, args: string[], stdin: string): Promise<void> {
-  const useSudo = config.usersUseSudo;
-  const spawnBin = useSudo ? 'sudo' : bin;
-  const spawnArgs = useSudo ? [bin, ...args] : args;
-
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(spawnBin, spawnArgs, { timeout: config.usersTimeoutMs });
+    const child = spawn(bin, args, { timeout: config.usersTimeoutMs });
     let stderr = '';
     child.stderr.on('data', (chunk: Buffer) => {
       stderr += chunk.toString();

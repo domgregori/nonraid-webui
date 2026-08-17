@@ -1,17 +1,17 @@
 import { spawn } from 'node:child_process';
 
-/** Same sudo-wrapping shape as RealNmdClient's runSystem() - this process may not itself have
- *  permission to read a raw block device, root-owned config files, or run host-config commands
- *  like hostnamectl/timedatectl, only sudo does. */
-export function spawnMaybeSudo(bin: string, args: string[], useSudo: boolean) {
-  return spawn(useSudo ? 'sudo' : bin, useSudo ? [bin, ...args] : args, { stdio: ['ignore', 'pipe', 'pipe'] });
+/** This process runs as root (see tools/install-webui.sh), so every command it shells out to just
+ *  runs directly - no privilege escalation needed for raw block devices, root-owned config files,
+ *  or host-config commands like hostnamectl/timedatectl. */
+export function spawnMaybeSudo(bin: string, args: string[]) {
+  return spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 /** Runs a command via spawnMaybeSudo and collects its output as a promise - shared by every
  *  caller that needs a real command result rather than a live stream (hostConfig.ts, hdparm.ts). */
-export function runSudoMaybe(bin: string, args: string[], useSudo: boolean): Promise<{ stdout: string; stderr: string }> {
+export function runSudoMaybe(bin: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawnMaybeSudo(bin, args, useSudo);
+    const child = spawnMaybeSudo(bin, args);
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk: Buffer) => {

@@ -61,7 +61,7 @@ export function systemRouter(
       res.status(404).json({ error: 'Boot disk could not be detected on this host.' });
       return;
     }
-    streamBootDiskImage(device, config.systemUseSudo, res, activity);
+    streamBootDiskImage(device, res, activity);
   });
 
   router.get('/system/boot-disk/backup/config', async (_req, res) => {
@@ -71,7 +71,7 @@ export function systemRouter(
       if (existing.length === 0) {
         throw new HttpError(400, 'No NonRAID config files were found to back up.');
       }
-      streamConfigBackup(existing, config.systemUseSudo, res, activity);
+      streamConfigBackup(existing, res, activity);
     } catch (err) {
       if (err instanceof HttpError) {
         res.status(err.status).json({ error: err.message });
@@ -110,7 +110,7 @@ export function systemRouter(
       return;
     }
     try {
-      const members = await listArchiveMembers(file.path, config.systemUseSudo);
+      const members = await listArchiveMembers(file.path);
       if (members.length === 0) throw new HttpError(400, 'Archive is empty or not a valid config backup.');
 
       const superblockPath = await nmd.getSuperblockPath();
@@ -169,7 +169,7 @@ export function systemRouter(
         throw new HttpError(400, 'Stop the array before restoring config.');
       }
 
-      const members = await listArchiveMembers(staged.filePath, config.systemUseSudo);
+      const members = await listArchiveMembers(staged.filePath);
       const superblockPath = await nmd.getSuperblockPath();
       const superblockMember = superblockPath.replace(/^\//, '');
       const arrayIsBlank = await isArrayBlank(nmd);
@@ -194,7 +194,7 @@ export function systemRouter(
       // what was merely requested.
       const restoredCount = toRestore.filter((m) => !m.endsWith('/')).length;
 
-      await restoreArchiveMembers(staged.filePath, toRestore, config.systemUseSudo);
+      await restoreArchiveMembers(staged.filePath, toRestore);
       dropStagedRestore(token);
       await unlink(staged.filePath).catch(() => {});
 
@@ -294,12 +294,12 @@ export function systemRouter(
 
     const smb = await runStep('SMB restart', async () => {
       const def = SERVICE_DEFS.find((d) => d.id === 'smb')!;
-      await restartService(def, config.systemUseSudo);
+      await restartService(def);
       return 'SMB restarted';
     });
     const nfs = await runStep('NFS restart', async () => {
       const def = SERVICE_DEFS.find((d) => d.id === 'nfs')!;
-      await restartService(def, config.systemUseSudo);
+      await restartService(def);
       return 'NFS restarted';
     });
     const driverReload = await runStep('Driver reload', async () => {
@@ -313,7 +313,7 @@ export function systemRouter(
     const docker = req.body?.restartDocker
       ? await runStep('Docker restart', async () => {
           const def = SERVICE_DEFS.find((d) => d.id === 'docker')!;
-          await restartService(def, config.systemUseSudo);
+          await restartService(def);
           return 'Docker restarted';
         })
       : null;
@@ -395,7 +395,7 @@ export function systemRouter(
       return;
     }
     try {
-      await setHostname(name, config.systemUseSudo);
+      await setHostname(name);
       activity.log(`Hostname changed to "${name}"`, 'blue').catch(() => {});
       res.json({ ok: true, message: `Hostname set to "${name}". Some services may need a restart to fully pick it up.` });
     } catch (err) {
@@ -410,7 +410,7 @@ export function systemRouter(
       return;
     }
     try {
-      await setTimezone(tz, config.systemUseSudo);
+      await setTimezone(tz);
       activity.log(`Timezone changed to "${tz}"`, 'blue').catch(() => {});
       res.json({ ok: true, message: `Timezone set to "${tz}".` });
     } catch (err) {
@@ -420,7 +420,7 @@ export function systemRouter(
 
   router.post('/system/reboot', async (_req, res) => {
     try {
-      await rebootHost(config.systemUseSudo);
+      await rebootHost();
       activity.log('System reboot requested', 'amber').catch(() => {});
       res.json({ ok: true, message: 'Rebooting now - this page will reconnect automatically once the host is back up.' });
     } catch (err) {

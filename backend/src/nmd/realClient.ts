@@ -1,4 +1,4 @@
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { promisify } from 'node:util';
@@ -102,9 +102,7 @@ export class RealNmdClient implements NmdClient {
   private nmdArgs(args: string[]): { bin: string; fullArgs: string[] } {
     const baseArgs = ['-u', '--no-color'];
     if (config.nmdSuperblock) baseArgs.push('-s', config.nmdSuperblock);
-    const bin = config.nmdUseSudo ? 'sudo' : config.nmdBin;
-    const fullArgs = config.nmdUseSudo ? [config.nmdBin, ...baseArgs, ...args] : [...baseArgs, ...args];
-    return { bin, fullArgs };
+    return { bin: config.nmdBin, fullArgs: [...baseArgs, ...args] };
   }
 
   private async run(args: string[]): Promise<{ stdout: string; stderr: string }> {
@@ -145,35 +143,13 @@ export class RealNmdClient implements NmdClient {
 
   /** Writes one command to /proc/nmdcmd - the driver interface nmdctl itself uses internally. */
   private async writeNmdCmd(cmd: string): Promise<void> {
-    if (!config.nmdUseSudo) {
-      await writeFile(config.nmdCmdPath, cmd);
-      return;
-    }
-
-    // Async execFile has no `input` option (that's execFileSync-only) - use spawn
-    // and write to stdin directly. `tee` takes the command on stdin, so there's no
-    // shell string here for anything to (mis)interpret.
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn('sudo', ['tee', config.nmdCmdPath], { timeout: config.nmdTimeoutMs });
-      let stderr = '';
-      child.stderr.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString();
-      });
-      child.on('error', reject);
-      child.on('close', (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(stderr.trim() || `Failed to write to ${config.nmdCmdPath} (exit ${code})`));
-      });
-      child.stdin.write(cmd);
-      child.stdin.end();
-    });
+    await writeFile(config.nmdCmdPath, cmd);
   }
 
-  /** For `mv`/`modprobe` - not nmdctl itself, but same sudo convention as everything else here. */
+  /** For `mv`/`modprobe` - not nmdctl itself. */
   private async runSystem(bin: string, args: string[], timeoutMs = 30_000): Promise<{ stdout: string; stderr: string }> {
-    const useSudo = config.nmdUseSudo;
     try {
-      return await execFileAsync(useSudo ? 'sudo' : bin, useSudo ? [bin, ...args] : args, { timeout: timeoutMs });
+      return await execFileAsync(bin, args, { timeout: timeoutMs });
     } catch (err) {
       const e = err as { stdout?: string; stderr?: string; message: string };
       throw new Error(e.stderr?.trim() || e.stdout?.trim() || e.message);
@@ -272,9 +248,6 @@ export class RealNmdClient implements NmdClient {
     // rmdir also refuses on an active mount point) is left alone rather
     // than risking deleting something real.
     for (const slot of dropSlots) {
-      // /mnt/diskN is root:root, same sudo escalation as every other filesystem touch in this
-      // class - a raw fs/promises rmdir here bypassed nmdUseSudo entirely and silently no-op'd
-      // via the .catch() below on every real deployment, leaving these orphaned forever.
       await this.runSystem('rmdir', [`/mnt/disk${slot}`]).catch(() => {});
     }
 
@@ -359,9 +332,7 @@ export class RealNmdClient implements NmdClient {
    * same as shrinkArray()) and that the disk matching is a fresh `import`
    * (nmdctl's own scan) rather than re-importing previously-known
    * identities. All filesystem touches go through runSystem (not plain
-   * Node fs) for the same reason every other privileged operation here
-   * does: this process may not itself have permission on the real
-   * superblock path, only sudo does (see nmdUseSudo).
+   * Node fs) for consistency with every other privileged operation here.
    *
    * The caller (routes/array.ts) is responsible for the same unmount-before
    * composition reloadDriver()'s callers use.
@@ -1066,8 +1037,6 @@ export class RealNmdClient implements NmdClient {
 
     const partition = `/dev/nmd${slot}p1`;
     const mkfsArgs = force ? ['-f', partition] : [partition];
-    const bin = config.nmdUseSudo ? 'sudo' : 'mkfs.xfs';
-    const args = config.nmdUseSudo ? ['mkfs.xfs', ...mkfsArgs] : mkfsArgs;
     try {
       // Without force, no -f is passed: mkfs.xfs refuses on its own if the partition already
       // carries a recognized filesystem/RAID signature - a real safety backstop, not just this
@@ -1075,7 +1044,7 @@ export class RealNmdClient implements NmdClient {
       // disk carrying data from outside this array (e.g. reused from another system) that the
       // caller has already confirmed - via the frontend's own two-step confirmation dialog - is
       // safe to destroy.
-      const { stdout } = await execFileAsync(bin, args, { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 });
+      const { stdout } = await execFileAsync('mkfs.xfs', mkfsArgs, { timeout: 60_000, maxBuffer: 4 * 1024 * 1024 });
       await this.run(['mount']);
       return { ok: true, message: stdout.trim() || `Formatted ${partition} as XFS and mounted it.` };
     } catch (err) {

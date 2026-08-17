@@ -1,7 +1,5 @@
 import { execFile } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../../config.js';
 import { HttpError } from '../../httpError.js';
@@ -39,9 +37,8 @@ function userMountPath(name: string): string {
 }
 
 async function run(bin: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
-  const useSudo = config.sharesUseSudo;
   try {
-    return await execFileAsync(useSudo ? 'sudo' : bin, useSudo ? [bin, ...args] : args, {
+    return await execFileAsync(bin, args, {
       timeout: 15_000,
       maxBuffer: 4 * 1024 * 1024,
     });
@@ -49,6 +46,30 @@ async function run(bin: string, args: string[]): Promise<{ stdout: string; stder
     const e = err as { stdout?: string; stderr?: string; message: string };
     throw new Error(e.stderr?.trim() || e.stdout?.trim() || e.message);
   }
+}
+
+/**
+ * Creates `dirPath` if missing and makes it (and everything created under it afterward - by this
+ * app, Samba, NFS, or a Docker container bind-mounting it) owned by config.arrayDataOwner/Group -
+ * the classic Unraid/linuxserver.io nobody:users (99:100) convention most Community-Apps
+ * containers already default their own PUID/PGID to. The default ACL (`-d`) is what makes this
+ * apply to *new* content going forward too, not just this one directory: POSIX default ACLs are
+ * inherited by every file/subdirectory created under it afterward, regardless of which uid
+ * actually creates them - so Browse's own mkdir/upload, a Samba write, or a bind-mounted
+ * container's write all land with the same access without this app needing to chown after every
+ * individual create call.
+ */
+async function provisionArrayDir(dirPath: string): Promise<void> {
+  await run('mkdir', ['-p', dirPath]);
+  await run('chown', [`${config.arrayDataOwner}:${config.arrayDataGroup}`, dirPath]);
+  // Setgid on every directory in the tree (not just dirPath itself) - Linux propagates it to every
+  // new subdirectory created afterward, so group=users is correct forever with no per-call-site
+  // code, even for content this backend's own root process creates directly (browse/service.ts,
+  // fileMove/service.ts). Only directories, not files - `find -type d` avoids setting the same bit
+  // on a regular file, where it means something unrelated (mandatory locking).
+  await run('find', [dirPath, '-type', 'd', '-exec', 'chmod', 'g+s', '{}', '+']);
+  const acl = `u:${config.arrayDataOwner}:rwx,g:${config.arrayDataGroup}:rwx`;
+  await run('setfacl', ['-R', '-m', acl, '-d', '-m', acl, dirPath]);
 }
 
 async function isMounted(mountPoint: string): Promise<boolean> {
@@ -124,16 +145,9 @@ async function replaceManagedBlock(filePath: string, replacementLines: string[])
       ? `${content.trimEnd()}\n\n${replacement}\n`
       : content.slice(0, beginIdx) + replacement + content.slice(endIdx + MANAGED_END.length);
 
-  // filePath (smb.conf/exports) is root-owned - same sudo escalation every other privileged
-  // operation in this file already gets via run(). The backup is a privileged copy of whatever's
-  // there *before* the rewrite (best-effort, never touch anything outside the markers either way);
-  // the new content is written to an unprivileged temp file and moved into place with sudo,
-  // mirroring docker/storagePath.ts's identical daemon.json-rewrite pattern - a plain overwrite
-  // would need sudo tee/dd wired up for stdin, which run()'s plain execFile wrapper doesn't support.
-  await run('cp', [filePath, `${filePath}.bak`]).catch(() => {});
-  const tmpPath = path.join(os.tmpdir(), `nonraid-webui-${path.basename(filePath)}-${process.pid}`);
-  await writeFile(tmpPath, next, 'utf8');
-  await run('mv', [tmpPath, filePath]);
+  // best-effort backup before every rewrite - never touch anything outside the markers either way
+  await writeFile(`${filePath}.bak`, content, 'utf8').catch(() => {});
+  await writeFile(filePath, next, 'utf8');
 }
 
 /**
@@ -182,13 +196,8 @@ export class RealShareApplier implements ShareApplier {
       throw new HttpError(409, `No mounted disks available for share "${share.name}" - ${reason}.`);
     }
 
-    // Array disks (and /mnt itself) are root:root - creating a new share directory under one
-    // needs the same sudo escalation every other privileged operation in this file already gets
-    // via run(), not fs/promises' own unprivileged mkdir. Confirmed live: this was throwing EACCES
-    // on every multi-disk array (nonraid ALL=(root) NOPASSWD: /usr/bin/mkdir was already
-    // provisioned in the sudoers file for exactly this, just never actually used).
     for (const branch of branches) {
-      await run('mkdir', ['-p', branch]);
+      await provisionArrayDir(branch);
     }
 
     const mountPoint = userMountPath(share.name);
@@ -312,17 +321,20 @@ export class RealShareApplier implements ShareApplier {
       // carves out per-user read-only *exceptions* to that default instead.
       lines.push(`   writable = yes`);
       lines.push(`   guest ok = ${isPublic ? 'yes' : 'no'}`);
-      // Share directories are created root:root at mkdir time (see mountShare()) and
-      // never chmod'd open - access control is meant to live entirely in this Samba
-      // block (valid/invalid/read list above), not in Unix permission bits. Without
-      // this, every non-root grantee (every managed user - none of them are actually
-      // root) hits a real POSIX permission wall on write regardless of what read-write
-      // Samba grants them: confirmed live, a user granted read-write could authenticate
-      // and list a share but got NT_STATUS_ACCESS_DENIED on any actual write. `force
-      // user` makes smbd perform the real filesystem operation as root for every
-      // connection on this share, so Samba's own ACL logic above is the sole authority,
-      // matching what the `writable = yes` comment already assumed was true.
-      lines.push(`   force user = root`);
+      // Share directories are owned config.arrayDataOwner:Group (see mountShare()'s
+      // provisionArrayDir()) with a default ACL granting that owner/group rwx - access control is
+      // meant to live entirely in this Samba block (valid/invalid/read list above), not in Unix
+      // permission bits. Without a `force user`, every non-root grantee (every managed user - none
+      // of them are actually root, or arrayDataOwner) hits a real POSIX permission wall on write
+      // regardless of what read-write Samba grants them: confirmed live, a user granted read-write
+      // could authenticate and list a share but got NT_STATUS_ACCESS_DENIED on any actual write.
+      // `force user`/`force group` make smbd perform the real filesystem operation as
+      // arrayDataOwner:Group for every connection on this share (matching what Docker CA-app
+      // containers using PUID=99/PGID=100 already write as, so SMB and container writes land with
+      // the same ownership), so Samba's own ACL logic above is the sole *access* authority, while
+      // the filesystem owner/group stays consistent for anything else touching this data.
+      lines.push(`   force user = ${config.arrayDataOwner}`);
+      lines.push(`   force group = ${config.arrayDataGroup}`);
 
       const validUsers = [...writeUsers, ...readOnlyUsers];
       // Non-public shares require real accounts, so only they get `valid users` - for
@@ -376,15 +388,15 @@ export class RealShareApplier implements ShareApplier {
       // explicit fsid - see isFuseMount()'s comment.
       const fsidOpt = (await isFuseMount(userMountPath(s.name))) ? `,fsid=${stableFsid(s.name)}` : '';
       // NFS access control here is host-based only (allowedHosts) - there's no per-user identity
-      // at all, unlike SMB. Share directories are root:root (see the `force user` comment in
-      // writeSmbBlock() above for why), so without this every connecting uid, root included via
-      // the server's own default root_squash, gets a real POSIX permission denied on write -
-      // confirmed live on both a mergerfs and a plain bind-mounted share. `all_squash` makes every
-      // connecting uid (not just root) map to `anonuid`/`anongid`, so being on the allowed host
-      // list is what actually grants access, matching the same "this app's own ACL is the sole
-      // authority" model the SMB fix already established - not a wider hole than that, since a
-      // host allowed onto the mount at all was already being trusted with the whole share.
-      const squashOpt = ',all_squash,anonuid=0,anongid=0';
+      // at all, unlike SMB. Share directories are owned config.arrayDataOwner:Group (see
+      // mountShare()'s provisionArrayDir()), so `all_squash` maps every connecting uid (not just
+      // root, which the server's own default root_squash already handles) to `anonuid`/`anongid`
+      // set to that same owner/group - matching what SMB's `force user`/`force group` already
+      // write as, and what Docker CA-app containers using PUID=99/PGID=100 already write as, so
+      // NFS/SMB/container writes all land with the same ownership. Being on the allowed host list
+      // is what actually grants access here, not a wider hole than that, since a host allowed onto
+      // the mount at all was already being trusted with the whole share.
+      const squashOpt = `,all_squash,anonuid=${config.arrayDataUid},anongid=${config.arrayDataGid}`;
       const opts = (s.nfs?.readOnly ? 'ro,sync,no_subtree_check' : 'rw,sync,no_subtree_check') + fsidOpt + squashOpt;
       for (const host of hosts) {
         lines.push(`${userMountPath(s.name)} ${host}(${opts})`);

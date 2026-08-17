@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
-import { config } from '../config.js';
 import { getServiceState, restartService, SERVICE_DEFS, startService, stopService, type ServiceState } from '../system/services.js';
 
 export function servicesRouter(activity: ActivityStore): Router {
@@ -9,7 +8,7 @@ export function servicesRouter(activity: ActivityStore): Router {
   router.get('/services', async (_req, res) => {
     try {
       const rows: Array<{ id: string; label: string; state: ServiceState }> = await Promise.all(
-        SERVICE_DEFS.map(async (def) => ({ id: def.id, label: def.label, state: await getServiceState(def, config.systemUseSudo) })),
+        SERVICE_DEFS.map(async (def) => ({ id: def.id, label: def.label, state: await getServiceState(def) })),
       );
       // Synthesized row: if this endpoint answered, the backend serving it is up.
       rows.push({ id: 'webui', label: 'nonraid-webui (this app)', state: 'active' });
@@ -26,7 +25,7 @@ export function servicesRouter(activity: ActivityStore): Router {
       return;
     }
     try {
-      await startService(def, config.systemUseSudo);
+      await startService(def);
       activity.log(`${def.label} started`, 'blue').catch(() => {});
       res.json({ ok: true, message: `${def.label} started.` });
     } catch (err) {
@@ -41,7 +40,7 @@ export function servicesRouter(activity: ActivityStore): Router {
       return;
     }
     try {
-      await stopService(def, config.systemUseSudo);
+      await stopService(def);
       activity.log(`${def.label} stopped`, 'amber').catch(() => {});
       res.json({ ok: true, message: `${def.label} stopped.` });
     } catch (err) {
@@ -70,7 +69,7 @@ export function servicesRouter(activity: ActivityStore): Router {
       return;
     }
     try {
-      await restartService(def, config.systemUseSudo);
+      await restartService(def);
       activity.log(`${def.label} restarted`, 'amber').catch(() => {});
       res.json({ ok: true, message: `${def.label} restarted.` });
     } catch (err) {

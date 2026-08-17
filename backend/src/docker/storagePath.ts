@@ -139,12 +139,12 @@ export async function migrateDockerStorage(
     }
 
     onProgress({ phase: 'stopping', message: 'Stopping the Docker service…' });
-    await runSudoMaybe('systemctl', ['stop', 'docker.socket', 'docker.service'], config.systemUseSudo);
+    await runSudoMaybe('systemctl', ['stop', 'docker.socket', 'docker.service']);
 
     onProgress({ phase: 'copying', message: `Copying data to ${targetPath}…` });
-    await runSudoMaybe('mkdir', ['-p', targetPath], config.systemUseSudo);
+    await runSudoMaybe('mkdir', ['-p', targetPath]);
     if (await pathExists(currentPath)) {
-      await runSudoMaybe('rsync', ['-a', `${currentPath}/`, `${targetPath}/`], config.systemUseSudo);
+      await runSudoMaybe('rsync', ['-a', `${currentPath}/`, `${targetPath}/`]);
     }
 
     onProgress({ phase: 'reconfiguring', message: 'Updating Docker configuration…' });
@@ -158,11 +158,11 @@ export async function migrateDockerStorage(
     daemonConfig['data-root'] = targetPath;
     const tmpPath = path.join(os.tmpdir(), `nonraid-daemon-${process.pid}.json`);
     await writeFile(tmpPath, JSON.stringify(daemonConfig, null, 2), 'utf8');
-    await runSudoMaybe('mkdir', ['-p', path.dirname(DAEMON_JSON_PATH)], config.systemUseSudo);
-    await runSudoMaybe('mv', [tmpPath, DAEMON_JSON_PATH], config.systemUseSudo);
+    await runSudoMaybe('mkdir', ['-p', path.dirname(DAEMON_JSON_PATH)]);
+    await runSudoMaybe('mv', [tmpPath, DAEMON_JSON_PATH]);
 
     onProgress({ phase: 'starting', message: 'Starting the Docker service…' });
-    await runSudoMaybe('systemctl', ['start', 'docker'], config.systemUseSudo);
+    await runSudoMaybe('systemctl', ['start', 'docker']);
 
     onProgress({ phase: 'verifying', message: 'Waiting for Docker to come back up…' });
     let verified = false;

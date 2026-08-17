@@ -80,7 +80,7 @@ export interface LogQueryOptions {
   sinceCursor?: number;
 }
 
-export async function queryLog(source: LogSourceDef, opts: LogQueryOptions, useSudo: boolean): Promise<{ logs: string; nextSince: number | null }> {
+export async function queryLog(source: LogSourceDef, opts: LogQueryOptions): Promise<{ logs: string; nextSince: number | null }> {
   const args = ['--no-pager', '-q', '-o', 'short-iso', ...source.args];
   if (opts.sinceCursor !== undefined) {
     args.push('--since', `@${Math.floor(opts.sinceCursor / 1000)}`);
@@ -89,7 +89,7 @@ export async function queryLog(source: LogSourceDef, opts: LogQueryOptions, useS
     args.push('-n', String(clampTail(opts.tail)));
   }
 
-  const { stdout } = await runSudoMaybe('journalctl', args, useSudo);
+  const { stdout } = await runSudoMaybe('journalctl', args);
   const text = stdout.replace(/\n$/, '');
   return { logs: text, nextSince: nextSinceFromLogText(text, opts.sinceCursor ?? null) };
 }

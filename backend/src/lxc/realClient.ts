@@ -69,10 +69,8 @@ export class RealLxcClient implements LxcClient {
   private stats = new LxcStatsPoller();
 
   private async run(bin: string, args: string[], timeoutMs = config.lxcTimeoutMs): Promise<{ stdout: string; stderr: string }> {
-    const cmd = config.lxcUseSudo ? 'sudo' : bin;
-    const fullArgs = config.lxcUseSudo ? [bin, ...args] : args;
     try {
-      return await execFileAsync(cmd, fullArgs, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 });
+      return await execFileAsync(bin, args, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 });
     } catch (err) {
       // Node's raw spawn failure (e.g. "spawn lxc-ls ENOENT") is accurate but
       // not exactly self-explanatory on a dashboard - the actual missing
@@ -421,9 +419,7 @@ export class RealLxcClient implements LxcClient {
    */
   private runCreateTemplate(args: string[], onProgress?: CreateLxcProgressCallback): Promise<void> {
     return new Promise((resolve, reject) => {
-      const bin = config.lxcUseSudo ? 'sudo' : 'lxc-create';
-      const fullArgs = config.lxcUseSudo ? ['lxc-create', ...args] : args;
-      const child = spawn(bin, fullArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = spawn('lxc-create', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
       const watchdog = setTimeout(() => {
         child.kill('SIGKILL');

@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { config } from '../config.js';
 import { LOG_SOURCE_DEFS, queryLog, windowMsFor } from '../system/logs.js';
 
 export function logsRouter(): Router {
@@ -25,7 +24,7 @@ export function logsRouter(): Router {
     const windowId = typeof req.query.window === 'string' ? req.query.window : undefined;
 
     try {
-      const result = await queryLog(source, { tail, windowMs: since === undefined ? windowMsFor(windowId) : null, sinceCursor: since }, config.systemUseSudo);
+      const result = await queryLog(source, { tail, windowMs: since === undefined ? windowMsFor(windowId) : null, sinceCursor: since });
       res.json(result);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });

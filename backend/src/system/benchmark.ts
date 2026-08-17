@@ -1,9 +1,6 @@
 import { spawn } from 'node:child_process';
-import { open } from 'node:fs/promises';
-import os from 'node:os';
+import { open, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { config } from '../config.js';
-import { runSudoMaybe } from './procUtil.js';
 
 export interface BenchmarkSample {
   elapsedSeconds: number;
@@ -176,12 +173,6 @@ export async function benchmarkRead(device: string, durationMs: number): Promise
  * that whole backlog in one call - blowing straight through the duration cap and collapsing what
  * should have been ~16 samples into 1. Syncing every chunk means every loop iteration takes real,
  * bounded device time, so the elapsed-time check actually holds and sampling stays meaningful.
- * Plain fs, not a subprocess, for the write loop itself - but the target disk's mountpoint is
- * root:root like every other array-disk/cache path in this app, so this process (which runs as
- * an unprivileged service user, not root - see tools/install-webui.sh's User= drop-in) can't
- * open() it directly. A privileged touch+chown makes the file writable by this process's own
- * user first (same reasoning as every other *UseSudo flag), so the sampling loop below still
- * runs as plain, fast, unprivileged fs calls - only the one-time setup and final cleanup shell out.
  */
 export async function benchmarkWrite(mountpoint: string, durationMs: number): Promise<BenchmarkResult> {
   return withLock(async () => {
@@ -194,8 +185,6 @@ export async function benchmarkWrite(mountpoint: string, durationMs: number): Pr
     let totalBytes = 0;
     let handle;
     try {
-      await runSudoMaybe('touch', [target], config.systemUseSudo);
-      await runSudoMaybe('chown', [os.userInfo().username, target], config.systemUseSudo);
       handle = await open(target, 'w');
       while (Date.now() - start < durationMs && totalBytes < MAX_MB * 1024 * 1024) {
         await handle.write(chunk);
@@ -214,7 +203,7 @@ export async function benchmarkWrite(mountpoint: string, durationMs: number): Pr
       }
     } finally {
       await handle?.close();
-      await runSudoMaybe('rm', ['-f', target], config.systemUseSudo).catch(() => {});
+      await unlink(target).catch(() => {});
     }
     const elapsedSeconds = (Date.now() - start) / 1000;
     const sizeMb = totalBytes / 1024 / 1024;

@@ -123,9 +123,9 @@ export async function migrateLxcStorage(
     }
 
     onProgress({ phase: 'copying', message: `Copying data to ${targetPath}…` });
-    await runSudoMaybe('mkdir', ['-p', targetPath], config.lxcUseSudo);
+    await runSudoMaybe('mkdir', ['-p', targetPath]);
     if (await pathExists(currentPath)) {
-      await runSudoMaybe('rsync', ['-a', `${currentPath}/`, `${targetPath}/`], config.lxcUseSudo);
+      await runSudoMaybe('rsync', ['-a', `${currentPath}/`, `${targetPath}/`]);
     }
 
     onProgress({ phase: 'switching', message: 'Switching to the new location…' });

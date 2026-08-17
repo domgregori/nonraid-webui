@@ -242,11 +242,9 @@ export class RealSmartClient implements SmartClient {
   private async run(device: string): Promise<{ data: SmartctlJson; spinState: SmartSpinState }> {
     // -n standby: don't spin up a sleeping disk just to check its temperature.
     const args = ['-n', 'standby', '--json', '-a', devicePath(device)];
-    const bin = config.smartUseSudo ? 'sudo' : config.smartctlBin;
-    const fullArgs = config.smartUseSudo ? [config.smartctlBin, ...args] : args;
 
     try {
-      const { stdout } = await execFileAsync(bin, fullArgs, { timeout: config.smartTimeoutMs, maxBuffer: 4 * 1024 * 1024 });
+      const { stdout } = await execFileAsync(config.smartctlBin, args, { timeout: config.smartTimeoutMs, maxBuffer: 4 * 1024 * 1024 });
       return { data: JSON.parse(stdout) as SmartctlJson, spinState: 'active' };
     } catch (err) {
       // smartctl's exit code is a bitmask of conditions (device asleep, SMART
@@ -338,11 +336,9 @@ export class RealSmartClient implements SmartClient {
 
   async startSelfTest(device: string, type: SelfTestType): Promise<void> {
     const args = ['-t', type, devicePath(device)];
-    const bin = config.smartUseSudo ? 'sudo' : config.smartctlBin;
-    const fullArgs = config.smartUseSudo ? [config.smartctlBin, ...args] : args;
     try {
       // smartctl returns immediately once the drive's controller has accepted the test - see types.ts's doc comment.
-      await execFileAsync(bin, fullArgs, { timeout: config.smartTimeoutMs, maxBuffer: 4 * 1024 * 1024 });
+      await execFileAsync(config.smartctlBin, args, { timeout: config.smartTimeoutMs, maxBuffer: 4 * 1024 * 1024 });
     } catch (err) {
       // Same bitmask-exit-code caveat as run() above: smartctl -t can exit
       // nonzero (e.g. "previous self-test still in progress") while still

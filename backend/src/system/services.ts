@@ -42,9 +42,9 @@ export const SERVICE_DEFS: ServiceDef[] = [
  * here, not a real failure - so this collects stdout itself instead of using runSudoMaybe (which
  * would discard stdout and reject on that exit code).
  */
-function isActive(units: string[], useSudo: boolean): Promise<string[]> {
+function isActive(units: string[]): Promise<string[]> {
   return new Promise((resolve, reject) => {
-    const child = spawnMaybeSudo('systemctl', ['is-active', ...units], useSudo);
+    const child = spawnMaybeSudo('systemctl', ['is-active', ...units]);
     let stdout = '';
     child.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString('utf8');
@@ -54,26 +54,26 @@ function isActive(units: string[], useSudo: boolean): Promise<string[]> {
   });
 }
 
-export async function getServiceState(def: ServiceDef, useSudo: boolean): Promise<ServiceState> {
-  const lines = await isActive(def.statusUnits, useSudo);
+export async function getServiceState(def: ServiceDef): Promise<ServiceState> {
+  const lines = await isActive(def.statusUnits);
   if (lines.length > 0 && lines.every((l) => l === 'active')) return 'active';
   if (lines.some((l) => l === 'failed')) return 'failed';
   if (lines.length > 0 && lines.every((l) => l === 'inactive')) return 'inactive';
   return 'mixed';
 }
 
-export function startService(def: ServiceDef, useSudo: boolean): Promise<{ stdout: string; stderr: string }> {
-  return runSudoMaybe('systemctl', ['start', ...def.startArgs], useSudo);
+export function startService(def: ServiceDef): Promise<{ stdout: string; stderr: string }> {
+  return runSudoMaybe('systemctl', ['start', ...def.startArgs]);
 }
 
-export function stopService(def: ServiceDef, useSudo: boolean): Promise<{ stdout: string; stderr: string }> {
-  return runSudoMaybe('systemctl', ['stop', ...def.stopArgs], useSudo);
+export function stopService(def: ServiceDef): Promise<{ stdout: string; stderr: string }> {
+  return runSudoMaybe('systemctl', ['stop', ...def.stopArgs]);
 }
 
 // Sequential stop-then-start, reusing the same argv shapes as startService/stopService, rather
 // than trusting `systemctl restart <multiple units>` ordering semantics for multi-unit groups
 // like smb.
-export async function restartService(def: ServiceDef, useSudo: boolean): Promise<void> {
-  await stopService(def, useSudo);
-  await startService(def, useSudo);
+export async function restartService(def: ServiceDef): Promise<void> {
+  await stopService(def);
+  await startService(def);
 }

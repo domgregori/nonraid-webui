@@ -40,8 +40,8 @@ export function dropStagedRestore(token: string): void {
  *  on newlines. GNU tar strips the leading "/" from absolute paths when creating an archive (see
  *  streamConfigBackup/writeConfigBackupToFile, which archive absolute paths directly), so members
  *  come back relative to "/" - re-prepend it before comparing against a real absolute path. */
-export async function listArchiveMembers(filePath: string, useSudo: boolean): Promise<string[]> {
-  const { stdout } = await runSudoMaybe('tar', ['-tzf', filePath], useSudo);
+export async function listArchiveMembers(filePath: string): Promise<string[]> {
+  const { stdout } = await runSudoMaybe('tar', ['-tzf', filePath]);
   return stdout
     .split('\n')
     .map((line) => line.trim())
@@ -75,8 +75,8 @@ export async function isArrayBlank(nmd: NmdClient): Promise<boolean> {
  * its parent directories anyway, so a bare directory entry never carried anything the file
  * extractions wouldn't already produce.
  */
-export async function restoreArchiveMembers(filePath: string, members: string[], useSudo: boolean): Promise<void> {
+export async function restoreArchiveMembers(filePath: string, members: string[]): Promise<void> {
   const fileMembers = members.filter((m) => !m.endsWith('/'));
   if (fileMembers.length === 0) return;
-  await runSudoMaybe('tar', ['-xzf', filePath, '-C', '/', ...fileMembers], useSudo);
+  await runSudoMaybe('tar', ['-xzf', filePath, '-C', '/', ...fileMembers]);
 }

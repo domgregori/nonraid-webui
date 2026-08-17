@@ -269,14 +269,11 @@ itself failed — nmdctl/Docker/smartctl/mergerfs/Samba/useradd family).
 - `CORS_ORIGIN` (default `http://localhost:5183`, the frontend's Vite dev server)
 - `NMD_BIN` — path/name of the nmdctl binary (default `nmdctl`)
 - `NMD_SUPERBLOCK` — optional, passed as `-s <path>` to every nmdctl call
-- `NMD_USE_SUDO` — `true` if this process doesn't run as root itself and instead needs
-  `sudo nmdctl ...` via a sudoers rule (see below)
 - `NMD_TIMEOUT_MS` — kill nmdctl subprocess after this long (default `15000`)
 - `DOCKER_HOST` / the standard Docker socket env vars — read by `dockerode` itself if you need a
   non-default connection
 - `LXC_DEFAULT_PATH` — container storage root, passed as `-P` to every `lxc-*` call (default
   `/var/lib/lxc`)
-- `LXC_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to the `lxc-*` family
 - `LXC_TIMEOUT_MS` — kill most `lxc-*` subprocesses after this long (default `15000`)
 - `LXC_CREATE_TIMEOUT_MS` — longer timeout for `lxc-create --template download`, which fetches a
   rootfs tarball (default `600000`, 10 minutes)
@@ -285,7 +282,6 @@ itself failed — nmdctl/Docker/smartctl/mergerfs/Samba/useradd family).
   a cold cache (default `30000`)
 - `LXC_STATS_INTERVAL_MS` — background poll interval for the CPU/mem/IP stats worker (default `3000`)
 - `SMARTCTL_BIN` — path/name of the smartctl binary (default `smartctl`)
-- `SMART_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to smartctl
 - `SMART_TIMEOUT_MS` — kill smartctl subprocess after this long (default `10000`)
 - `SMART_CACHE_TTL_MS` — how long a cached temperature is served before a background refresh
   (default `60000`)
@@ -293,49 +289,43 @@ itself failed — nmdctl/Docker/smartctl/mergerfs/Samba/useradd family).
 - `SHARE_MOUNT_ROOT` — pooled mount root (default `/mnt/user`)
 - `SMB_CONF_PATH` / `EXPORTS_PATH` — config files to write the managed block into (defaults
   `/etc/samba/smb.conf` / `/etc/exports`)
-- `SHARES_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to mount/mergerfs/umount
 - `SHARE_ACCESS_CONFIG_PATH` — where `share-access.json` lives (default `backend/data/share-access.json`)
 - `BROWSE_ROOT` — the file browser's traversal ceiling; nothing above this path is reachable (default
   `/mnt`)
 - `BROWSE_DEFAULT_PATH` — where the Browse page starts (default `/mnt/user`)
 - `SYSTEM_STATS_INTERVAL_MS` — background CPU-sampling interval (default `2000`)
-- `USERS_USE_SUDO` — same idea as `NMD_USE_SUDO`, for a sudoers rule scoped to the useradd/smbpasswd
-  family
 - `USERS_UID_RANGE_START` — uid/gid floor for managed accounts/groups (default `20000`)
 - `USERS_SHELL_PATH` — login shell assigned to created accounts (default `/usr/sbin/nologin`)
 - `USERS_TIMEOUT_MS` — kill useradd/smbpasswd/etc. subprocess after this long (default `15000`)
 
 ## Privileges
 
-`nmdctl` needs root for anything beyond `status`. For now this backend assumes it's either run as
-root directly, or granted a narrowly-scoped sudoers rule, e.g.:
+This backend runs as **root**, the same way Unraid's own single-appliance OS does — see
+`tools/install-webui.sh` and `tools/systemd/nonraid-webui.service` (no `User=` override). There is
+no privilege-drop, no service account, and no sudoers rule: `nmdctl`, Docker, LXC, `smartctl`,
+`mount`/`mergerfs`/`umount`, and the `useradd`/`smbpasswd` family are all shelled out to directly,
+since every one of them needs root anyway.
 
-```
-webui ALL=(root) NOPASSWD: /usr/local/sbin/nmdctl
-```
+What root doesn't decide on its own is who *owns* the data this backend creates on the array,
+pools, and cache. That's handled separately: array/pool/cache directories are chowned to
+`user:users` (uid/gid `99:100`, see `config.arrayDataOwner`/`arrayDataGroup` in `src/config.ts`) —
+the classic Unraid/linuxserver.io `nobody:users` convention most Community-Apps Docker templates
+already default their own `PUID`/`PGID` to. A POSIX default ACL is set alongside the `chown` (see
+`provisionArrayDir()` in `src/shares/applier/realApplier.ts` and `mountCache()` in
+`src/cache/mount.ts`), so everything created under that directory afterward — by this app's own
+Browse/upload code, by a Samba or NFS client, or by a Docker container writing through a bind mount
+— inherits the same ownership automatically, without this backend needing to `chown` after every
+individual create call. Samba's `force user`/`force group` and NFS's `anonuid`/`anongid` are set to
+the same `user`/`users`/`99`/`100` values for the same reason: so a network client's writes land
+with the same ownership as everything else.
 
-with `NMD_USE_SUDO=true`.
-
-Docker access needs the process to run as root, or as a user in the `docker` group. Note that group
-membership is effectively root-equivalent (container mounts make privilege escalation trivial) — same
-severity as the nmdctl sudoers rule above.
-
-LXC needs root (or a sudoers rule via `LXC_USE_SUDO`) for the `lxc-*` toolset — same severity as
-Docker/nmdctl, since it can create/start/destroy full system containers on the host.
-
-`smartctl` also needs root (or a sudoers rule, same pattern as nmdctl's `NMD_USE_SUDO`).
-
-Shares needs root for `mount`/`mergerfs`/`umount` and to write `smb.conf`/`/etc/exports` — same
-sudoers pattern via `SHARES_USE_SUDO`. This is the most consequential of the four: it's not just
-running privileged commands, it's rewriting system service config and mounting/unmounting real
-filesystems. The managed-block + backup approach limits blast radius on the config-file side; the
-mount side has no equivalent safety net beyond the offline-disk check.
-
-Users needs root for `useradd`/`usermod`/`userdel`/`groupadd`/`groupdel`/`chpasswd`/`smbpasswd` — same
-sudoers pattern via `USERS_USE_SUDO`. This is consequential in the same way Shares is: it's creating
-and deleting real host accounts, not just config. The uid/gid-range restriction (`USERS_UID_RANGE_START`)
-is the safety net here — every operation refuses to touch anything below it, so it can't be pointed at
-real system/service accounts even by a buggy caller.
+**There is no auth layer on this API yet** — anyone who can reach it can start/stop the array, run
+parity checks, start/stop/restart any container, read disk identifiers/serials, create/rename/delete
+shares (which mounts/unmounts filesystems and exports them over the network), and create, delete,
+and set passwords for real system accounts. Fine for a trusted LAN during development; needs an
+auth layer before this is ever exposed beyond that. Since the process runs as root with no privilege
+separation, that gap is more consequential here than it would be behind a sudoers allowlist — there
+is no OS-level boundary limiting what a compromised or buggy request can do.
 
 **There is no auth layer on this API yet** — anyone who can reach it can start/stop the array, run
 parity checks, start/stop/restart any container, read disk identifiers/serials, create/rename/delete

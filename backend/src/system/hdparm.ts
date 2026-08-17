@@ -13,7 +13,7 @@ function devicePath(device: string): string {
 
 /** Puts the drive into standby immediately - hdparm's own documented spin-down command. */
 export async function spinDown(device: string): Promise<void> {
-  await runSudoMaybe(config.hdparmBin, ['-y', devicePath(device)], config.hdparmUseSudo);
+  await runSudoMaybe(config.hdparmBin, ['-y', devicePath(device)]);
 }
 
 /**
@@ -22,9 +22,7 @@ export async function spinDown(device: string): Promise<void> {
  * for a state *check*. Forcing a real spin-up means forcing a real read: a single direct-I/O sector
  * read bypasses the page cache (which could otherwise satisfy the read from a stale cached block
  * without ever touching the platters) - the same technique real Unraid uses for its own spin-up.
- * Reuses hdparmUseSudo (same privilege domain as the other spin-control calls in this file) rather
- * than reading a raw block device unprivileged.
  */
 export async function spinUp(device: string): Promise<void> {
-  await runSudoMaybe('dd', [`if=${devicePath(device)}`, 'of=/dev/null', 'bs=512', 'count=1', 'iflag=direct'], config.hdparmUseSudo);
+  await runSudoMaybe('dd', [`if=${devicePath(device)}`, 'of=/dev/null', 'bs=512', 'count=1', 'iflag=direct']);
 }

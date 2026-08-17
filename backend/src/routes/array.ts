@@ -413,7 +413,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
         if (!stopContainers) throw err;
 
         activity.log('Stopping Docker and running LXC containers to allow the driver reload', 'amber').catch(() => {});
-        await runSudoMaybe('systemctl', ['stop', 'docker.socket', 'docker.service'], config.systemUseSudo).catch(() => {});
+        await runSudoMaybe('systemctl', ['stop', 'docker.socket', 'docker.service']).catch(() => {});
         dockerStopped = true;
 
         const containers = await lxc.listContainers().catch(() => []);
@@ -444,7 +444,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       // ultimately succeeded - leaving Docker/containers down on a failed reload attempt would
       // turn a recovery action into a second outage.
       if (dockerStopped) {
-        await runSudoMaybe('systemctl', ['start', 'docker'], config.systemUseSudo).catch(() => {});
+        await runSudoMaybe('systemctl', ['start', 'docker']).catch(() => {});
       }
       for (const name of stoppedLxcNames) {
         await lxc.startContainer(name).catch(() => {});
