@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { servicesApi } from '../../api/servicesApi';
 import { deriveServiceStatusView } from '../../selectors/services';
+import { useArrayStatus } from '../../state/useArrayStatus';
+import { COLORS } from '../../styles/colors';
 import type { ServiceStatus } from '../../types/servicesApi';
+import { ReloadDriverPrompt } from '../shared/ReloadDriverPrompt';
 
 type Action = 'start' | 'stop' | 'restart';
 
@@ -18,6 +21,12 @@ const HEALTH_POLL_INTERVAL_MS = 2000;
 const HEALTH_POLL_TIMEOUT_MS = 30_000;
 
 export function ServicesSection() {
+  const { status: arrayStatus, loadState: arrayLoadState, refresh: refreshArrayStatus } = useArrayStatus();
+  // The driver has no systemd unit of its own to poll (see the row below) - a successful array
+  // status fetch is itself proof the kernel module is loaded and responding, since nmdctl can't
+  // report anything at all otherwise (not even "no array configured yet").
+  const driverLabel = arrayStatus ? 'Running' : arrayLoadState === 'error' ? 'Unreachable' : 'Checking…';
+  const driverColor = arrayStatus ? COLORS.green : arrayLoadState === 'error' ? COLORS.red : COLORS.textDim;
   const [services, setServices] = useState<ServiceStatus[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -134,6 +143,27 @@ export function ServicesSection() {
           </div>
         );
       })}
+      {/* Not a systemd unit - unlike everything else on this page, "restarting" the kernel driver
+          means unloading and reloading the kernel module against the array's own superblock, with
+          the array itself stopped/started around it (see ReloadDriverPrompt / /array/reload-driver).
+          No independent start/stop concept exists for it, so this only ever offers Restart. */}
+      <div>
+        <div className="toggle-row toggle-row--bordered">
+          <div>
+            <div className="toggle-row__title">NonRAID Kernel Driver</div>
+            <div className="toggle-row__desc" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span className="docker-card__status-dot" style={{ background: driverColor }} />
+              {driverLabel}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <ReloadDriverPrompt
+              description="Resets stale internal counters - doesn't change array disks. May leave the array briefly down; let it finish."
+              onReloaded={refreshArrayStatus}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

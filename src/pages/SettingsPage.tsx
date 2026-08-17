@@ -17,6 +17,7 @@ import { StorageLocationField } from '../components/settings/StorageLocationFiel
 import { TlsSection } from '../components/settings/TlsSection';
 import { TwoFactorSection } from '../components/settings/TwoFactorSection';
 import { PathAutocomplete } from '../components/shared/PathAutocomplete';
+import { ReloadDriverPrompt } from '../components/shared/ReloadDriverPrompt';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
 import { useSettings } from '../hooks/useSettings';
 import { useSystemStats } from '../hooks/useSystemStats';
@@ -49,7 +50,7 @@ export function SettingsPage() {
   const { settings, loadState, error, saving, saveError, update } = useSettings();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const stats = useSystemStats();
-  const { status } = useArrayStatus();
+  const { status, refresh: refreshArrayStatus } = useArrayStatus();
   const { replay } = useOnboarding();
   const dataDisks = (status?.disks ?? []).filter((d) => d.type === 'data').map((d) => ({ slot: d.slot, label: `Disk ${d.slot}` }));
 
@@ -93,12 +94,6 @@ export function SettingsPage() {
   const [labelResult, setLabelResult] = useState<string | null>(null);
   const [labelError, setLabelError] = useState<string | null>(null);
   const [labelSaving, setLabelSaving] = useState(false);
-
-  const [reloadConfirming, setReloadConfirming] = useState(false);
-  const [reloadStopContainers, setReloadStopContainers] = useState(false);
-  const [reloadRunning, setReloadRunning] = useState(false);
-  const [reloadResult, setReloadResult] = useState<string | null>(null);
-  const [reloadError, setReloadError] = useState<string | null>(null);
 
   const [rebootConfirming, setRebootConfirming] = useState(false);
   const [rebootRunning, setRebootRunning] = useState(false);
@@ -356,21 +351,6 @@ export function SettingsPage() {
       setLabelError((err as Error).message);
     } finally {
       setLabelSaving(false);
-    }
-  };
-
-  const handleReloadDriver = async () => {
-    setReloadRunning(true);
-    setReloadError(null);
-    setReloadResult(null);
-    try {
-      const result = await nmdApi.reloadDriver(reloadStopContainers);
-      setReloadResult(result.message);
-      setReloadConfirming(false);
-    } catch (err) {
-      setReloadError((err as Error).message);
-    } finally {
-      setReloadRunning(false);
     }
   };
 
@@ -725,50 +705,13 @@ export function SettingsPage() {
 
         <div className="settings-field toggle-row--bordered">
           <div className="toggle-row__title">Reload driver</div>
-          <div className="toggle-row__desc">
-            Reloads the storage driver and re-imports every disk's already-known
-            identity
-            <br />
-            A routine sequence of unassign/replace operations can leave driver-side counters out
-            of sync; this clears that without waiting
-            for it to surface as a real array error.
-            <br />
-            The array is briefly unavailable while it runs and containers must be stopped if stored on array.
+          <div className="toggle-row__desc">Resets stale internal counters - doesn't change array disks.</div>
+          <div className="settings-field__row" style={{ marginTop: 8 }}>
+            <ReloadDriverPrompt
+              description="Resets stale internal counters - doesn't change array disks. May leave the array briefly down; let it finish."
+              onReloaded={refreshArrayStatus}
+            />
           </div>
-          {!reloadConfirming ? (
-            <div className="settings-field__row">
-              <button type="button" className="btn" onClick={() => setReloadConfirming(true)}>
-                Reload Driver
-              </button>
-            </div>
-          ) : (
-            <>
-              <label className="disk-checkbox" style={{ marginTop: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={reloadStopContainers}
-                  onChange={(e) => setReloadStopContainers(e.target.checked)}
-                  disabled={reloadRunning}
-                />
-                Stop Docker and running LXC containers first, if needed
-              </label>
-              <div className="toggle-row__desc">
-                {reloadStopContainers
-                  ? 'If a disk is busy (e.g. Docker or an LXC container has storage on an array disk), Docker and any running LXC containers are stopped before the reload and started again right after. Leave this off and the reload just fails with a clear error instead - nothing is stopped without your say-so.'
-                  : "Off by default: if a disk turns out to be busy, the reload fails with a clear error instead of stopping anything. Check this to let it stop Docker/LXC containers first when that's actually what's blocking it, then restart them automatically afterward."}
-              </div>
-              <div className="settings-field__row">
-                <button type="button" className="btn" disabled={reloadRunning} onClick={() => setReloadConfirming(false)}>
-                  Cancel
-                </button>
-                <button type="button" className="btn btn--danger" disabled={reloadRunning} onClick={handleReloadDriver}>
-                  {reloadRunning ? 'Reloading…' : 'Confirm Reload'}
-                </button>
-              </div>
-            </>
-          )}
-          {reloadResult && <div className="status-note">{reloadResult}</div>}
-          {reloadError && <div className="status-note status-note--error">{reloadError}</div>}
         </div>
       </div>
 

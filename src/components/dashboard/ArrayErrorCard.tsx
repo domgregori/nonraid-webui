@@ -36,7 +36,7 @@ export function ArrayErrorCard() {
       <div className="status-note status-note--error">
         <strong>{status.array.state}</strong> - {status.array.health.details || 'the array needs attention before it can start normally.'}
       </div>
-      <ReloadDriverPrompt description="This reloads the storage driver to recover from stale internal counters - it doesn't change which disks are in the array, only refreshes its live state. Like any driver reload, it can leave the array briefly down if interrupted; let it finish once started." />
+      <ReloadDriverPrompt description="Resets stale internal counters - doesn't change array disks. May leave the array briefly down; let it finish." />
     </Card>
   );
 }

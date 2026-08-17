@@ -53,7 +53,7 @@ export function ParityCheckCard() {
 
       {parity.needsDriverReload && (
         <ReloadDriverPrompt
-          description="A clear/rebuild is stuck pending from before a disk was unassigned, with no real disk behind it anymore - Start would just fail. Reloading the driver resets this; it doesn't change which disks are in the array, only refreshes its live state."
+          description="Stuck pending from an unassigned disk with nothing behind it - Start would fail. Reload resets it without changing array disks."
           onReloaded={refresh}
         />
       )}
