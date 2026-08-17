@@ -23,7 +23,7 @@ export function DashboardPage() {
         {loadState === 'error' && error && <div className="status-note status-note--error">{error}</div>}
         {actionError && (
           <div className="status-note status-note--error">
-            {actionError}
+            {stopBlockedByContainers ? 'A disk is in use by Docker or LXC. Stop containers?' : actionError}
             {stopBlockedByContainers && (
               <div style={{ marginTop: 8 }}>
                 <button type="button" className="btn btn--danger" disabled={arrayPending} onClick={() => toggleArray(true)}>
