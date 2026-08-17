@@ -18,7 +18,7 @@ function mergerfsPolicy(method: AllocationMethod): string {
     case 'fill-up':
       return 'ff'; // first branch (in order) with room - fills one disk before moving on
     case 'high-water':
-      // No exact mergerfs equivalent to Unraid's High-Water. `mspmfs` (most shared path,
+      // No exact mergerfs equivalent to this app's own High-Water allocation method. `mspmfs` (most shared path,
       // tie-broken by most free space among branches that already contain the path) is
       // the closest approximation, not a faithful reproduction. Bare `msp` is NOT a valid
       // policy name on its own - it's always paired with a tiebreak suffix (mspmfs/msplfs/
@@ -51,7 +51,7 @@ async function run(bin: string, args: string[]): Promise<{ stdout: string; stder
 /**
  * Creates `dirPath` if missing and makes it (and everything created under it afterward - by this
  * app, Samba, NFS, or a Docker container bind-mounting it) owned by config.arrayDataOwner/Group -
- * the classic Unraid/linuxserver.io nobody:users (99:100) convention most Community-Apps
+ * the classic linuxserver.io nobody:users (99:100) convention most Community-Apps
  * containers already default their own PUID/PGID to. The default ACL (`-d`) is what makes this
  * apply to *new* content going forward too, not just this one directory: POSIX default ACLs are
  * inherited by every file/subdirectory created under it afterward, regardless of which uid

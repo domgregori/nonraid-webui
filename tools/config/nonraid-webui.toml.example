@@ -124,7 +124,7 @@ frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
 #shell_path = "/usr/sbin/nologin"
 
 [apps]
-# Community Applications template feed. primary is Unraid's own CDN; backup
+# Community Applications template feed. primary is the feed's own CDN; backup
 # is the GitHub-hosted mirror the CA plugin itself falls back to.
 #feed_primary_url = "https://assets.ca.unraid.net/feed/applicationFeed.json"
 #feed_backup_url = "https://raw.githubusercontent.com/Squidly271/AppFeed/master/applicationFeed.json"

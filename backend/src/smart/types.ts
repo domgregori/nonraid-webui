@@ -21,7 +21,7 @@ export interface SelfTestHistoryEntry {
   lifetimeHours: number | null;
 }
 
-/** One row of the raw ATA SMART attribute table (smartctl's `-a` output), e.g. Unraid's "Attributes" tab. */
+/** One row of the raw ATA SMART attribute table (smartctl's `-a` output), same data most array-management webGUIs show on an "Attributes" tab. */
 export interface SmartRawAttribute {
   id: number;
   name: string;
@@ -38,7 +38,7 @@ export interface SmartRawAttribute {
   rawString: string | null;
 }
 
-/** Drive/controller capability + self-test polling info, e.g. Unraid's "Capabilities" tab. */
+/** Drive/controller capability + self-test polling info, same data most array-management webGUIs show on a "Capabilities" tab. */
 export interface SmartCapabilitiesInfo {
   offlineDataCollectionStatus: string | null;
   offlineDataCollectionSeconds: number | null;

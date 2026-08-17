@@ -297,8 +297,9 @@ export class RealLxcClient implements LxcClient {
    * directory - checking for that is a reliable, naming-scheme-independent
    * way to find veth-attachable bridges, unlike guessing from interface name
    * prefixes (br-, eth-, bond-, vhost-, virbr- per the reference plugin -
-   * that list is Unraid-specific and misses e.g. `lxcbr0`, the bridge
-   * `lxc-net` itself creates by default on Debian/Ubuntu, or `docker0`).
+   * that list is specific to a different host OS's own conventions and misses
+   * e.g. `lxcbr0`, the bridge `lxc-net` itself creates by default on
+   * Debian/Ubuntu, or `docker0`).
    * Physical/predictable-named NICs (enp2s0, eth0, wlan0...) and loopback
    * correctly fall out of this check since they aren't bridges.
    *

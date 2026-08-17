@@ -8,7 +8,7 @@ import type { CaFeed } from './types.js';
  * hosted by the CA maintainers (not an official public API) - this fetches it
  * on startup, persists it to disk so a restart doesn't require re-fetching
  * immediately, and refreshes on a long background interval rather than per
- * request. The primary URL is Unraid's own CDN; the GitHub-hosted mirror is
+ * request. The primary URL is the feed's own CDN; the GitHub-hosted mirror is
  * used as a fallback if that's unreachable.
  */
 export class CaFeedStore {

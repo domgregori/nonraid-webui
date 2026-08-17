@@ -92,8 +92,9 @@ export interface NmdClient {
   reloadDriver(): Promise<NmdCommandResult>;
   // Puts an uploaded superblock file (still at its staged temp path) into
   // place and loads it, importing whatever disks match - the guided import
-  // wizard's commit step, for bringing in a whole prior Unraid array's
-  // worth of disks at once. Unlike reloadDriver(), the file itself really is
+  // wizard's commit step, for bringing in a whole prior array's worth of
+  // disks at once, from another host running compatible array software.
+  // Unlike reloadDriver(), the file itself really is
   // different, so this is the one case where nmdctl's own disk matching
   // (not just this driver's re-import of already-known identities) decides
   // what comes in. Resolves the real target path itself (the live array's
@@ -118,8 +119,9 @@ export interface NmdClient {
   reloadModuleAndImport(): Promise<ImportResult>;
   // The driver has no readback for write method - it's a write-only kernel
   // command (confirmed: absent from both `status -o json` and /proc/nmdstat)
-  // - so the caller is the source of truth for what's "currently" set, same
-  // as real Unraid's own webGUI does with its persisted disk.cfg tunable.
+  // - so the caller is the source of truth for what's "currently" set, the
+  // same pattern other array-management webGUIs use with their own persisted
+  // tunable config.
   setWriteMethod(turbo: boolean): Promise<NmdCommandResult>;
   // Unlike write method, the label *is* read back via getStatus().array.label
   // - nmdctl requires the array to be stopped to change it, and returns a

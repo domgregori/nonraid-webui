@@ -20,8 +20,8 @@ function healthColor(health: CacheHealth): string {
   return COLORS.border;
 }
 
-/** Placed between Boot Disk and Unassigned Devices on the Disks page, matching Unraid's own
- *  dashboard ordering (see the cache pool plan). */
+/** Placed between Boot Disk and Unassigned Devices on the Disks page, matching the conventional
+ *  dashboard ordering other array-management webGUIs use (see the cache pool plan). */
 export function CacheSection() {
   const { status, refresh } = useCacheStatus();
   const [showSetup, setShowSetup] = useState(false);

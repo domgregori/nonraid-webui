@@ -140,7 +140,7 @@ export function AppsPage() {
             <a href="https://github.com/Squidly271/community.applications" target="_blank" rel="noreferrer">
               Community Applications
             </a>
-            , an independent, community-curated template repository for Unraid. Templates are not vetted by this
+            , an independent, community-curated Docker app template repository. Templates are not vetted by this
             project - review the container's ports, volumes, and image before installing.
           </div>
         </div>

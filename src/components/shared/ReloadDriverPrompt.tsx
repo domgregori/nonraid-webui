@@ -9,8 +9,8 @@ interface ReloadDriverPromptProps {
 }
 
 /** Two-step "Reload Driver" control for stale driver-side counters - counters that accumulate
- *  across import calls within one loaded module session (num_new, num_invalid, etc. in
- *  md_unraid.c's status_resync()) and are only ever reset by a fresh module load, not a plain
+ *  across import calls within one loaded module session (num_new, num_invalid, etc. in the kernel
+ *  driver's own status_resync()) and are only ever reset by a fresh module load, not a plain
  *  stop/start. Shared by ArrayErrorBanner (an ERROR:* array state) and ParityCheckCard (a
  *  clear/recon stuck pending with no real disk behind it) - same underlying driver quirk, two
  *  different symptoms.

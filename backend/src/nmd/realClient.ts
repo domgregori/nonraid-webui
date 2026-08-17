@@ -14,9 +14,9 @@ const execFileAsync = promisify(execFile);
 // SUPERBLOCK_PATH is given.
 const DEFAULT_SUPERBLOCK_PATH = '/nonraid.dat';
 
-// Every ERROR:* array state the kernel driver can report (confirmed against md_unraid.c this
-// session - these five bake the prefix into the state name itself, unlike every other abnormal
-// state). Used by startArray() to turn a failed start into a one-line, specific explanation
+// Every ERROR:* array state the kernel driver can report (confirmed against the kernel driver's
+// own source this session - these five bake the prefix into the state name itself, unlike every
+// other abnormal state). Used by startArray() to turn a failed start into a one-line, specific explanation
 // instead of nmdctl's own multi-paragraph scan/import/status banner - that raw text is still
 // genuinely useful for anything NOT in this list (an unrecognized failure), just not for these.
 const ARRAY_ERROR_DESCRIPTIONS: Record<string, string> = {
@@ -521,15 +521,16 @@ export class RealNmdClient implements NmdClient {
     if (action === 'CORRECT' || action === 'NOCORRECT') {
       const status = await this.getStatus();
       if (status.resync.pending && !status.resync.action.trim().toLowerCase().startsWith('check')) {
-        // The driver's own num_new/num_invalid/etc counters (see md_unraid.c's status_resync())
-        // only ever increment across import_slot() calls within a loaded module's lifetime, never
-        // decrement - so unassigning a disk that had briefly been "new" leaves resync.pending true
-        // (and resync.action still naming a clear/recon) with nothing real backing it, forever.
-        // size_gb reads 0 in exactly that phantom case (real array disks are never actually this
-        // small), and the kernel's own offset check (0 >= 0) then rejects any attempt to start it
-        // with a bare "Invalid argument" - confirmed live on the test rig, traced all the way to
-        // check_array() in md_unraid.c. A full module reload is the only thing that resets these
-        // counters (see reloadModuleAndImport) - surfacing that here instead of the raw EINVAL.
+        // The driver's own num_new/num_invalid/etc counters (see the kernel driver's own
+        // status_resync()) only ever increment across import_slot() calls within a loaded module's
+        // lifetime, never decrement - so unassigning a disk that had briefly been "new" leaves
+        // resync.pending true (and resync.action still naming a clear/recon) with nothing real
+        // backing it, forever. size_gb reads 0 in exactly that phantom case (real array disks are
+        // never actually this small), and the kernel's own offset check (0 >= 0) then rejects any
+        // attempt to start it with a bare "Invalid argument" - confirmed live on the test rig,
+        // traced all the way to the driver's own check_array(). A full module reload is the only
+        // thing that resets these counters (see reloadModuleAndImport) - surfacing that here
+        // instead of the raw EINVAL.
         if (status.resync.size_gb === 0) {
           const pendingWord = status.resync.action.trim().split(/\s+/)[0];
           throw new Error(

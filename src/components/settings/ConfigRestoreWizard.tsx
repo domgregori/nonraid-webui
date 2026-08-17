@@ -210,7 +210,7 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
                   <div className="import-warning__desc">
                     {superblockWillRestore
                       ? "This array has nothing assigned yet, so the archive's own superblock will be restored too, reconstructing the array itself along with the rest of the config."
-                      : "This array already has disks assigned, so the archive's superblock is skipped for safety - restoring it here would bypass the disk-matching checks Settings → Import From Unraid has. Use that instead if you specifically need to restore the array itself."}
+                      : "This array already has disks assigned, so the archive's superblock is skipped for safety - restoring it here would bypass the disk-matching checks Settings → Import Existing Array has. Use that instead if you specifically need to restore the array itself."}
                   </div>
                 </div>
               )}

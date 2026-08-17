@@ -44,7 +44,7 @@ function deriveStartStep(hasAnyDisk: boolean, hasDataDisk: boolean): Step {
 }
 
 // Checked against status.disks directly, not array.total_slots - total_slots only reflects
-// *committed* data disks (see md_unraid.c's sb->num_disks update), staying 0 until a `start`
+// *committed* data disks (see the kernel driver's own sb->num_disks update), staying 0 until a `start`
 // commits whatever's been add-ed so far, which ArrayBuilder's whole plan-then-build model
 // deliberately defers until the very end (see its own doc comment).
 function deriveHasDisks(status: NmdStatusResponse | null): { hasAnyDisk: boolean; hasDataDisk: boolean } {
@@ -275,7 +275,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
                 >
                   <span className="onboarding-choice__title">Import an existing array</span>
                   <span className="onboarding-choice__desc">
-                    From Unraid or a previous NonRAID install - both save the same superblock file.
+                    From a previous NonRAID install, or another array using the same superblock format.
                   </span>
                 </button>
                 <button

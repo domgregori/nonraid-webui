@@ -95,7 +95,7 @@ export class AppsService {
   ) {}
 
   /**
-   * The feed mixes real Docker apps with actual Unraid *plugins* (.plg/.txz
+   * The feed mixes real Docker apps with native OS *plugins* (.plg/.txz
    * packages installed outside Docker entirely - their `Repository` is a
    * .plg URL, not an image). There's no framework in this project for
    * installing plugins, so they're excluded here, once, rather than filtered
@@ -202,9 +202,10 @@ export class AppsService {
         labels: {
           [APP_NAME_LABEL]: app.Name,
           [APP_REPOSITORY_LABEL]: app.Repository,
-          // Same label convention real Unraid's dashboard reads directly off any
-          // container - stamping it here means our own catalog installs show a
-          // real icon on the dashboard without needing a runtime catalog lookup.
+          // A widely-used Docker label convention several dashboards (including this app's own,
+          // see docker/realClient.ts) read directly off any container - stamping it here means
+          // our own catalog installs show a real icon without needing a runtime catalog lookup,
+          // and stay recognizable to any other tool that reads the same convention.
           ...(app.Icon ? { 'net.unraid.docker.icon': app.Icon } : {}),
         },
       },

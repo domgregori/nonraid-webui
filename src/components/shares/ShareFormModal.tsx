@@ -26,7 +26,7 @@ const ALLOCATION_OPTIONS: { value: AllocationMethod; label: string; description:
     value: 'high-water',
     label: 'High-water',
     description:
-      'Keeps files under the same path together on one disk when possible, otherwise picks the disk with the most free space. An approximation of Unraid’s High-Water policy, not an exact match.',
+      'Keeps files under the same path together on one disk when possible, otherwise picks the disk with the most free space. An approximation of the classic High-Water allocation policy, not an exact match.',
   },
   {
     value: 'single-disk',

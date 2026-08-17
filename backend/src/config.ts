@@ -185,7 +185,7 @@ export const config = {
   usersTimeoutMs: num('USERS_TIMEOUT_MS', t('users', 'timeout_ms'), 15_000),
   usersShellPath: str('USERS_SHELL_PATH', t('users', 'shell_path'), '/usr/sbin/nologin'),
   // Community Applications template feed - see backend/src/apps/. Primary is
-  // Unraid's own CDN; backup is the GitHub-hosted mirror the CA plugin itself
+  // the feed's own CDN; backup is the GitHub-hosted mirror the CA plugin itself
   // falls back to.
   appsFeedPrimaryUrl: str('APPS_FEED_PRIMARY_URL', t('apps', 'feed_primary_url'), 'https://assets.ca.unraid.net/feed/applicationFeed.json'),
   appsFeedBackupUrl: str(
@@ -220,7 +220,7 @@ export const config = {
   schedulerTickIntervalMs: num('SCHEDULER_TICK_INTERVAL_MS', t('scheduler', 'tick_interval_ms'), 60_000),
   // LXC containers - see backend/src/lxc/. Shells out to the classic liblxc
   // `lxc-*` command-line tools (lxc-ls/lxc-info/lxc-create/...), the same
-  // toolset ich777's unraid-lxc-plugin wraps in PHP. `lxcDefaultPath` is
+  // toolset a well-known community LXC plugin wraps in PHP. `lxcDefaultPath` is
   // passed as `-P` to every lxc-* call, matching that plugin's configurable
   // storage root (analogous to appsBindRoots above).
   lxcDefaultPath: str('LXC_DEFAULT_PATH', t('lxc', 'default_path'), '/var/lib/lxc'),
@@ -254,7 +254,7 @@ export const config = {
   cacheMkfsTimeoutMs: num('CACHE_MKFS_TIMEOUT_MS', t('cache', 'mkfs_timeout_ms'), 5 * 60 * 1000),
   // Array/pool/cache data ownership (see shares/applier/realApplier.ts's mountShare(),
   // cache/mount.ts's mountCache(), and writeSmbBlock()/writeExportsBlock()'s force
-  // user/group and anonuid/anongid) - the classic Unraid/linuxserver.io nobody:users
+  // user/group and anonuid/anongid) - the classic linuxserver.io nobody:users
   // (99:100) convention most Community-Apps containers already default their own
   // PUID/PGID to. Named "user" rather than "nobody" here since Debian's own nobody
   // account is a fixed uid 65534, not 99 - that name's already taken, so this app

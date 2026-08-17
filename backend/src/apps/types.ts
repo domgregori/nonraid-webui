@@ -1,7 +1,6 @@
-// Shapes transcribed from the Community Applications feed
-// (https://assets.ca.unraid.net/feed/applicationFeed.json). `CaApp` only models
-// the fields this project actually reads - the real feed has ~130 possible keys
-// per entry, most app-specific and unused here.
+// Shapes transcribed from the Community Applications feed (see config.ts's appsFeedPrimaryUrl
+// for the actual URL). `CaApp` only models the fields this project actually reads - the real feed
+// has ~130 possible keys per entry, most app-specific and unused here.
 
 export type CaConfigType = 'Port' | 'Variable' | 'Path' | 'Device' | 'Label';
 
@@ -25,7 +24,7 @@ export interface CaConfigEntry {
 export interface CaApp {
   Name: string;
   Repository: string; // for a real Docker app, an image reference - but see `Plugin` below
-  // A real Unraid *plugin* (a .plg/.txz package installed outside Docker
+  // A native OS *plugin* (a .plg/.txz package installed outside Docker
   // entirely, not a container) - appears in the same feed as Docker apps,
   // but its `Repository` is a .plg URL, not an image. There's no framework
   // in this project for installing plugins, so these must be filtered out

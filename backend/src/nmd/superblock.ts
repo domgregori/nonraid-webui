@@ -2,8 +2,8 @@ import { HttpError } from '../httpError.js';
 import type { AvailableDevice } from './types.js';
 
 /**
- * Layout confirmed directly against `mdp_superblock_s`/`mdp_disk_t` in
- * md_nonraid's md_unraid.h (the sibling nonraid repo): a fixed 4096-byte,
+ * Layout confirmed directly against `mdp_superblock_s`/`mdp_disk_t` in the
+ * sibling nonraid repo's own kernel driver header: a fixed 4096-byte,
  * native-endian binary struct - 32 "common" words (128 bytes), then 30
  * fixed-size 128-byte disk descriptors, then one reserved descriptor
  * (128 + 30*128 + 128 = 4096). No serialization layer, so this reads it
@@ -62,7 +62,7 @@ export function parseSuperblock(buf: Buffer): ParsedSuperblock {
   }
   const magic = buf.readUInt32LE(0);
   if (magic !== MD_SB_MAGIC) {
-    throw new HttpError(400, 'Not a valid superblock file - magic number mismatch. Pick the original super.dat copied from the Unraid host.');
+    throw new HttpError(400, 'Not a valid superblock file - magic number mismatch. Pick the original superblock file (usually named super.dat) copied from the source array host.');
   }
 
   const label = readCString(buf, LABEL_OFFSET, LABEL_BYTES);
@@ -82,8 +82,8 @@ export function parseSuperblock(buf: Buffer): ParsedSuperblock {
 
 /** The "serial number" half of a udev-style `Model_Serial` id string - the
  * substring after the last underscore, or the whole string if there is none.
- * Mirrors same_disk_info()'s non-strict comparison in md_unraid.c exactly:
- * both sides of a match get this same transform applied independently. */
+ * Mirrors same_disk_info()'s non-strict comparison in the kernel driver's own
+ * source exactly: both sides of a match get this same transform applied independently. */
 function serialPart(id: string): string {
   const idx = id.lastIndexOf('_');
   return idx === -1 ? id : id.slice(idx + 1);
@@ -97,7 +97,7 @@ export interface DiskMatch {
 }
 
 /**
- * Predicts what the kernel's own same_disk_info() (md_unraid.c) would decide
+ * Predicts what the kernel's own same_disk_info() would decide
  * at real import time: exact match on the serial-number portion of the id
  * string (not a substring/contains check - confirmed from source, strcmp on
  * the derived serial), and an exact size match. Both failing the same way

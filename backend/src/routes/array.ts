@@ -90,8 +90,8 @@ async function buildImportPreview(nmd: NmdClient, buf: Buffer, stagedPath: strin
     };
   });
 
-  // Cheaply predicts the kernel's own ERROR:PARITY_NOT_BIGGEST (confirmed from md_unraid.c)
-  // directly from the superblock's own recorded sizes - no physical disk needed for this one.
+  // Cheaply predicts the kernel's own ERROR:PARITY_NOT_BIGGEST (confirmed from the kernel driver's
+  // own source) directly from the superblock's own recorded sizes - no physical disk needed for this one.
   const dataSlots = parsed.slots.filter((s) => s.role === 'data');
   const paritySlots = parsed.slots.filter((s) => s.role !== 'data');
   const largestDataKb = dataSlots.length > 0 ? Math.max(...dataSlots.map((s) => s.sizeKb)) : 0;
@@ -156,9 +156,9 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       const result = await nmd.startArray();
       // The driver forgets write method across a stop/start (no persistence
       // of its own - see nmd/client.ts's setWriteMethod doc comment), so
-      // reapply our persisted preference every time, the same way real
-      // Unraid's webGUI resends its tunable as part of its own array-start
-      // sequence. Best-effort: a failure here shouldn't fail array start.
+      // reapply our persisted preference every time, the same pattern other
+      // array-management webGUIs use to resend their own tunable as part of
+      // their own array-start sequence. Best-effort: a failure here shouldn't fail array start.
       const settings = await settingsStore.get();
       if (settings.turboWrite) await nmd.setWriteMethod(true).catch(() => {});
 
@@ -199,7 +199,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
     }
   });
 
-  // Guided Unraid-array-import wizard: choose a .dat superblock file, see
+  // Guided array-import wizard: choose a .dat superblock file, see
   // exactly what it expects and how that lines up against what's physically
   // connected, then explicitly commit. Parsing is done directly on the raw
   // bytes (see nmd/superblock.ts) rather than by loading it into the kernel
@@ -244,7 +244,7 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
   // Lists real subdirectories and .dat files under an absolute path on this host's own root
   // filesystem - the "locate on disk" half of the import wizard's file picker, for hosts (like
   // this one) where the boot/OS disk is the same filesystem the backend itself runs on, not a
-  // separate flash drive the way Unraid uses. Read-only; see resolveRootPath() above for scope.
+  // separate flash drive the way some other array-appliance OSes use. Read-only; see resolveRootPath() above for scope.
   router.get('/array/import/browse-root', async (req, res) => {
     const requested = typeof req.query.path === 'string' ? req.query.path : '/';
     try {

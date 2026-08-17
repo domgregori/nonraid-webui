@@ -37,7 +37,7 @@ const SECTIONS = [
   { id: 'services', label: 'Services' },
   { id: 'logs', label: 'System Logs' },
   { id: 'parity', label: 'Parity' },
-  { id: 'import', label: 'Import from Unraid' },
+  { id: 'import', label: 'Import Existing Array' },
   { id: 'shares', label: 'Pools' },
   { id: 'backups', label: 'Backups' },
   { id: 'notifications', label: 'Notifications' },

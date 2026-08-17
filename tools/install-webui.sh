@@ -44,11 +44,11 @@ log "Logging this run to $LOG_FILE"
 
 log "Checking for the $ARRAY_DATA_USER:$ARRAY_DATA_GROUP ($ARRAY_DATA_UID:$ARRAY_DATA_GID) account"
 # nonraid-webui itself runs as root (see nonraid-webui.service — no User= override), the same way
-# Unraid's own single-appliance design works, so there's no separate service account to provision
+# other single-appliance array OS designs work, so there's no separate service account to provision
 # here. What still needs a fixed identity is array/pool/cache data ownership: this app chowns and
 # sets a default ACL for $ARRAY_DATA_USER:$ARRAY_DATA_GROUP on that data (see
 # shares/applier/realApplier.ts's provisionArrayDir() and cache/mount.ts's mountCache()) — the
-# classic Unraid/linuxserver.io nobody:users (99:100) convention most Community-Apps containers
+# classic linuxserver.io nobody:users (99:100) convention most Community-Apps containers
 # already default their own PUID/PGID to. Named "user" rather than "nobody" since Debian's own
 # nobody account is a fixed uid 65534, not 99 — that name's already taken.
 if ! getent group "$ARRAY_DATA_GROUP" >/dev/null 2>&1; then

@@ -104,7 +104,7 @@ the source of truth and reconciles it onto three real subsystems:
   can include a different disk subset), branches at `<disk-mountpoint>/<name>` on each included disk.
   A single-disk share skips mergerfs entirely and uses a plain bind mount. Allocation method maps to
   mergerfs's `category.create` policy: `most-free`→`mfs`, `fill-up`→`ff`. `high-water` has no exact
-  mergerfs equivalent (that's Unraid's own term) — mapped to `msp` as the closest approximation, not a
+  mergerfs equivalent (that's this app's own allocation-method term) — mapped to `msp` as the closest approximation, not a
   faithful reproduction.
 - **SMB** — a managed block in `smb.conf` (`SMB_CONF_PATH`), fully regenerated from the complete
   current share list on every change, then `smbcontrol smbd reload-config` (falls back to starting
@@ -263,7 +263,7 @@ progress events instead of a single response - see API.md's "Conventions" sectio
 
 ## Privileges
 
-This backend runs as **root**, the same way Unraid's own single-appliance OS does — see
+This backend runs as **root**, the same way other single-appliance array OSes do — see
 `tools/install-webui.sh` and `tools/systemd/nonraid-webui.service` (no `User=` override). There is
 no privilege-drop, no service account, and no sudoers rule: `nmdctl`, Docker, LXC, `smartctl`,
 `mount`/`mergerfs`/`umount`, and the `useradd`/`smbpasswd` family are all shelled out to directly,
@@ -272,7 +272,7 @@ since every one of them needs root anyway.
 What root doesn't decide on its own is who *owns* the data this backend creates on the array,
 pools, and cache. That's handled separately: array/pool/cache directories are chowned to
 `user:users` (uid/gid `99:100`, see `config.arrayDataOwner`/`arrayDataGroup` in `src/config.ts`) —
-the classic Unraid/linuxserver.io `nobody:users` convention most Community-Apps Docker templates
+the classic linuxserver.io `nobody:users` convention most Community-Apps Docker templates
 already default their own `PUID`/`PGID` to. A POSIX default ACL is set alongside the `chown` (see
 `provisionArrayDir()` in `src/shares/applier/realApplier.ts` and `mountCache()` in
 `src/cache/mount.ts`), so everything created under that directory afterward — by this app's own
@@ -307,7 +307,7 @@ since it now manages credentials, not just infrastructure.
 - LXC: Phase 1 only (lifecycle + create-from-download-template + config-file editing). Snapshots,
   `lxc-autobackup`-style backups, ZFS/BTRFS backing-device conversion, and a GitHub-release-based
   community template catalog (the CA-equivalent for LXC) are explicitly deferred — see the handoff
-  doc this was built from for how the reference plugin (ich777/unraid-lxc-plugin) implements those.
+  doc this was built from for how the reference plugin this was modeled on implements those.
   Stats-poller CPU% is a `/proc/<pid>`-based approximation, not real cgroup accounting (see the LXC
   section above).
 - SMART: only temperature is read today; SMART pass/fail health, reallocated sectors, etc. aren't
