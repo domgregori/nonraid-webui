@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { lxcApi } from '../../api/lxcApi';
 import type { CreateLxcProgress, LxcDistroOption } from '../../types/lxcApi';
+import { DistroIcon } from './DistroIcon';
 
 interface CreateLxcDialogProps {
   onClose: () => void;
@@ -150,20 +151,23 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
 
             <label className="form-field">
               <span className="form-field__label">Distribution</span>
-              <select
-                className="history-input"
-                style={{ width: '100%' }}
-                disabled={locked}
-                value={selectedDistroKey}
-                onChange={(e) => handleDistroChange(e.target.value)}
-              >
-                {distros.map((d) => (
-                  <option key={distroKey(d)} value={distroKey(d)}>
-                    {d.label}
-                  </option>
-                ))}
-                <option value={CUSTOM_VALUE}>Custom…</option>
-              </select>
+              <div className="container-form-row" style={{ alignItems: 'center' }}>
+                <DistroIcon distribution={distribution} size={28} />
+                <select
+                  className="history-input"
+                  style={{ width: '100%' }}
+                  disabled={locked}
+                  value={selectedDistroKey}
+                  onChange={(e) => handleDistroChange(e.target.value)}
+                >
+                  {distros.map((d) => (
+                    <option key={distroKey(d)} value={distroKey(d)}>
+                      {d.label}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_VALUE}>Custom…</option>
+                </select>
+              </div>
             </label>
 
             {selectedDistroKey === CUSTOM_VALUE && (

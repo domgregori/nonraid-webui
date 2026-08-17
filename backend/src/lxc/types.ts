@@ -18,6 +18,11 @@ export interface LxcContainerSummary {
   autostart: boolean;
   description: string | null;
   webUiUrl: string | null;
+  // The `distribution` this container was created from (e.g. "debian") - stamped at creation time
+  // only, see realClient.ts's DISTRIBUTION_KEY. null for a container created before this field
+  // existed - LXC itself has no notion of "what template was this built from" the way Docker's
+  // image string is one, so there's no way to recover it after the fact for those.
+  distribution: string | null;
   // Filled in by the stats poller (see statsPoller.ts) - null when stopped
   // or when no sample has landed yet.
   cpuPercent: number | null;
@@ -37,6 +42,7 @@ export interface LxcContainerDetail {
   autostart: boolean;
   description: string | null;
   webUiUrl: string | null;
+  distribution: string | null;
   pid: number | null;
   rootfsPath: string | null;
   bridge: string | null;

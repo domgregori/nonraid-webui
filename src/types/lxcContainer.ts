@@ -5,6 +5,7 @@ export interface LxcContainerViewModel {
   autostart: boolean;
   description: string | null;
   webUiUrl: string | null;
+  distribution: string | null;
   cpuLabel: string;
   memLabel: string;
   ips: string;

@@ -7,6 +7,7 @@ export interface LxcContainerSummary {
   autostart: boolean;
   description: string | null;
   webUiUrl: string | null;
+  distribution: string | null;
   cpuPercent: number | null;
   memUsedBytes: number | null;
   memLimitBytes: number | null;
@@ -30,6 +31,7 @@ export interface LxcContainerDetail {
   autostart: boolean;
   description: string | null;
   webUiUrl: string | null;
+  distribution: string | null;
   pid: number | null;
   rootfsPath: string | null;
   bridge: string | null;

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CreateLxcDialog } from '../components/lxc/CreateLxcDialog';
+import { DistroIcon } from '../components/lxc/DistroIcon';
 import { EditLxcConfigDialog } from '../components/lxc/EditLxcConfigDialog';
 import { SnapshotsDialog } from '../components/lxc/SnapshotsDialog';
 import { useLxcContainers } from '../hooks/useLxcContainers';
@@ -48,7 +49,10 @@ export function LxcPage() {
         {views.map((c) => (
           <div className="docker-card" key={c.name}>
             <div className="docker-card__head">
-              <div className="docker-card__name">{c.name}</div>
+              <div className="docker-card__identity">
+                <DistroIcon distribution={c.distribution} fallbackLabel={c.name} size={32} />
+                <div className="docker-card__name">{c.name}</div>
+              </div>
               <span className="docker-card__status" style={{ color: c.statusColor }}>
                 <span className="docker-card__status-dot" style={{ background: c.statusColor }} />
                 {c.statusLabel}

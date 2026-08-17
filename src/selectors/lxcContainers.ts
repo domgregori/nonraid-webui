@@ -45,6 +45,7 @@ export function deriveLxcContainerViewModel(container: LxcContainerSummary, acti
     autostart: container.autostart,
     description: container.description,
     webUiUrl: container.webUiUrl,
+    distribution: container.distribution,
     cpuLabel: container.cpuPercent === null ? '-' : `${Math.round(container.cpuPercent)}%`,
     memLabel: container.memUsedBytes === null ? '-' : formatBytesAsMB(container.memUsedBytes),
     ips: container.ips.length > 0 ? preferIPv4(container.ips).join(', ') : '-',

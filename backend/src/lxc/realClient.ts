@@ -24,6 +24,11 @@ const execFileAsync = promisify(execFile);
 
 const DESCRIPTION_KEY = '#container_description';
 const WEBUI_KEY = '#container_webui';
+// Stamped at creation time only (see createContainer() below) - LXC itself has no notion of "what
+// template was this built from", unlike Docker's image string. A container created before this
+// field existed simply has no value here; that's a normal, permanent state, not an error - the
+// frontend's DistroIcon falls back to a plain letter mark when this is null.
+const DISTRIBUTION_KEY = '#container_distribution';
 const AUTOSTART_KEY = 'lxc.start.auto';
 // Fixed, obviously-synthetic name used only to satisfy lxc-create's
 // mandatory -n flag when probing the download template's image index -
@@ -117,14 +122,17 @@ export class RealLxcClient implements LxcClient {
     }
   }
 
-  private async readMetadata(name: string): Promise<{ description: string | null; webUiUrl: string | null; autostart: boolean }> {
+  private async readMetadata(
+    name: string,
+  ): Promise<{ description: string | null; webUiUrl: string | null; autostart: boolean; distribution: string | null }> {
     const configPath = containerConfigPath(name);
-    const [description, webUiUrl, autostartRaw] = await Promise.all([
+    const [description, webUiUrl, autostartRaw, distribution] = await Promise.all([
       getVariable(configPath, DESCRIPTION_KEY),
       getVariable(configPath, WEBUI_KEY),
       getVariable(configPath, AUTOSTART_KEY),
+      getVariable(configPath, DISTRIBUTION_KEY),
     ]);
-    return { description, webUiUrl, autostart: autostartRaw === '1' };
+    return { description, webUiUrl, autostart: autostartRaw === '1', distribution };
   }
 
   async listContainers(): Promise<LxcContainerSummary[]> {
@@ -139,6 +147,7 @@ export class RealLxcClient implements LxcClient {
           autostart,
           description: meta.description,
           webUiUrl: meta.webUiUrl,
+          distribution: meta.distribution,
           cpuPercent: sample?.cpuPercent ?? null,
           memUsedBytes: sample?.memUsedBytes ?? null,
           memLimitBytes: null,
@@ -167,6 +176,7 @@ export class RealLxcClient implements LxcClient {
       autostart: meta.autostart,
       description: meta.description,
       webUiUrl: meta.webUiUrl,
+      distribution: meta.distribution,
       pid,
       rootfsPath: stripDirPrefix(rootfsRaw),
       bridge,
@@ -311,7 +321,17 @@ export class RealLxcClient implements LxcClient {
         }
       }),
     );
-    return bridges.filter((n): n is string => n !== null).sort();
+    // lxcbr0 - the lxc package's own default bridge, set up specifically for container
+    // connectivity - sorts first when present, so it (not docker0, or any other bridge that
+    // happens to alphabetize earlier) is what a fresh container defaults to. Everything else stays
+    // plain alphabetical.
+    return bridges
+      .filter((n): n is string => n !== null)
+      .sort((a, b) => {
+        if (a === 'lxcbr0') return -1;
+        if (b === 'lxcbr0') return 1;
+        return a.localeCompare(b);
+      });
   }
 
   /**
@@ -510,6 +530,7 @@ export class RealLxcClient implements LxcClient {
       [AUTOSTART_KEY, options.autostart ? '1' : '0'],
       [DESCRIPTION_KEY, options.description.trim() || null],
       [WEBUI_KEY, options.webUiUrl.trim() || null],
+      [DISTRIBUTION_KEY, options.distribution.trim() || null],
     ]);
 
     onProgress?.({ phase: 'starting', message: 'Starting container', percent: null });
