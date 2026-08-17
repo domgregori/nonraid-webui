@@ -44,6 +44,7 @@ Proxmox VE. Update this list as items change or new items appear.
 - `openssl` — used by the webui's built-in TLS feature (Settings → Security → HTTPS) to generate
   self-signed certificates and inspect imported ones. Near-universally present on Debian already;
   called explicitly rather than assumed, same as every other shelled-out tool in this list.
+- `avahi-daemon` - used for network discovery.
 - `docker.io` — Docker Engine, for the Docker tab. `nonraid-webui` talks to `/var/run/docker.sock`
   directly (`dockerode`); no separate install step exists for this anywhere else, so it must be
   installed explicitly.

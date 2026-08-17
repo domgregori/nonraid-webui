@@ -1,0 +1,12 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!-- Advertises this host's SMB shares over mDNS/DNS-SD (_smb._tcp on port 445) so they show up
+     in network-browse UIs (Finder, GNOME Files) as "<hostname>.local" - installed by
+     install-webui.sh to /etc/avahi/services/samba.service. %h expands to the local hostname. -->
+<service-group>
+  <name replace-wildcards="yes">%h</name>
+  <service>
+    <type>_smb._tcp</type>
+    <port>445</port>
+  </service>
+</service-group>

@@ -83,6 +83,7 @@ apt-get install -y \
   apprise \
   docker.io \
   lxc lxc-templates \
+  avahi-daemon \
   linux-headers-amd64
 
 # Separate --no-install-recommends call for the packages whose recommends are pure bloat for this
@@ -231,6 +232,10 @@ rsync -a --delete "$REPO_ROOT/dist/" "$INSTALL_ROOT/frontend-dist/"
 log "Installing systemd unit"
 install -m 644 "$REPO_ROOT/tools/systemd/nonraid-webui.service" /etc/systemd/system/nonraid-webui.service
 
+log "Installing Avahi service-type file for SMB share discovery"
+mkdir -p /etc/avahi/services
+install -m 644 "$REPO_ROOT/tools/config/avahi-samba.service" /etc/avahi/services/samba.service
+
 if [ ! -e /etc/nonraid/config.toml ]; then
   log "Installing default config (/etc/nonraid/config.toml)"
   mkdir -p /etc/nonraid
@@ -240,13 +245,15 @@ else
 fi
 
 log "Starting system services"
-# samba/nfs-kernel-server/docker.io's own postinst scripts already enable+start their services by
-# default on Debian — this is the same "make sure, don't just assume" belt-and-suspenders as the
-# nonraid.service line above, explicit rather than relying on package-manager defaults that could
-# vary. mergerfs and lxc/lxc-templates have no persistent daemon of their own to start (mergerfs
-# is mounted per-share on demand by nonraid-webui itself; lxc containers are started individually
-# via the LXC tab, not a single system-wide service).
-systemctl enable --now smbd nmbd nfs-kernel-server docker
+# samba/nfs-kernel-server/docker.io/avahi-daemon's own postinst scripts already enable+start their
+# services by default on Debian — this is the same "make sure, don't just assume" belt-and-suspenders
+# as the nonraid.service line above, explicit rather than relying on package-manager defaults that
+# could vary. Also re-triggers avahi-daemon to pick up the service file just installed above if it
+# was already running from a previous install. mergerfs and lxc/lxc-templates have no persistent
+# daemon of their own to start (mergerfs is mounted per-share on demand by nonraid-webui itself;
+# lxc containers are started individually via the LXC tab, not a single system-wide service).
+systemctl enable --now smbd nmbd nfs-kernel-server docker avahi-daemon
+systemctl reload-or-restart avahi-daemon
 
 log "Reloading systemd and (re)starting nonraid-webui"
 systemctl daemon-reload

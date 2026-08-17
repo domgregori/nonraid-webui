@@ -11,7 +11,7 @@ export function servicesRouter(activity: ActivityStore): Router {
         SERVICE_DEFS.map(async (def) => ({ id: def.id, label: def.label, state: await getServiceState(def) })),
       );
       // Synthesized row: if this endpoint answered, the backend serving it is up.
-      rows.push({ id: 'webui', label: 'nonraid-webui (this app)', state: 'active' });
+      rows.push({ id: 'webui', label: 'NonRAID WebUI', state: 'active' });
       res.json(rows);
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });

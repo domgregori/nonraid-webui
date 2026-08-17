@@ -1,6 +1,6 @@
 import { runSudoMaybe, spawnMaybeSudo } from './procUtil.js';
 
-export type ServiceId = 'docker' | 'lxc' | 'smb' | 'nfs' | 'ssh';
+export type ServiceId = 'docker' | 'lxc' | 'smb' | 'nfs' | 'ssh' | 'avahi';
 
 export type ServiceState = 'active' | 'inactive' | 'failed' | 'mixed';
 
@@ -35,6 +35,12 @@ export const SERVICE_DEFS: ServiceDef[] = [
   },
   { id: 'nfs', label: 'NFS Sharing', statusUnits: ['nfs-server.service'], stopArgs: ['nfs-server'], startArgs: ['nfs-server'] },
   { id: 'ssh', label: 'SSH', statusUnits: ['ssh.service'], stopArgs: ['ssh'], startArgs: ['ssh'] },
+  // mDNS/DNS-SD - lets SMB shares show up in network-browse UIs (Finder, GNOME Files) as
+  // "<hostname>.local" without depending on the router's own DNS. install-webui.sh installs
+  // avahi-daemon and drops in the Samba service-type file that actually advertises the shares;
+  // this entry just gives the daemon itself the same start/stop/restart/status row as everything
+  // else here.
+  { id: 'avahi', label: 'Avahi/mDNS', statusUnits: ['avahi-daemon.service'], stopArgs: ['avahi-daemon'], startArgs: ['avahi-daemon'] },
 ];
 
 /**

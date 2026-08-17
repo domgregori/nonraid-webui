@@ -11,6 +11,7 @@ const WARNINGS: Record<string, string> = {
   smb: 'Stopping or restarting this will drop active SMB client connections.',
   nfs: 'Stopping or restarting this will drop active NFS client connections.',
   ssh: 'Stopping or restarting this may drop your current SSH session and any other active SSH connections.',
+  avahi: 'Stopping or restarting this may drop network discovery',
 };
 
 const HEALTH_POLL_INTERVAL_MS = 2000;
