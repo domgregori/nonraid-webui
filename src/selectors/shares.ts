@@ -20,6 +20,23 @@ export interface ShareViewModel {
   pct: number;
   connectionsLabel: string;
   accessLabel: string;
+  endpoints: string[];
+}
+
+/**
+ * One connection string per enabled protocol - `smb://host/name` is a real share-name
+ * abstraction (see smb.conf's `[name]` section), but NFS has no such thing on its own; the short
+ * `nfs://host/name` form only resolves because writeExportsBlock() now exports config.shareMountRoot
+ * itself as an NFSv4 pseudo-root (fsid=0,crossmnt) - see its own doc comment for why. Uses
+ * window.location.hostname (whatever address the browser is actually connected through right now),
+ * same pattern selectors/containers.ts's resolveContainerWebUi() already uses for Docker/LXC links.
+ */
+export function deriveShareEndpoints(share: Pick<ShareWithStats, 'name' | 'protocols'>): string[] {
+  const host = window.location.hostname;
+  const endpoints: string[] = [];
+  if (share.protocols.includes('smb')) endpoints.push(`smb://${host}/${share.name}`);
+  if (share.protocols.includes('nfs')) endpoints.push(`nfs://${host}/${share.name}`);
+  return endpoints;
 }
 
 /** Groups get Samba's own "@groupname" convention, matching how they're already written into
@@ -62,5 +79,6 @@ export function deriveShareViewModel(share: ShareWithStats): ShareViewModel {
     pct,
     connectionsLabel: share.activeConnections > 0 ? `${share.activeConnections} connection${share.activeConnections === 1 ? '' : 's'}` : '-',
     accessLabel: deriveAccessLabel(share),
+    endpoints: deriveShareEndpoints(share),
   };
 }

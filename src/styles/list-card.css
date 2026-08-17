@@ -44,6 +44,20 @@
   min-width: 180px;
 }
 
+.list-card__endpoints {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.list-card__endpoint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-dim);
+  user-select: all;
+}
+
 .list-card__progress {
   flex: 1 1 160px;
   min-width: 160px;

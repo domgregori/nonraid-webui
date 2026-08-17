@@ -56,7 +56,18 @@ export function UsersPage() {
               <div className="list-card__title">{share.name}</div>
               <div className="list-card__subtitle">{share.protocolLabel}</div>
             </div>
-            <div className="list-card__col--wide">{share.accessLabel}</div>
+            <div className="list-card__col--wide">
+              {share.accessLabel}
+              {share.endpoints.length > 0 && (
+                <div className="list-card__endpoints">
+                  {share.endpoints.map((ep) => (
+                    <div className="list-card__endpoint" key={ep}>
+                      {ep}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="list-card__actions">
               <button
                 type="button"
