@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AppIcon } from '../components/apps/AppIcon';
 import { ContainerFormDialog } from '../components/docker/ContainerFormDialog';
 import { LogsDialog } from '../components/docker/LogsDialog';
 import { useDockerContainers } from '../hooks/useDockerContainers';
@@ -51,7 +52,10 @@ export function DockerPage() {
         {views.map((c) => (
           <div className="docker-card" key={c.id}>
             <div className="docker-card__head">
-              <div className="docker-card__name">{c.name}</div>
+              <div className="docker-card__identity">
+                <AppIcon name={c.name} icon={c.icon} size={32} />
+                <div className="docker-card__name">{c.name}</div>
+              </div>
               <span className="docker-card__status" style={{ color: c.statusColor }}>
                 <span className="docker-card__status-dot" style={{ background: c.statusColor }} />
                 {c.statusLabel}

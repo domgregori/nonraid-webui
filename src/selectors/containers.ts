@@ -45,6 +45,7 @@ export function deriveContainerViewModel(container: DockerContainerSummary, acti
   return {
     id: container.id,
     name: container.name,
+    icon: container.icon,
     image: container.image,
     ports: container.ports,
     statusLabel: running ? 'Running' : 'Stopped',

@@ -1,6 +1,7 @@
 export interface ContainerViewModel {
   id: string;
   name: string;
+  icon: string | null;
   image: string;
   ports: string;
   statusLabel: string;

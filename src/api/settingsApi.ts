@@ -9,6 +9,11 @@ export const settingsApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(patch),
     }),
-  testNotification: () => request<CommandResult>('/api/settings/notifications/test', { method: 'POST' }),
+  testNotification: (appriseUrls?: string) =>
+    request<CommandResult>('/api/settings/notifications/test', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ appriseUrls }),
+    }),
   getNotificationEvents: () => request<NotificationEventDef[]>('/api/settings/notification-events'),
 };

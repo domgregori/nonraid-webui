@@ -88,6 +88,8 @@ export interface AppSummary {
   categories: string[];
   privileged: boolean;
   installed: InstalledInfo | null;
+  downloads: number | null;
+  stars: number | null;
 }
 
 export type AppSort = 'trending' | 'latest' | 'new';

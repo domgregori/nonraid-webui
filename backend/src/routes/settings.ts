@@ -123,10 +123,14 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
     }
   });
 
-  router.post('/settings/notifications/test', async (_req, res) => {
+  router.post('/settings/notifications/test', async (req, res) => {
     try {
-      const settings = await store.get();
-      res.json(await sendAppriseNotification(settings.notifications.appriseUrls, 'NonRAID', 'Test notification from the nonraid dashboard.'));
+      // Tests whatever's currently in the form, not what's already saved - lets the user check a
+      // URL works before committing to it. Falls back to the persisted URLs when the body doesn't
+      // include one (e.g. a bare test-with-saved-config call).
+      const { appriseUrls } = req.body as { appriseUrls?: unknown };
+      const urls = typeof appriseUrls === 'string' ? appriseUrls : (await store.get()).notifications.appriseUrls;
+      res.json(await sendAppriseNotification(urls, 'NonRAID', 'Test notification from the nonraid dashboard.'));
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

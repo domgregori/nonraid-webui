@@ -11,12 +11,33 @@ interface ShareFormModalProps {
   onSubmit: (input: ShareInput) => Promise<boolean>;
 }
 
-const ALLOCATION_OPTIONS: { value: AllocationMethod; label: string }[] = [
-  { value: 'most-free', label: 'Most-free' },
-  { value: 'fill-up', label: 'Fill-up' },
-  { value: 'high-water', label: 'High-water' },
-  { value: 'single-disk', label: 'Single disk' },
-  { value: 'cache-only', label: 'Cache only' },
+const ALLOCATION_OPTIONS: { value: AllocationMethod; label: string; description: string }[] = [
+  {
+    value: 'most-free',
+    label: 'Most-free',
+    description: 'Writes new files to whichever disk currently has the most free space - keeps usage balanced across all disks over time.',
+  },
+  {
+    value: 'fill-up',
+    label: 'Fill-up',
+    description: 'Fills disks in order - writes go to the first disk (in disk order) with room until it’s full, then moves on to the next.',
+  },
+  {
+    value: 'high-water',
+    label: 'High-water',
+    description:
+      'Keeps files under the same path together on one disk when possible, otherwise picks the disk with the most free space. An approximation of Unraid’s High-Water policy, not an exact match.',
+  },
+  {
+    value: 'single-disk',
+    label: 'Single disk',
+    description: 'Pins this pool to exactly one disk - no spreading files across drives.',
+  },
+  {
+    value: 'cache-only',
+    label: 'Cache only',
+    description: 'Lives entirely on the cache disks - no array disk is used, and the mover never touches it.',
+  },
 ];
 
 export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: ShareFormModalProps) {
@@ -193,9 +214,10 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
               style={{ width: '100%' }}
               value={allocationMethod}
               onChange={(e) => handleAllocationChange(e.target.value as AllocationMethod)}
+              title={ALLOCATION_OPTIONS.find((opt) => opt.value === allocationMethod)?.description}
             >
               {ALLOCATION_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value} disabled={opt.value === 'cache-only' && !cacheConfigured}>
+                <option key={opt.value} value={opt.value} disabled={opt.value === 'cache-only' && !cacheConfigured} title={opt.description}>
                   {opt.value === 'cache-only' && !cacheConfigured ? `${opt.label} (set up a cache pool first)` : opt.label}
                 </option>
               ))}

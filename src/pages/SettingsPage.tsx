@@ -492,7 +492,7 @@ export function SettingsPage() {
     setTestError(null);
     setTestResult(null);
     try {
-      const result = await settingsApi.testNotification();
+      const result = await settingsApi.testNotification(appriseDraft);
       setTestResult(result.message);
     } catch (err) {
       setTestError((err as Error).message);

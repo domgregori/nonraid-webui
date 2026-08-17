@@ -218,50 +218,13 @@ file support — set an env var directly for a quick one-off override.
 
 ## API
 
-| Method | Path                | Body/Params                                          | Notes |
-|--------|---------------------|-------------------------------------------------------|-------|
-| GET    | `/api/health`        | —                                                       | `{ ok }` |
-| GET    | `/api/status`         | —                                                       | Full `nmdctl status -o json` passthrough |
-| POST   | `/api/array/start`     | —                                                       | `nmdctl start` |
-| POST   | `/api/array/stop`       | —                                                       | `nmdctl stop`. Rejects with 502 if a parity check is active. |
-| POST   | `/api/parity/:action`    | `:action` = `CORRECT` \| `NOCORRECT` \| `PAUSE` \| `RESUME` \| `CANCEL` | `nmdctl check <action>` |
-| GET    | `/api/docker/containers`        | —                                                       | List all containers (running + stopped), normalized `DockerContainerSummary[]` |
-| POST   | `/api/docker/containers/:id/start`  | —                                                   | |
-| POST   | `/api/docker/containers/:id/stop`    | —                                                   | |
-| POST   | `/api/docker/containers/:id/restart`  | —                                                   | |
-| GET    | `/api/lxc/containers`          | —                                                       | `LxcContainerSummary[]` — name, state, autostart, description, webUiUrl, cpu/mem/ips |
-| GET    | `/api/lxc/containers/:name`      | —                                                       | Full detail — pid, rootfs path, bridge, MAC, cgroup limits |
-| GET    | `/api/lxc/containers/:name/config` | —                                                     | `{ content }` — the container's raw on-disk config file text |
-| PUT    | `/api/lxc/containers/:name/config` | `{ content }`                                         | Overwrites the config file verbatim |
-| POST   | `/api/lxc/containers/:name/start`  | —                                                       | |
-| POST   | `/api/lxc/containers/:name/stop`   | `{ force? }`                                            | `force: true` → `lxc-stop --kill` instead of a graceful timeout |
-| POST   | `/api/lxc/containers/:name/restart` | —                                                       | |
-| DELETE | `/api/lxc/containers/:name`      | —                                                       | `lxc-destroy` |
-| POST   | `/api/lxc/containers`         | `{ name, distribution, release, arch, bridge, autostart, description?, webUiUrl? }` | NDJSON progress stream, same protocol as Docker create |
-| GET    | `/api/lxc/distros`           | —                                                       | `{ distros, defaultArch }` — live image index, falls back to a static list |
-| GET    | `/api/lxc/bridges`           | —                                                       | Host bridge names a new container's veth can attach to |
-| GET    | `/api/smart/temperatures`        | —                                                       | `{ [device]: number \| null }` for every disk currently in the array |
-| GET    | `/api/shares`             | —                                                               | `ShareWithStats[]` — config + live used/total bytes |
-| POST   | `/api/shares`              | `{ name, disks, allocationMethod, protocols, smb?, nfs? }`         | 201 on success, 409 if the name exists |
-| PUT    | `/api/shares/:name`          | same body as POST                                                    | Renaming (body `name` ≠ `:name`) unmounts the old pool and mounts a new one |
-| DELETE | `/api/shares/:name`            | —                                                                       | Unmounts + un-exports only — never deletes files |
-| GET    | `/api/system`             | —                                                               | `{ hostname, uptimeSeconds, cpuPercent, memUsedBytes, memTotalBytes }` |
-| GET    | `/api/users`               | —                                                               | `User[]` — managed accounts (uid ≥ `USERS_UID_RANGE_START`) |
-| POST   | `/api/users`                | `{ username, password, groups }`                                     | 201 on success, 409 if the username exists |
-| PUT    | `/api/users/:username`        | `{ password?, groups? }`                                            | Either field optional — omit to leave unchanged |
-| DELETE | `/api/users/:username`          | —                                                                       | Also purges the user from every share's access list and resyncs `smb.conf` |
-| GET    | `/api/users/:username/access`    | —                                                                       | `{ shareName, permission }[]` — one entry per existing share, `'none'` where unset |
-| PUT    | `/api/users/:username/access/:shareName` | `{ permission }` — one of `read-write` \| `read-only` \| `none` \| `hidden` | Resyncs `smb.conf` |
-| GET    | `/api/groups`               | —                                                               | `Group[]` — managed groups (gid ≥ `USERS_UID_RANGE_START`) |
-| POST   | `/api/groups`                | `{ name }`                                                            | 201 on success, 409 if the group exists |
-| DELETE | `/api/groups/:name`            | —                                                                       | Also purges the group from every share's access list and resyncs `smb.conf` |
-| GET    | `/api/groups/:name/access`       | —                                                                       | Same shape as the per-user access endpoint |
-| PUT    | `/api/groups/:name/access/:shareName`  | `{ permission }`                                                | Same as the per-user version, applied via Samba's `@groupname` syntax |
-
-Errors are `{ error: string }` with status 400 (bad request — e.g. invalid parity action, or a share
-name/disks/allocation method that fails validation), 404 (share/user/group not found), 409 (name
-already exists, or none of a share's disks are currently mounted), or 502 (the underlying command
-itself failed — nmdctl/Docker/smartctl/mergerfs/Samba/useradd family).
+Full endpoint-by-endpoint reference (every route, request body, response shape, and error
+convention) lives in **[`API.md`](./API.md)** rather than here, since it now covers ~100 routes
+across array/disk/share/Docker/LXC/Apps/auth/TLS/settings management. In short: every route is
+mounted under `/api`, requires a session cookie except `/api/health` and `/api/auth/*`, and returns
+errors as `{ error: string }` (usually `400`/`404`/`409`/`502`). A handful of long-running
+operations (image pulls, container creation, storage migrations) stream newline-delimited JSON
+progress events instead of a single response - see API.md's "Conventions" section.
 
 ## Config (env vars, see `tools/config/nonraid-webui.toml.example` for the TOML equivalents)
 

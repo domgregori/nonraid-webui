@@ -9,10 +9,13 @@ interface AppCardProps {
 
 const MAX_VISIBLE_CATEGORIES = 2;
 
+const compactNumber = new Intl.NumberFormat('en', { notation: 'compact' });
+
 export function AppCard({ app, onInstall, onViewDetail }: AppCardProps) {
   const shownCategories = app.categories.slice(0, MAX_VISIBLE_CATEGORIES);
   const extraCount = app.categories.length - shownCategories.length;
   const updateAvailable = app.installed?.updateAvailable ?? false;
+  const hasStats = app.downloads !== null || app.stars !== null;
 
   return (
     <div
@@ -46,6 +49,21 @@ export function AppCard({ app, onInstall, onViewDetail }: AppCardProps) {
       </div>
 
       {app.overviewShort && <div className="app-card__overview">{app.overviewShort}</div>}
+
+      {hasStats && (
+        <div className="app-card__stats">
+          {app.downloads !== null && (
+            <span title={`${app.downloads.toLocaleString()} downloads`}>
+              {compactNumber.format(app.downloads)} download{app.downloads === 1 ? '' : 's'}
+            </span>
+          )}
+          {app.stars !== null && (
+            <span title={`${app.stars.toLocaleString()} stars`}>
+              {compactNumber.format(app.stars)} star{app.stars === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="app-card__foot">
         <div className="app-card__categories">

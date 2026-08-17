@@ -59,6 +59,8 @@ function toSummary(app: CaApp, installedContainer: DockerContainerSummary | unde
     categories: Array.isArray(app.CategoryList) ? app.CategoryList : [],
     privileged: app.Privileged === 'true',
     installed,
+    downloads: typeof app.downloads === 'number' ? app.downloads : null,
+    stars: typeof app.stars === 'number' ? app.stars : null,
   };
 }
 

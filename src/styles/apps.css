@@ -243,6 +243,13 @@
   flex: 1;
 }
 
+.app-card__stats {
+  display: flex;
+  gap: var(--space-md);
+  font-size: 11px;
+  color: var(--color-text-dim);
+}
+
 .app-card__foot {
   display: flex;
   align-items: center;
