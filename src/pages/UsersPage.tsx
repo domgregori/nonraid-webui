@@ -56,6 +56,7 @@ export function UsersPage() {
               <div className="list-card__title">{share.name}</div>
               <div className="list-card__subtitle">{share.protocolLabel}</div>
             </div>
+            <div className="list-card__col--wide">{share.accessLabel}</div>
             <div className="list-card__actions">
               <button
                 type="button"
