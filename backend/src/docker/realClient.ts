@@ -223,6 +223,11 @@ export class RealDockerClient implements DockerClient {
       binds,
       devices,
       labels: info.Config.Labels ?? {},
+      // Anything other than Docker's own default ("no", or absent on a container created before
+      // this field existed) counts as "start on boot" for this app's purposes - "always" and
+      // "on-failure" both still restart on daemon start, just with additional restart triggers
+      // this simple checkbox doesn't expose.
+      autostart: !!info.HostConfig.RestartPolicy?.Name && info.HostConfig.RestartPolicy.Name !== 'no',
     };
   }
 
@@ -394,6 +399,7 @@ export class RealDockerClient implements DockerClient {
         })),
         NetworkMode: options.network,
         Privileged: options.privileged,
+        RestartPolicy: { Name: options.autostart ? 'unless-stopped' : 'no' },
       },
     });
     onProgress?.({ phase: 'starting', message: 'Starting container', percent: null });

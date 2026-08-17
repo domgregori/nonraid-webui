@@ -55,6 +55,12 @@ export interface CreateContainerOptions {
   binds: string[]; // "hostPath:containerPath" or "hostPath:containerPath:ro"
   devices: CreateContainerDevice[];
   labels: Record<string, string>;
+  // Maps to Docker's own RestartPolicy ("unless-stopped" vs "no") - Docker's native mechanism for
+  // "start this container when the daemon starts", the same thing /array/start relies on to bring
+  // containers back after a stopContainers-driven Docker restart (see routes/array.ts). Distinct
+  // from "always", which would also restart a container the user explicitly stopped themselves -
+  // "unless-stopped" respects that, matching what "start on boot" actually means to a user.
+  autostart: boolean;
 }
 
 export interface CreateContainerProgress {
@@ -108,6 +114,7 @@ export interface ContainerDetail {
   binds: ContainerVolumeMount[];
   devices: ContainerDeviceMapping[];
   labels: Record<string, string>;
+  autostart: boolean;
 }
 
 // A manually-configured container (via the Docker tab's Add/Edit dialog) has
@@ -123,6 +130,7 @@ export interface ManualContainerRequest {
   binds: ContainerVolumeMount[];
   devices: ContainerDeviceMapping[];
   privilegedAck?: boolean;
+  autostart?: boolean;
 }
 
 export interface ManualPlanBind extends ContainerVolumeMount {
@@ -145,4 +153,5 @@ export interface ManualContainerPlan {
   errors: string[];
   requiresPrivilegedAck: boolean;
   elevatedAccessReasons: string[];
+  autostart: boolean;
 }

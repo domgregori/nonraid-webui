@@ -12,7 +12,7 @@ import { SystemCard } from '../components/dashboard/SystemCard';
 import { useArrayStatus } from '../state/useArrayStatus';
 
 export function DashboardPage() {
-  const { status, loadState, error, actionError } = useArrayStatus();
+  const { status, loadState, error, actionError, stopBlockedByContainers, arrayPending, toggleArray } = useArrayStatus();
 
   return (
     <div className="dashboard">
@@ -21,7 +21,18 @@ export function DashboardPage() {
         {/* 'not-configured' (no array ever created) is expected on a fresh install - OnboardingGate
             covers this with the setup wizard instead of a scary error banner. */}
         {loadState === 'error' && error && <div className="status-note status-note--error">{error}</div>}
-        {actionError && <div className="status-note status-note--error">{actionError}</div>}
+        {actionError && (
+          <div className="status-note status-note--error">
+            {actionError}
+            {stopBlockedByContainers && (
+              <div style={{ marginTop: 8 }}>
+                <button type="button" className="btn btn--danger" disabled={arrayPending} onClick={() => toggleArray(true)}>
+                  {arrayPending ? 'Stopping…' : 'Stop Docker/LXC and retry'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {status && (
           <>
             <StatCards />

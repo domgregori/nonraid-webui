@@ -51,6 +51,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
   const [binds, setBinds] = useState<ContainerVolumeMount[]>([]);
   const [devices, setDevices] = useState<ContainerDeviceMapping[]>([]);
   const [privilegedAck, setPrivilegedAck] = useState(false);
+  const [autostart, setAutostart] = useState(false);
   const [availableDevices, setAvailableDevices] = useState<HostDevice[]>([]);
 
   useEffect(() => {
@@ -78,6 +79,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
         setPorts(detail.ports);
         setBinds(detail.binds);
         setDevices(detail.devices);
+        setAutostart(detail.autostart);
         setCaAppName(detail.labels[CA_APP_NAME_LABEL] ?? null);
         setStage('editing');
       })
@@ -106,6 +108,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
     binds: binds.filter((b) => b.hostPath && b.containerPath),
     devices: devices.filter((d) => d.hostPath && d.containerPath),
     privilegedAck,
+    autostart,
   });
 
   const handleReview = async () => {
@@ -230,6 +233,20 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                   }}
                 />
                 Privileged (full host access)
+              </label>
+            )}
+
+            {!locked && (
+              <label className="apps-privileged-banner__ack">
+                <input
+                  type="checkbox"
+                  checked={autostart}
+                  onChange={(e) => {
+                    setAutostart(e.target.checked);
+                    invalidate();
+                  }}
+                />
+                Start automatically on boot
               </label>
             )}
 
@@ -528,6 +545,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                       <span className="apps-plan-review__kv-value">
                         {plan.network}
                         {plan.privileged ? ' · privileged' : ''}
+                        {plan.autostart ? ' · starts on boot' : ''}
                       </span>
                     </div>
                   </div>

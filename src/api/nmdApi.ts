@@ -15,7 +15,12 @@ import type {
 export const nmdApi = {
   getStatus: () => request<NmdStatusResponse>('/api/status'),
   startArray: () => request<NmdCommandResult>('/api/array/start', { method: 'POST' }),
-  stopArray: () => request<NmdCommandResult>('/api/array/stop', { method: 'POST' }),
+  stopArray: (stopContainers = false) =>
+    request<NmdCommandResult>('/api/array/stop', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ stopContainers }),
+    }),
   previewImport: (file: File) => {
     const form = new FormData();
     form.append('file', file);

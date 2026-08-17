@@ -15,6 +15,12 @@ export interface ArrayStatusContextValue {
    *  Does NOT get cleared by background polling - only by the next action attempt - so it stays
    *  visible long enough to actually read. */
   actionError: string | null;
+  /** True when the last stop attempt failed because something (usually Docker's own data root,
+   *  relocated onto an array disk via Settings -> Docker & LXC Storage) still had a file open on
+   *  an array disk - a real, expected failure mode, not a generic error. Lets the UI offer a
+   *  targeted "stop Docker/LXC and retry" action instead of just showing the raw nmdctl error.
+   *  Cleared by any other action, or once a stop attempt (with or without stopContainers) succeeds. */
+  stopBlockedByContainers: boolean;
   temps: Record<string, number | null>;
   diskHealths: Record<string, 'passed' | 'failed' | null>;
   /** SSD/HDD per array disk device - fetched once (not polled), since a disk's rotational type
@@ -35,7 +41,9 @@ export interface ArrayStatusContextValue {
    *  `hasAnyDisk` derived from `status` at render time) are fixed by closure and won't pick up a
    *  state update that happens later in the same call, even after awaiting one. */
   refresh: () => Promise<NmdStatusResponse | null>;
-  toggleArray: () => void;
+  /** stopContainers only takes effect when the array is currently started (i.e. this call is a
+   *  stop, not a start) - see stopBlockedByContainers above for the retry flow that passes it. */
+  toggleArray: (stopContainers?: boolean) => void;
   parityAction: (action: ParityCheckAction) => void;
   selectDisk: (id: string) => void;
   closeDetail: () => void;

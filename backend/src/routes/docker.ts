@@ -217,6 +217,7 @@ export function dockerRouter(
           binds: plan.binds.map((b) => `${b.hostPath}:${b.containerPath}${b.readOnly ? ':ro' : ''}`),
           devices: plan.devices.map((d) => ({ hostPath: d.hostPath, containerPath: d.containerPath })),
           labels: {},
+          autostart: plan.autostart,
         },
         (progress) => send({ type: 'progress', ...progress }),
       );
@@ -261,6 +262,7 @@ export function dockerRouter(
           binds: plan.binds.map((b) => `${b.hostPath}:${b.containerPath}${b.readOnly ? ':ro' : ''}`),
           devices: plan.devices.map((d) => ({ hostPath: d.hostPath, containerPath: d.containerPath })),
           labels: existing.labels,
+          autostart: plan.autostart,
         },
         (progress) => send({ type: 'progress', ...progress }),
       );

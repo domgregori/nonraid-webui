@@ -208,6 +208,10 @@ export class AppsService {
           // and stay recognizable to any other tool that reads the same convention.
           ...(app.Icon ? { 'net.unraid.docker.icon': app.Icon } : {}),
         },
+        // CA templates have no equivalent field to resolve this from, and this app's manual
+        // create/edit dialog is where "start on boot" is actually surfaced (see routes/docker.ts) -
+        // an install here can already be edited afterward to turn it on.
+        autostart: false,
       },
       onProgress,
     );

@@ -174,6 +174,31 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
         activity.log(`Array started, but mounting disks failed: ${(err as Error).message}`, 'amber').catch(() => {});
       }
 
+      // Best-effort recovery from /array/stop's own stopContainers path (see there for why a
+      // successful stop never restarts Docker/LXC itself): if that left docker.service stopped -
+      // e.g. the array was stopped, then started again in the same session without anyone manually
+      // restarting Docker - bring it back now so its own containers (any with a real restart
+      // policy - this app doesn't set one on the ones it creates, so most won't self-start) at
+      // least have a running daemon to restart against. LXC has no daemon-level equivalent - each
+      // container's own `autostart` (lxc.start.auto) is normally only honored by lxc's systemd
+      // unit at a real host boot, not when this app starts/stops containers mid-session - so it's
+      // applied explicitly here instead.
+      await runSudoMaybe('systemctl', ['start', 'docker']).catch(() => {});
+      try {
+        const containers = await lxc.listContainers();
+        const started: string[] = [];
+        for (const c of containers) {
+          if (!c.autostart || c.state === 'running') continue;
+          await lxc.startContainer(c.name).catch(() => {});
+          started.push(c.name);
+        }
+        if (started.length > 0) {
+          activity.log(`Started autostart LXC container(s): ${started.join(', ')}`, 'blue').catch(() => {});
+        }
+      } catch {
+        // best-effort - a failure listing/starting LXC containers shouldn't fail array start itself
+      }
+
       activity.log('Array started', 'green', 'arrayStarted').catch(() => {});
       notifyEvent(settingsStore, 'arrayStarted', 'NonRAID: array started', 'Array started');
       res.json(result);
@@ -182,19 +207,61 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
     }
   });
 
-  router.post('/array/stop', async (_req, res) => {
+  router.post('/array/stop', async (req, res) => {
+    // Opt-in - stopping Docker/every running LXC container is a real disruption, so it only
+    // happens if the caller explicitly agreed to it AND it turns out to actually be necessary
+    // (unmountDisks() below only fails this way when something has a file open on an array disk -
+    // e.g. Docker's own data root relocated there via Settings -> Docker & LXC Storage, not just a
+    // container's bind-mounted volume - see docker/storagePath.ts and lxc/storagePath.ts for the
+    // same class of conflict during a storage move). Unlike /array/reload-driver, a *successful*
+    // stop here never restarts Docker/LXC afterward - their storage lives on the array disk that's
+    // about to be unmounted, so there'd be nothing left for them to run against. Only restarted if
+    // the stop attempt still fails even after stopping them, so a failed attempt doesn't leave
+    // Docker/LXC down for nothing while the array keeps running.
+    const stopContainers = req.body?.stopContainers === true;
+    let dockerStopped = false;
+    const stoppedLxcNames: string[] = [];
+
     try {
       // nmdctl refuses to stop (in unattended mode, always used here) with
       // any disk filesystem still mounted - and a share's mergerfs/bind mount
       // holds a live reference into those disk mounts that nmdctl itself has
       // no idea exists, so both layers need unmounting before nmdctl stop.
       await shares.unmountAll();
-      await nmd.unmountDisks();
+      try {
+        await nmd.unmountDisks();
+      } catch (err) {
+        if (!stopContainers) throw err;
+
+        activity.log('Stopping Docker and running LXC containers to allow the array to stop', 'amber').catch(() => {});
+        await runSudoMaybe('systemctl', ['stop', 'docker.socket', 'docker.service']).catch(() => {});
+        dockerStopped = true;
+
+        const containers = await lxc.listContainers().catch(() => []);
+        for (const c of containers) {
+          if (c.state !== 'running') continue;
+          await lxc.stopContainer(c.name).catch(() => {});
+          stoppedLxcNames.push(c.name);
+        }
+
+        await shares.unmountAll().catch(() => {});
+        await nmd.unmountDisks(); // still busy after stopping containers - let this one throw for real
+      }
+
       const result = await nmd.stopArray();
       activity.log('Array stopped', 'blue', 'arrayStopped').catch(() => {});
       notifyEvent(settingsStore, 'arrayStopped', 'NonRAID: array stopped', 'Array stopped');
       res.json(result);
     } catch (err) {
+      // The stop attempt itself failed (or never got past unmountDisks) - restore whatever we
+      // stopped along the way, since the array is still running and there's no reason for
+      // Docker/LXC to stay down.
+      if (dockerStopped) {
+        await runSudoMaybe('systemctl', ['start', 'docker']).catch(() => {});
+      }
+      for (const name of stoppedLxcNames) {
+        await lxc.startContainer(name).catch(() => {});
+      }
       res.status(502).json({ error: (err as Error).message });
     }
   });

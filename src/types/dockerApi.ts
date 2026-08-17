@@ -77,6 +77,7 @@ export interface ContainerDetail {
   binds: ContainerVolumeMount[];
   devices: ContainerDeviceMapping[];
   labels: Record<string, string>;
+  autostart: boolean;
 }
 
 export interface ManualContainerRequest {
@@ -89,6 +90,7 @@ export interface ManualContainerRequest {
   binds: ContainerVolumeMount[];
   devices: ContainerDeviceMapping[];
   privilegedAck?: boolean;
+  autostart?: boolean;
 }
 
 export interface ManualPlanBind extends ContainerVolumeMount {
@@ -111,6 +113,7 @@ export interface ManualContainerPlan {
   errors: string[];
   requiresPrivilegedAck: boolean;
   elevatedAccessReasons: string[];
+  autostart: boolean;
 }
 
 // Labels stamped by the Apps (Community Applications) feature at install

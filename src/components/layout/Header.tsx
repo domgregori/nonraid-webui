@@ -26,7 +26,7 @@ export function Header() {
           type="button"
           className="toggle-array-btn"
           disabled={!status || arrayPending}
-          onClick={toggleArray}
+          onClick={() => toggleArray()}
           style={{ borderColor: toggleBtn.border, background: toggleBtn.bg, color: toggleBtn.fg }}
         >
           {toggleBtn.label}

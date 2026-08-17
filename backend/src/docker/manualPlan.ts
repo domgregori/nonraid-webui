@@ -60,5 +60,6 @@ export async function buildManualPlan(request: ManualContainerRequest, bindRoots
     errors,
     requiresPrivilegedAck: elevatedAccessReasons.length > 0,
     elevatedAccessReasons,
+    autostart: request.autostart === true,
   };
 }

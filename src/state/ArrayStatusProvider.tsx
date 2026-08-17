@@ -13,6 +13,7 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [stopBlockedByContainers, setStopBlockedByContainers] = useState(false);
   const [temps, setTemps] = useState<Record<string, number | null>>({});
   const [diskHealths, setDiskHealths] = useState<Record<string, 'passed' | 'failed' | null>>({});
   const [diskTypes, setDiskTypes] = useState<Record<string, boolean | null>>({});
@@ -84,18 +85,29 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
     };
   }, [refreshStatus, refreshTemps, refreshHealth]);
 
-  const toggleArray = useCallback(() => {
-    const current = statusRef.current;
-    if (!current) return;
-    setArrayPending(true);
-    setActionNote(null);
-    setActionError(null);
-    const call = current.array.state === 'STARTED' ? nmdApi.stopArray() : nmdApi.startArray();
-    call
-      .then(() => refreshStatus())
-      .catch((err) => setActionError((err as Error).message))
-      .finally(() => setArrayPending(false));
-  }, [refreshStatus]);
+  const toggleArray = useCallback(
+    (stopContainers = false) => {
+      const current = statusRef.current;
+      if (!current) return;
+      setArrayPending(true);
+      setActionNote(null);
+      setActionError(null);
+      setStopBlockedByContainers(false);
+      const stopping = current.array.state === 'STARTED';
+      const call = stopping ? nmdApi.stopArray(stopContainers) : nmdApi.startArray();
+      call
+        .then(() => refreshStatus())
+        .catch((err) => {
+          setActionError((err as Error).message);
+          // Only offer the retry-with-stopContainers prompt on the *first* failed attempt - if
+          // the caller already tried with stopContainers and it still failed, offering the same
+          // retry again would be misleading (the error banner alone covers that case).
+          if (stopping && !stopContainers) setStopBlockedByContainers(true);
+        })
+        .finally(() => setArrayPending(false));
+    },
+    [refreshStatus],
+  );
 
   const parityAction = useCallback(
     (action: ParityCheckAction) => {
@@ -161,6 +173,7 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
         loadState,
         error,
         actionError,
+        stopBlockedByContainers,
         temps,
         diskHealths,
         diskTypes,
