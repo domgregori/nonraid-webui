@@ -40,7 +40,7 @@ containers, LXC containers, historical metrics, and array management.
 
 ## Requirements
 
-- Debian 13 new install with a sudo user, to run install script
+- Debian 13 new install
   - NonRAID has specific kernel needs
   - Not tested on other distros. Only tested on fresh install of Debian 13
 - Install script installs the other requirements. Read [REQUIREMENTS.md](REQUIREMENTS.md) and [install-webui.sh](tools/install-webui.sh)

@@ -34,8 +34,7 @@ export function SharesPage() {
       </div>
 
       <div className="toggle-row__desc" style={{ marginBottom: 'var(--space-md)' }}>
-        A pool is a unified folder spanning one or more disks - a place to store files. Creating one here doesn't
-        share it with anything on your network; turn on SMB or NFS access for it from the Sharing tab.
+        A pool is a unified folder spanning one or more disks - a place to store files.
       </div>
 
       {status === 'loading' && <div className="status-note">Loading pools…</div>}
