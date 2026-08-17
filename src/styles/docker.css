@@ -54,6 +54,10 @@
   font-family: var(--font-mono);
 }
 
+.docker-card__autostart-row {
+  margin-top: 6px;
+}
+
 .docker-card__badges {
   margin-top: 6px;
   display: flex;
@@ -118,7 +122,7 @@
   margin: 0;
   width: 13px;
   height: 13px;
-  border-radius: 50%;
+  border-radius: 3px;
   border: 1.5px solid var(--color-border);
   background: transparent;
   cursor: inherit;
@@ -133,10 +137,11 @@
 
 .docker-card__autostart input[type='checkbox']:checked::after {
   content: '';
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--color-surface);
+  width: 3px;
+  height: 6px;
+  border: solid var(--color-surface);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
 }
 
 .docker-card__stats {

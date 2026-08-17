@@ -9,6 +9,7 @@ import { ParityCheckCard } from '../components/dashboard/ParityCheckCard';
 import { SharesCard } from '../components/dashboard/SharesCard';
 import { StatCards } from '../components/dashboard/StatCards';
 import { SystemCard } from '../components/dashboard/SystemCard';
+import { ArrayActionErrorBanner } from '../components/shared/ArrayActionErrorBanner';
 import { useArrayStatus } from '../state/useArrayStatus';
 
 export function DashboardPage() {
@@ -22,16 +23,12 @@ export function DashboardPage() {
             covers this with the setup wizard instead of a scary error banner. */}
         {loadState === 'error' && error && <div className="status-note status-note--error">{error}</div>}
         {actionError && (
-          <div className="status-note status-note--error">
-            {stopBlockedByContainers ? 'A disk is in use by Docker or LXC. Stop containers?' : actionError}
-            {stopBlockedByContainers && (
-              <div style={{ marginTop: 8 }}>
-                <button type="button" className="btn btn--danger" disabled={arrayPending} onClick={() => toggleArray(true)}>
-                  {arrayPending ? 'Stopping…' : 'Stop Docker/LXC and retry'}
-                </button>
-              </div>
-            )}
-          </div>
+          <ArrayActionErrorBanner
+            actionError={actionError}
+            stopBlockedByContainers={stopBlockedByContainers}
+            arrayPending={arrayPending}
+            onRetryWithStopContainers={() => toggleArray(true)}
+          />
         )}
         {status && (
           <>

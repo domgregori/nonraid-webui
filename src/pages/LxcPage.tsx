@@ -60,17 +60,19 @@ export function LxcPage() {
               </span>
             </div>
             {c.description && <div className="docker-card__image">{c.description}</div>}
-            <div className="docker-card__badges">
-              {c.webUiUrl && (
-                <a className="docker-card__weburl" href={c.webUiUrl.replace('[IP]', window.location.hostname)} target="_blank" rel="noreferrer">
-                  Web UI &#8599;
-                </a>
-              )}
+            <div className="docker-card__autostart-row">
               <label className="docker-card__autostart">
                 <input type="checkbox" checked={c.autostart} disabled={c.isPending} onChange={c.onToggleAutostart} />
                 Autostart
               </label>
             </div>
+            {c.webUiUrl && (
+              <div className="docker-card__badges">
+                <a className="docker-card__weburl" href={c.webUiUrl.replace('[IP]', window.location.hostname)} target="_blank" rel="noreferrer">
+                  Web UI &#8599;
+                </a>
+              </div>
+            )}
             <div className="docker-card__stats">
               <span>CPU {c.cpuLabel}</span>
               <span>Mem {c.memLabel}</span>

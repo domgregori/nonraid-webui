@@ -7,10 +7,11 @@ import { ParityCheckCard } from '../components/dashboard/ParityCheckCard';
 import { BootDiskDetailPanel } from '../components/disk-detail/BootDiskDetailPanel';
 import { CacheSection } from '../components/disk-detail/CacheSection';
 import { UnassignedDevicesCard } from '../components/disk-detail/UnassignedDevicesCard';
+import { ArrayActionErrorBanner } from '../components/shared/ArrayActionErrorBanner';
 import { useArrayStatus } from '../state/useArrayStatus';
 
 export function DisksPage() {
-  const { status, loadState, error, actionError } = useArrayStatus();
+  const { status, loadState, error, actionError, stopBlockedByContainers, arrayPending, toggleArray } = useArrayStatus();
   const [showBootDisk, setShowBootDisk] = useState(false);
 
   return (
@@ -21,7 +22,14 @@ export function DisksPage() {
 
       {loadState === 'loading' && !status && <div className="status-note">Loading array status…</div>}
       {error && <div className="status-note status-note--error">{error}</div>}
-      {actionError && <div className="status-note status-note--error">{actionError}</div>}
+      {actionError && (
+        <ArrayActionErrorBanner
+          actionError={actionError}
+          stopBlockedByContainers={stopBlockedByContainers}
+          arrayPending={arrayPending}
+          onRetryWithStopContainers={() => toggleArray(true)}
+        />
+      )}
 
       {status && (
         <div className="disks-page">

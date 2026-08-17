@@ -63,6 +63,12 @@ export function DockerPage() {
               </span>
             </div>
             <div className="docker-card__image">{c.image}</div>
+            <div className="docker-card__autostart-row">
+              <label className="docker-card__autostart">
+                <input type="checkbox" checked={c.autostart} disabled={c.isPending} onChange={c.onToggleAutostart} />
+                Autostart
+              </label>
+            </div>
             <div className="docker-card__badges">
               {c.caAppName ? (
                 <span className="docker-card__badge docker-card__badge--ca">CA: {c.caAppName}</span>
@@ -74,10 +80,6 @@ export function DockerPage() {
                   Web UI &#8599;
                 </a>
               )}
-              <label className="docker-card__autostart">
-                <input type="checkbox" checked={c.autostart} disabled={c.isPending} onChange={c.onToggleAutostart} />
-                Autostart
-              </label>
             </div>
             <div className="docker-card__stats">
               <span>CPU {c.cpuLabel}</span>
