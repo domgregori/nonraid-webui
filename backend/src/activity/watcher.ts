@@ -87,7 +87,12 @@ export class ActivityWatcher {
     this.checkArrayError(status.array.state);
     this.checkParitySync(status.array.last_sync, status.array.counters.sync_errors);
     this.checkDisks(status.disks);
-    this.checkNeedsFormat(status.disks);
+    // Only meaningful while the array is started - nmdctl only reports a disk's real filesystem
+    // type once it's actually mounted, so every disk looks "unformatted" while stopped regardless
+    // of what's really on it. Skipping entirely (rather than just not logging) also keeps
+    // needsFormatSnapshots from recording a false negative that would fire a bogus edge on the
+    // next start.
+    if (status.array.state === 'STARTED') this.checkNeedsFormat(status.disks);
     await this.checkSmartHealth(status.disks);
     await this.checkTemperatures(status.disks);
     await this.checkCacheMirror();

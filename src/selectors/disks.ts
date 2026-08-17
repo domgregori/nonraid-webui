@@ -66,7 +66,10 @@ export function deriveDisk(
   const usedPct = role === 'data' ? parseUsagePct(disk.filesystem?.usage) : 0;
   const sizeTB = disk.size_gb / 1024;
   const tempColor = typeof tempC === 'number' && tempC >= 40 ? COLORS.amber : COLORS.textSecondary;
-  const needsFormat = diskNeedsFormat(disk);
+  // nmdctl only reports a disk's real filesystem type once the array is started and the disk is
+  // actually mounted - while stopped, filesystem.type comes back blank/"unknown" for every disk
+  // regardless of what's really on it, so diskNeedsFormat() can't be trusted until arrayStarted.
+  const needsFormat = arrayStarted && diskNeedsFormat(disk);
 
   return {
     id: String(disk.slot),
