@@ -9,9 +9,9 @@ import { AddDiskDialog } from './AddDiskDialog';
 import { UnassignedDeviceDetailPanel } from './UnassignedDeviceDetailPanel';
 
 /** Fetched per row on mount - unassigned devices have no array-wide poll to piggyback on, and
- *  there are normally only a handful of them, so one on-demand call each is cheap enough. Drives
- *  the row's top-border color (see the .disk-card__health-dot doc comment history - a dot read as
- *  too easy to miss, so health is now a border color instead). */
+ *  there are normally only a handful of them, so one on-demand call each is cheap enough. Shown as
+ *  its own dot+label row, same treatment as DiskCard's .disk-card__health - a colored top border
+ *  read as one ambiguous signal instead of an explicit one. */
 function useDeviceHealth(device: string): 'passed' | 'failed' | null {
   const [health, setHealth] = useState<'passed' | 'failed' | null>(null);
 
@@ -33,10 +33,11 @@ function useDeviceHealth(device: string): 'passed' | 'failed' | null {
 
 function DeviceRow({ device: d, onOpen, onAdd }: { device: AvailableDevice; onOpen: () => void; onAdd: () => void }) {
   const health = useDeviceHealth(d.device);
-  const healthColor = health === 'failed' ? COLORS.red : health === 'passed' ? COLORS.green : COLORS.border;
+  const healthColor = health === 'failed' ? COLORS.red : health === 'passed' ? COLORS.green : COLORS.textDim;
+  const healthLabel = health === 'failed' ? 'SMART Failing' : health === 'passed' ? 'SMART OK' : 'SMART -';
 
   return (
-    <div className="unassigned-device-row" style={{ borderTopColor: healthColor }} onClick={onOpen} title={`SMART: ${health ?? 'unknown'}`}>
+    <div className="unassigned-device-row" onClick={onOpen}>
       <div className="unassigned-device-row__info">
         <div className="unassigned-device-row__name">{d.model ?? 'Unknown drive'}</div>
         <div className="unassigned-device-row__meta">
@@ -46,6 +47,10 @@ function DeviceRow({ device: d, onOpen, onAdd }: { device: AvailableDevice; onOp
           {d.uuid ? ` · ${d.uuid}` : ' · no filesystem'}
           {d.locked ? ' · locked' : ''}
         </div>
+        <span className="disk-card__health" style={{ color: healthColor }}>
+          <span className="disk-card__health-dot" style={{ background: healthColor }} />
+          {healthLabel}
+        </span>
       </div>
       <button
         type="button"

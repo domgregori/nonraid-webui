@@ -159,9 +159,6 @@
   gap: var(--space-md);
   padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--color-border);
-  /* SMART health color, set inline per-row — see the disk-card__health-dot doc comment history for
-     why this replaced a small dot. */
-  border-top-width: 3px;
   border-radius: var(--radius-btn);
   background: var(--color-surface-elevated);
 }
@@ -172,6 +169,9 @@
 .unassigned-device-row__info {
   min-width: 0;
   flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .unassigned-device-row__name {
@@ -182,7 +182,6 @@
 }
 
 .unassigned-device-row__meta {
-  margin-top: 2px;
   font-size: 11px;
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
@@ -255,6 +254,8 @@
   display: flex;
   align-items: center;
   gap: 5px;
+  font-size: 10px;
+  font-family: var(--font-mono);
 }
 
 .disk-card__health-dot {
