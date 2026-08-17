@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { DistroIcon } from '../lxc/DistroIcon';
 import { useLxcContainers } from '../../hooks/useLxcContainers';
 import { deriveLxcContainerViewModel } from '../../selectors/lxcContainers';
 import { Card } from '../shared/Card';
@@ -25,8 +26,16 @@ export function LxcWidgetCard() {
         <div className="icon-grid">
           {containers.map((c) => {
             const view = deriveLxcContainerViewModel(c, NOOP_ACTIONS);
-            // LXC containers have no icon convention (they're OS templates, not app images) - always falls back to the initial-letter avatar.
-            return <IconTile key={c.name} name={view.name} statusLabel={view.statusLabel} statusColor={view.statusColor} webUiUrl={view.webUiUrl} />;
+            return (
+              <IconTile
+                key={c.name}
+                name={view.name}
+                statusLabel={view.statusLabel}
+                statusColor={view.statusColor}
+                webUiUrl={view.webUiUrl}
+                icon={<DistroIcon distribution={view.distribution} fallbackLabel={view.name} size={32} />}
+              />
+            );
           })}
         </div>
       )}

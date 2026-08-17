@@ -35,7 +35,7 @@ export function deriveAccessLabel(share: Pick<ShareWithStats, 'access' | 'smb' |
       .map(([name]) => `@${name}`),
   ];
   if (principals.length > 0) return principals.join(', ');
-  if (share.smb?.public !== false) return 'Public';
+  if (share.smb?.public === true) return 'Public';
   return 'No access configured';
 }
 

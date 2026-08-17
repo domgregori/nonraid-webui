@@ -95,6 +95,20 @@ async function unexport(mountPoint: string): Promise<void> {
 }
 
 /**
+ * Disconnects every SMB client currently connected to `shareName` before it gets unmounted -
+ * unexport() above only releases NFS's own hold, but a connected SMB client leaves a live smbd
+ * worker process with its cwd (and any open files) inside the share, which is just as real a VFS
+ * reference as an open file descriptor and blocks `umount` exactly the same way. Confirmed live:
+ * `umount: /mnt/user/<share>: target is busy` while a client's smbd worker still had the mount
+ * point as its cwd, resolved immediately by this call. Best-effort and safe to call
+ * unconditionally: closing a share with no active connections (SMB-only-just-enabled, NFS-only
+ * shares, or smbd not running at all) is a harmless no-op here, not an error worth surfacing.
+ */
+async function closeSmbClients(shareName: string): Promise<void> {
+  await run('smbcontrol', ['smbd', 'close-share', shareName]).catch(() => {});
+}
+
+/**
  * True when `mountPoint` is currently a FUSE mount (mergerfs, in this app's case). knfsd can
  * derive a stable filesystem id from a real block device or bind mount on its own, but not from
  * FUSE - exporting one without an explicit `fsid=` fails outright ("Cannot export ... possibly
@@ -206,6 +220,7 @@ export class RealShareApplier implements ShareApplier {
     // idempotent: branch list or policy may have changed since last apply
     if (await isMounted(mountPoint)) {
       await unexport(mountPoint);
+      await closeSmbClients(share.name);
       await run('umount', [mountPoint]);
     }
 
@@ -243,6 +258,7 @@ export class RealShareApplier implements ShareApplier {
     const mountPoint = userMountPath(name);
     if (await isMounted(mountPoint)) {
       await unexport(mountPoint);
+      await closeSmbClients(name);
       await run('umount', [mountPoint]);
     }
     return { ok: true, message: `Share "${name}" unmounted` };
@@ -307,7 +323,9 @@ export class RealShareApplier implements ShareApplier {
       const readOnlyUsers = named('read-only');
       const deniedUsers = named('none');
       const hiddenUsers = named('hidden');
-      const isPublic = s.smb?.public !== false;
+      // Defaults to NOT public: an absent/unspecified smb.public means guest access wasn't
+      // explicitly opted into, not that it was implicitly granted.
+      const isPublic = s.smb?.public === true;
 
       lines.push(`[${s.name}]`);
       lines.push(`   path = ${userMountPath(s.name)}`);

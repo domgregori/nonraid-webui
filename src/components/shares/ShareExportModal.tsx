@@ -12,7 +12,7 @@ interface ShareExportModalProps {
  *  allocationMethod/description unchanged) since the update route replaces, not patches. */
 export function ShareExportModal({ share, onCancel, onSubmit }: ShareExportModalProps) {
   const [smbEnabled, setSmbEnabled] = useState(share.protocols.includes('smb'));
-  const [smbPublic, setSmbPublic] = useState(share.smb?.public ?? true);
+  const [smbPublic, setSmbPublic] = useState(share.smb?.public ?? false);
   const [nfsEnabled, setNfsEnabled] = useState(share.protocols.includes('nfs'));
   const [nfsReadOnly, setNfsReadOnly] = useState(share.nfs?.readOnly ?? false);
   const [nfsHosts, setNfsHosts] = useState(share.nfs?.allowedHosts?.join(', ') ?? '*');
@@ -86,6 +86,12 @@ export function ShareExportModal({ share, onCancel, onSubmit }: ShareExportModal
 
           {!smbEnabled && !nfsEnabled && (
             <div className="status-note">Not shared - this pool won't be reachable over the network until SMB or NFS is turned on.</div>
+          )}
+          {smbEnabled && !smbPublic && (
+            <div className="status-note">
+              Not public - no one can connect over SMB until you grant specific users or groups access from the
+              Sharing tab.
+            </div>
           )}
 
           {error && <div className="status-note status-note--error">{error}</div>}

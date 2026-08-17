@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 
 interface IconTileProps {
@@ -6,6 +7,10 @@ interface IconTileProps {
   statusColor: string;
   iconUrl?: string | null;
   webUiUrl?: string | null;
+  /** Overrides iconUrl/img/letter-avatar entirely when provided - for a caller with its own
+   *  icon source and fallback logic (e.g. LxcWidgetCard's DistroIcon, a bundled vector mark
+   *  rather than a hosted image URL). */
+  icon?: ReactNode;
 }
 
 /**
@@ -16,14 +21,16 @@ interface IconTileProps {
  * the full Docker/LXC pages use - LXC in particular has frozen/unknown
  * states a plain running/stopped binary would misrepresent.
  */
-export function IconTile({ name, statusLabel, statusColor, iconUrl, webUiUrl }: IconTileProps) {
+export function IconTile({ name, statusLabel, statusColor, iconUrl, webUiUrl, icon }: IconTileProps) {
   const [imgFailed, setImgFailed] = useState(false);
-  const showImg = !!iconUrl && !imgFailed;
+  const showImg = !icon && !!iconUrl && !imgFailed;
 
   return (
     <div className="icon-tile">
       <div className="icon-tile__icon">
-        {showImg ? (
+        {icon ? (
+          icon
+        ) : showImg ? (
           <img src={iconUrl ?? undefined} alt="" onError={() => setImgFailed(true)} />
         ) : (
           <span className="icon-tile__avatar">{name.charAt(0).toUpperCase()}</span>
