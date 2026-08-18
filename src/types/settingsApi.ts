@@ -78,6 +78,7 @@ export interface OnboardingSettings {
 }
 
 export interface AppSettings {
+  timeFormat: '12h' | '24h';
   turboWrite: boolean;
   trustProxy: boolean;
   notifications: NotificationSettings;
@@ -92,6 +93,7 @@ export interface AppSettings {
 }
 
 export type AppSettingsUpdate = Partial<{
+  timeFormat: '12h' | '24h';
   turboWrite: boolean;
   trustProxy: boolean;
   notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {

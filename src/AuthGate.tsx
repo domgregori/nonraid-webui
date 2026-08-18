@@ -3,6 +3,7 @@ import { LoginPage } from './pages/LoginPage';
 import { SetupPage } from './pages/SetupPage';
 import { ArrayStatusProvider } from './state/ArrayStatusProvider';
 import { NotificationsProvider } from './state/NotificationsProvider';
+import { SettingsProvider } from './state/SettingsProvider';
 import { useAuth } from './state/useAuth';
 
 /**
@@ -34,9 +35,11 @@ export function AuthGate() {
 
   return (
     <ArrayStatusProvider>
-      <NotificationsProvider>
-        <OnboardingGate />
-      </NotificationsProvider>
+      <SettingsProvider>
+        <NotificationsProvider>
+          <OnboardingGate />
+        </NotificationsProvider>
+      </SettingsProvider>
     </ArrayStatusProvider>
   );
 }

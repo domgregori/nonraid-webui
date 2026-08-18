@@ -582,6 +582,22 @@ export function SettingsPage() {
         </div>
 
         <div className="settings-field toggle-row--bordered">
+          <div className="toggle-row__title">Time format</div>
+          <div className="settings-field__row">
+            <select
+              className="history-input"
+              style={{ width: '100%' }}
+              value={settings?.timeFormat ?? '12h'}
+              onChange={(e) => update({ timeFormat: e.target.value as '12h' | '24h' })}
+              disabled={!settings || saving}
+            >
+              <option value="12h">12-hour (2:30 PM)</option>
+              <option value="24h">24-hour (14:30)</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="settings-field toggle-row--bordered">
           <div className="toggle-row__title">Setup tour</div>
           <div className="toggle-row__desc">Walk back through array setup, cache, and the Apps/Docker/LXC/Notifications tour.</div>
           <button type="button" className="btn" style={{ marginTop: 6 }} onClick={replay}>

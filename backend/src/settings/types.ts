@@ -81,6 +81,9 @@ export interface OnboardingSettings {
 }
 
 export interface AppSettings {
+  // Clock display in the header - purely a formatting preference, doesn't affect any stored
+  // timestamp (those stay server-local time throughout, same as every RecurringSchedule's hour).
+  timeFormat: '12h' | '24h';
   // Desired state for the array's write method (nmdctl's md_write_method /
   // "turbo write") - see nmd/client.ts's setWriteMethod doc comment for why
   // this has to be persisted here rather than read back from the driver.
@@ -107,6 +110,7 @@ export interface AppSettings {
 }
 
 export type AppSettingsUpdate = Partial<{
+  timeFormat: '12h' | '24h';
   turboWrite: boolean;
   trustProxy: boolean;
   notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {

@@ -3,6 +3,7 @@ import { deriveToggleButton } from '../../selectors/status';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { useAuth } from '../../state/useAuth';
 import { ArrayStatusPill } from './ArrayStatusPill';
+import { HeaderClock } from './HeaderClock';
 import { HeaderSystemInfo } from './HeaderSystemInfo';
 import { NotificationBell } from './NotificationBell';
 
@@ -13,10 +14,13 @@ export function Header() {
 
   return (
     <div className="header">
-      <Link to="/" className="header__brand">
-        <img src="/logo.png" alt="" className="header__logo" />
-        <div className="header__title">NonRAID</div>
-      </Link>
+      <div className="header__brand-group">
+        <Link to="/" className="header__brand">
+          <img src="/logo.png" alt="" className="header__logo" />
+          <div className="header__title">NonRAID</div>
+        </Link>
+        <HeaderClock />
+      </div>
 
       <HeaderSystemInfo />
 

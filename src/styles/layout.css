@@ -76,6 +76,12 @@
   color: var(--color-text);
 }
 
+.header__brand-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
 .header__brand {
   display: flex;
   align-items: center;
@@ -97,6 +103,16 @@
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.header__clock {
+  font-family: 'Barlow Condensed', var(--font-ui);
+  font-weight: 300;
+  font-size: 26px;
+  line-height: 1;
+  padding-bottom: 5px;
+  color: var(--color-text-secondary);
 }
 
 .header__info {

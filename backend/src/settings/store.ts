@@ -41,6 +41,7 @@ function normalizeEventTypes(
 }
 
 const DEFAULTS: AppSettings = {
+  timeFormat: '12h',
   turboWrite: false,
   trustProxy: false,
   notifications: { enabled: false, appriseUrls: '', eventTypes: DEFAULT_EVENT_TYPES },
