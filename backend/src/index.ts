@@ -41,6 +41,7 @@ import { sharesRouter } from './routes/shares.js';
 import { smartRouter } from './routes/smart.js';
 import { statusRouter } from './routes/status.js';
 import { systemRouter } from './routes/system.js';
+import { tailscaleRouter } from './routes/tailscale.js';
 import { tlsRouter } from './routes/tls.js';
 import { usersRouter } from './routes/users.js';
 import { SettingsStore } from './settings/index.js';
@@ -48,6 +49,7 @@ import { createShareApplier, ShareAccessStore, ShareService, ShareStore } from '
 import { createSmartClient, SmartService } from './smart/index.js';
 import { BackupScheduler } from './system/backupScheduler.js';
 import { SystemStatsService } from './system/service.js';
+import { createTailscaleClient } from './tailscale/index.js';
 import { TlsStore } from './tls/index.js';
 import { createUsersClient, UsersService } from './users/index.js';
 
@@ -76,6 +78,7 @@ async function main() {
   const authService = new AuthService(authStore);
   await authStore.get(); // fail fast at boot on a corrupt auth.json
   const tlsStore = new TlsStore();
+  const tailscale = createTailscaleClient();
   const tlsRecord = await tlsStore.get(); // fail fast at boot on a corrupt tls.json
   if (config.serveFrontend && !existsSync(path.join(config.frontendDistPath, 'index.html'))) {
     throw new Error(`serveFrontend is true but no index.html at ${config.frontendDistPath} - did the frontend build run?`);
@@ -195,11 +198,12 @@ async function main() {
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
   app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics));
-  app.use('/api', servicesRouter(activity));
+  app.use('/api', servicesRouter(activity, settingsStore));
   app.use('/api', usersRouter(users));
   app.use('/api', appsRouter(apps));
   app.use('/api', activityRouter(activity));
   app.use('/api', tlsRouter(tlsStore, activity, authService));
+  app.use('/api', tailscaleRouter(tailscale, settingsStore, activity));
 
   // Protocol is chosen once at boot from the persisted TLS config, same "config changes need a
   // restart" model as everything else in this app - see backend/src/tls/. Falls open to plain

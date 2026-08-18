@@ -14,6 +14,7 @@ import { PasskeySection } from '../components/settings/PasskeySection';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ServicesSection } from '../components/settings/ServicesSection';
 import { StorageLocationField } from '../components/settings/StorageLocationField';
+import { TailscaleSection } from '../components/settings/TailscaleSection';
 import { TlsSection } from '../components/settings/TlsSection';
 import { TwoFactorSection } from '../components/settings/TwoFactorSection';
 import { PathAutocomplete } from '../components/shared/PathAutocomplete';
@@ -43,6 +44,7 @@ const SECTIONS = [
   { id: 'backups', label: 'Backups' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'security', label: 'Security' },
+  { id: 'tailscale', label: 'Tailscale' },
 ] as const;
 
 export function SettingsPage() {
@@ -1187,6 +1189,11 @@ export function SettingsPage() {
 
         <TwoFactorSection />
         <PasskeySection />
+      </div>
+
+      <div className={`settings-card${activeSection === 'tailscale' ? '' : ' settings-hidden'}`}>
+        <div className="settings-card__title">Tailscale</div>
+        <TailscaleSection />
       </div>
         </div>
       </div>

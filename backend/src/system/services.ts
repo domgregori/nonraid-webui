@@ -1,6 +1,6 @@
 import { runSudoMaybe, spawnMaybeSudo } from './procUtil.js';
 
-export type ServiceId = 'docker' | 'lxc' | 'smb' | 'nfs' | 'ssh' | 'avahi';
+export type ServiceId = 'docker' | 'lxc' | 'smb' | 'nfs' | 'ssh' | 'avahi' | 'tailscale';
 
 export type ServiceState = 'active' | 'inactive' | 'failed' | 'mixed';
 
@@ -41,6 +41,10 @@ export const SERVICE_DEFS: ServiceDef[] = [
   // this entry just gives the daemon itself the same start/stop/restart/status row as everything
   // else here.
   { id: 'avahi', label: 'Avahi/mDNS', statusUnits: ['avahi-daemon.service'], stopArgs: ['avahi-daemon'], startArgs: ['avahi-daemon'] },
+  // Only ever shown when settings.tailscale.enabled is true (filtered in routes/services.ts) -
+  // this daemon can be installed but deliberately unused, and this row would otherwise be a
+  // confusing always-present entry for a feature most installs never turn on.
+  { id: 'tailscale', label: 'Tailscale', statusUnits: ['tailscaled.service'], stopArgs: ['tailscaled'], startArgs: ['tailscaled'] },
 ];
 
 /**

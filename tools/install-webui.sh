@@ -178,6 +178,25 @@ ensure_mergerfs() {
   fi
 }
 
+# Tailscale for the optional Tailscale settings section - not in Debian's own repos, needs their
+# apt repo added first. Disabled by default (see backend/src/settings/types.ts's TailscaleSettings)
+# so nothing here starts/enables tailscaled - the webui's own enable toggle does that once someone
+# actually turns the feature on.
+ensure_tailscale() {
+  log "Checking Tailscale"
+  if command -v tailscale >/dev/null 2>&1; then
+    log "tailscale already installed"
+    return
+  fi
+  log "Adding Tailscale's apt repo and installing"
+  install -d -m 0755 /usr/share/keyrings
+  curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+  curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.tailscale-keyring.list -o /etc/apt/sources.list.d/tailscale.list
+  apt-get update
+  apt-get install -y tailscale
+  systemctl disable --now tailscaled >/dev/null 2>&1 || true
+}
+
 install_node() {
   log "Installing Node.js 22.x from NodeSource"
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
@@ -437,6 +456,7 @@ STEPS=(
   install_system_packages
   install_smb_conf
   ensure_mergerfs
+  ensure_tailscale
   ensure_node
   install_nonraid_driver
   install_nmdctl_and_units

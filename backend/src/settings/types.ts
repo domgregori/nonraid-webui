@@ -70,6 +70,18 @@ export interface CacheSettings {
   fsUuid: string | null;
 }
 
+// Tailscale, deliberately minimal: everything tailscaled itself already knows (connection state,
+// assigned IPs, hostname, current SSH/DNS/routes flags) is read live from `tailscale status
+// --json` instead of duplicated here - same "don't shadow an external source of truth" split as
+// CacheSettings.enabled vs. the mirror's own live mount state. This only holds what tailscaled
+// can't tell you before you've ever connected: whether the feature is switched on at all (hides
+// the whole section and its Services row when off), and the login-server to pre-fill in the login
+// form so a self-hosted Headscale user doesn't have to retype it every time.
+export interface TailscaleSettings {
+  enabled: boolean;
+  loginServer: string; // '' = Tailscale's own coordination server; a URL = a self-hosted Headscale
+}
+
 // Tracks whether the first-run setup wizard (src/components/onboarding) has been dismissed or
 // completed - a single flag rather than a per-step record, since resume position is always
 // derived live from the array's actual state (see OnboardingWizard's deriveStartStep()), not
@@ -106,6 +118,7 @@ export interface AppSettings {
   lxcStorage: StorageLocation;
   cache: CacheSettings;
   cacheSchedule: CacheSchedule;
+  tailscale: TailscaleSettings;
   onboarding: OnboardingSettings;
 }
 
@@ -123,5 +136,6 @@ export type AppSettingsUpdate = Partial<{
   lxcStorage: Partial<StorageLocation>;
   cache: Partial<CacheSettings>;
   cacheSchedule: Partial<CacheSchedule>;
+  tailscale: Partial<TailscaleSettings>;
   onboarding: Partial<OnboardingSettings>;
 }>;
