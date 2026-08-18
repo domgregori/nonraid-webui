@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
 import type { CacheService } from '../cache/service.js';
 import type { DiskQueueService } from '../diskQueue/service.js';
+import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
 import { notifyEvent } from '../settings/notify.js';
 import type { SettingsStore } from '../settings/store.js';
@@ -135,7 +136,11 @@ export function disksRouter(
       activity.log(`Disk in slot ${slot} restored after unassign`, 'blue').catch(() => {});
       res.json(result);
     } catch (err) {
-      res.status(502).json({ error: (err as Error).message });
+      if (err instanceof HttpError) {
+        res.status(err.status).json({ error: err.message });
+      } else {
+        res.status(502).json({ error: (err as Error).message });
+      }
     }
   });
 
@@ -206,7 +211,11 @@ export function disksRouter(
       activity.log(`Disk unassigned from slot ${slot}`, 'amber').catch(() => {});
       res.json(result);
     } catch (err) {
-      res.status(502).json({ error: (err as Error).message });
+      if (err instanceof HttpError) {
+        res.status(err.status).json({ error: err.message });
+      } else {
+        res.status(502).json({ error: (err as Error).message });
+      }
     }
   });
 

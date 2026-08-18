@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
+import { HttpError } from '../httpError.js';
 import { getDiskType } from '../system/diskType.js';
 import type { NmdClient } from './client.js';
 import { ArrayNotConfiguredError, type AddDiskResult, type AvailableDevice, type ImportResult, type NmdCommandResult, type NmdStatusResponse, type ParityCheckAction } from './types.js';
@@ -987,22 +988,23 @@ export class RealNmdClient implements NmdClient {
   async restoreUnassignedDisk(slot: number): Promise<NmdCommandResult> {
     const status = await this.getStatus();
     if (status.array.state === 'STARTED') {
-      throw new Error('Array must be stopped to restore a disk.');
+      throw new HttpError(409, 'Array must be stopped to restore a disk.');
     }
     const disk = status.disks.find((d) => d.slot === slot);
     if (!disk || disk.status !== 'DISK_NP_MISSING') {
-      throw new Error(`Slot ${slot} isn't a pending, uncommitted unassign - nothing to restore.`);
+      throw new HttpError(404, `Slot ${slot} isn't a pending, uncommitted unassign - nothing to restore.`);
     }
     if (!disk.disk_id || disk.disk_id === 'none') {
-      throw new Error(`Slot ${slot} has no recorded identity to restore.`);
+      throw new HttpError(409, `Slot ${slot} has no recorded identity to restore.`);
     }
 
     const found = await this.findDeviceByDiskId(disk.disk_id);
     if (!found) {
-      throw new Error(`Could not find a physical device matching slot ${slot}'s recorded ID (${disk.disk_id}) - is the disk connected?`);
+      throw new HttpError(404, `Could not find a physical device matching slot ${slot}'s recorded ID (${disk.disk_id}) - is the disk connected?`);
     }
     if (disk.size_kb && found.sizeKb && Math.abs(found.sizeKb - disk.size_kb) > 1024) {
-      throw new Error(
+      throw new HttpError(
+        409,
         `Size mismatch for slot ${slot}: recorded ${disk.size_kb} KB, found device is ${found.sizeKb} KB - refusing, this may not be the same disk.`,
       );
     }
@@ -1060,18 +1062,19 @@ export class RealNmdClient implements NmdClient {
     const status = await this.getStatus();
 
     if (status.array.state === 'STARTED') {
-      throw new Error('Array must be stopped before unassigning disks.');
+      throw new HttpError(409, 'Array must be stopped before unassigning disks.');
     }
 
     const disk = status.disks.find((d) => d.slot === slot);
     if (!disk || disk.status === 'DISK_NP_DSBL') {
-      throw new Error(`No disk assigned to slot ${slot}, or it's already unassigned.`);
+      throw new HttpError(404, `No disk assigned to slot ${slot}, or it's already unassigned.`);
     }
 
     const parityCount = status.disks.filter((d) => (d.type === 'P' || d.type === 'Q') && d.size_gb > 0).length;
     const alreadyMissing = status.disks.filter((d) => d.status === 'DISK_NP_MISSING' || d.status === 'DISK_NP_DSBL').length;
     if (alreadyMissing + 1 > parityCount) {
-      throw new Error(
+      throw new HttpError(
+        409,
         `Not enough parity to unassign another disk (parity disks: ${parityCount}, already missing: ${alreadyMissing}).`,
       );
     }

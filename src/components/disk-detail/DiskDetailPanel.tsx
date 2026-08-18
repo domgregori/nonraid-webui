@@ -4,6 +4,7 @@ import { useDiskSmart } from '../../hooks/useDiskSmart';
 import { deriveDisks } from '../../selectors/disks';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { COLORS } from '../../styles/colors';
+import { ArrayActionErrorBanner } from '../shared/ArrayActionErrorBanner';
 import { ProgressBar } from '../shared/ProgressBar';
 import { BenchmarkSection } from './BenchmarkSection';
 import { EmptyDiskDialog } from './EmptyDiskDialog';
@@ -21,8 +22,21 @@ function boolLabel(v: boolean | null): string {
 }
 
 export function DiskDetailPanel() {
-  const { status, temps, diskHealths, diskTypes, selectedDiskId, actionNote, unassignPending, restorePending, closeDetail, unassignDisk, restoreDisk } =
-    useArrayStatus();
+  const {
+    status,
+    temps,
+    diskHealths,
+    diskTypes,
+    selectedDiskId,
+    actionNote,
+    actionError,
+    stopBlockedByContainers,
+    unassignPending,
+    restorePending,
+    closeDetail,
+    unassignDisk,
+    restoreDisk,
+  } = useArrayStatus();
   const { all } = status ? deriveDisks(status, temps, diskHealths, diskTypes) : { all: [] };
   const disk = selectedDiskId ? all.find((d) => d.id === selectedDiskId) : undefined;
 
@@ -509,6 +523,7 @@ export function DiskDetailPanel() {
         </div>
 
         {actionNote && <div className="detail-note">{actionNote}</div>}
+        {actionError && <ArrayActionErrorBanner actionError={actionError} stopBlockedByContainers={stopBlockedByContainers} />}
       </div>
 
       {showReplaceDialog && (
