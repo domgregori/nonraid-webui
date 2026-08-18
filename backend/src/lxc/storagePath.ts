@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { stat } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
+import path from 'node:path';
 import { promisify } from 'node:util';
 import type { CacheService } from '../cache/service.js';
 import { config } from '../config.js';
@@ -8,6 +9,7 @@ import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
 import type { StorageLocation } from '../settings/types.js';
 import { runSudoMaybe } from '../system/procUtil.js';
+import { getVariable, setVariable } from './configFile.js';
 import type { LxcClient } from './client.js';
 
 const execFileAsync = promisify(execFile);
@@ -75,7 +77,30 @@ export async function getCurrentLxcStorage(settingsStore: SettingsStore): Promis
 }
 
 /**
- * Stops any running containers, rsyncs the container directory tree to the new location, switches
+ * lxc.rootfs.path is written as an absolute path (typically an overlay spec,
+ * `overlay:<lxcpath>/<name>/rootfs:<lxcpath>/<name>/overlay/delta`, baked in at container-create
+ * time by lxc-create/lxc-copy) - rsync-ing a container's directory to a new lxcpath does not
+ * update this, so without rewriting it here, every relocated container silently keeps depending on
+ * its OLD location for its actual rootfs. That's invisible right up until the old location is
+ * removed - which is exactly what migrateLxcStorage()'s own "done" message below tells the admin
+ * to do once they've verified the move - at which point every relocated container fails to start.
+ * Confirmed live: found via a container that broke exactly this way.
+ */
+async function rewriteRootfsPaths(oldPrefix: string, newPrefix: string, containerRoot: string): Promise<void> {
+  const entries = await readdir(containerRoot, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const configPath = path.join(containerRoot, entry.name, 'config');
+    const rootfsPath = await getVariable(configPath, 'lxc.rootfs.path');
+    if (rootfsPath && rootfsPath.includes(oldPrefix)) {
+      await setVariable(configPath, 'lxc.rootfs.path', rootfsPath.split(oldPrefix).join(newPrefix));
+    }
+  }
+}
+
+/**
+ * Stops any running containers, rsyncs the container directory tree to the new location, rewrites
+ * each container's lxc.rootfs.path to match (see rewriteRootfsPaths above), switches
  * config.lxcDefaultPath (read fresh by every lxc-* call in realClient.ts - no restart needed) and
  * persists the choice, then restarts whatever was running. Never deletes the old data - leaves it
  * in place so a failed verification doesn't mean lost containers, at the cost of temporary double
@@ -126,6 +151,7 @@ export async function migrateLxcStorage(
     await runSudoMaybe('mkdir', ['-p', targetPath]);
     if (await pathExists(currentPath)) {
       await runSudoMaybe('rsync', ['-a', `${currentPath}/`, `${targetPath}/`]);
+      await rewriteRootfsPaths(currentPath, targetPath, targetPath);
     }
 
     onProgress({ phase: 'switching', message: 'Switching to the new location…' });
