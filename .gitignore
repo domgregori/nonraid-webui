@@ -13,6 +13,9 @@ dist-ssr
 *.local
 backend/src/buildInfo.generated.ts
 
+# Personal/local-only tooling, never shipped or synced to either remote
+tools/local/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
