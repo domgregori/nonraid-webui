@@ -60,10 +60,10 @@ disk changes until `/array/import/commit`.
 | GET | `/disks/available` | - | Unassigned devices eligible to be added, excluding anything already claimed by the cache mirror or sitting in the disk-add queue. |
 | POST | `/disks/:slot/add` | `{ device, autoStart? }` | `:slot` 0-29 (0/29 = parity, 1-28 = data). `device` must currently appear in `/disks/available`. |
 | POST | `/disks/:slot/replace` | `{ device }` | `409` if a queued disk operation is already running. |
-| POST | `/disks/:slot/restore` | - | Restores a disk that was previously unassigned. |
+| POST | `/disks/:slot/restore` | - | Restores a disk that was previously unassigned. `HttpError`: `409` if the array is running, `404` if the slot isn't a pending uncommitted unassign or the original device can't be found, `409` if its recorded identity/size doesn't match. |
 | POST | `/disks/:slot/format` | `{ force? }` | Formats as XFS. `force: true` overwrites an existing filesystem. `409` if the queue is busy. |
 | POST | `/disks/:slot/mount` | - | Mounts every currently-unmounted disk (nmdctl has no per-slot mount command), then reports specifically whether `:slot` ended up mounted. |
-| POST | `/disks/:slot/unassign` | - | `409` if the queue is busy. |
+| POST | `/disks/:slot/unassign` | - | `409` if the queue is busy. `HttpError`: `409` if the array is running, `404` if no disk is assigned to the slot, `409` if unassigning would leave more missing disks than parity can cover. |
 | POST | `/disks/:slot/spin-down` | - | `409` if a parity check/clear is active. |
 | POST | `/disks/:slot/spin-up` | - | |
 | GET | `/disks/:slot/smart` | - | SMART attributes for the disk in this slot. |
@@ -143,6 +143,7 @@ Operates over the whole `/mnt` tree (not scoped per-share) - paths are absolute 
 | POST | `/docker/containers/:id/start` | - | |
 | POST | `/docker/containers/:id/stop` | - | |
 | POST | `/docker/containers/:id/restart` | - | |
+| PUT | `/docker/containers/:id/autostart` | `{ autostart: boolean }` | Toggles the container's restart policy between `unless-stopped` and `no`. |
 | DELETE | `/docker/containers/:id` | - | |
 | GET | `/docker/devices` | - | Curated `/dev` subdirectories (GPU, audio, stable-named serial) for the device picker - also used by the Apps install dialog for `Device`-type template config entries. |
 | POST | `/docker/images/prune` | - | Removes unused images. |
@@ -176,6 +177,7 @@ Operates over the whole `/mnt` tree (not scoped per-share) - paths are absolute 
 | POST | `/lxc/containers/:name/start` | - | |
 | POST | `/lxc/containers/:name/stop` | `{ force? }` | `force: true` → `lxc-stop --kill` instead of a graceful timeout. |
 | POST | `/lxc/containers/:name/restart` | - | |
+| PUT | `/lxc/containers/:name/autostart` | `{ autostart: boolean }` | Sets `lxc.start.auto` (`1`/`0`) directly on the container's config file. |
 | DELETE | `/lxc/containers/:name` | - | |
 | GET | `/lxc/containers/:name/config` | - | `{ content }` - raw on-disk config file text. |
 | PUT | `/lxc/containers/:name/config` | `{ content }` | Overwrites the config file verbatim. |
@@ -208,7 +210,7 @@ Operates over the whole `/mnt` tree (not scoped per-share) - paths are absolute 
 | PUT | `/system/timezone` | `{ timezone }` | |
 | POST | `/system/reboot` | - | Reboots the whole host. |
 | POST | `/system/reload-driver` | - | Manual retry of the driver reload a superblock restore already attempts automatically. |
-| POST | `/system/restart-services` | `{ restartDocker? }` | Restarts SMB, NFS, reloads the driver, optionally restarts Docker, then self-restarts nonraid-webui (drops the connection - the client reconnects automatically). The "make everything take effect" action after a config restore. |
+| POST | `/system/restart-services` | `{ restartDocker? }` | Restarts SMB, NFS, reloads the driver, optionally restarts Docker, then self-restarts nonraid-webui (drops the connection - the client reconnects automatically). The "make everything take effect" action after a config restore. The driver reload here only re-imports the superblock - it never mounts array disks - so if Docker's storage is on an array disk and the array isn't started, the Docker restart is skipped instead of bouncing it against an unmounted path (reported in the response as `docker: { ok: false, message }` rather than attempted). |
 | POST | `/system/boot-disk/benchmark/read` | `{ durationSeconds? }` | `404` if no boot disk detected, `409` if a parity check/clear is active. |
 | POST | `/system/boot-disk/benchmark/write` | `{ durationSeconds? }` | |
 | GET | `/system/boot-disk/backup/image` | - | Streams a raw image of the boot disk. `404` if none detected. |

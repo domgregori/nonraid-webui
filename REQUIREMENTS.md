@@ -25,6 +25,9 @@ Proxmox VE. Update this list as items change or new items appear.
 - `nmdctl` — from `../nonraid`'s `tools/nmdctl`.
 - `blkid`, `parted` or `sgdisk`.
 - Filesystem tools: `xfsprogs`, `e2fsprogs`, `btrfs-progs` (as needed for the filesystems used).
+- `acl` (`setfacl`) — used by the Shares and Cache features to set a recursive default ACL on each
+  share's and the cache pool's mount point, so files created under them later inherit the right
+  ownership without a per-file chown.
 - `smartmontools` (`smartctl`) — used by the webui for disk temperature.
 - `hdparm` — used by the Disks page's spin-down/spin-up actions
   (`backend/src/system/hdparm.ts`). Not installed by default; without it, the backend's own error

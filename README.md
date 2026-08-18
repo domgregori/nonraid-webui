@@ -7,7 +7,7 @@
 - **This webui was AI coded.**
 - The backbone nonraid kernel driver from [qvr/nonraid](https://github.com/qvr/nonraid) is based on the unraid kernel driver, not AI coded.
 - The nonraid tool (nmdctl) was written by [qvr](https://github.com/qvr/nonraid)
-- I am using my own [fork](https://github.com/domgregori/nonraid) of nonraid that has fixes to the nmdctl tool and the service files. The driver code was not touched.
+- I am using my own [fork](https://github.com/domgregori/nonraid) of nonraid that has fixes to the nmdctl tool, the service files, and one fix to the driver.
 
 This is a web dashboard for [NonRAID](https://github.com/qvr/nonraid) - an alternative to Unraid NAS. Surfaces array status, parity protection, per-disk detail, shares, users, Docker
 containers, LXC containers, historical metrics, and array management.
@@ -20,7 +20,7 @@ containers, LXC containers, historical metrics, and array management.
 - A mirrored pair of cache disks with scheduled moving to array
 - Dashboard with up-to-date info
 - Disks menu to easily add parity, storage, and cache disks
-- Sharing for creating shares (pools)
+- Create pools for storage and sharing
 - Users for sharing shares via samba/nfs
   - Groups are supported
 - A file browser to interact with shares
@@ -96,21 +96,37 @@ src/
                groups modal, per-user detail panel with share-access grid), shared UI primitives
   pages/       one component per route
   styles/      CSS token file + per-area stylesheets
+  utils/       format.ts (units/dates for display) + webauthnSupport.ts (passkey capability checks)
+  assets/      static images (logo, etc.)
 
 backend/                 Express API wrapping nmdctl, Docker, lxc-*, smartctl, shares, users, and
                          system stats
-  src/nmd/     NmdClient interface + RealNmdClient (shells out to nmdctl)
-  src/docker/  DockerClient interface + RealDockerClient (dockerode)
-  src/lxc/     LxcClient interface + RealLxcClient (shells out to lxc-ls/lxc-info/lxc-create/...) +
-               configFile.ts (line-based get/set against a container's real config file — its only
-               metadata store) + statsPoller.ts (poll-and-cache CPU/mem/IPs)
-  src/smart/   SmartClient interface + RealSmartClient (smartctl) + caching service
-  src/shares/  ShareStore (owns shares.json) + ShareAccessStore (owns share-access.json, per-user/
-               group SMB permissions) + ShareApplier interface (mergerfs/Samba/NFS) +
-               ShareService (orchestrates all three)
-  src/users/   UsersClient interface + RealUsersClient (shells out to useradd/smbpasswd/etc., host
-               /etc/passwd+/etc/group as source of truth) + UsersService
-  src/system/  SystemStatsService (host CPU/memory via Node's os module)
-  src/routes/  /api/status, /api/array/*, /api/parity/*, /api/docker/*, /api/lxc/*, /api/smart/*,
-               /api/shares/*, /api/users/*, /api/groups/*, /api/system
+  src/nmd/         NmdClient interface + RealNmdClient (shells out to nmdctl)
+  src/docker/      DockerClient interface + RealDockerClient (dockerode)
+  src/lxc/         LxcClient interface + RealLxcClient (shells out to lxc-ls/lxc-info/lxc-create/
+                   ...) + configFile.ts (line-based get/set against a container's real config
+                   file — its only metadata store) + statsPoller.ts (poll-and-cache CPU/mem/IPs)
+  src/smart/       SmartClient interface + RealSmartClient (smartctl) + caching service
+  src/shares/      ShareStore (owns shares.json) + ShareAccessStore (owns share-access.json,
+                   per-user/group SMB permissions) + ShareApplier interface (mergerfs/Samba/NFS)
+                   + ShareService (orchestrates all three)
+  src/users/       UsersClient interface + RealUsersClient (shells out to useradd/smbpasswd/etc.,
+                   host /etc/passwd+/etc/group as source of truth) + UsersService
+  src/system/      SystemStatsService (host CPU/memory via Node's os module)
+  src/routes/      /api/status, /api/array/*, /api/parity/*, /api/docker/*, /api/lxc/*,
+                   /api/smart/*, /api/shares/*, /api/users/*, /api/groups/*, /api/system
+  src/auth/        session cookies, password hashing, login rate limiting, request-origin
+                   detection (for the Secure cookie flag and passkey RP ID)
+  src/tls/         built-in HTTPS: self-signed cert generation, imported cert inspection, TLS
+                   enable/disable state
+  src/apps/        the Apps catalog (Community Applications feed) backing one-click Docker installs
+  src/browse/      the file browser (list/upload/rename/copy/move/delete under /mnt)
+  src/cache/       cache pool mount, and the scheduled mover that drains cache onto the array
+  src/metrics/     CPU/memory/disk/network sampling + the SQLite store behind the History graphs
+  src/parity/      scheduled parity check trigger
+  src/settings/    app settings store, notification catalog/dispatch (Apprise), schedule matching
+  src/activity/    the Dashboard/History activity log (event store + file watcher)
+  src/diskQueue/   the disk add/clear queue (sequences array stop/start around a disk operation)
+  src/emptyDisk/   the "Empty Disk" data-eviction flow ahead of removing a disk
+  src/fileMove/    move/copy primitives shared by Browse and the disk queue
 ```
