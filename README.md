@@ -36,6 +36,7 @@ containers, LXC containers, historical metrics, and array management.
 - Automatic config backups
 - Apprise notifications
 - http, https self signed, or import cert/key
+- Tailscale service. Can use custom login-server such as Headscale
 - 2FA: TOTP, Passkey when using https
 
 ## Requirements
@@ -129,4 +130,7 @@ backend/                 Express API wrapping nmdctl, Docker, lxc-*, smartctl, s
   src/diskQueue/   the disk add/clear queue (sequences array stop/start around a disk operation)
   src/emptyDisk/   the "Empty Disk" data-eviction flow ahead of removing a disk
   src/fileMove/    move/copy primitives shared by Browse and the disk queue
+  src/tailscale/   TailscaleClient interface + RealTailscaleClient (shells out to `tailscale`) -
+                    status/login/logout/set, including capturing the login URL live from `tailscale
+                    up`'s output for the interactive login flow
 ```

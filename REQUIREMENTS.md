@@ -48,6 +48,12 @@ Proxmox VE. Update this list as items change or new items appear.
   self-signed certificates and inspect imported ones. Near-universally present on Debian already;
   called explicitly rather than assumed, same as every other shelled-out tool in this list.
 - `avahi-daemon` - used for network discovery.
+- `tailscale` — for the optional Tailscale settings section (Settings → Tailscale), disabled by
+  default. Not in Debian's own repos; `tools/install-webui.sh`'s `ensure_tailscale()` adds
+  Tailscale's own apt repo first, then installs it and immediately disables+stops `tailscaled`
+  (its postinst enables it by default, same as docker.io/samba/nfs-kernel-server - undone here
+  since this feature must start off). The webui's own enable toggle (`PUT /tailscale/enabled`)
+  starts it back up when someone actually turns the feature on.
 - `docker.io` — Docker Engine, for the Docker tab. `nonraid-webui` talks to `/var/run/docker.sock`
   directly (`dockerode`); no separate install step exists for this anywhere else, so it must be
   installed explicitly.

@@ -235,6 +235,20 @@ Same preview-then-commit shape as the array import wizard.
 | POST | `/services/:id/stop` | - | |
 | POST | `/services/:id/restart` | - | `:id = webui` is special-cased to a self-exit (relies on the unit's `Restart=on-failure`) rather than `systemctl restart`, which would be killed by systemd's own stop phase first. |
 
+## Tailscale
+
+Disabled by default (`settings.tailscale.enabled`) - `GET /tailscale/status` still works either
+way (so the section can render its own "not installed"/"not enabled" state), but every other route
+here is only meaningful once the feature's switched on.
+
+| Method | Path | Body/Params | Response / Notes |
+|---|---|---|---|
+| GET | `/tailscale/status` | - | Live status from `tailscale status --json` + `tailscale debug prefs`, merged with `featureEnabled`/`loginServer` from settings.json. `installed: false` (not an error) when the `tailscale` binary isn't on PATH. |
+| PUT | `/tailscale/enabled` | `{ enabled: boolean }` | Persists the toggle and best-effort starts/stops the `tailscaled` systemd unit to match (a host that never installed the package still gets the toggle persisted, just with `installed: false` still showing). |
+| POST | `/tailscale/login` | `{ loginServer?: string }` | Persists `loginServer` as the new preference regardless of outcome, then runs `tailscale up --login-server=<url>` (omitted when blank, meaning Tailscale's own server). Resolves once a login URL is captured from its output (`{ authUrl }`) or the command finishes on its own because the node was already authenticated (`{ authUrl: null }`) - never waits for the user to actually finish the browser flow, which can take minutes. |
+| POST | `/tailscale/logout` | - | `tailscale logout`. |
+| PUT | `/tailscale/options` | `{ hostname?, ssh?, acceptDns?, advertiseRoutes?: string[], acceptRoutes? }` | `tailscale set` with only the given fields. `advertiseRoutes` replaces the full set (`[]` clears it); advertised routes still need approving in the Tailscale/Headscale admin console before they take effect - this app can't do that part. |
+
 ## Settings
 
 | Method | Path | Body/Params | Response / Notes |
