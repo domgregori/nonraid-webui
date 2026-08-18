@@ -1,12 +1,15 @@
 // Mirrors backend/src/browse/types.ts. Keep in sync.
 export type BrowseEntryType = 'file' | 'directory' | 'symlink';
 
+export type BrowseLocationType = 'pool' | 'disk' | 'cache' | 'boot';
+
 export interface BrowseEntry {
   name: string;
   type: BrowseEntryType;
   size: number;
   modifiedAt: string;
   locations?: string[];
+  locationType?: BrowseLocationType;
 }
 
 export interface BrowseListing {

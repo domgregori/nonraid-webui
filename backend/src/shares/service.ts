@@ -229,6 +229,14 @@ export class ShareService {
     return locations;
   }
 
+  /** Just the configured share/pool names - no stats/context/connection-count enrichment, unlike
+   *  list() below, which is overkill for a simple "is this name a real pool" membership check (see
+   *  BrowseService.list()'s own directory classification, used when browsing inside a raw array
+   *  disk to label its per-disk pool branch directories). */
+  async getShareNames(): Promise<string[]> {
+    return (await this.store.list()).map((s) => s.name);
+  }
+
   async list(): Promise<ShareWithStats[]> {
     const [shares, ctx, access, connectionCounts] = await Promise.all([
       this.store.list(),

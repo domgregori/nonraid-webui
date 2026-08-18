@@ -6,7 +6,8 @@ import { NewFolderModal } from '../components/browse/NewFolderModal';
 import { RenameModal } from '../components/browse/RenameModal';
 import { TransferModal } from '../components/browse/TransferModal';
 import { useBrowse } from '../hooks/useBrowse';
-import type { BrowseEntry } from '../types/browseApi';
+import { LOCATION_TYPE_COLOR, LOCATION_TYPE_LABEL } from '../selectors/browse';
+import type { BrowseEntry, BrowseLocationType } from '../types/browseApi';
 import { formatFileSize } from '../utils/format';
 
 function formatModified(iso: string): string {
@@ -27,6 +28,18 @@ export function BrowsePage() {
   const ready = browse.status === 'ready';
   const entries = browse.listing?.entries ?? [];
   const allSelected = entries.length > 0 && entries.every((e) => browse.selected.has(e.name));
+  // Only ever set at exactly two depths (see backend/src/browse/types.ts's BrowseLocationType doc
+  // comment) - computed from what's actually present rather than a fixed list, so the legend only
+  // shows entries that are actually on screen (e.g. no "Cache" row before a cache pool exists).
+  const presentLocationTypes = [...new Set(entries.map((e) => e.locationType).filter((t): t is BrowseLocationType => t !== undefined))];
+  // A directory legitimately spans multiple disks in a pool - that's the whole point of mergerfs.
+  // A *file* on more than one is not: something bypassed mergerfs (direct disk access outside
+  // this app, e.g. over SSH) and wrote the same name onto two branches independently - mergerfs
+  // then has to arbitrarily pick one to actually serve, silently stranding the other with whatever
+  // it holds (same data, or not - no way to tell without comparing them by hand). Rare, but a real
+  // footgun once it happens, so it's called out rather than left to look like an ordinary file.
+  const isFileConflict = (entry: BrowseEntry) => entry.type === 'file' && (entry.locations?.length ?? 0) > 1;
+  const hasFileConflicts = entries.some(isFileConflict);
 
   const handleDeleteClick = (entry: BrowseEntry) => {
     if (confirmingDelete === entry.name) {
@@ -88,6 +101,23 @@ export function BrowsePage() {
 
       <Breadcrumbs path={browse.path} onNavigate={browse.navigate} />
 
+      {(presentLocationTypes.length > 0 || hasFileConflicts) && (
+        <div className="browse-legend">
+          {presentLocationTypes.map((t) => (
+            <span key={t} className="browse-legend__item">
+              <span className="docker-card__status-dot" style={{ background: LOCATION_TYPE_COLOR[t] }} />
+              {LOCATION_TYPE_LABEL[t]}
+            </span>
+          ))}
+          {hasFileConflicts && (
+            <span className="browse-legend__item">
+              <span className="browse-conflict-icon">!</span>
+              File exists on multiple disks - please fix
+            </span>
+          )}
+        </div>
+      )}
+
       {browse.status === 'loading' && <div className="status-note">Loading…</div>}
       {browse.error && <div className="status-note status-note--error">{browse.error}</div>}
       {browse.actionError && <div className="status-note status-note--error">{browse.actionError}</div>}
@@ -142,7 +172,23 @@ export function BrowsePage() {
                 <input type="checkbox" checked={browse.selected.has(entry.name)} onChange={() => browse.toggleSelect(entry.name)} aria-label={`Select ${entry.name}`} />
               </div>
               <div className="browse-row__name">
+                {entry.locationType && (
+                  <span
+                    className="docker-card__status-dot"
+                    style={{ background: LOCATION_TYPE_COLOR[entry.locationType], marginRight: 6 }}
+                    title={LOCATION_TYPE_LABEL[entry.locationType]}
+                  />
+                )}
                 <span className={`browse-row__name-text--${entry.type}`}>{entry.name}</span>
+                {isFileConflict(entry) && (
+                  <span
+                    className="browse-conflict-icon"
+                    style={{ marginLeft: 6 }}
+                    title={`File exists on multiple disks (${entry.locations?.join(', ')}) - please fix`}
+                  >
+                    !
+                  </span>
+                )}
               </div>
               <div className="browse-row__size" onClick={(e) => e.stopPropagation()}>
                 {entry.type === 'directory' ? (

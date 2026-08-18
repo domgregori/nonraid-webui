@@ -23,6 +23,32 @@ async function chownArrayOwner(absPath: string, recursive = false): Promise<void
   await execFileAsync('chown', args);
 }
 
+/** Splits an absolute path known to start with `prefix` into the share/pool name (its first
+ *  segment past the prefix) and everything after that (possibly empty) - the two arguments
+ *  ShareService.locateShareEntries() needs. Shared by both places a browse path can land inside a
+ *  pool's data: the merged view at shareMountRoot, and a single disk's own branch of it. */
+function splitShareRelDir(prefix: string, absPath: string): { shareName: string; relDir: string } | null {
+  if (!absPath.startsWith(prefix)) return null;
+  const rel = absPath.slice(prefix.length);
+  const slash = rel.indexOf('/');
+  const shareName = slash === -1 ? rel : rel.slice(0, slash);
+  if (!shareName) return null;
+  return { shareName, relDir: slash === -1 ? '' : rel.slice(slash + 1) };
+}
+
+/** "/mnt/disk1/" for any absPath under a raw array disk (at any depth - .../media, .../media/sub,
+ *  etc.), regardless of what's actually inside it - null everywhere else. Just root's immediate
+ *  child, so this doesn't itself confirm anything past that is a real pool; splitShareRelDir()
+ *  plus locateShareEntries() returning null handles that. */
+function diskBranchPrefix(root: string, absPath: string): string | null {
+  const rootPrefix = `${root}/`;
+  if (!absPath.startsWith(rootPrefix)) return null;
+  const rel = absPath.slice(rootPrefix.length);
+  const slash = rel.indexOf('/');
+  const firstSegment = slash === -1 ? rel : rel.slice(0, slash);
+  return /^disk\d+$/.test(firstSegment) ? `${rootPrefix}${firstSegment}/` : null;
+}
+
 /** Browses the whole /mnt tree (config.browseRoot), not a single share - see
  * paths.ts for the traversal-ceiling enforcement every method here relies on. */
 export class BrowseService {
@@ -50,17 +76,58 @@ export class BrowseService {
       return a.name.localeCompare(b.name);
     });
 
-    // Inside a user share, mergerfs can blend more than one physical disk into this one
-    // directory listing - annotate each entry with which disk(s) it's really on. Left
-    // undefined outside a share (e.g. /mnt root, or a raw /mnt/diskN) since the question
-    // doesn't apply there.
-    const shareMountPrefix = `${config.shareMountRoot}/`;
-    if (absPath.startsWith(shareMountPrefix)) {
-      const rel = absPath.slice(shareMountPrefix.length);
-      const slash = rel.indexOf('/');
-      const shareName = slash === -1 ? rel : rel.slice(0, slash);
-      const relDir = slash === -1 ? '' : rel.slice(slash + 1);
-      const locations = await this.shares.locateShareEntries(shareName, relDir);
+    // Classify each top-level location by kind, one level above the location itself - lets the UI
+    // color-code otherwise identical-looking folders (see BrowseLocationType's own doc comment).
+    // Only meaningful at exactly these two depths: /mnt root (raw array disks, the cache pool) and
+    // shareMountRoot (individual pools) - anywhere deeper is just regular file/folder content with
+    // no location-type distinction to make. Every real location here is a genuine mount point
+    // (mergerfs for a pool, the raw disk filesystem, btrfs for cache) - a same-named plain
+    // directory that just happens to sit alongside them (e.g. a container's own conventional
+    // /mnt/user/appdata, created without going through this app's Pools feature) is NOT one, and
+    // isMountPoint() is what tells the two apart. Since /mnt (and /mnt/user within it) aren't
+    // mount points themselves, anything unmounted here is really just sitting on the boot disk's
+    // own filesystem - confirmed live via `stat -f`, same device as `/`.
+    if (absPath === root || absPath === config.shareMountRoot) {
+      await Promise.all(
+        entries.map(async (entry) => {
+          if (entry.type !== 'directory') return;
+          const entryAbsPath = path.join(absPath, entry.name);
+          if (!(await isMountPoint(entryAbsPath).catch(() => false))) {
+            entry.locationType = 'boot';
+            return;
+          }
+          if (absPath === config.shareMountRoot) entry.locationType = 'pool';
+          else if (entryAbsPath === config.cacheMountPoint) entry.locationType = 'cache';
+          else if (/^disk\d+$/.test(entry.name)) entry.locationType = 'disk';
+        }),
+      );
+    } else if (path.dirname(absPath) === root && /^disk\d+$/.test(path.basename(absPath))) {
+      // Inside a raw array disk (e.g. /mnt/disk1) - each pool's real data actually lives here, one
+      // per-disk branch directory per pool, merged together (with every other disk's own copy of
+      // the same name) into the unified view at shareMountRoot. Not a mount point itself (that's
+      // only true one level up, at /mnt/diskN), so the only way to tell "this is a pool's branch"
+      // from "this is just some other directory on the disk" (e.g. Docker/LXC storage relocated
+      // here) is whether the name matches a real configured share.
+      const shareNames = new Set(await this.shares.getShareNames());
+      for (const entry of entries) {
+        if (entry.type === 'directory' && shareNames.has(entry.name)) entry.locationType = 'pool';
+      }
+    }
+
+    // Inside a pool's data, mergerfs can blend more than one physical disk into this one
+    // directory listing - annotate each entry with which disk(s) it's really on. This is also how
+    // BrowsePage.tsx spots a file mistakenly living on more than one branch at once (e.g. written
+    // directly to two disks outside mergerfs, over SSH) - see its own isFileConflict(). Reachable
+    // two ways: the merged view at shareMountRoot, or browsing a single disk's own branch of the
+    // same pool directly (/mnt/diskN/<pool>/...) - locateShareEntries() itself doesn't care which
+    // branch you're looking at, it always scans every one. Left undefined everywhere else (e.g.
+    // /mnt root, or a raw disk's non-pool content like relocated Docker storage) since the
+    // question doesn't apply there - splitShareRelDir() returns null for those paths, or
+    // locateShareEntries() returns null when the resulting name isn't a real configured share.
+    const diskPrefix = diskBranchPrefix(root, absPath);
+    const shareRelDir = splitShareRelDir(`${config.shareMountRoot}/`, absPath) ?? (diskPrefix ? splitShareRelDir(diskPrefix, absPath) : null);
+    if (shareRelDir) {
+      const locations = await this.shares.locateShareEntries(shareRelDir.shareName, shareRelDir.relDir);
       if (locations) {
         for (const entry of entries) entry.locations = locations[entry.name] ?? [];
       }
