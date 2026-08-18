@@ -13,7 +13,7 @@ import { ArrayActionErrorBanner } from '../components/shared/ArrayActionErrorBan
 import { useArrayStatus } from '../state/useArrayStatus';
 
 export function DashboardPage() {
-  const { status, loadState, error, actionError, stopBlockedByContainers, arrayPending, toggleArray } = useArrayStatus();
+  const { status, loadState, error, actionError, stopBlockedByContainers } = useArrayStatus();
 
   return (
     <div className="dashboard">
@@ -22,14 +22,7 @@ export function DashboardPage() {
         {/* 'not-configured' (no array ever created) is expected on a fresh install - OnboardingGate
             covers this with the setup wizard instead of a scary error banner. */}
         {loadState === 'error' && error && <div className="status-note status-note--error">{error}</div>}
-        {actionError && (
-          <ArrayActionErrorBanner
-            actionError={actionError}
-            stopBlockedByContainers={stopBlockedByContainers}
-            arrayPending={arrayPending}
-            onRetryWithStopContainers={() => toggleArray(true)}
-          />
-        )}
+        {actionError && <ArrayActionErrorBanner actionError={actionError} stopBlockedByContainers={stopBlockedByContainers} />}
         {status && (
           <>
             <StatCards />

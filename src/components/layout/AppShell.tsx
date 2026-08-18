@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { DiskDetailPanel } from '../disk-detail/DiskDetailPanel';
+import { ArrayStopBlockedModal } from '../shared/ArrayStopBlockedModal';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { NavTabs } from './NavTabs';
@@ -14,6 +15,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {children}
       <Footer />
       <DiskDetailPanel />
+      <ArrayStopBlockedModal />
     </div>
   );
 }

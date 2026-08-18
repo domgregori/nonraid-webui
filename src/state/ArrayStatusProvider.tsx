@@ -127,6 +127,11 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
     setActionNote(null);
   }, []);
 
+  const dismissActionError = useCallback(() => {
+    setActionError(null);
+    setStopBlockedByContainers(false);
+  }, []);
+
   const closeDetail = useCallback(() => {
     setSelectedDiskId(null);
     setActionNote(null);
@@ -185,6 +190,7 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
         restorePending,
         refresh: refreshStatus,
         toggleArray,
+        dismissActionError,
         parityAction,
         selectDisk,
         closeDetail,

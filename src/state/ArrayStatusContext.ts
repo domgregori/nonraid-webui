@@ -44,6 +44,10 @@ export interface ArrayStatusContextValue {
   /** stopContainers only takes effect when the array is currently started (i.e. this call is a
    *  stop, not a start) - see stopBlockedByContainers above for the retry flow that passes it. */
   toggleArray: (stopContainers?: boolean) => void;
+  /** Dismisses the current actionError/stopBlockedByContainers without retrying - for closing
+   *  ArrayStopBlockedModal's Cancel/overlay-click, which (unlike the inline banner it replaced)
+   *  needs an explicit way to go away rather than just waiting for the next action attempt. */
+  dismissActionError: () => void;
   parityAction: (action: ParityCheckAction) => void;
   selectDisk: (id: string) => void;
   closeDetail: () => void;

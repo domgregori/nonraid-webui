@@ -11,7 +11,7 @@ import { ArrayActionErrorBanner } from '../components/shared/ArrayActionErrorBan
 import { useArrayStatus } from '../state/useArrayStatus';
 
 export function DisksPage() {
-  const { status, loadState, error, actionError, stopBlockedByContainers, arrayPending, toggleArray } = useArrayStatus();
+  const { status, loadState, error, actionError, stopBlockedByContainers } = useArrayStatus();
   const [showBootDisk, setShowBootDisk] = useState(false);
 
   return (
@@ -22,14 +22,7 @@ export function DisksPage() {
 
       {loadState === 'loading' && !status && <div className="status-note">Loading array status…</div>}
       {error && <div className="status-note status-note--error">{error}</div>}
-      {actionError && (
-        <ArrayActionErrorBanner
-          actionError={actionError}
-          stopBlockedByContainers={stopBlockedByContainers}
-          arrayPending={arrayPending}
-          onRetryWithStopContainers={() => toggleArray(true)}
-        />
-      )}
+      {actionError && <ArrayActionErrorBanner actionError={actionError} stopBlockedByContainers={stopBlockedByContainers} />}
 
       {status && (
         <div className="disks-page">
