@@ -198,12 +198,17 @@ export class RealLxcClient implements LxcClient {
   async stopContainer(name: string, options?: { force?: boolean }): Promise<LxcCommandResult> {
     const args = ['-P', config.lxcDefaultPath, '-n', name];
     args.push(options?.force ? '--kill' : `--timeout=${config.lxcStopTimeoutSec}`);
-    await this.run('lxc-stop', args);
+    // Node's own process timeout must outlast the `--timeout` we just told lxc-stop to honor -
+    // otherwise Node kills the still-gracefully-shutting-down process first and reports a bogus
+    // failure (observed live: a container took a little over lxcTimeoutMs's default 15s to stop,
+    // Node SIGTERM'd lxc-stop before its own 30s grace period ended, and a manual immediate retry
+    // then succeeded in under a second since the container was already stopping).
+    await this.run('lxc-stop', args, (config.lxcStopTimeoutSec + 5) * 1000);
     return { ok: true, message: `Container "${name}" stopped` };
   }
 
   async restartContainer(name: string): Promise<LxcCommandResult> {
-    await this.run('lxc-stop', ['-P', config.lxcDefaultPath, '-n', name, `--timeout=${config.lxcStopTimeoutSec}`]);
+    await this.run('lxc-stop', ['-P', config.lxcDefaultPath, '-n', name, `--timeout=${config.lxcStopTimeoutSec}`], (config.lxcStopTimeoutSec + 5) * 1000);
     await this.run('lxc-start', ['-P', config.lxcDefaultPath, '-n', name]);
     return { ok: true, message: `Container "${name}" restarted` };
   }
