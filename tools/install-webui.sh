@@ -218,8 +218,16 @@ ensure_node() {
 fetch_nonraid_source() {
   log "Fetching NonRAID from $NONRAID_REPO_URL (main branch)"
   if [ -d "$NONRAID_SRC_DIR/.git" ]; then
-    git -C "$NONRAID_SRC_DIR" fetch origin main
-    git -C "$NONRAID_SRC_DIR" reset --hard origin/main
+    # An existing checkout only shows up here on a re-run/update, or when one was pre-seeded onto
+    # an install image (see nonraid-os's build/build-image.sh) so the install still has something
+    # to build against with no network at all. Either way, a failed fetch isn't fatal the way it
+    # is below when there's nothing to fall back on: warn and keep building from what's already
+    # there rather than aborting the whole install.
+    if git -C "$NONRAID_SRC_DIR" fetch origin main; then
+      git -C "$NONRAID_SRC_DIR" reset --hard origin/main
+    else
+      log "Could not reach $NONRAID_REPO_URL (offline?) — building from the existing checkout at $NONRAID_SRC_DIR as-is"
+    fi
   else
     rm -rf "$NONRAID_SRC_DIR"
     git clone --branch main "$NONRAID_REPO_URL" "$NONRAID_SRC_DIR"
