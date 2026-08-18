@@ -39,13 +39,25 @@ export function resolveDockerPath(location: StorageLocation): string {
   return `/mnt/disk${location.diskSlot}/system/docker`;
 }
 
-export async function getCurrentDockerStorage(docker: DockerClient): Promise<DockerStorageInfo> {
-  const currentPath = await docker.getDataRoot();
+function classifyDockerStorage(currentPath: string): DockerStorageInfo {
   if (currentPath === '/var/lib/docker') return { mode: 'boot', diskSlot: null, path: currentPath };
   if (currentPath === `${config.cacheMountPoint}/system/docker`) return { mode: 'cache', diskSlot: null, path: currentPath };
   const match = currentPath.match(/^\/mnt\/disk(\d+)\/system\/docker$/);
   if (match) return { mode: 'array', diskSlot: Number(match[1]), path: currentPath };
   return { mode: 'custom', diskSlot: null, path: currentPath };
+}
+
+export async function getCurrentDockerStorage(docker: DockerClient): Promise<DockerStorageInfo> {
+  return classifyDockerStorage(await docker.getDataRoot());
+}
+
+/** Same classification as getCurrentDockerStorage(), but read straight from daemon.json instead of
+ *  querying the live daemon - needed for callers that may run while dockerd itself is stopped
+ *  (e.g. deciding whether it's safe to restart Docker in the first place). */
+export async function getConfiguredDockerStorage(): Promise<DockerStorageInfo> {
+  const raw = await readFile(DAEMON_JSON_PATH, 'utf8').catch(() => null);
+  const dataRoot = raw ? (JSON.parse(raw) as { 'data-root'?: string })['data-root'] : undefined;
+  return classifyDockerStorage(dataRoot ?? '/var/lib/docker');
 }
 
 /** Same "don't move onto a mirror that can't actually serve the data" gate for both cache

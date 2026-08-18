@@ -5,7 +5,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import type { ActivityStore } from '../activity/store.js';
 import { config } from '../config.js';
-import { DAEMON_JSON_PATH } from '../docker/storagePath.js';
+import { DAEMON_JSON_PATH, getConfiguredDockerStorage } from '../docker/storagePath.js';
 import { HttpError } from '../httpError.js';
 import { NetRateTracker } from '../metrics/net.js';
 import type { NmdClient } from '../nmd/client.js';
@@ -310,12 +310,26 @@ export function systemRouter(
     // an explicit opt-in from the caller, not run by default, so a restore that never touched
     // daemon.json (or a click of this button outside a restore) doesn't bounce Docker for no
     // reason. The config-restore wizard sets this from commitResult.dockerConfigRestored.
-    const docker = req.body?.restartDocker
-      ? await runStep('Docker restart', async () => {
-          const def = SERVICE_DEFS.find((d) => d.id === 'docker')!;
-          await restartService(def);
-          return 'Docker restarted';
-        })
+    //
+    // The driver reload above only re-imports the superblock - it never mounts array disks (that
+    // only happens on a full array start, which this endpoint doesn't perform). If Docker's
+    // storage lives on an array disk and the array isn't started, that path is empty right now;
+    // restarting dockerd against it makes it initialize fresh empty state there, permanently
+    // orphaning every existing container/image (the files stay on disk, but neither dockerd nor
+    // containerd's "moby" namespace reference them anymore once mounted later - confirmed live).
+    // Skip the bounce in that case; /array/start already restarts Docker correctly once the disk
+    // is actually mounted, so there's nothing to do here but explain why it was skipped.
+    const dockerStorage = req.body?.restartDocker ? await getConfiguredDockerStorage().catch(() => null) : null;
+    const arrayStarted = req.body?.restartDocker ? (await nmd.getStatus()).array.state === 'STARTED' : true;
+    const dockerRestartUnsafe = dockerStorage?.mode === 'array' && !arrayStarted;
+    const dockerResult = req.body?.restartDocker
+      ? dockerRestartUnsafe
+        ? { ok: false, message: "Docker storage is on an array disk that isn't mounted yet - start the array to bring Docker back." }
+        : await runStep('Docker restart', async () => {
+            const def = SERVICE_DEFS.find((d) => d.id === 'docker')!;
+            await restartService(def);
+            return 'Docker restarted';
+          })
       : null;
 
     activity.log('Restarting nonraid-webui backend', 'amber').catch(() => {});
@@ -323,7 +337,7 @@ export function systemRouter(
       smb,
       nfs,
       driverReload,
-      docker,
+      docker: dockerResult,
       message: 'Restarting nonraid-webui - this page will reconnect automatically in a few seconds.',
     });
     // Same self-exit pattern as /services/webui/restart: this unit's own Restart=on-failure
