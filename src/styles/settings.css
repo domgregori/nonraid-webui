@@ -496,3 +496,18 @@
 .logs-line--warn {
   color: var(--color-amber);
 }
+
+/* break-all (the desktop default above) chops long journalctl lines - full ISO timestamps,
+   mergerfs's own verbose one-key-per-line config dump - at arbitrary points on a narrow screen,
+   producing unreadable fragments like "ssthrough" or "rity=-10". break-word prefers natural
+   boundaries (=, :, /, whitespace) and only breaks mid-token as a last resort. Smaller font +
+   tighter padding also fit more real content per line before wrapping is needed at all. Placed
+   after the base .logs-output rule (not up with settings.css's other 860px rules) since same-
+   specificity CSS resolves by source order, not by which one sits inside a media query.  */
+@media (max-width: 860px) {
+  .logs-output {
+    font-size: 10px;
+    padding: var(--space-sm);
+    word-break: break-word;
+  }
+}

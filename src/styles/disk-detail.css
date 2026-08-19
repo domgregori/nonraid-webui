@@ -157,6 +157,7 @@
 
 .smart-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-sm);
   margin-bottom: var(--space-md);
 }

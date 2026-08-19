@@ -179,6 +179,7 @@
 
 .docker-logs-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-sm);
   align-items: center;
 }
