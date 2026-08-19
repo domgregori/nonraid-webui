@@ -1,0 +1,192 @@
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 480px;
+  max-width: 92vw;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  z-index: 21;
+  padding: var(--space-2xl);
+  box-sizing: border-box;
+}
+
+.dialog__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+}
+
+.dialog__title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-field__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* Extra emphasis over the base label — full-bright text instead of the dim
+   secondary color, a size step up. Used sparingly (TLS cert/key file
+   labels), not a blanket replacement for .form-field__label. */
+.form-field__label--strong {
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+/* Read-only stand-in for a form-field's <input> once its value is locked in
+   (e.g. mid-install) — same box metrics as .history-input so the layout
+   doesn't jump, but visually inert. */
+.form-field__value {
+  padding: 8px 12px;
+  border-radius: var(--radius-btn);
+  border: 1px solid transparent;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+/* Repeatable rows for the Docker tab's Add/Edit Container dialog (ports, env
+   vars, volumes, devices) — each row is a few inputs + a remove button. */
+.container-form-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.container-form-row .history-input {
+  width: auto;
+  max-width: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.container-form-row--header {
+  margin-bottom: 4px;
+}
+
+.container-form-row--header .apps-field__hint {
+  flex: 1;
+  min-width: 0;
+}
+
+.path-autocomplete {
+  position: relative;
+  width: 100%;
+}
+
+.container-form-row .path-autocomplete {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.path-autocomplete__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+}
+
+.path-autocomplete__item {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--color-text);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.path-autocomplete__item:hover,
+.path-autocomplete__item--active {
+  background: var(--color-bg);
+}
+
+.container-form-row__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.container-form-row__remove {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text-dim);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.container-form-row__remove:hover {
+  color: var(--color-red);
+  border-color: var(--color-red);
+}
+
+.container-form-list__add {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--color-blue);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.disk-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+}
+
+.disk-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}

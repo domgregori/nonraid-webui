@@ -1,0 +1,22 @@
+.access-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.access-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.access-row__name {
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+.access-row select {
+  flex-shrink: 0;
+  width: 140px;
+}

@@ -1,0 +1,284 @@
+/* First-run setup wizard (src/components/onboarding) — a full takeover screen like .auth-screen,
+   not a dialog, since it's shown right after login/setup before the real dashboard is ever seen.
+   Sits above everything (including AppShell, which is already mounted underneath — see
+   OnboardingGate's doc comment) while open. */
+.onboarding {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.onboarding__chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg) var(--space-2xl);
+  flex-shrink: 0;
+}
+
+.onboarding__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.onboarding__brand-logo {
+  width: 128px;
+  height: 128px;
+}
+
+.onboarding__brand-title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+/* Signature element: a small row of "drive bay" glyphs standing in for a generic numbered/dot
+   progress tracker — each represents one stage of getting the array physically ready, which is
+   literally what filling in disk bays looks like. Active/done states reuse the app's existing
+   semantic blue/green rather than introducing new colors. */
+.onboarding-track {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 var(--space-2xl) var(--space-xl);
+  flex-shrink: 0;
+}
+
+.onboarding-track__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.onboarding-rail {
+  width: 22px;
+  height: 1px;
+  background: var(--color-border);
+  margin-top: -16px;
+}
+
+.onboarding-bay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.onboarding-bay__glyph {
+  width: 32px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--color-border-lit);
+  background: var(--color-surface);
+  position: relative;
+}
+
+.onboarding-bay__glyph::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  background: var(--color-border-lit);
+  border-radius: 1px;
+}
+
+.onboarding-bay__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+}
+
+.onboarding-bay--active .onboarding-bay__glyph {
+  border-color: var(--color-blue);
+  background: var(--color-blue-tint);
+}
+
+.onboarding-bay--active .onboarding-bay__glyph::after {
+  background: var(--color-blue);
+}
+
+.onboarding-bay--active .onboarding-bay__label {
+  color: var(--color-text);
+}
+
+.onboarding-bay--done .onboarding-bay__glyph {
+  border-color: var(--color-green);
+  background: var(--color-green-tint);
+}
+
+.onboarding-bay--done .onboarding-bay__glyph::after {
+  background: var(--color-green);
+}
+
+.onboarding-bay--done .onboarding-bay__label {
+  color: var(--color-text-secondary);
+}
+
+.onboarding__stage {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--space-2xl) var(--space-2xl);
+}
+
+.onboarding__panel {
+  width: 100%;
+  max-width: 640px;
+}
+
+.onboarding-hero__eyebrow {
+  margin-bottom: 10px;
+}
+
+.onboarding-hero__title {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  margin-bottom: 12px;
+}
+
+.onboarding-hero__desc {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  max-width: 540px;
+  margin-bottom: var(--space-2xl);
+}
+
+.onboarding-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-xl);
+}
+
+@media (max-width: 640px) {
+  .onboarding-choices {
+    grid-template-columns: 1fr;
+  }
+}
+
+.onboarding-choice {
+  text-align: left;
+  padding: var(--space-xl);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: inherit;
+  color: var(--color-text);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.onboarding-choice:hover {
+  border-color: var(--color-border-lit);
+  background: var(--color-surface-elevated);
+}
+
+.onboarding-choice--primary {
+  border-color: var(--color-blue);
+  background: var(--color-blue-tint-soft);
+}
+
+.onboarding-choice--primary:hover {
+  background: var(--color-blue-tint);
+}
+
+.onboarding-choice__title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.onboarding-choice__desc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.onboarding-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  margin: var(--space-2xl) 0 10px;
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--color-border);
+}
+
+.onboarding-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--space-lg);
+}
+
+.onboarding-summary__row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 7px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-chip);
+  background: var(--color-surface);
+}
+
+.onboarding-slide__dots {
+  display: flex;
+  gap: 6px;
+  margin-top: var(--space-sm);
+}
+
+.onboarding-slide__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-lit);
+  transition: all 0.15s ease;
+}
+
+.onboarding-slide__dot--active {
+  background: var(--color-blue);
+  width: 16px;
+}
+
+.onboarding__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+.onboarding__actions-right {
+  display: flex;
+  gap: var(--space-sm);
+  margin-left: auto;
+}
+
+/* The embedded ImportArrayWizard/CacheSetupDialog dialogs already bring their own
+   .detail-overlay backdrop — stacking fine over the (already fullscreen, opaque) wizard behind
+   them, same as they do over Settings in normal use. Nothing extra needed here. */

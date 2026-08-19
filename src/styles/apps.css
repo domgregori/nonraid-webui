@@ -1,0 +1,618 @@
+.apps-eyebrow {
+  margin-top: 4px;
+}
+
+.apps-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xl);
+}
+
+.apps-sidebar {
+  flex: 0 0 190px;
+  position: sticky;
+  top: var(--space-xl);
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+}
+
+.apps-sidebar__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+  font-family: var(--font-mono);
+  padding: 0 12px var(--space-sm);
+}
+
+.apps-sidebar__separator {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-sm) 4px;
+}
+
+.apps-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.apps-toolbar {
+  margin-bottom: var(--space-md);
+}
+
+.apps-search {
+  width: 100%;
+  max-width: 420px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 9px 14px;
+}
+
+.apps-search:focus {
+  outline: none;
+  border-color: var(--color-blue);
+}
+
+.category-item {
+  flex-shrink: 0;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
+  padding: 7px 12px;
+  cursor: pointer;
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category-item:hover {
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.category-item--active {
+  background: var(--color-blue-tint);
+  border-left-color: var(--color-blue);
+  color: var(--color-blue);
+}
+
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 860px) {
+  .apps-layout {
+    flex-direction: column;
+  }
+
+  .apps-sidebar {
+    flex-direction: row;
+    flex-basis: auto;
+    position: static;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: visible;
+    width: 100%;
+    align-items: center;
+    padding-bottom: var(--space-sm);
+  }
+
+  .apps-sidebar__title {
+    display: none;
+  }
+
+  .category-item {
+    border-left: none;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border);
+  }
+
+  .category-item--active {
+    border-color: var(--color-blue);
+  }
+
+  .apps-sidebar__separator {
+    width: 1px;
+    height: 24px;
+    flex-shrink: 0;
+    margin: 0 var(--space-xs);
+  }
+}
+
+.app-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  cursor: pointer;
+}
+
+.app-card:hover {
+  border-color: var(--color-border-lit);
+}
+
+.app-card:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+}
+
+.app-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+
+.app-card__icon {
+  border-radius: var(--radius-chip);
+  object-fit: contain;
+  background: var(--color-surface-elevated);
+  flex-shrink: 0;
+}
+
+.app-card__icon--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--color-text-secondary);
+}
+
+.app-card__heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-card__name {
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-card__repo {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.app-card__privileged {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-amber);
+  background: color-mix(in oklch, var(--color-amber) 15%, transparent);
+  border-radius: var(--radius-chip);
+  padding: 3px 7px;
+}
+
+.app-card__installed {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-green);
+  background: color-mix(in oklch, var(--color-green) 15%, transparent);
+  border-radius: var(--radius-chip);
+  padding: 3px 7px;
+}
+
+.app-card__installed--update {
+  color: var(--color-amber);
+  background: color-mix(in oklch, var(--color-amber) 15%, transparent);
+}
+
+.app-card__overview {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
+}
+
+.app-card__stats {
+  display: flex;
+  gap: var(--space-md);
+  font-size: 11px;
+  color: var(--color-text-dim);
+}
+
+.app-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.app-card__categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.category-tag {
+  font-size: 10px;
+  color: var(--color-text-dim);
+  background: var(--color-surface-elevated);
+  border-radius: var(--radius-chip);
+  padding: 3px 7px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.category-tag--more {
+  color: var(--color-text-secondary);
+}
+
+.apps-load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-xl);
+}
+
+.apps-attribution {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--color-text-dim);
+}
+
+/* Install dialog */
+
+.apps-install-dialog {
+  width: 560px;
+  overflow-x: hidden;
+}
+
+.apps-install-overview {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.apps-privileged-banner {
+  border: 1px solid var(--color-amber);
+  background: color-mix(in oklch, var(--color-amber) 10%, var(--color-surface));
+  border-radius: var(--radius-card);
+  padding: var(--space-md);
+}
+
+.apps-privileged-banner__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-amber);
+}
+
+.apps-privileged-banner__body {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.apps-privileged-banner__ack {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin-top: var(--space-sm);
+  cursor: pointer;
+}
+
+.apps-required-mark {
+  color: var(--color-red);
+}
+
+.apps-field__hint {
+  font-size: 11px;
+  color: var(--color-text-dim);
+}
+
+.apps-field__hint--error {
+  color: var(--color-red);
+}
+
+.apps-field--error {
+  border-color: var(--color-red) !important;
+}
+
+.apps-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  border-top: 1px dashed var(--color-border);
+  padding-top: var(--space-md);
+}
+
+.apps-advanced__toggle {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--color-blue);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.apps-plan-review {
+  background: var(--color-surface-elevated);
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.apps-plan-review__title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.apps-plan-review__section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.apps-plan-review__section + .apps-plan-review__section {
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.apps-plan-review__section-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+  font-family: var(--font-mono);
+  margin-bottom: 2px;
+}
+
+.apps-plan-review__kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-md);
+  font-size: 12px;
+  padding: 2px 0;
+}
+
+.apps-plan-review__kv-label {
+  color: var(--color-text-secondary);
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.apps-plan-review__kv-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text);
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.apps-plan-review__weburl {
+  text-align: left;
+}
+
+.apps-plan-review__bind {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 0;
+}
+
+.apps-plan-review__bind + .apps-plan-review__bind {
+  border-top: 1px dashed var(--color-border);
+}
+
+.apps-plan-review__bind-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.apps-plan-review__bind-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.apps-plan-review__bind-arrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-dim);
+  padding-left: var(--space-md);
+}
+
+.apps-plan-review__badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-dim);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-chip);
+  padding: 1px 5px;
+}
+
+.apps-install-done {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  align-items: flex-start;
+}
+
+.apps-install-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.apps-install-progress__status {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.apps-install-progress__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.apps-install-progress__bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-blue);
+  transition: width 0.2s ease;
+}
+
+/* Unknown percentage (e.g. "creating"/"starting" phases have no byte count) —
+   an animated sweep instead of a stalled, static bar. */
+.apps-install-progress__bar-fill--indeterminate {
+  width: 40%;
+  animation: apps-install-progress-sweep 1.2s ease-in-out infinite;
+}
+
+@keyframes apps-install-progress-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+.apps-install-progress__log {
+  max-height: 140px;
+  overflow-y: auto;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.apps-install-progress__log-line {
+  display: flex;
+  gap: var(--space-sm);
+  padding: 1px 0;
+  white-space: nowrap;
+}
+
+.apps-install-progress__log-id {
+  color: var(--color-text-dim);
+  flex-shrink: 0;
+}
+
+.apps-install-progress__log-status {
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* App detail panel */
+
+.apps-detail__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+
+.apps-detail__namespace {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+}
+
+.apps-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+}
+
+.apps-detail__overview {
+  margin-top: var(--space-lg);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+}
+
+.apps-detail__maintainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+.apps-detail__note {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--color-text-dim);
+}
+
+.apps-update-note {
+  margin-top: var(--space-sm);
+  padding: 10px 12px;
+  border-radius: var(--radius-btn);
+  background: color-mix(in oklch, var(--color-amber) 10%, var(--color-surface));
+  border: 1px solid var(--color-amber);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}

@@ -1,0 +1,51 @@
+/* Full-page Setup/Login screens — rendered outside AppShell (no header/nav
+   yet, since nothing is authenticated), so this owns its own centered layout. */
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  padding: var(--space-lg);
+  box-sizing: border-box;
+}
+
+.auth-card {
+  width: 360px;
+  max-width: 100%;
+}
+
+.auth-card__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: var(--space-xl);
+}
+
+.auth-card__logo {
+  width: 36px;
+  height: 36px;
+}
+
+.auth-card__title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.auth-card__subtitle {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 4px 0 var(--space-xl);
+}
+
+.auth-card__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.auth-card .history-input {
+  width: 100%;
+}

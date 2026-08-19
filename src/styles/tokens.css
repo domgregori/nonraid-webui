@@ -1,0 +1,104 @@
+:root {
+  /* Light palette (default — see the dark overrides below for both the
+     prefers-color-scheme and explicit data-theme cases). Surfaces get
+     progressively whiter than the page background, mirroring the dark
+     palette's own bg < surface < surface-elevated depth ordering. */
+  --color-bg: oklch(0.95 0.006 260);
+  --color-surface: oklch(0.99 0.003 260);
+  --color-surface-elevated: oklch(1 0 0);
+  --color-border: oklch(0.87 0.01 260);
+  --color-border-lit: oklch(0.78 0.015 260);
+
+  --color-text: oklch(0.22 0.02 260);
+  --color-text-secondary: oklch(0.42 0.02 260);
+  --color-text-dim: oklch(0.56 0.02 260);
+
+  --color-blue: oklch(0.55 0.16 240);
+  --color-green: oklch(0.55 0.14 145);
+  --color-amber: oklch(0.58 0.15 75);
+  --color-red: oklch(0.55 0.2 25);
+
+  /* Extra chart-line swatches beyond the 4 semantic colors above — see
+     HistoryPage.tsx's DISK_PALETTE. */
+  --color-chart-purple: oklch(0.55 0.17 293);
+  --color-chart-cyan: oklch(0.52 0.13 200);
+  --color-chart-pink: oklch(0.55 0.2 350);
+  --color-chart-lime: oklch(0.5 0.16 128);
+
+  --color-blue-tint: color-mix(in oklch, var(--color-blue) 15%, transparent);
+  --color-blue-tint-strong: color-mix(in oklch, var(--color-blue) 18%, transparent);
+  --color-blue-tint-soft: color-mix(in oklch, var(--color-blue) 12%, transparent);
+  --color-green-tint: color-mix(in oklch, var(--color-green) 15%, transparent);
+  --color-red-tint: color-mix(in oklch, var(--color-red) 8%, var(--color-surface));
+
+  --font-ui: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --radius-card: 12px;
+  --radius-chip: 7px;
+  --radius-btn: 8px;
+  --radius-pill: 999px;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg: oklch(0.16 0.02 260);
+    --color-surface: oklch(0.21 0.02 260);
+    --color-surface-elevated: oklch(0.25 0.02 260);
+    --color-border: oklch(0.32 0.02 260);
+    --color-border-lit: oklch(0.4 0.03 260);
+
+    --color-text: oklch(0.93 0.01 260);
+    --color-text-secondary: oklch(0.68 0.02 260);
+    --color-text-dim: oklch(0.52 0.02 260);
+
+    --color-blue: oklch(0.68 0.14 240);
+    --color-green: oklch(0.72 0.15 145);
+    --color-amber: oklch(0.78 0.15 80);
+    --color-red: oklch(0.64 0.19 25);
+
+    --color-chart-purple: oklch(0.75 0.14 293);
+    --color-chart-cyan: oklch(0.79 0.13 200);
+    --color-chart-pink: oklch(0.72 0.18 350);
+    --color-chart-lime: oklch(0.77 0.18 128);
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-bg: oklch(0.16 0.02 260);
+  --color-surface: oklch(0.21 0.02 260);
+  --color-surface-elevated: oklch(0.25 0.02 260);
+  --color-border: oklch(0.32 0.02 260);
+  --color-border-lit: oklch(0.4 0.03 260);
+
+  --color-text: oklch(0.93 0.01 260);
+  --color-text-secondary: oklch(0.68 0.02 260);
+  --color-text-dim: oklch(0.52 0.02 260);
+
+  --color-blue: oklch(0.68 0.14 240);
+  --color-green: oklch(0.72 0.15 145);
+  --color-amber: oklch(0.78 0.15 80);
+  --color-red: oklch(0.64 0.19 25);
+
+  --color-chart-purple: oklch(0.75 0.14 293);
+  --color-chart-cyan: oklch(0.79 0.13 200);
+  --color-chart-pink: oklch(0.72 0.18 350);
+  --color-chart-lime: oklch(0.77 0.18 128);
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}

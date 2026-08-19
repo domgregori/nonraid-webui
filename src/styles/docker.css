@@ -1,0 +1,219 @@
+.docker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.docker-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+}
+
+.docker-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.docker-card__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.docker-card__name {
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docker-card__status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.docker-card__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+}
+
+.docker-card__image {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+}
+
+.docker-card__autostart-row {
+  margin-top: 6px;
+}
+
+.docker-card__badges {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.docker-card__weburl {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-blue);
+  text-decoration: none;
+}
+
+.docker-card__weburl:hover {
+  text-decoration: underline;
+}
+
+.docker-card__badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-chip);
+  padding: 3px 7px;
+}
+
+.docker-card__badge--ca {
+  color: var(--color-green);
+  background: color-mix(in oklch, var(--color-green) 15%, transparent);
+}
+
+.docker-card__badge--custom {
+  color: var(--color-text-dim);
+  background: var(--color-surface-elevated);
+}
+
+.docker-card__autostart {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-dim);
+  cursor: pointer;
+}
+
+.docker-card__autostart:has(input:checked) {
+  color: var(--color-blue);
+}
+
+.docker-card__autostart:has(input:disabled) {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.docker-card__autostart input[type='checkbox'] {
+  appearance: none;
+  margin: 0;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1.5px solid var(--color-border);
+  background: transparent;
+  cursor: inherit;
+  display: grid;
+  place-content: center;
+}
+
+.docker-card__autostart input[type='checkbox']:checked {
+  border-color: var(--color-blue);
+  background: var(--color-blue);
+}
+
+.docker-card__autostart input[type='checkbox']:checked::after {
+  content: '';
+  width: 3px;
+  height: 6px;
+  border: solid var(--color-surface);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+
+.docker-card__stats {
+  margin-top: var(--space-md);
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.docker-card__actions {
+  margin-top: 14px;
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.docker-card__actions .btn {
+  flex: 1;
+  padding: 7px;
+  text-align: center;
+}
+
+.docker-card__actions .btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.docker-card__actions + .docker-card__actions {
+  margin-top: var(--space-sm);
+}
+
+.dialog.docker-logs-dialog {
+  width: 720px;
+}
+
+.docker-logs-toolbar {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.docker-logs-toolbar .history-input {
+  width: auto;
+}
+
+.docker-logs-live-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.docker-logs-live-toggle:has(input:disabled) {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.docker-logs-output {
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
