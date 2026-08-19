@@ -425,8 +425,16 @@ export function systemRouter(
     }
     try {
       await setTimezone(tz);
-      activity.log(`Timezone changed to "${tz}"`, 'blue').catch(() => {});
-      res.json({ ok: true, message: `Timezone set to "${tz}".` });
+      activity.log(`Timezone changed to "${tz}" - nonraid-webui is restarting`, 'amber').catch(() => {});
+      res.json({ ok: true, message: `Timezone set to "${tz}". Restarting to pick it up - you'll be reconnected shortly.` });
+      // Node/ICU caches the local timezone at process startup (Intl.DateTimeFormat().resolvedOptions().timeZone
+      // in system/service.ts never re-reads it), so the OS-level change above is real but everything this
+      // process reports/renders stays on the old zone until it restarts. Same self-restart shape as
+      // routes/tls.ts's scheduleSelfRestart() and routes/services.ts's webui-restart branch: exit non-zero and
+      // let the unit's Restart=on-failure bring it back.
+      res.on('finish', () => {
+        setTimeout(() => process.exit(1), 200);
+      });
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }
