@@ -16,6 +16,7 @@ export function TailscaleSection() {
   const [enableError, setEnableError] = useState<string | null>(null);
 
   const [loginServerDraft, setLoginServerDraft] = useState('');
+  const [showCustomLogin, setShowCustomLogin] = useState(false);
   const draftInitialized = useRef(false);
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export function TailscaleSection() {
         if (!draftInitialized.current) {
           draftInitialized.current = true;
           setLoginServerDraft(s.loginServer);
+          if (s.loginServer) setShowCustomLogin(true);
           setHostnameDraft(s.hostname ?? '');
           setAdvertiseRoutesDraft(s.advertiseRoutes.join(', '));
         }
@@ -198,27 +200,42 @@ export function TailscaleSection() {
 
       {status.featureEnabled && (
         <>
-          <div className="toggle-row__title" style={{ marginTop: 12 }}>
-            Login server
-          </div>
-          <div className="toggle-row__desc">Leave blank to use Tailscale's own server, or set a self-hosted Headscale URL.</div>
-          <div className="settings-field__row">
-            <input
-              className="history-input"
-              style={{ width: '100%' }}
-              value={loginServerDraft}
-              onChange={(e) => setLoginServerDraft(e.target.value)}
-              placeholder="https://headscale.example.com"
-              disabled={status.loggedIn || loggingIn}
-            />
-          </div>
-
-          {!status.loggedIn && (
-            <div className="settings-field__row" style={{ marginTop: 8 }}>
+          {!status.loggedIn && !showCustomLogin && (
+            <div className="settings-field__row" style={{ marginTop: 12 }}>
               <button type="button" className="btn" disabled={loggingIn || waitingForAuth} onClick={login}>
                 {loggingIn ? 'Starting…' : waitingForAuth ? 'Waiting for login…' : 'Log in'}
               </button>
+              <button type="button" className="btn" onClick={() => setShowCustomLogin(true)}>
+                Custom login server
+              </button>
             </div>
+          )}
+
+          {(showCustomLogin || status.loggedIn) && (
+            <>
+              <div className="toggle-row__title" style={{ marginTop: 12 }}>
+                Login server
+              </div>
+              <div className="toggle-row__desc">Leave blank to use Tailscale's own server, or set a self-hosted Headscale URL.</div>
+              <div className="settings-field__row">
+                <input
+                  className="history-input"
+                  style={{ width: '100%' }}
+                  value={loginServerDraft}
+                  onChange={(e) => setLoginServerDraft(e.target.value)}
+                  placeholder="https://headscale.example.com"
+                  disabled={status.loggedIn || loggingIn}
+                />
+              </div>
+
+              {!status.loggedIn && (
+                <div className="settings-field__row" style={{ marginTop: 8 }}>
+                  <button type="button" className="btn" disabled={loggingIn || waitingForAuth} onClick={login}>
+                    {loggingIn ? 'Starting…' : waitingForAuth ? 'Waiting for login…' : 'Log in'}
+                  </button>
+                </div>
+              )}
+            </>
           )}
           {loginError && <div className="status-note status-note--error">{loginError}</div>}
           {authUrl && (
