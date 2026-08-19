@@ -1,8 +1,13 @@
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
-  value: h,
-  label: h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`,
-}));
+
+/** Same 12h/24h choice as the header clock (Settings -> About -> Time format), not hardcoded -
+ *  this picker is the one other place in the app a literal clock time is chosen, not just displayed. */
+function hourOptions(hour12: boolean): { value: number; label: string }[] {
+  return Array.from({ length: 24 }, (_, h) => ({
+    value: h,
+    label: hour12 ? (h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`) : `${String(h).padStart(2, '0')}:00`,
+  }));
+}
 // 1-28 only - every month has at least 28 days, so this sidesteps "the 30th
 // doesn't exist in February" without needing month-length logic, matching
 // backend/src/settings/types.ts's WeeklyOrMonthlySchedule.dayOfMonth.
@@ -17,6 +22,7 @@ interface ScheduleFieldsProps {
   onDayOfMonthChange: (day: number) => void;
   hour: number;
   onHourChange: (hour: number) => void;
+  hour12: boolean;
   disabled?: boolean;
 }
 
@@ -31,6 +37,7 @@ export function ScheduleFields({
   onDayOfMonthChange,
   hour,
   onHourChange,
+  hour12,
   disabled,
 }: ScheduleFieldsProps) {
   return (
@@ -65,7 +72,7 @@ export function ScheduleFields({
           </select>
         )}
         <select className="history-input" value={hour} onChange={(e) => onHourChange(Number(e.target.value))} disabled={disabled}>
-          {HOUR_OPTIONS.map((h) => (
+          {hourOptions(hour12).map((h) => (
             <option key={h.value} value={h.value}>
               {h.label}
             </option>
