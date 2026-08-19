@@ -52,6 +52,7 @@ export const dockerApi = {
   },
   pruneImages: () => request<PruneImagesResult>('/api/docker/images/prune', { method: 'POST' }),
   listDevices: () => request<HostDevice[]>('/api/docker/devices'),
+  listNetworks: () => request<string[]>('/api/docker/networks'),
   getStorage: () => request<DockerStorageInfo>('/api/docker/storage'),
   moveStorage: (target: StorageLocation, onProgress: (p: StoragePathProgress) => void) =>
     streamNdjson<StoragePathProgress, StoragePathResult>(

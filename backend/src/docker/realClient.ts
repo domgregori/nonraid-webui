@@ -333,6 +333,13 @@ export class RealDockerClient implements DockerClient {
     });
   }
 
+  async listNetworks(): Promise<string[]> {
+    return this.guard(async () => {
+      const networks = await this.docker.listNetworks();
+      return networks.map((n) => n.Name).sort((a, b) => a.localeCompare(b));
+    });
+  }
+
   /** dockerode's createContainer, unlike the `docker` CLI, does not pull a missing
    * image on its own - it fails outright with a 404 if the image isn't already
    * cached locally, which is the common case for a template being installed for

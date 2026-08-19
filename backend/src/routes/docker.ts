@@ -110,6 +110,16 @@ export function dockerRouter(
     }
   });
 
+  // Real Docker networks (custom + built-in bridge/host/none) for the create/edit dialog's
+  // Network dropdown.
+  router.get('/docker/networks', async (_req, res) => {
+    try {
+      res.json(await docker.listNetworks());
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   router.get('/docker/containers/:id', async (req, res) => {
     try {
       res.json(await docker.inspectContainer(req.params.id));

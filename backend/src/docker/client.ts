@@ -36,4 +36,8 @@ export interface DockerClient {
   // (untagged) ones, since a plain "unused tagged image" like a leftover from a destroyed
   // container is the common case an admin actually wants cleaned up.
   pruneImages(): Promise<{ imagesDeleted: number; spaceReclaimedBytes: number }>;
+  // Real network names Docker itself knows about (custom networks a user created, plus its own
+  // built-ins like "bridge"/"host"/"none") - backs the create/edit form's Network dropdown so
+  // picking one doesn't require typing it from memory.
+  listNetworks(): Promise<string[]>;
 }

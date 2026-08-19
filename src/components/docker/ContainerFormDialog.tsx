@@ -29,6 +29,12 @@ type Stage = 'loading' | 'editing' | 'reviewed' | 'installing' | 'done' | 'load-
 // the curated GPU/audio/serial categories, falls back to free text.
 const DEVICE_CUSTOM = '__custom__';
 
+// Docker's own network modes, always offered even if the daemon's own listNetworks() doesn't
+// happen to include them (host/none aren't real network objects, and a fresh daemon may not
+// have re-created "bridge" under an unexpected name).
+const BUILTIN_NETWORKS = ['bridge', 'host', 'none'];
+const NETWORK_CUSTOM = '__custom_network__';
+
 function updateAt<T>(list: T[], index: number, patch: Partial<T>): T[] {
   return list.map((item, i) => (i === index ? { ...item, ...patch } : item));
 }
@@ -53,10 +59,14 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
   const [privilegedAck, setPrivilegedAck] = useState(false);
   const [autostart, setAutostart] = useState(false);
   const [availableDevices, setAvailableDevices] = useState<HostDevice[]>([]);
+  const [availableNetworks, setAvailableNetworks] = useState<string[]>([]);
 
   useEffect(() => {
     dockerApi.listDevices().then(setAvailableDevices).catch(() => {});
+    dockerApi.listNetworks().then(setAvailableNetworks).catch(() => {});
   }, []);
+
+  const networkOptions = [...BUILTIN_NETWORKS, ...availableNetworks.filter((n) => !BUILTIN_NETWORKS.includes(n))];
 
   const [plan, setPlan] = useState<ManualContainerPlan | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
@@ -208,16 +218,37 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
               {locked ? (
                 <div className="form-field__value">{network}</div>
               ) : (
-                <input
-                  className="history-input"
-                  style={{ width: '100%' }}
-                  placeholder="bridge"
-                  value={network}
-                  onChange={(e) => {
-                    setNetwork(e.target.value || 'bridge');
-                    invalidate();
-                  }}
-                />
+                <>
+                  <select
+                    className="history-input"
+                    style={{ width: '100%' }}
+                    value={networkOptions.includes(network) ? network : NETWORK_CUSTOM}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setNetwork(v === NETWORK_CUSTOM ? '' : v);
+                      invalidate();
+                    }}
+                  >
+                    {networkOptions.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                    <option value={NETWORK_CUSTOM}>Custom…</option>
+                  </select>
+                  {!networkOptions.includes(network) && (
+                    <input
+                      className="history-input"
+                      style={{ width: '100%', marginTop: 8 }}
+                      placeholder="Existing network's name"
+                      value={network}
+                      onChange={(e) => {
+                        setNetwork(e.target.value);
+                        invalidate();
+                      }}
+                    />
+                  )}
+                </>
               )}
               <span className="apps-field__hint">bridge, host, none, or an existing network's name</span>
             </label>
