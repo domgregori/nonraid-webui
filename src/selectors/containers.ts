@@ -41,16 +41,38 @@ function resolveContainerWebUi(container: DockerContainerSummary): string | null
   return hostPort ? `http://${window.location.hostname}:${hostPort}` : null;
 }
 
+/**
+ * Tells a crash apart from a clean/deliberate stop, instead of collapsing both down to a flat
+ * "Stopped" - checked in priority order: an active crash loop is the most actionable thing to
+ * surface, then how the container most recently went down.
+ */
+function deriveStatus(container: DockerContainerSummary): { label: string; color: string } {
+  if (container.restarting) {
+    return { label: `Crash looping (${container.restartCount} restart${container.restartCount === 1 ? '' : 's'})`, color: COLORS.amber };
+  }
+  if (container.state === 'running') {
+    return { label: 'Running', color: COLORS.green };
+  }
+  if (container.oomKilled) {
+    return { label: 'Exited (out of memory)', color: COLORS.red };
+  }
+  if (container.exitCode !== null && container.exitCode !== 0) {
+    return { label: `Exited (${container.exitCode})`, color: COLORS.red };
+  }
+  return { label: 'Stopped', color: COLORS.textDim };
+}
+
 export function deriveContainerViewModel(container: DockerContainerSummary, actions: ContainerActions): ContainerViewModel {
   const running = container.state === 'running';
+  const status = deriveStatus(container);
   return {
     id: container.id,
     name: container.name,
     icon: container.icon,
     image: container.image,
     ports: container.ports,
-    statusLabel: running ? 'Running' : 'Stopped',
-    statusColor: running ? COLORS.green : COLORS.textDim,
+    statusLabel: status.label,
+    statusColor: status.color,
     cpuLabel: container.cpuPercent === null ? '-' : `${Math.round(container.cpuPercent)}%`,
     memLabel: container.memUsedBytes === null ? '-' : formatBytesAsMB(container.memUsedBytes),
     toggleLabel: running ? 'Stop' : 'Start',

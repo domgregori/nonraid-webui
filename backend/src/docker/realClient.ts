@@ -182,11 +182,19 @@ export class RealDockerClient implements DockerClient {
         // the extra round trip per container at NAS-scale counts so the card's autostart toggle
         // reflects real state, not just what this app itself set most recently.
         let autostart = false;
+        let exitCode: number | null = null;
+        let oomKilled = false;
+        let restarting = false;
+        let restartCount = 0;
         try {
           const info = await this.docker.getContainer(c.Id).inspect();
           autostart = !!info.HostConfig.RestartPolicy?.Name && info.HostConfig.RestartPolicy.Name !== 'no';
+          exitCode = state === 'running' ? null : info.State.ExitCode;
+          oomKilled = info.State.OOMKilled;
+          restarting = info.State.Restarting;
+          restartCount = info.RestartCount;
         } catch {
-          // container may have been removed between list and inspect calls - leave autostart false
+          // container may have been removed between list and inspect calls - leave the above at their defaults
         }
 
         return {
@@ -204,6 +212,10 @@ export class RealDockerClient implements DockerClient {
           webUiUrl: null,
           icon: c.Labels?.['net.unraid.docker.icon'] ?? null,
           autostart,
+          exitCode,
+          oomKilled,
+          restarting,
+          restartCount,
         };
       }),
     );

@@ -20,6 +20,10 @@ export interface DockerContainerSummary {
   webUiUrl: string | null;
   icon: string | null;
   autostart: boolean;
+  exitCode: number | null;
+  oomKilled: boolean;
+  restarting: boolean;
+  restartCount: number;
 }
 
 export interface DockerCommandResult {

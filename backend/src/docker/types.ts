@@ -31,6 +31,19 @@ export interface DockerContainerSummary {
   // needs a real inspect() per container to know its RestartPolicy - worth the extra round trip
   // at NAS-scale container counts so the card's autostart toggle can show real state.
   autostart: boolean;
+  // The four below come off the same inspect() already fetched for autostart, no extra round
+  // trip - lets the UI tell a crash apart from a clean/deliberate stop instead of collapsing
+  // both down to a flat "Stopped".
+  exitCode: number | null; // last exit code; null while running
+  oomKilled: boolean;
+  // True only while the daemon is actively mid-cycle restarting this container after it exited,
+  // under a restart policy - not set for a normal user-initiated start/stop/restart. Transient
+  // (often sub-second), so catching it on a poll is a real-time signal, not a sticky flag.
+  restarting: boolean;
+  // Lifetime count of restart-policy-triggered restarts since the container was created (never
+  // reset by stop/start) - shown alongside `restarting` so "it's crash-looping" comes with "how
+  // many times" rather than just a yes/no.
+  restartCount: number;
 }
 
 export interface DockerCommandResult {
