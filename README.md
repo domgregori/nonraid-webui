@@ -2,6 +2,8 @@
 
 <center><img src="./public/logo.png" width="300"></center>
 
+<center><img src="./public/Screenshot.png"></center>
+
 ### Disclaimer: **$\color{red}{\textsf{EXPERIMENTAL!}}$ HAVE ANOTHER BACKUP OF YOUR DATA!**
 
 - **This webui was AI coded.**
