@@ -295,20 +295,61 @@
     display: none;
   }
 
-  .header__logo {
-    height: 36px;
+  /* Centers the logo on the row itself, not just the brand+clock cluster as a block - "NonRAID"
+     and the clock are different widths, so a plain centered flex row leaves the logo off-center
+     by roughly half that width difference. `.header__brand` (the Link wrapping title+logo)
+     becomes `display: contents` so its own children join this grid directly as the left/center
+     items, without changing the Link's DOM structure or click target. */
+  .header__brand-group {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    width: 100%;
+    gap: var(--space-md);
+  }
+
+  .header__brand {
+    display: contents;
   }
 
   .header__title {
     font-size: 15px;
+    justify-self: end;
+  }
+
+  .header__logo {
+    height: 36px;
+    justify-self: center;
   }
 
   .header__clock {
     font-size: 20px;
+    justify-self: start;
   }
 
   .nav-tabs {
     padding: 0 var(--space-md);
+  }
+
+  /* Slimmer second row (array status/actions) - same controls, less vertical padding, so the
+     header eats less of a phone's limited height. */
+  .header__status .toggle-array-btn {
+    padding: 5px 12px;
+    font-size: 12px;
+  }
+
+  .header__status .status-pill {
+    padding: 4px 10px;
+  }
+
+  .header__status .btn {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+
+  .header__status .notification-bell__button {
+    width: 28px;
+    height: 28px;
   }
 
   /* Right-anchored-to-the-button (like on desktop) risks running off a narrow screen's edge -
