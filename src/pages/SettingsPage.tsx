@@ -31,19 +31,19 @@ import { formatMemLabel, formatUptime } from '../utils/format';
 
 const SECTIONS = [
   { id: 'about', label: 'About' },
-  { id: 'network', label: 'Network' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'array', label: 'Array' },
+  { id: 'backups', label: 'Backups' },
   { id: 'cache', label: 'Cache' },
   { id: 'docker-lxc', label: 'Docker & LXC Storage' },
+  { id: 'import', label: 'Import Existing Array' },
+  { id: 'network', label: 'Network' },
+  { id: 'notifications', label: 'Notifications' },
+  { id: 'parity', label: 'Parity' },
+  { id: 'shares', label: 'Pools' },
+  { id: 'security', label: 'Security' },
   { id: 'services', label: 'Services' },
   { id: 'logs', label: 'System Logs' },
-  { id: 'parity', label: 'Parity' },
-  { id: 'import', label: 'Import Existing Array' },
-  { id: 'shares', label: 'Pools' },
-  { id: 'backups', label: 'Backups' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'security', label: 'Security' },
   { id: 'tailscale', label: 'Tailscale' },
 ] as const;
 
