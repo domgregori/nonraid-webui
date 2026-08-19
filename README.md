@@ -1,8 +1,8 @@
 # NonRAID WebUI
 
-<center><img src="./public/logo.png" width="300"></center>
+<p align="center"><img src="./public/logo.png" width="300"></p>
 
-<center><img src="./public/Screenshot.png"></center>
+<p align="center"><img src="./public/Screenshot.png"></p>
 
 ### Disclaimer: **$\color{red}{\textsf{EXPERIMENTAL!}}$ HAVE ANOTHER BACKUP OF YOUR DATA!**
 
