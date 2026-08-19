@@ -3,7 +3,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-lg);
-  padding: var(--space-lg) var(--space-2xl);
+  padding: 0 var(--space-2xl);
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   flex-wrap: wrap;
@@ -94,7 +94,7 @@
 }
 
 .header__logo {
-  height: 40px;
+  height: 75px;
   width: auto;
   flex-shrink: 0;
 }
