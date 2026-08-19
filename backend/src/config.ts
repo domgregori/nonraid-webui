@@ -147,7 +147,6 @@ export const config = {
   tlsSelfSignedDays: num('TLS_SELF_SIGNED_DAYS', t('tls', 'self_signed_days'), 3650),
   opensslBin: str('OPENSSL_BIN', t('tls', 'openssl_bin'), 'openssl'),
   nmdBin: str('NMD_BIN', t('nmd', 'bin'), 'nmdctl'),
-  nmdSuperblock: optStr('NMD_SUPERBLOCK', t('nmd', 'superblock')), // optional -s override, undefined = nmdctl default
   nmdTimeoutMs: num('NMD_TIMEOUT_MS', t('nmd', 'timeout_ms'), 15_000),
   // nmdctl's own `unassign` has an unconditional interactive confirm prompt with
   // no unattended bypass, so unassign writes this driver command directly instead

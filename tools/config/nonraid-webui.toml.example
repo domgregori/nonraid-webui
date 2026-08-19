@@ -78,8 +78,6 @@ frontend_dist_path = "/opt/nonraid-webui/frontend-dist"
 
 [nmd]
 #bin = "nmdctl"
-# Optional -s superblock path override — omit to use nmdctl's own default.
-#superblock = "/nonraid.dat"
 # Set to true if this backend doesn't run as root and instead relies on a
 # sudoers rule, e.g.: www-data ALL=(root) NOPASSWD: /usr/local/sbin/nmdctl
 #use_sudo = false

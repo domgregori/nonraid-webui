@@ -102,7 +102,6 @@ export class RealNmdClient implements NmdClient {
 
   private nmdArgs(args: string[]): { bin: string; fullArgs: string[] } {
     const baseArgs = ['-u', '--no-color'];
-    if (config.nmdSuperblock) baseArgs.push('-s', config.nmdSuperblock);
     return { bin: config.nmdBin, fullArgs: [...baseArgs, ...args] };
   }
 
@@ -335,34 +334,47 @@ export class RealNmdClient implements NmdClient {
    * identities. All filesystem touches go through runSystem (not plain
    * Node fs) for consistency with every other privileged operation here.
    *
+   * targetPath is always the hardcoded default (/nonraid.dat), not
+   * getSuperblockPath()'s live-value-following resolution - every other
+   * fixed reference to the superblock (nonraid.service, nmdctl's own
+   * default) is hardcoded to this same path now, so an import should always
+   * converge there too rather than perpetuating whatever
+   * status.array.superblock happened to report before this import. The
+   * staged file (routes/array.ts's stagedImports - always a private tmp
+   * copy, never the caller's own original) is moved into place, not copied,
+   * so there's nothing left to clean up after a successful commit.
+   *
    * The caller (routes/array.ts) is responsible for the same unmount-before
    * composition reloadDriver()'s callers use.
    */
   /**
    * The live value must actually look like an absolute path before it's trusted - confirmed live,
    * twice: the module ended up loaded with its super= parameter set to the *literal, unexpanded*
-   * string "$SUPER" (nonraid.service's own boot-time start resolves this correctly via its
-   * Environment= default - confirmed separately - so the literal only ever showed up *after* one
-   * of this class's own methods read a bad status.array.superblock and handed it straight back to
-   * modprobe as the *next* reload's target, without validating it first). Once that happens,
-   * status.array.superblock faithfully reports the same garbage back from then on, and every
-   * caller that trusts it perpetuates it - the automatic post-restore reload "succeeded" (modprobe
-   * doesn't validate its own arguments) while doing nothing, and the array stayed stuck
+   * string "$SUPER" (nonraid.service used to resolve this via an Environment="SUPER=..." default;
+   * the literal only ever showed up *after* one of this class's own methods read a bad
+   * status.array.superblock and handed it straight back to modprobe as the *next* reload's target,
+   * without validating it first - nonraid.service now hardcodes /nonraid.dat directly instead of
+   * going through a $SUPER env var at all, which removes that specific failure mode at the source,
+   * but this resolver stays as the general-purpose guard against any other bad live value). Once
+   * this happens, status.array.superblock faithfully reports the same garbage back from then on,
+   * and every caller that trusts it perpetuates it - the automatic post-restore reload "succeeded"
+   * (modprobe doesn't validate its own arguments) while doing nothing, and the array stayed stuck
    * unconfigured no matter how many times it ran. getSuperblockPath() and shrinkArray() both hit
    * this independently (two separate inline reads of the same live field) before both were routed
    * through this one validated resolver.
    */
   private resolveSuperblockPath(live: string | null | undefined): string {
     if (live && live.startsWith('/')) return live;
-    return config.nmdSuperblock || DEFAULT_SUPERBLOCK_PATH;
+    return DEFAULT_SUPERBLOCK_PATH;
   }
 
   /**
    * The superblock file actually in play right now: the live path
-   * (`status.array.superblock`) when something's loaded, else this app's own
-   * configured override, else nmdctl's own hardcoded default. `getStatus()`
-   * can throw on a genuinely fresh host - see check_module_loaded() in
-   * tools/nmdctl - so that's the fallback trigger, not a real error here.
+   * (`status.array.superblock`) when something's loaded, else the hardcoded
+   * default (`/nonraid.dat`, same as nmdctl's own and nonraid.service's).
+   * `getStatus()` can throw on a genuinely fresh host - see
+   * check_module_loaded() in tools/nmdctl - so that's the fallback trigger,
+   * not a real error here.
    */
   async getSuperblockPath(): Promise<string> {
     try {
@@ -404,7 +416,7 @@ export class RealNmdClient implements NmdClient {
   }
 
   async commitImportedSuperblock(stagedFilePath: string): Promise<{ result: ImportResult; targetPath: string; backedUpTo: string | null }> {
-    const targetPath = await this.getSuperblockPath();
+    const targetPath = DEFAULT_SUPERBLOCK_PATH;
 
     let backedUpTo: string | null = null;
     try {
@@ -416,7 +428,7 @@ export class RealNmdClient implements NmdClient {
     }
 
     try {
-      await this.runSystem('cp', [stagedFilePath, targetPath]);
+      await this.runSystem('mv', [stagedFilePath, targetPath]);
     } catch (err) {
       // Restore the backup filename before surfacing the error - nothing
       // kernel-side has changed yet at this point, same recovery shape as
