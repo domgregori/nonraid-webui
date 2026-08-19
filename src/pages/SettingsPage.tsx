@@ -765,6 +765,7 @@ export function SettingsPage() {
             onDayOfMonthChange={setCacheSchedDayOfMonth}
             hour={cacheSchedHour}
             onHourChange={setCacheSchedHour}
+            hour12={settings?.timeFormat !== '24h'}
             disabled={!settings}
           />
           <div className="settings-field__row">
@@ -871,6 +872,7 @@ export function SettingsPage() {
             onDayOfMonthChange={setParitySchedDayOfMonth}
             hour={paritySchedHour}
             onHourChange={setParitySchedHour}
+            hour12={settings?.timeFormat !== '24h'}
             disabled={!settings}
           />
           <div className="settings-field__row">
@@ -945,6 +947,7 @@ export function SettingsPage() {
             onDayOfMonthChange={setBackupSchedDayOfMonth}
             hour={backupSchedHour}
             onHourChange={setBackupSchedHour}
+            hour12={settings?.timeFormat !== '24h'}
             disabled={!settings}
           />
           <div className="toggle-row__title" style={{ marginTop: 10 }}>
