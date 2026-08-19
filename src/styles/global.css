@@ -132,6 +132,7 @@ button {
 }
 
 .btn--primary {
+  cursor: pointer;
   border-radius: var(--radius-btn);
   border: 1px solid var(--color-blue);
   background: var(--color-blue-tint);
@@ -142,6 +143,7 @@ button {
 }
 
 .btn--primary-sm {
+  cursor: pointer;
   border-radius: var(--radius-chip);
   border: 1px solid var(--color-blue);
   background: var(--color-blue-tint);

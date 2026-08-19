@@ -1,11 +1,17 @@
 /* Full-page Setup/Login screens — rendered outside AppShell (no header/nav
    yet, since nothing is authenticated), so this owns its own centered layout. */
 .auth-screen {
+  /* dvh after vh (not instead of - a fallback for browsers that don't know it): plain vh is
+     sized against the *maximum* viewport, ignoring a mobile browser's collapsible address/tab
+     bar, so a vh-centered card can sit visibly off-center against what's actually on screen. */
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(59, 130, 246, 0.1), transparent 60%),
+    var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-ui);
   padding: var(--space-lg);
@@ -13,30 +19,40 @@
 }
 
 .auth-card {
-  width: 360px;
+  width: 380px;
   max-width: 100%;
+}
+
+/* .auth-card.card (not just .auth-card) so this reliably beats .card's own padding regardless of
+   which stylesheet happens to load later - same specificity otherwise, so source order would
+   decide it. */
+.auth-card.card {
+  padding: 8px;
 }
 
 .auth-card__brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: var(--space-xl);
 }
 
 .auth-card__logo {
-  width: 36px;
-  height: 36px;
+  width: 56px;
+  height: 56px;
 }
 
 .auth-card__title {
   font-size: 16px;
   font-weight: 700;
+  text-align: center;
 }
 
 .auth-card__subtitle {
-  font-size: 12px;
+  font-size: 16px;
   color: var(--color-text-secondary);
+  text-align: center;
   margin: 4px 0 var(--space-xl);
 }
 
@@ -44,8 +60,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+  padding: 0 var(--space-lg) var(--space-2xl);
+}
+
+.auth-card__form .btn--primary {
+  margin-top: 8px;
 }
 
 .auth-card .history-input {
   width: 100%;
+  max-width: none;
 }
