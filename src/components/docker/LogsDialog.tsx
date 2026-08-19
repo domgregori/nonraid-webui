@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnsiUp } from 'ansi_up';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dockerApi } from '../../api/dockerApi';
 
 interface LogsDialogProps {
@@ -34,6 +35,12 @@ export function LogsDialog({ containerId, containerName, onClose }: LogsDialogPr
   // line matches lastLineRef just gets that one line dropped before appending.
   const sinceRef = useRef<number | null>(null);
   const lastLineRef = useRef('');
+  // Container stdout/stderr commonly carries real ANSI color codes (colorized app output) -
+  // escape_html defaults to true, so plain text is still safe to render raw, only the ANSI
+  // sequences themselves become styled spans. One instance reused across renders/polls rather
+  // than a fresh one per render - it's stateful only in the sense of its configured options,
+  // never mid-conversion state that would need resetting between calls.
+  const ansiUp = useMemo(() => new AnsiUp(), []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,9 +131,11 @@ export function LogsDialog({ containerId, containerName, onClose }: LogsDialogPr
           {error && <div className="status-note status-note--error">{error}</div>}
 
           {logs !== null && (
-            <pre className="docker-logs-output" ref={logRef}>
-              {logs || 'No log output.'}
-            </pre>
+            <pre
+              className="docker-logs-output"
+              ref={logRef}
+              dangerouslySetInnerHTML={{ __html: logs ? ansiUp.ansi_to_html(logs) : 'No log output.' }}
+            />
           )}
         </div>
       </div>
