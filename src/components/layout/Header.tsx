@@ -16,8 +16,8 @@ export function Header() {
     <div className="header">
       <div className="header__brand-group">
         <Link to="/" className="header__brand">
-          <img src="/logo.png" alt="" className="header__logo" />
           <div className="header__title">NonRAID</div>
+          <img src="/logo.png" alt="" className="header__logo" />
         </Link>
         <HeaderClock />
       </div>

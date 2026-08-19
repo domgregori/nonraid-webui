@@ -100,8 +100,9 @@
 }
 
 .header__title {
+  font-family: 'Roboto', var(--font-ui);
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 900;
   letter-spacing: -0.01em;
   line-height: 1;
 }
