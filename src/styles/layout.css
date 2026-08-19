@@ -274,3 +274,54 @@
   color: var(--color-blue);
   border-bottom-color: var(--color-blue);
 }
+
+/* Same 860px breakpoint as settings.css/apps.css/dashboard.css. Without this the header's three
+   flex groups (brand, system info, status/actions) wrap into three stacked rows on a phone,
+   shoving real content far down the page before it's even visible - the system-info row is also
+   pure duplication of the Dashboard's own System card, so it's dropped entirely here rather than
+   just shrunk. */
+@media (max-width: 860px) {
+  .header {
+    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-sm);
+    /* With .header__info hidden, only two groups (brand, status) are left, and each wraps onto
+       its own line - justify-content still applies per line when wrapped, so this centers each
+       line's group instead of leaving it pinned to the start (the only other item to "space
+       between" on that line). */
+    justify-content: center;
+  }
+
+  .header__info {
+    display: none;
+  }
+
+  .header__logo {
+    height: 36px;
+  }
+
+  .header__title {
+    font-size: 15px;
+  }
+
+  .header__clock {
+    font-size: 20px;
+  }
+
+  .nav-tabs {
+    padding: 0 var(--space-md);
+  }
+
+  /* Right-anchored-to-the-button (like on desktop) risks running off a narrow screen's edge -
+     centered on the viewport instead. `fixed` (not `absolute`) so centering is against the
+     screen itself, not the button's own position within it - the button sits left-of-center in
+     its row, so anchoring to it would center the dropdown off to one side instead. `top` is
+     tuned to this breakpoint's two-row header height (see the rules above).  */
+  .notification-dropdown {
+    position: fixed;
+    top: 100px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(320px, calc(100vw - 32px));
+  }
+}
