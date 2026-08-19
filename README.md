@@ -2,7 +2,7 @@
 
 <p align="center"><img src="./public/logo.png" width="300"></p>
 
-<p align="center"><img src="./public/Screenshot.png"></p>
+<p align="center"><img src="./public/Screenshot.png"><img src="./public/Screenshot2.png"></p>
 
 ### Disclaimer: **$\color{red}{\textsf{EXPERIMENTAL!}}$ HAVE ANOTHER BACKUP OF YOUR DATA!**
 
