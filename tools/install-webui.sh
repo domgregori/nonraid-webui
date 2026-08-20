@@ -34,6 +34,7 @@ ARRAY_DATA_GROUP=users
 ARRAY_DATA_GID=100
 ARRAY_DATA_USER=user
 ARRAY_DATA_UID=99
+NFSD_THREADS=32
 LOG_DIR=/var/log/nonraid-webui
 LOG_FILE="$LOG_DIR/install-$(date +%Y%m%d-%H%M%S).log"
 
@@ -150,6 +151,18 @@ install_smb_conf() {
   else
     install -m 644 "$smb_template" "$smb_conf"
   fi
+}
+
+# Debian ships nfsd at 16 threads by default (an improvement over older releases' default of 8,
+# but still conservative for a NAS expected to serve several clients/streams at once) - bumping
+# it is a plain concurrency win with no correctness/durability tradeoff, unlike exports' sync vs
+# async (left alone - see backend/src/shares/applier/realApplier.ts's writeExportsBlock() for why
+# every export stays `sync`). `nfsconf --set` is the package-sanctioned way to edit /etc/nfs.conf
+# - idempotent and comment-aware, unlike hand-rolled sed against a file nfs-kernel-server itself
+# also owns. Only takes effect on nfs-kernel-server's next (re)start, done in enable_services.
+configure_nfs_threads() {
+  log "Setting nfsd thread count to $NFSD_THREADS"
+  nfsconf --set nfsd threads "$NFSD_THREADS"
 }
 
 # Debian's repo package versions like "2.40.2-5"; the upstream release .deb versions like
@@ -427,6 +440,12 @@ start_system_services() {
   # lxc containers are started individually via the LXC tab, not a single system-wide service).
   systemctl enable --now smbd nmbd nfs-kernel-server docker avahi-daemon
   systemctl reload-or-restart avahi-daemon
+  # nfs-kernel-server's own ExecReload only re-runs `exportfs -r` (exports, not nfsd itself) -
+  # the thread count configure_nfs_threads just wrote to /etc/nfs.conf is only read by rpc.nfsd
+  # at its own startup, so an already-running server needs a real restart, not reload, to pick it
+  # up. A plain `enable --now` above is a no-op here since the service is already active on a
+  # re-run.
+  systemctl restart nfs-kernel-server
 }
 
 restart_webui() {
@@ -497,6 +516,7 @@ STEPS=(
   ensure_array_data_account
   install_system_packages
   install_smb_conf
+  configure_nfs_threads
   ensure_mergerfs
   ensure_tailscale
   ensure_rclone
