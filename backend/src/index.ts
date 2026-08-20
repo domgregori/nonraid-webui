@@ -77,13 +77,18 @@ async function main() {
   new ActivityWatcher(nmd, smart, activity, settingsStore, cache);
   new ParityScheduler(nmd, settingsStore, activity);
   const metrics = new MetricsService(openMetricsDb());
-  const backupScheduler = new BackupScheduler(nmd, settingsStore, activity, metrics);
+  // Constructed ahead of BackupScheduler (moved up from its former call site further down) purely
+  // so BackupScheduler can take a real RcloneClient - it only ever calls reveal() on it, to turn a
+  // saved (obscured) encryption password back into the plaintext an encrypted run's openssl
+  // subprocess needs, same "reuse rclone's own obscure mechanism" reasoning RcloneService's own
+  // password handling uses.
+  const rclone = createRcloneClient();
+  const backupScheduler = new BackupScheduler(nmd, settingsStore, activity, metrics, rclone);
   const authStore = new AuthStore();
   const authService = new AuthService(authStore);
   await authStore.get(); // fail fast at boot on a corrupt auth.json
   const tlsStore = new TlsStore();
   const tailscale = createTailscaleClient();
-  const rclone = createRcloneClient();
   const rcloneService = new RcloneService(rclone, nmd, activity, settingsStore);
   new RcloneSyncScheduler(rcloneService, settingsStore);
   const tlsRecord = await tlsStore.get(); // fail fast at boot on a corrupt tls.json
@@ -192,7 +197,7 @@ async function main() {
   app.use('/api', statusRouter(nmd));
   app.use('/api', arrayRouter(nmd, settingsStore, activity, shares, lxc));
   app.use('/api', parityRouter(nmd, activity, settingsStore));
-  app.use('/api', settingsRouter(settingsStore, nmd, activity, shares, app));
+  app.use('/api', settingsRouter(settingsStore, nmd, activity, shares, app, rclone));
   app.use('/api', disksRouter(nmd, smart, activity, settingsStore, cache, diskQueue));
   app.use('/api', emptyDiskRouter(emptyDisk, activity));
   app.use('/api', cacheRouter(cache, cacheMover, settingsStore, activity, shares, diskQueue));

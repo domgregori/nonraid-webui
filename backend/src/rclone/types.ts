@@ -1,4 +1,5 @@
-import type { RecurringSchedule } from '../settings/types.js';
+import type { BackupCategoryId } from '../system/backupCatalog.js';
+import type { BackupEncryption, RecurringSchedule } from '../settings/types.js';
 
 // One field in a provider's own config schema, as reported live by rclone's `config/providers` RC
 // call (confirmed live against rclone v1.75.0 on the test rig - this is a real RC call, not just a
@@ -77,6 +78,13 @@ export interface SyncJob {
   // it's kept here rather than baked into the remote definition itself.
   schedule: RecurringSchedule;
   retention: SyncJobRetention;
+  // Per-job password encryption (openssl enc) for this job's own uploaded archive - see
+  // BackupEncryption's own doc comment (settings/types.ts). Only meaningful for 'config'/
+  // 'configAppdata' scope (each run uploads one discrete archive); a 'custom' scope job mirrors an
+  // arbitrary folder file-by-file via rclone sync/sync, which is a fundamentally different problem
+  // ("encrypt every synced file individually", rclone's own crypt backend territory) this feature
+  // deliberately doesn't take on - the UI never offers this toggle for a 'custom' scope job.
+  encryption: BackupEncryption;
   // Last-run summary - persisted so it survives a backend restart, shown on the job card's resting
   // stats line. null until the job has completed at least one run.
   lastSyncedAt: number | null;
@@ -104,4 +112,28 @@ export type SyncJobRuntimeState = 'idle' | 'syncing' | 'disabled';
 export interface SyncJobWithRuntime extends SyncJob {
   state: SyncJobRuntimeState;
   progress: SyncJobProgress | null; // set only when state === 'syncing'
+}
+
+// One non-directory entry from rclone's own `operations/list` - the subset RcloneClient.listDir()
+// actually reads, used both by RcloneService's own retention pruning (a private, narrower call
+// shape - see service.ts's rcListDir) and the Recovery hub's "restore from a remote backup" file
+// picker (GET /rclone/jobs/:id/backups, which filters this down to just the job's own archives).
+export interface RcloneDirEntry {
+  name: string;
+  path: string;
+  sizeBytes: number;
+  modTime: string; // ISO 8601, straight from rclone
+}
+
+// GET /rclone/jobs/:id/backups - one archive a 'config'/'configAppdata' scope job has already
+// uploaded, enriched with its own `.meta.json` sidecar (backupMeta.ts) when one exists next to it
+// remotely. `encrypted: false, categories: null` for an archive with no sidecar at all - reads the
+// same as "legacy, made before this feature shipped" everywhere, never an error (see
+// backupMeta.ts's readMetaSidecar doc comment for the local equivalent of this same rule).
+export interface RemoteBackupEntry {
+  name: string;
+  sizeBytes: number;
+  modTime: string;
+  encrypted: boolean;
+  categories: BackupCategoryId[] | null;
 }

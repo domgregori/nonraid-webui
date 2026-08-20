@@ -47,6 +47,21 @@ export interface BackupDestination {
   customPath: string; // meaningful only when mode === 'custom'
 }
 
+// Per-job password encryption (openssl enc, AES-256/PBKDF2) - shared shape between Local Backups'
+// own schedule (BackupSchedule.encryption below) and each Remote Backup sync job (rclone/types.ts's
+// SyncJob.encryption), one independent toggle+password per job rather than one shared app-wide
+// password (see the handoff doc's "Password scope" decision). `passwordObscured` is rclone's own
+// `core/obscure` output (RcloneClient.obscure()/reveal() - rclone/obscure.ts), never plaintext -
+// stored so a scheduled/unattended run can reveal() it again without a human retyping it each
+// time, same trust boundary as everything else in this app's root-readable config. null until a
+// password has ever been saved; meaningless while `enabled` is false, but deliberately left in
+// place rather than cleared when encryption is turned off, so turning it back on later without
+// typing a new password just reuses the last one instead of forcing re-entry.
+export interface BackupEncryption {
+  enabled: boolean;
+  passwordObscured: string | null;
+}
+
 export interface BackupSchedule extends RecurringSchedule {
   scope: BackupScope;
   destination: BackupDestination;
@@ -54,6 +69,7 @@ export interface BackupSchedule extends RecurringSchedule {
   // When true, retain is ignored and nothing is ever pruned - same "keep all forever" override the
   // mockup gives Remote Backup's own retention field.
   retainForever: boolean;
+  encryption: BackupEncryption;
 }
 
 // Mover schedule - no extra fields beyond the shared shape; unlike backups there's no destination
