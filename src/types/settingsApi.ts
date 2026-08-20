@@ -47,17 +47,28 @@ export interface NotificationSettings {
 
 export interface RecurringSchedule {
   enabled: boolean;
-  frequency: 'daily' | 'weekly' | 'monthly';
+  frequency: 'daily' | 'weekly' | 'monthly' | 'cron';
   dayOfWeek: number; // 0 (Sun) - 6 (Sat), server local time - used when frequency is 'weekly'
   dayOfMonth: number; // 1-28, server local time - used when frequency is 'monthly'
   hour: number; // 0-23, server local time - the only field that matters when frequency is 'daily'
+  cronExpression: string; // 5-field cron, only meaningful when frequency is 'cron'
 }
 
 export type ParitySchedule = RecurringSchedule;
 
+export type BackupScope = 'config' | 'configAppdata';
+
+export interface BackupDestination {
+  mode: 'boot' | 'array' | 'custom';
+  diskSlot: number | null;
+  customPath: string;
+}
+
 export interface BackupSchedule extends RecurringSchedule {
-  destDir: string;
+  scope: BackupScope;
+  destination: BackupDestination;
   retain: number;
+  retainForever: boolean;
 }
 
 export type CacheSchedule = RecurringSchedule;

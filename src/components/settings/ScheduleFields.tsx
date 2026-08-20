@@ -14,8 +14,8 @@ function hourOptions(hour12: boolean): { value: number; label: string }[] {
 const DAY_OF_MONTH_OPTIONS = Array.from({ length: 28 }, (_, i) => i + 1);
 
 interface ScheduleFieldsProps {
-  frequency: 'daily' | 'weekly' | 'monthly';
-  onFrequencyChange: (frequency: 'daily' | 'weekly' | 'monthly') => void;
+  frequency: 'daily' | 'weekly' | 'monthly' | 'cron';
+  onFrequencyChange: (frequency: 'daily' | 'weekly' | 'monthly' | 'cron') => void;
   dayOfWeek: number;
   onDayOfWeekChange: (day: number) => void;
   dayOfMonth: number;
@@ -24,10 +24,16 @@ interface ScheduleFieldsProps {
   onHourChange: (hour: number) => void;
   hour12: boolean;
   disabled?: boolean;
+  // Opt-in per caller (Local Backups, each Remote Backup sync job) - Parity and the Cache mover
+  // schedule cards don't offer this option, so they simply never pass it.
+  allowCron?: boolean;
+  cronExpression?: string;
+  onCronExpressionChange?: (expr: string) => void;
 }
 
-/** Daily/weekly/monthly + day + hour picker shared by the Parity, Backups, and Cache mover schedule
- *  cards. Daily has no day picker at all - only the hour matters. */
+/** Daily/weekly/monthly(/cron) + day + hour picker shared by the Parity, Backups, Cache mover, and
+ *  Remote Backup sync job schedule cards. Daily has no day picker at all - only the hour matters;
+ *  cron replaces both the day and hour pickers with a raw cron-expression input. */
 export function ScheduleFields({
   frequency,
   onFrequencyChange,
@@ -39,6 +45,9 @@ export function ScheduleFields({
   onHourChange,
   hour12,
   disabled,
+  allowCron,
+  cronExpression,
+  onCronExpressionChange,
 }: ScheduleFieldsProps) {
   return (
     <>
@@ -46,12 +55,13 @@ export function ScheduleFields({
         <select
           className="history-input"
           value={frequency}
-          onChange={(e) => onFrequencyChange(e.target.value as 'daily' | 'weekly' | 'monthly')}
+          onChange={(e) => onFrequencyChange(e.target.value as 'daily' | 'weekly' | 'monthly' | 'cron')}
           disabled={disabled}
         >
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
           <option value="monthly">Monthly</option>
+          {allowCron && <option value="cron">Cron format</option>}
         </select>
         {frequency === 'weekly' && (
           <select className="history-input" value={dayOfWeek} onChange={(e) => onDayOfWeekChange(Number(e.target.value))} disabled={disabled}>
@@ -71,15 +81,31 @@ export function ScheduleFields({
             ))}
           </select>
         )}
-        <select className="history-input" value={hour} onChange={(e) => onHourChange(Number(e.target.value))} disabled={disabled}>
-          {hourOptions(hour12).map((h) => (
-            <option key={h.value} value={h.value}>
-              {h.label}
-            </option>
-          ))}
-        </select>
+        {frequency !== 'cron' && (
+          <select className="history-input" value={hour} onChange={(e) => onHourChange(Number(e.target.value))} disabled={disabled}>
+            {hourOptions(hour12).map((h) => (
+              <option key={h.value} value={h.value}>
+                {h.label}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       {frequency === 'monthly' && <div className="toggle-row__desc">Only days 1-28 are offered, so every month always has a matching date.</div>}
+      {frequency === 'cron' && (
+        <label className="field" style={{ marginTop: 8 }}>
+          <span className="settings-field__label">Cron expression</span>
+          <input
+            className="history-input"
+            style={{ width: '100%', fontFamily: 'var(--font-mono)' }}
+            value={cronExpression ?? ''}
+            onChange={(e) => onCronExpressionChange?.(e.target.value)}
+            placeholder="* * * * *"
+            disabled={disabled}
+          />
+          <span className="settings-field__hint">minute hour day month weekday</span>
+        </label>
+      )}
     </>
   );
 }
