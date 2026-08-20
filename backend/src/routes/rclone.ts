@@ -294,5 +294,41 @@ export function rcloneRouter(client: RcloneClient, service: RcloneService, setti
     }
   });
 
+  // Onboarding's disaster-recovery path: browse an arbitrary remote+path directly, with no sync
+  // job behind it - a from-scratch install has no jobs configured yet, so the by-job routes above
+  // (GET /rclone/jobs/:id/backups etc.) have nothing to key off of. Same
+  // listBackupsAt()/previewBackupAt() logic those routes use under the hood, just reached without
+  // a job id. Both 400 rather than 502 on failure, same reasoning as the by-job routes: a bad
+  // remote name/path or archive name is a request-shaped error, not an rclone-side one.
+  router.post('/rclone/browse-backups', async (req, res) => {
+    const { remoteName, remotePath } = req.body ?? {};
+    if (typeof remoteName !== 'string' || !remoteName.trim()) {
+      res.status(400).json({ error: 'remoteName is required.' });
+      return;
+    }
+    try {
+      res.json(await service.listBackupsAt(remoteName, typeof remotePath === 'string' ? remotePath : ''));
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/rclone/browse-backups/restore-preview', async (req, res) => {
+    const { remoteName, remotePath, name, password } = req.body ?? {};
+    if (typeof remoteName !== 'string' || !remoteName.trim()) {
+      res.status(400).json({ error: 'remoteName is required.' });
+      return;
+    }
+    if (typeof name !== 'string' || !name.trim()) {
+      res.status(400).json({ error: 'name is required.' });
+      return;
+    }
+    try {
+      res.json(await service.previewBackupAt(remoteName, typeof remotePath === 'string' ? remotePath : '', name, typeof password === 'string' ? password : null, 'browse'));
+    } catch (err) {
+      handleRestorePreviewError(err, res);
+    }
+  });
+
   return router;
 }
