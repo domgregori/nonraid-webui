@@ -204,7 +204,7 @@ async function main() {
   app.use('/api', diskQueueRouter(diskQueue, nmd));
   app.use('/api', dockerRouter(docker, config.appsBindRoots, apps, activity, nmd, cache));
   app.use('/api', lxcRouter(lxc, activity, nmd, settingsStore, cache));
-  app.use('/api', logsRouter());
+  app.use('/api', logsRouter(settingsStore));
   app.use('/api', metricsRouter(metrics));
   app.use('/api', smartRouter(nmd, smart, system));
   app.use('/api', sharesRouter(shares));

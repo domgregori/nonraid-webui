@@ -1,11 +1,18 @@
 import { Router } from 'express';
+import type { SettingsStore } from '../settings/store.js';
 import { LOG_SOURCE_DEFS, queryLog, windowMsFor } from '../system/logs.js';
 
-export function logsRouter(): Router {
+export function logsRouter(settingsStore: SettingsStore): Router {
   const router = Router();
 
-  router.get('/logs/sources', (_req, res) => {
-    res.json(LOG_SOURCE_DEFS.map((s) => ({ id: s.id, label: s.label })));
+  router.get('/logs/sources', async (_req, res) => {
+    // Same reasoning as routes/services.ts's own SERVICE_DEFS filter - Tailscale's log tab only
+    // makes sense once the feature's actually switched on; an always-empty tab for a service
+    // nobody enabled is just noise. Avahi has no such gate - it's always running (see
+    // install-webui.sh's systemctl enable --now), same as NFS/SMB/SSH.
+    const settings = await settingsStore.get();
+    const sources = LOG_SOURCE_DEFS.filter((s) => s.id !== 'tailscale' || settings.tailscale.enabled);
+    res.json(sources.map((s) => ({ id: s.id, label: s.label })));
   });
 
   router.get('/logs/:sourceId', async (req, res) => {

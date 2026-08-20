@@ -1,6 +1,6 @@
 import { runSudoMaybe } from './procUtil.js';
 
-export type LogSourceId = 'webui' | 'kernel' | 'nfs' | 'smb' | 'ssh' | 'docker' | 'lxc' | 'smart';
+export type LogSourceId = 'webui' | 'kernel' | 'nfs' | 'smb' | 'ssh' | 'docker' | 'lxc' | 'smart' | 'avahi' | 'tailscale';
 
 export interface LogSourceDef {
   id: LogSourceId;
@@ -25,6 +25,8 @@ export const LOG_SOURCE_DEFS: LogSourceDef[] = [
   { id: 'docker', label: 'Docker', args: ['-u', 'docker'] },
   { id: 'lxc', label: 'LXC', args: ['-u', 'lxc'] },
   { id: 'smart', label: 'SMART', args: ['-u', 'smartmontools'] },
+  { id: 'avahi', label: 'Avahi/mDNS', args: ['-u', 'avahi-daemon'] },
+  { id: 'tailscale', label: 'Tailscale', args: ['-u', 'tailscaled'] },
 ];
 
 export const WINDOW_DEFS: Record<string, number | null> = {
