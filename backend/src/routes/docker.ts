@@ -10,6 +10,7 @@ import { getCurrentDockerStorage, migrateDockerStorage } from '../docker/storage
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { StorageLocation } from '../settings/types.js';
+import { provisionArrayDir } from '../system/arrayDir.js';
 
 function parseStorageLocation(body: unknown): StorageLocation {
   const mode = (body as { mode?: unknown })?.mode;
@@ -228,6 +229,11 @@ export function dockerRouter(
       if (plan.requiresPrivilegedAck && req.body?.privilegedAck !== true) {
         throw new HttpError(400, `Requires elevated host access (${plan.elevatedAccessReasons.join(' ')}). Set privilegedAck: true to confirm.`);
       }
+      // See apps/service.ts's install() for why this runs before createContainer - Docker itself
+      // would otherwise auto-create a missing bind-mount host path as root:root with no ACL.
+      for (const bind of plan.binds) {
+        if (bind.allowed) await provisionArrayDir(bind.hostPath);
+      }
       const result = await docker.createContainer(
         {
           name: plan.containerName,
@@ -273,6 +279,9 @@ export function dockerRouter(
       await docker.stopContainer(req.params.id).catch(() => {});
       await docker.removeContainer(req.params.id, { force: true });
 
+      for (const bind of plan.binds) {
+        if (bind.allowed) await provisionArrayDir(bind.hostPath);
+      }
       const result = await docker.createContainer(
         {
           name: plan.containerName,
