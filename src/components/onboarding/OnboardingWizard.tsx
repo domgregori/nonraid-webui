@@ -5,9 +5,16 @@ import { useArrayStatus } from '../../state/useArrayStatus';
 import type { NmdStatusResponse } from '../../types/nmdApi';
 import { ConfigRestoreWizard } from '../settings/ConfigRestoreWizard';
 import { ImportArrayWizard } from '../settings/ImportArrayWizard';
+import { RestoreFromLocalWizard } from '../settings/RestoreFromLocalWizard';
 import { ArrayBuilder } from './ArrayBuilder';
+import { RemoteRestoreOnboarding } from './RemoteRestoreOnboarding';
 
 type Step = 'welcome' | 'start' | 'import' | 'restoreConfig' | 'disks' | 'info' | 'done';
+// Which of the three sources the 'restoreConfig' step is currently showing - null means "still on
+// the chooser", matching Settings → Recovery's own upload/local/remote three-button pattern (see
+// SettingsPage.tsx's Recovery card) rather than jumping straight to the upload-only flow this
+// wizard used to have.
+type RestoreSource = 'upload' | 'local' | 'remote';
 type Stage = 0 | 1 | 2;
 
 const STAGE_LABELS = ['Array', 'Tour', 'Done'];
@@ -75,6 +82,11 @@ const INFO_SLIDES = [
     title: 'Stay in the loop',
     body: 'Turn on notifications in Settings to hear about it - by email, Discord, or anything Apprise supports - when a disk fails, a parity check finishes, or something needs a look.',
   },
+  {
+    eyebrow: 'Backups & Recovery',
+    title: "Don't lose this setup twice",
+    body: "Back up this app's own config - array, shares, users, and settings - locally or to a remote via rclone. Settings → Backups sets it up; Settings → Recovery brings it back, from an upload, a local backup, or a remote one.",
+  },
 ] as const;
 
 interface OnboardingWizardProps {
@@ -94,6 +106,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
   const [infoIndex, setInfoIndex] = useState(0);
   const [importedJustNow, setImportedJustNow] = useState(false);
   const [restoredJustNow, setRestoredJustNow] = useState(false);
+  const [restoreSource, setRestoreSource] = useState<RestoreSource | null>(null);
 
   const [hostnameDraft, setHostnameDraft] = useState('');
   const [timezoneDraft, setTimezoneDraft] = useState('');
@@ -165,9 +178,15 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
   // array import does covers both that case and the config-only case (superblock skipped, array
   // still blank) identically, since deriveStartStep would just land back on 'disks' for the latter
   // on next resolve anyway. Simplest to just re-derive live rather than special-case it here.
+  //
+  // Shared onClose for all three restore sources (upload/local/remote) mounted under the
+  // 'restoreConfig' step - a plain cancel (nothing actually landed) drops back to that step's own
+  // upload/local/remote chooser rather than all the way out to 'start', so picking the wrong
+  // source doesn't lose the "I'm restoring a config backup" context. A real restore still re-
+  // derives the live step exactly like handleImportClose, for the same stale-closure reason.
   const handleRestoreClose = async () => {
     if (!restoredJustNow) {
-      setStep('start');
+      setRestoreSource(null);
       return;
     }
     const fresh = await refresh();
@@ -283,6 +302,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
                   className="onboarding-choice"
                   onClick={() => {
                     setRestoredJustNow(false);
+                    setRestoreSource(null);
                     setStep('restoreConfig');
                   }}
                 >
@@ -297,7 +317,36 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
           )}
 
           {step === 'import' && <ImportArrayWizard onClose={handleImportClose} onImported={() => setImportedJustNow(true)} />}
-          {step === 'restoreConfig' && <ConfigRestoreWizard onClose={handleRestoreClose} onRestored={() => setRestoredJustNow(true)} />}
+
+          {step === 'restoreConfig' && restoreSource === null && (
+            <>
+              <div className="eyebrow onboarding-hero__eyebrow">First-time setup</div>
+              <div className="onboarding-hero__title">Restore a full config backup</div>
+              <div className="onboarding-hero__desc">
+                Bring back everything from a previous nonraid-webui install at once - array, shares, users, and
+                settings. Pick where the backup is coming from.
+              </div>
+              <div className="settings-field__row">
+                <button type="button" className="btn" onClick={() => setRestoreSource('upload')}>
+                  From an uploaded file…
+                </button>
+                <button type="button" className="btn" onClick={() => setRestoreSource('local')}>
+                  From a local backup…
+                </button>
+                <button type="button" className="btn" onClick={() => setRestoreSource('remote')}>
+                  From a remote backup…
+                </button>
+              </div>
+              <div className="onboarding__actions">
+                <button type="button" className="btn" onClick={() => setStep('start')}>
+                  Back
+                </button>
+              </div>
+            </>
+          )}
+          {step === 'restoreConfig' && restoreSource === 'upload' && <ConfigRestoreWizard onClose={handleRestoreClose} onRestored={() => setRestoredJustNow(true)} />}
+          {step === 'restoreConfig' && restoreSource === 'local' && <RestoreFromLocalWizard onClose={handleRestoreClose} onRestored={() => setRestoredJustNow(true)} />}
+          {step === 'restoreConfig' && restoreSource === 'remote' && <RemoteRestoreOnboarding onClose={handleRestoreClose} onRestored={() => setRestoredJustNow(true)} />}
 
           {step === 'disks' && (
             <>
