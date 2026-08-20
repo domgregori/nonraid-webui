@@ -219,11 +219,31 @@ Operates over the whole `/mnt` tree (not scoped per-share) - paths are absolute 
 
 ### Config restore
 
-Same preview-then-commit shape as the array import wizard.
+Same preview-then-commit shape as the array import wizard. Three ways to get a preview/token -
+upload, an archive already sitting at the Local Backups destination, or one pulled down from a
+configured Remote Backup sync job (see Rclone's own `/backups` routes below) - all feed the exact
+same `/system/backup/restore/commit`, which only ever cares about the staged token, not where it
+came from.
+
+**Encryption**: Local Backups and each Remote Backup sync job can optionally password-encrypt
+their own archives (`openssl enc`, AES-256/PBKDF2 - see `backend/src/system/backupCrypto.ts`).
+Every archive gets a plaintext `.meta.json` sidecar written alongside it either way (same
+directory locally, same remote path for rclone) recording `{ version, createdAt, scope,
+categories, encrypted }` - a missing sidecar (a backup made before this feature shipped) reads as
+`{ encrypted: false, categories: null }` everywhere, never an error (`backend/src/system/
+backupMeta.ts`). All three preview routes below accept an optional `password` and decrypt to a
+temp plaintext file *before* ever building the preview - a missing/wrong password fails with
+`400` and `{ code: "PASSWORD_REQUIRED" }` in the body (see `PasswordRequiredError`/
+`IncorrectPasswordError` in `backupCrypto.ts`), which the frontend keys off to show a password
+field rather than a confusing "not a valid config backup" error. The raw-upload route has no
+sidecar of its own to check ahead of time - it detects "needs a password" from the file's own
+bytes (gzip magic vs. not) instead.
 
 | Method | Path | Body/Params | Response / Notes |
 |---|---|---|---|
-| POST | `/system/backup/restore/preview` | multipart `file` | Lists archive contents by category, flags the array superblock member and whether restoring it is currently allowed (only when the array has nothing assigned yet). Returns a `token`. |
+| POST | `/system/backup/restore/preview` | multipart `file`, `password?` | Lists archive contents by category, flags the array superblock member and whether restoring it is currently allowed (only when the array has nothing assigned yet). Returns a `token`. |
+| GET | `/system/backup/local/list` | - | What's already sitting at the configured Local Backups destination. `{ destDir: string \| null, backups: [{ name, sizeBytes, modifiedAt, encrypted, categories: string[] \| null }] }` - `destDir: null` covers both "nothing configured yet" and a destination picker that can't resolve without more setup (the `array` mode with no disk slot chosen); either way `backups` is `[]`, not an error. `encrypted`/`categories` come from the archive's own `.meta.json` sidecar. |
+| POST | `/system/backup/local/restore/preview` | `{ name, password? }` | Same preview shape as the upload route, sourced from one of `GET /system/backup/local/list`'s own entries instead of a fresh upload. `name` must exactly match a real entry there - no arbitrary host path accepted. |
 | POST | `/system/backup/restore/commit` | `{ token, categories?: string[] }` | Re-validates fresh (array must be stopped). `categories` omitted/malformed restores everything (back-compat with pre-selection clients). Best-effort superblock reload if the superblock was restored - a reload failure is reported in the body, not a `502`, since the files are safely on disk either way. |
 
 ## Services
@@ -271,20 +291,22 @@ locally (`backend/src/rclone/syncJobStore.ts`).
 | GET | `/rclone/remotes/:name` | - | The remote's current saved config (`config/dump`, scoped to one remote) - backs the Edit-remote form's pre-filled values. |
 | PUT | `/rclone/remotes/:name` | `{ parameters }` | `config/update` - merges the given fields into the existing remote config rather than replacing it wholesale. Provider type itself isn't editable this way (delete + recreate instead). |
 | DELETE | `/rclone/remotes/:name` | - | `config/delete`. Any sync job still pointing at this remote isn't deleted or blocked - it starts reporting a "remote missing" error state instead (see `GET /rclone/jobs`). |
-| GET | `/rclone/jobs` | - | Every sync job plus live runtime state (`idle` \| `syncing` \| `disabled`) and, for whichever job is currently running, live progress (bytes/speed/ETA/file counts) read from rclone's own `core/stats`. |
-| POST | `/rclone/jobs` | `{ name, scope, customPath?, remoteName, remotePath?, schedule, retention }` | `scope` is `config` \| `configAppdata` \| `custom` (`customPath` required only for `custom`). `retention` is always day-based (`{ keepDays, forever }`) regardless of scope, never a "keep last N" count - see `SyncJobRetention`'s own doc comment for why. `400` with a specific message on any validation failure. |
-| PUT | `/rclone/jobs/:id` | partial patch of the same shape | Any subset of fields; `schedule`/`retention` are validated the same way as on create when present. |
+| GET | `/rclone/jobs` | - | Every sync job plus live runtime state (`idle` \| `syncing` \| `disabled`) and, for whichever job is currently running, live progress (bytes/speed/ETA/file counts) read from rclone's own `core/stats`. Each job's `encryption` comes back redacted as `{ enabled, hasPassword }` - the real (obscured) password is never round-tripped to the client. |
+| POST | `/rclone/jobs` | `{ name, scope, customPath?, remoteName, remotePath?, schedule, retention, encryption }` | `scope` is `config` \| `configAppdata` \| `custom` (`customPath` required only for `custom`). `retention` is always day-based (`{ keepDays, forever }`) regardless of scope, never a "keep last N" count - see `SyncJobRetention`'s own doc comment for why. `encryption` is `{ enabled, password? }` - `password` is plaintext, obscured via rclone's own `core/obscure` RC call before being stored (`RcloneClient.obscure()`); only meaningful for `config`/`configAppdata` scope (never offered for `custom`, a live file-by-file mirror). `400` with a specific message on any validation failure, including "Enter a password to enable encryption." when `enabled: true` resolves to no password at all. |
+| PUT | `/rclone/jobs/:id` | partial patch of the same shape | Any subset of fields; `schedule`/`retention` are validated the same way as on create when present. `encryption.password` blank/omitted means "keep the current saved password" (same pattern as a remote's own password-type provider fields) - only required the first time `enabled` turns on with nothing saved yet. |
 | DELETE | `/rclone/jobs/:id` | - | Deletes the job record only - never touches whatever's already been synced to the remote. |
 | PUT | `/rclone/jobs/:id/enabled` | `{ enabled: boolean }` | Toggles a single job without a full edit - same precedent as the Docker/LXC autostart toggles. |
 | POST | `/rclone/jobs/:id/sync` | - | Runs this job immediately, outside its schedule. Blocks until the sync finishes (and retention's been enforced) rather than returning a job handle - poll `GET /rclone/jobs` for live progress while it runs. |
 | POST | `/rclone/jobs/:id/cancel` | - | Cancels whichever sync is currently in progress (at most one runs at a time). |
+| GET | `/rclone/jobs/:id/backups` | - | Archives this job has already uploaded to its own remote target (`operations/list` on the job's `remoteName:remotePath`, filtered to this app's own config-backup filename pattern). Only `config`/`configAppdata` scope jobs have anything here - a `custom` scope job mirrors a folder live with no single archive to list, and `400`s instead. `[{ name, sizeBytes, modTime, encrypted, categories: string[] \| null }]` - `encrypted`/`categories` come from each archive's own `.meta.json` sidecar (downloaded and read alongside the listing) when one exists next to it remotely. |
+| POST | `/rclone/jobs/:id/backups/:name/restore-preview` | `{ password? }` | Downloads that one archive into a private staging path (`operations/copyfile`) and builds the same preview/token shape as `/system/backup/restore/preview` - the Config restore section above's `/system/backup/restore/commit` is what actually restores it from there. Decrypts first when the archive's own sidecar says it's encrypted (`400` + `{ code: "PASSWORD_REQUIRED" }` on a missing/wrong password). `400` for a `custom` scope job or an unrecognized `name`. |
 
 ## Settings
 
 | Method | Path | Body/Params | Response / Notes |
 |---|---|---|---|
-| GET | `/settings` | - | Full settings object (schedules, notifications, temp alerts, turbo write, trust-proxy, min free space, ...). |
-| PUT | `/settings` | partial patch of the same shape | `turboWrite` and `trustProxy` are applied live (not just persisted) as part of the same request; `minFreeSpaceGb` triggers a share remount. Each nested section (`paritySchedule`, `backupSchedule`, `cacheSchedule`, `notifications.eventTypes`, `tempAlerts`) is validated independently. |
+| GET | `/settings` | - | Full settings object (schedules, notifications, temp alerts, turbo write, trust-proxy, min free space, ...). `backupSchedule.encryption` comes back redacted as `{ enabled, hasPassword }` - the real (obscured) password is never round-tripped to the client. |
+| PUT | `/settings` | partial patch of the same shape | `turboWrite` and `trustProxy` are applied live (not just persisted) as part of the same request; `minFreeSpaceGb` triggers a share remount. Each nested section (`paritySchedule`, `backupSchedule`, `cacheSchedule`, `notifications.eventTypes`, `tempAlerts`) is validated independently. `backupSchedule.encryption` is `{ enabled, password? }` - same obscure-and-store, blank-means-keep-current handling as a Remote Backup sync job's own `encryption` (see Rclone's `POST /rclone/jobs` above). |
 | GET | `/settings/notification-events` | - | Catalog of notifiable event types (id, label, default severity). |
 | POST | `/settings/notifications/test` | `{ appriseUrls? }` | Sends a test notification. Uses `appriseUrls` from the body if given (so the form can be tested before saving), otherwise falls back to the persisted config. |
 

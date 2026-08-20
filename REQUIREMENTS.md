@@ -45,8 +45,10 @@ Proxmox VE. Update this list as items change or new items appear.
 - `rsync` — required by `tools/install-webui.sh` itself (stages build output into
   `/opt/nonraid-webui`); not installed by default on a minimal Debian 13 install.
 - `openssl` — used by the webui's built-in TLS feature (Settings → Security → HTTPS) to generate
-  self-signed certificates and inspect imported ones. Near-universally present on Debian already;
-  called explicitly rather than assumed, same as every other shelled-out tool in this list.
+  self-signed certificates and inspect imported ones, and by the optional per-job password
+  encryption on Local Backups / Remote Backup sync jobs (`openssl enc`, AES-256/PBKDF2 — see
+  `backend/src/system/backupCrypto.ts`). Near-universally present on Debian already; called
+  explicitly rather than assumed, same as every other shelled-out tool in this list.
 - `avahi-daemon` - used for network discovery.
 - `tailscale` — for the optional Tailscale settings section (Settings → Tailscale), disabled by
   default. Not in Debian's own repos; `tools/install-webui.sh`'s `ensure_tailscale()` adds
