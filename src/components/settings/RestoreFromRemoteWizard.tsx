@@ -10,22 +10,38 @@ interface RestoreFromRemoteWizardProps {
   onRestored?: () => void;
   // Threaded straight through to ConfigRestoreWizard - see its own doc comment on this prop.
   focusCategory?: BackupCategoryId;
+  // When set, skips the "which sync job" picker entirely and browses archives at this arbitrary
+  // remote+path directly instead (POST /rclone/browse-backups, not a job's own fixed target) -
+  // onboarding's disaster-recovery restore, which runs before any sync job has ever been
+  // configured. `onBack`, when also given, replaces the archive list's "Back" button (which
+  // normally returns to the job list - meaningless in this mode) with a caller-owned action, e.g.
+  // returning to onboarding's own remote-path entry step.
+  browsePath?: { remoteName: string; remotePath: string };
+  onBack?: () => void;
 }
 
 const SCOPE_LABEL: Record<string, string> = { config: 'Config backups', configAppdata: 'Config backups + appdata' };
+
+// Which remote+path this instance is browsing, and how to actually fetch its archives/preview a
+// pick - a job's own fixed target (picked from the job list below) or an arbitrary remote+path
+// passed in via `browsePath`. Keeping both shapes behind one `source` value is what lets the rest
+// of this component (archive list, password prompt, preview handoff) stay written once instead of
+// forked per mode.
+type ArchiveSource = { kind: 'job'; job: SyncJobWithRuntime } | { kind: 'path'; remoteName: string; remotePath: string };
 
 /**
  * "Recover from a remote backup" - two picker steps (which sync job, then which archive it's
  * already uploaded) ahead of the same ConfigRestoreWizard review/confirm/result flow every other
  * restore source shares. Only Remote Backup jobs scoped to 'config'/'configAppdata' are offered -
  * a 'custom' scope job mirrors an arbitrary folder live and has no single archive to restore from
- * (see rclone/service.ts's listJobBackups()).
+ * (see rclone/service.ts's listJobBackups()). With `browsePath` set, the first picker step is
+ * skipped and archives are listed straight from that remote+path instead (see ArchiveSource above).
  */
-export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory }: RestoreFromRemoteWizardProps) {
-  const [loadingJobs, setLoadingJobs] = useState(true);
+export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, browsePath, onBack }: RestoreFromRemoteWizardProps) {
+  const [loadingJobs, setLoadingJobs] = useState(!browsePath);
   const [jobs, setJobs] = useState<SyncJobWithRuntime[]>([]);
   const [jobsError, setJobsError] = useState<string | null>(null);
-  const [job, setJob] = useState<SyncJobWithRuntime | null>(null);
+  const [source, setSource] = useState<ArchiveSource | null>(browsePath ? { kind: 'path', ...browsePath } : null);
 
   const [loadingArchives, setLoadingArchives] = useState(false);
   const [archives, setArchives] = useState<RemoteBackupEntry[]>([]);
@@ -45,31 +61,36 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory }: 
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (browsePath) return; // no job list to load - already browsing a fixed remote+path
     rcloneApi
       .getJobs()
       .then((all) => setJobs(all.filter((j) => j.scope !== 'custom')))
       .catch((err) => setJobsError((err as Error).message))
       .finally(() => setLoadingJobs(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const pickJob = (picked: SyncJobWithRuntime) => {
-    setJob(picked);
+  const loadArchivesFor = (src: ArchiveSource) => {
+    setSource(src);
     setLoadingArchives(true);
     setArchivesError(null);
-    rcloneApi
-      .listJobBackups(picked.id)
-      .then(setArchives)
-      .catch((err) => setArchivesError((err as Error).message))
-      .finally(() => setLoadingArchives(false));
+    const list = src.kind === 'job' ? rcloneApi.listJobBackups(src.job.id) : rcloneApi.browseBackups(src.remoteName, src.remotePath);
+    list.then(setArchives).catch((err) => setArchivesError((err as Error).message)).finally(() => setLoadingArchives(false));
   };
 
+  // browsePath mode has no job-picker step to trigger loadArchivesFor from - fetch straight away.
+  useEffect(() => {
+    if (browsePath) loadArchivesFor({ kind: 'path', ...browsePath });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const previewFor = async (name: string, password?: string) => {
-    if (!job) return;
+    if (!source) return;
     setPreviewingName(name);
     setPreviewError(null);
     setPasswordError(null);
     try {
-      const result = await rcloneApi.previewJobBackupRestore(job.id, name, password);
+      const result = source.kind === 'job' ? await rcloneApi.previewJobBackupRestore(source.job.id, name, password) : await rcloneApi.browseBackupsRestorePreview(source.remoteName, source.remotePath, name, password);
       setPreview(result);
       setPickedName(name);
       setPasswordEntry(null);
@@ -123,7 +144,7 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory }: 
         </div>
 
         <div className="dialog__body">
-          {!job && (
+          {!browsePath && !source && (
             <>
               <div className="toggle-row__desc">
                 Pick a Remote Backup sync job to pull an archive down from. Only jobs that upload config backups (not a live folder mirror) have
@@ -138,7 +159,7 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory }: 
               {!loadingJobs && jobs.length > 0 && (
                 <div className="import-browser__list">
                   {jobs.map((j) => (
-                    <button type="button" key={j.id} className="import-browser__row" onClick={() => pickJob(j)}>
+                    <button type="button" key={j.id} className="import-browser__row" onClick={() => loadArchivesFor({ kind: 'job', job: j })}>
                       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.name}</span>
                       <span style={{ flexShrink: 0, color: 'var(--color-text-dim)' }}>
                         {SCOPE_LABEL[j.scope] ?? j.scope} · {j.remoteName}
@@ -156,7 +177,7 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory }: 
             </>
           )}
 
-          {job && passwordEntry && (
+          {source && passwordEntry && (
             <>
               <div className="toggle-row__desc">
                 <strong>{passwordEntry.name}</strong> is password-encrypted. Enter its password to read what's inside.
@@ -185,15 +206,25 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory }: 
             </>
           )}
 
-          {job && !passwordEntry && (
+          {source && !passwordEntry && (
             <>
               <div className="toggle-row__desc">
-                Archives already uploaded by <strong>{job.name}</strong> ({job.remoteName}:{job.remotePath || '/'}).
+                {source.kind === 'job' ? (
+                  <>
+                    Archives already uploaded by <strong>{source.job.name}</strong> ({source.job.remoteName}:{source.job.remotePath || '/'}).
+                  </>
+                ) : (
+                  <>
+                    Archives found at <strong>{source.remoteName}:{source.remotePath || '/'}</strong>.
+                  </>
+                )}
               </div>
 
               {loadingArchives && <div className="status-note">Loading…</div>}
               {archivesError && <div className="status-note status-note--error">{archivesError}</div>}
-              {!loadingArchives && !archivesError && archives.length === 0 && <div className="status-note">This job hasn't uploaded any backups yet.</div>}
+              {!loadingArchives && !archivesError && archives.length === 0 && (
+                <div className="status-note">{source.kind === 'job' ? "This job hasn't uploaded any backups yet." : 'No config backups found at this remote+path.'}</div>
+              )}
 
               {!loadingArchives && archives.length > 0 && (
                 <div className="import-browser__list">
@@ -217,17 +248,25 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory }: 
               {previewError && <div className="status-note status-note--error">{previewError}</div>}
 
               <div className="dialog__actions">
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => {
-                    setJob(null);
-                    setArchives([]);
-                    setArchivesError(null);
-                  }}
-                >
-                  Back
-                </button>
+                {source.kind === 'job' ? (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setSource(null);
+                      setArchives([]);
+                      setArchivesError(null);
+                    }}
+                  >
+                    Back
+                  </button>
+                ) : (
+                  onBack && (
+                    <button type="button" className="btn" onClick={onBack}>
+                      Back
+                    </button>
+                  )
+                )}
                 <button type="button" className="btn" onClick={onClose}>
                   Cancel
                 </button>

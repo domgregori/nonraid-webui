@@ -74,4 +74,21 @@ export const rcloneApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ password }),
     }),
+
+  // Same listing/preview as listJobBackups/previewJobBackupRestore above, but at an arbitrary
+  // remote+path with no sync job behind it - onboarding's disaster-recovery restore, which runs
+  // before any job has ever been configured (see backend/src/routes/rclone.ts's browse-backups
+  // routes).
+  browseBackups: (remoteName: string, remotePath: string) =>
+    request<RemoteBackupEntry[]>('/api/rclone/browse-backups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ remoteName, remotePath }),
+    }),
+  browseBackupsRestorePreview: (remoteName: string, remotePath: string, name: string, password?: string) =>
+    request<RestorePreview>('/api/rclone/browse-backups/restore-preview', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ remoteName, remotePath, name, password }),
+    }),
 };
