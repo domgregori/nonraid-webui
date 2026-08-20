@@ -17,19 +17,43 @@ export interface NotificationSettings {
 
 export interface RecurringSchedule {
   enabled: boolean;
-  frequency: 'daily' | 'weekly' | 'monthly';
+  frequency: 'daily' | 'weekly' | 'monthly' | 'cron';
   dayOfWeek: number; // 0 (Sun) - 6 (Sat), server local time - used when frequency is 'weekly'
   // 1-28 rather than 1-31: every month has at least 28 days, so this sidesteps
   // "the 30th doesn't exist in February" without needing month-length logic.
   dayOfMonth: number; // 1-28, server local time - used when frequency is 'monthly'
   hour: number; // 0-23, server local time - the only field that matters when frequency is 'daily'
+  // Standard 5-field cron ("minute hour day month weekday") - only meaningful when frequency is
+  // 'cron'; '' otherwise. Shared onto every RecurringSchedule (rather than only BackupSchedule)
+  // so the same shape/matcher (cronMatch.ts) works for the remote sync jobs' own per-job schedule
+  // too - Parity/Cache mover schedules just never offer the 'cron' option in their own UI.
+  cronExpression: string;
 }
 
 export type ParitySchedule = RecurringSchedule;
 
+// What a "Config backups" / "Config backups + appdata" backup scope covers - shared by Local
+// Backups (BackupSchedule.scope below) and each Remote Backup sync job (rclone/types.ts's
+// SyncJob.scope, which adds a third 'custom' option on top of these same two).
+export type BackupScope = 'config' | 'configAppdata';
+
+// Structured replacement for the old free-text destDir - same "mode + diskSlot" shape as
+// StorageLocation (lxcStorage/StorageLocationField), so this reads the same way that picker
+// already does elsewhere in Settings. resolveBackupDestDir() (system/backupDestination.ts) turns
+// this into the actual absolute path BackupScheduler writes into.
+export interface BackupDestination {
+  mode: 'boot' | 'array' | 'custom';
+  diskSlot: number | null; // meaningful only when mode === 'array'
+  customPath: string; // meaningful only when mode === 'custom'
+}
+
 export interface BackupSchedule extends RecurringSchedule {
-  destDir: string; // absolute path to write backups into - should be on the array, not the boot disk
+  scope: BackupScope;
+  destination: BackupDestination;
   retain: number; // how many past backups to keep; older ones are pruned after each successful run
+  // When true, retain is ignored and nothing is ever pruned - same "keep all forever" override the
+  // mockup gives Remote Backup's own retention field.
+  retainForever: boolean;
 }
 
 // Mover schedule - no extra fields beyond the shared shape; unlike backups there's no destination
@@ -82,6 +106,18 @@ export interface TailscaleSettings {
   loginServer: string; // '' = Tailscale's own coordination server; a URL = a self-hosted Headscale
 }
 
+// Remote Backup, deliberately as minimal as TailscaleSettings above: the rclone-rcd daemon itself
+// is the source of truth for configured remotes (read live over its RC API, see rclone/), and each
+// sync job's own definition/schedule lives in its own store (rclone/syncJobStore.ts, a growing list
+// of structured records - a poor fit for settings.json's single-object-per-feature shape, same
+// reasoning shares.json/tls.json get their own files instead of living in here). This only holds
+// the one thing neither of those can tell you before the feature's ever been turned on: whether
+// it's switched on at all - hides the whole section, and gates whether rclone-rcd.service is kept
+// running, when off.
+export interface RemoteBackupSettings {
+  enabled: boolean;
+}
+
 // Tracks whether the first-run setup wizard (src/components/onboarding) has been dismissed or
 // completed - a single flag rather than a per-step record, since resume position is always
 // derived live from the array's actual state (see OnboardingWizard's deriveStartStep()), not
@@ -119,6 +155,7 @@ export interface AppSettings {
   cache: CacheSettings;
   cacheSchedule: CacheSchedule;
   tailscale: TailscaleSettings;
+  remoteBackup: RemoteBackupSettings;
   onboarding: OnboardingSettings;
 }
 
@@ -137,5 +174,6 @@ export type AppSettingsUpdate = Partial<{
   cache: Partial<CacheSettings>;
   cacheSchedule: Partial<CacheSchedule>;
   tailscale: Partial<TailscaleSettings>;
+  remoteBackup: Partial<RemoteBackupSettings>;
   onboarding: Partial<OnboardingSettings>;
 }>;

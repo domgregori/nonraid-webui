@@ -1,6 +1,6 @@
 import { runSudoMaybe, spawnMaybeSudo } from './procUtil.js';
 
-export type ServiceId = 'docker' | 'lxc' | 'smb' | 'nfs' | 'ssh' | 'avahi' | 'tailscale';
+export type ServiceId = 'docker' | 'lxc' | 'smb' | 'nfs' | 'ssh' | 'avahi' | 'tailscale' | 'rclone-rcd';
 
 export type ServiceState = 'active' | 'inactive' | 'failed' | 'mixed';
 
@@ -45,6 +45,10 @@ export const SERVICE_DEFS: ServiceDef[] = [
   // this daemon can be installed but deliberately unused, and this row would otherwise be a
   // confusing always-present entry for a feature most installs never turn on.
   { id: 'tailscale', label: 'Tailscale', statusUnits: ['tailscaled.service'], stopArgs: ['tailscaled'], startArgs: ['tailscaled'] },
+  // rclone's own RC daemon backing Remote Backup - same shape and same "only ever shown when its
+  // own feature is switched on" gating as Tailscale above (filtered in routes/services.ts on
+  // settings.remoteBackup.enabled instead).
+  { id: 'rclone-rcd', label: 'Remote Backup (rclone)', statusUnits: ['rclone-rcd.service'], stopArgs: ['rclone-rcd'], startArgs: ['rclone-rcd'] },
 ];
 
 /**

@@ -264,4 +264,20 @@ export const config = {
   arrayDataGroup: 'users',
   arrayDataUid: 99,
   arrayDataGid: 100,
+  // Remote Backup (rclone) - see backend/src/rclone/. The daemon (rclone-rcd.service, installed by
+  // tools/install-webui.sh's ensure_rclone()) binds to loopback only; its RC user/pass live in
+  // rcloneRcEnvFilePath (an EnvironmentFile the systemd unit's own ExecStart also reads, so both
+  // sides always agree - see rclone/rcCredentials.ts) rather than settings.json, since it's a
+  // generated secret, not a user preference.
+  rcloneRcUrl: str('RCLONE_RC_URL', t('rclone', 'rc_url'), 'http://127.0.0.1:5572'),
+  rcloneRcEnvFilePath: str('RCLONE_RC_ENV_FILE_PATH', t('rclone', 'rc_env_file_path'), '/etc/default/rclone-rcd'),
+  rcloneRcTimeoutMs: num('RCLONE_RC_TIMEOUT_MS', t('rclone', 'rc_timeout_ms'), 15_000),
+  rcloneBin: str('RCLONE_BIN', t('rclone', 'bin'), 'rclone'),
+  // The sync-job list (rclone/syncJobStore.ts) - a growing list of structured records, same reason
+  // shares.json/tls.json get their own file instead of living inside settings.json.
+  rcloneSyncJobsConfigPath: str('RCLONE_SYNC_JOBS_CONFIG_PATH', t('rclone', 'sync_jobs_config_path'), path.join(process.cwd(), 'data', 'rclone-sync-jobs.json')),
+  // How often RcloneSyncScheduler checks every sync job's own schedule against the current time -
+  // same 1-minute cadence as BackupScheduler/ParityScheduler, fine-grained enough for a 'cron'
+  // schedule's minute-level precision.
+  rcloneSchedulerTickIntervalMs: num('RCLONE_SCHEDULER_TICK_INTERVAL_MS', t('rclone', 'scheduler_tick_interval_ms'), 60_000),
 };

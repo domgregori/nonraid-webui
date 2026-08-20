@@ -1,4 +1,4 @@
-import { access, constants, readdir, stat, unlink } from 'node:fs/promises';
+import { access, constants, mkdir, readdir, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { ActivityStore } from '../activity/index.js';
 import { config } from '../config.js';
@@ -6,7 +6,8 @@ import type { MetricsService } from '../metrics/service.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
 import { notifyEvent } from '../settings/notify.js';
-import { scheduleMatchesHour } from '../settings/scheduleMatch.js';
+import { scheduleFireKey, scheduleMatches } from '../settings/scheduleMatch.js';
+import { resolveBackupDestDir } from './backupDestination.js';
 import { resolveConfigBackupPaths, writeConfigBackupToFile } from './backupStream.js';
 
 const BACKUP_PREFIX = 'nonraid-config-backup-';
@@ -24,7 +25,7 @@ const BACKUP_SUFFIX = '.tar.gz';
  */
 export class BackupScheduler {
   private timer: NodeJS.Timeout;
-  private lastFiredDateKey: string | null = null;
+  private lastFiredKey: string | null = null;
 
   constructor(
     private nmd: NmdClient,
@@ -43,11 +44,11 @@ export class BackupScheduler {
     if (!schedule.enabled) return;
 
     const now = new Date();
-    if (!scheduleMatchesHour(schedule, now)) return;
+    if (!scheduleMatches(schedule, now)) return;
 
-    const dateKey = now.toISOString().slice(0, 10);
-    if (this.lastFiredDateKey === dateKey) return;
-    this.lastFiredDateKey = dateKey;
+    const fireKey = scheduleFireKey(schedule, now);
+    if (this.lastFiredKey === fireKey) return;
+    this.lastFiredKey = fireKey;
 
     // runNow() already logs/notifies on every failure path - this is only here so a skip/failure
     // doesn't become an unhandled rejection from the un-awaited setInterval callback in the
@@ -66,35 +67,54 @@ export class BackupScheduler {
   async runNow(label = 'Manual backup'): Promise<{ bytes: number }> {
     const settings = await this.settings.get();
     const schedule = settings.backupSchedule;
+    let destDir: string;
+    try {
+      destDir = resolveBackupDestDir(schedule.destination);
+    } catch (err) {
+      const msg = `${label} skipped - ${(err as Error).message}`;
+      this.activity.log(msg, 'amber').catch(() => {});
+      throw err;
+    }
 
-    if (!schedule.destDir) {
+    if (!destDir) {
       const msg = `${label} skipped - no destination directory configured`;
       this.activity.log(msg, 'amber').catch(() => {});
       throw new Error('No destination directory configured - set one below and save first.');
     }
+    // The 'boot'/'array' picker options resolve to a fixed convention path (e.g.
+    // /var/lib/nonraid-webui/backups, /mnt/diskN/backups) that may not exist yet on a host that's
+    // never backed up there before - create it rather than failing, same as any other
+    // first-use-creates-the-folder destination in this app. A 'custom' path is left as-is: an
+    // admin-typed path that doesn't exist is more likely a typo worth surfacing than something to
+    // silently create.
+    if (schedule.destination.mode !== 'custom') {
+      await mkdir(destDir, { recursive: true }).catch(() => {});
+    }
     try {
-      await access(schedule.destDir, constants.W_OK);
+      await access(destDir, constants.W_OK);
     } catch {
-      const msg = `${label} skipped - destination "${schedule.destDir}" doesn't exist or isn't writable`;
+      const msg = `${label} skipped - destination "${destDir}" doesn't exist or isn't writable`;
       this.activity.log(msg, 'amber').catch(() => {});
-      throw new Error(`Destination "${schedule.destDir}" doesn't exist or isn't writable.`);
+      throw new Error(`Destination "${destDir}" doesn't exist or isn't writable.`);
     }
 
     try {
       this.metrics.checkpointForBackup();
-      const paths = await resolveConfigBackupPaths(this.nmd);
+      const paths = await resolveConfigBackupPaths(this.nmd, schedule.scope === 'configAppdata');
       if (paths.length === 0) {
         const msg = `${label} skipped - no config files found to back up`;
         this.activity.log(msg, 'amber').catch(() => {});
         throw new Error('No config files found to back up.');
       }
-      const destPath = path.join(schedule.destDir, `${BACKUP_PREFIX}${Date.now()}${BACKUP_SUFFIX}`);
+      const destPath = path.join(destDir, `${BACKUP_PREFIX}${Date.now()}${BACKUP_SUFFIX}`);
       const bytes = await writeConfigBackupToFile(paths, destPath);
       const sizeLabel = bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
       const completedText = `${label} completed (${sizeLabel})`;
       this.activity.log(completedText, 'blue', 'backupCompleted').catch(() => {});
       notifyEvent(this.settings, 'backupCompleted', 'NonRAID: backup completed', completedText);
-      await this.prune(schedule.destDir, schedule.retain);
+      if (!schedule.retainForever) {
+        await this.prune(destDir, schedule.retain);
+      }
       return { bytes };
     } catch (err) {
       const failedText = `${label} failed: ${(err as Error).message}`;

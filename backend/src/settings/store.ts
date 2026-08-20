@@ -46,13 +46,25 @@ const DEFAULTS: AppSettings = {
   trustProxy: false,
   notifications: { enabled: false, appriseUrls: '', eventTypes: DEFAULT_EVENT_TYPES },
   minFreeSpaceGb: 4,
-  paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2 },
-  backupSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3, destDir: '', retain: 7 },
+  paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2, cronExpression: '' },
+  backupSchedule: {
+    enabled: false,
+    frequency: 'weekly',
+    dayOfWeek: 0,
+    dayOfMonth: 1,
+    hour: 3,
+    cronExpression: '',
+    scope: 'config',
+    destination: { mode: 'custom', diskSlot: null, customPath: '' },
+    retain: 7,
+    retainForever: false,
+  },
   tempAlerts: { cpuWarnAboveCelsius: 55, diskWarnAboveCelsius: 55 },
   lxcStorage: { mode: 'boot', diskSlot: null },
   cache: { enabled: false, fsUuid: null },
-  cacheSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3 },
+  cacheSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3, cronExpression: '' },
   tailscale: { enabled: false, loginServer: '' },
+  remoteBackup: { enabled: false },
   onboarding: { dismissed: false },
 };
 
@@ -80,6 +92,7 @@ export class SettingsStore {
       cache: { ...settings.cache },
       cacheSchedule: { ...settings.cacheSchedule },
       tailscale: { ...settings.tailscale },
+      remoteBackup: { ...settings.remoteBackup },
       onboarding: { ...settings.onboarding },
     };
   }
@@ -96,12 +109,17 @@ export class SettingsStore {
           eventTypes: mergeEventTypes(current.notifications.eventTypes, patch.notifications?.eventTypes),
         },
         paritySchedule: { ...current.paritySchedule, ...patch.paritySchedule },
-        backupSchedule: { ...current.backupSchedule, ...patch.backupSchedule },
+        backupSchedule: {
+          ...current.backupSchedule,
+          ...patch.backupSchedule,
+          destination: { ...current.backupSchedule.destination, ...patch.backupSchedule?.destination },
+        },
         tempAlerts: { ...current.tempAlerts, ...patch.tempAlerts },
         lxcStorage: { ...current.lxcStorage, ...patch.lxcStorage },
         cache: { ...current.cache, ...patch.cache },
         cacheSchedule: { ...current.cacheSchedule, ...patch.cacheSchedule },
         tailscale: { ...current.tailscale, ...patch.tailscale },
+        remoteBackup: { ...current.remoteBackup, ...patch.remoteBackup },
         onboarding: { ...current.onboarding, ...patch.onboarding },
       };
       await this.persistAtomic(next);
@@ -134,6 +152,15 @@ export class SettingsStore {
               tempAlertDisk: { apprise: legacyTempAlertEnabled, webui: true },
             }
           : undefined;
+      // One-time migration from the pre-restructure BackupSchedule shape (a bare `destDir: string`,
+      // no `scope`/`destination`/`retainForever`) - an already-configured destination becomes the
+      // equivalent 'custom' picker selection rather than silently resetting an existing install
+      // back to an empty, unconfigured destination.
+      const legacyBackupSchedule = parsed.backupSchedule as Partial<{ destDir: string }> | undefined;
+      const migratedBackupDestination =
+        typeof legacyBackupSchedule?.destDir === 'string' && legacyBackupSchedule.destDir
+          ? { mode: 'custom' as const, diskSlot: null, customPath: legacyBackupSchedule.destDir }
+          : undefined;
       this.cache = {
         ...DEFAULTS,
         ...parsed,
@@ -147,12 +174,17 @@ export class SettingsStore {
           },
         },
         paritySchedule: { ...DEFAULTS.paritySchedule, ...parsed.paritySchedule },
-        backupSchedule: { ...DEFAULTS.backupSchedule, ...parsed.backupSchedule },
+        backupSchedule: {
+          ...DEFAULTS.backupSchedule,
+          ...parsed.backupSchedule,
+          destination: { ...DEFAULTS.backupSchedule.destination, ...migratedBackupDestination, ...parsed.backupSchedule?.destination },
+        },
         tempAlerts: { ...DEFAULTS.tempAlerts, ...migratedTempAlerts, ...parsed.tempAlerts },
         lxcStorage: { ...DEFAULTS.lxcStorage, ...parsed.lxcStorage },
         cache: { ...DEFAULTS.cache, ...parsed.cache },
         cacheSchedule: { ...DEFAULTS.cacheSchedule, ...parsed.cacheSchedule },
         tailscale: { ...DEFAULTS.tailscale, ...parsed.tailscale },
+        remoteBackup: { ...DEFAULTS.remoteBackup, ...parsed.remoteBackup },
         onboarding: { ...DEFAULTS.onboarding, ...parsed.onboarding },
       };
     } catch (err) {
