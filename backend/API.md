@@ -249,6 +249,36 @@ here is only meaningful once the feature's switched on.
 | POST | `/tailscale/logout` | - | `tailscale logout`. |
 | PUT | `/tailscale/options` | `{ hostname?, ssh?, acceptDns?, advertiseRoutes?: string[], acceptRoutes? }` | `tailscale set` with only the given fields. `advertiseRoutes` replaces the full set (`[]` clears it); advertised routes still need approving in the Tailscale/Headscale admin console before they take effect - this app can't do that part. |
 
+## Rclone (Remote Backup)
+
+Disabled by default (`settings.remoteBackup.enabled`) - `GET /rclone/status` still works either
+way (so the section can render its own "not installed"/"not enabled" state), but every other route
+here is only meaningful once the feature's switched on and `rclone-rcd` is running. This app talks
+to rclone entirely through its own RC (remote control) daemon over HTTP - no local copy of remote
+definitions is persisted here; remotes are rclone's own source of truth (`config/listremotes` +
+`config/dump`), same "don't shadow an external source of truth" reasoning as Tailscale above. Sync
+jobs (the schedule/scope/retention around a remote) are this app's own concept and are persisted
+locally (`backend/src/rclone/syncJobStore.ts`).
+
+| Method | Path | Body/Params | Response / Notes |
+|---|---|---|---|
+| GET | `/rclone/status` | - | `{ installed, running, featureEnabled }`. `installed: false` (not an error) when the `rclone` binary isn't on PATH; `running` reflects whether `rclone-rcd` answered a live RC call just now. |
+| PUT | `/rclone/enabled` | `{ enabled: boolean }` | Persists the toggle and best-effort starts/stops the `rclone-rcd` systemd unit to match. |
+| GET | `/rclone/providers` | - | Every backend rclone supports, live from its own `config/providers` RC call, reduced to the handful of non-advanced fields (name/help/default/required/isPassword/type) this app's dynamic Add-remote form actually renders - not the full advanced option set. |
+| GET | `/rclone/remotes` | - | Configured remotes with live per-remote status (`ok` \| `authExpired` \| `error` \| `unknown`), from `config/listremotes` plus a `checkRemote()` probe on each. |
+| POST | `/rclone/remotes` | `{ name, type, parameters }` | `config/create`. OAuth-based providers (Google Drive, Dropbox, ...) return mid-flow instead of finishing immediately (`{ done: false, state, ... }`) - the frontend then calls `.../continue` once the user's done authorizing. |
+| POST | `/rclone/remotes/:name/continue` | `{ type, state }` | Resumes an in-progress OAuth remote setup (`config/create` called again with the saved `state`) until it reports `done: true`. |
+| GET | `/rclone/remotes/:name` | - | The remote's current saved config (`config/dump`, scoped to one remote) - backs the Edit-remote form's pre-filled values. |
+| PUT | `/rclone/remotes/:name` | `{ parameters }` | `config/update` - merges the given fields into the existing remote config rather than replacing it wholesale. Provider type itself isn't editable this way (delete + recreate instead). |
+| DELETE | `/rclone/remotes/:name` | - | `config/delete`. Any sync job still pointing at this remote isn't deleted or blocked - it starts reporting a "remote missing" error state instead (see `GET /rclone/jobs`). |
+| GET | `/rclone/jobs` | - | Every sync job plus live runtime state (`idle` \| `syncing` \| `disabled`) and, for whichever job is currently running, live progress (bytes/speed/ETA/file counts) read from rclone's own `core/stats`. |
+| POST | `/rclone/jobs` | `{ name, scope, customPath?, remoteName, remotePath?, schedule, retention }` | `scope` is `config` \| `configAppdata` \| `custom` (`customPath` required only for `custom`). `retention` is always day-based (`{ keepDays, forever }`) regardless of scope, never a "keep last N" count - see `SyncJobRetention`'s own doc comment for why. `400` with a specific message on any validation failure. |
+| PUT | `/rclone/jobs/:id` | partial patch of the same shape | Any subset of fields; `schedule`/`retention` are validated the same way as on create when present. |
+| DELETE | `/rclone/jobs/:id` | - | Deletes the job record only - never touches whatever's already been synced to the remote. |
+| PUT | `/rclone/jobs/:id/enabled` | `{ enabled: boolean }` | Toggles a single job without a full edit - same precedent as the Docker/LXC autostart toggles. |
+| POST | `/rclone/jobs/:id/sync` | - | Runs this job immediately, outside its schedule. Blocks until the sync finishes (and retention's been enforced) rather than returning a job handle - poll `GET /rclone/jobs` for live progress while it runs. |
+| POST | `/rclone/jobs/:id/cancel` | - | Cancels whichever sync is currently in progress (at most one runs at a time). |
+
 ## Settings
 
 | Method | Path | Body/Params | Response / Notes |
