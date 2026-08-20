@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ShareExportModal } from '../components/shares/ShareExportModal';
+import { AddGroupModal } from '../components/users/AddGroupModal';
 import { AddUserModal } from '../components/users/AddUserModal';
-import { GroupsModal } from '../components/users/GroupsModal';
+import { GroupDetailPanel } from '../components/users/GroupDetailPanel';
 import { UserDetailPanel } from '../components/users/UserDetailPanel';
 import { useGroups } from '../hooks/useGroups';
 import { useShares } from '../hooks/useShares';
@@ -15,14 +16,18 @@ export function UsersPage() {
   const groups = useGroups();
   const shares = useShares();
   const [creating, setCreating] = useState(false);
-  const [managingGroups, setManagingGroups] = useState(false);
+  const [addingGroup, setAddingGroup] = useState(false);
   const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
+  const [selectedGroupName, setSelectedGroupName] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const [confirmingGroupDelete, setConfirmingGroupDelete] = useState<string | null>(null);
   const [exportingShare, setExportingShare] = useState<Share | null>(null);
 
   const views = users.map(deriveUserViewModel);
   const existingUsernames = users.map((u) => u.username);
+  const existingGroupNames = groups.groups.map((g) => g.name);
   const selectedUser = users.find((u) => u.username === selectedUsername) ?? null;
+  const selectedGroup = groups.groups.find((g) => g.name === selectedGroupName) ?? null;
   const shareViews = shares.shares.map(deriveShareViewModel);
 
   const handleDeleteClick = (username: string) => {
@@ -31,6 +36,15 @@ export function UsersPage() {
       setConfirmingDelete(null);
     } else {
       setConfirmingDelete(username);
+    }
+  };
+
+  const handleGroupDeleteClick = (name: string) => {
+    if (confirmingGroupDelete === name) {
+      groups.remove(name);
+      setConfirmingGroupDelete(null);
+    } else {
+      setConfirmingGroupDelete(name);
     }
   };
 
@@ -88,14 +102,9 @@ export function UsersPage() {
       <div className="eyebrow disk-section-label">Users</div>
       <div className="page-header">
         <div />
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" className="btn" onClick={() => setManagingGroups(true)}>
-            Groups
-          </button>
-          <button type="button" className="btn--primary" onClick={() => setCreating(true)}>
-            Add User
-          </button>
-        </div>
+        <button type="button" className="btn--primary" onClick={() => setCreating(true)}>
+          Add User
+        </button>
       </div>
 
       {status === 'loading' && <div className="status-note">Loading users…</div>}
@@ -129,6 +138,48 @@ export function UsersPage() {
         {status === 'ready' && views.length === 0 && <div className="status-note">No users yet.</div>}
       </div>
 
+      <div className="eyebrow disk-section-label">Groups</div>
+      <div className="page-header">
+        <div />
+        <button type="button" className="btn--primary" onClick={() => setAddingGroup(true)}>
+          Add Group
+        </button>
+      </div>
+
+      {groups.status === 'loading' && <div className="status-note">Loading groups…</div>}
+      {groups.error && <div className="status-note status-note--error">{groups.error}</div>}
+      {groups.actionError && <div className="status-note status-note--error">{groups.actionError}</div>}
+
+      <div className="list">
+        {groups.groups.map((g) => {
+          const memberNames = users.filter((u) => u.groups.includes(g.name)).map((u) => u.username);
+          return (
+            <div className="list-card" key={g.name}>
+              <div className="avatar">{g.name[0]?.toUpperCase()}</div>
+              <div className="list-card__col--name">
+                <div className="list-card__title">{g.name}</div>
+                <div className="list-card__subtitle">gid {g.gid}</div>
+              </div>
+              <div className="list-card__col--wide">{memberNames.length > 0 ? memberNames.join(', ') : 'No members'}</div>
+              <div className="list-card__actions">
+                <button type="button" className="btn" disabled={groups.pendingNames.has(g.name)} onClick={() => setSelectedGroupName(g.name)}>
+                  Manage
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  disabled={groups.pendingNames.has(g.name)}
+                  onClick={() => handleGroupDeleteClick(g.name)}
+                >
+                  {confirmingGroupDelete === g.name ? 'Confirm?' : 'Remove'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        {groups.status === 'ready' && groups.groups.length === 0 && <div className="status-note">No groups yet.</div>}
+      </div>
+
       {creating && (
         <AddUserModal
           existingUsernames={existingUsernames}
@@ -141,7 +192,31 @@ export function UsersPage() {
         />
       )}
 
-      {managingGroups && <GroupsModal groups={groups} onClose={() => setManagingGroups(false)} />}
+      {addingGroup && (
+        <AddGroupModal
+          existingGroupNames={existingGroupNames}
+          onCancel={() => setAddingGroup(false)}
+          onSubmit={async (input) => {
+            const ok = await groups.create(input);
+            if (ok) setAddingGroup(false);
+            return ok;
+          }}
+        />
+      )}
+
+      {selectedGroup && (
+        <GroupDetailPanel
+          group={selectedGroup}
+          users={users}
+          pending={groups.pendingNames.has(selectedGroup.name)}
+          onClose={() => setSelectedGroupName(null)}
+          onDelete={async () => {
+            const ok = await groups.remove(selectedGroup.name);
+            if (ok) setSelectedGroupName(null);
+            return ok;
+          }}
+        />
+      )}
 
       {exportingShare && (
         <ShareExportModal
