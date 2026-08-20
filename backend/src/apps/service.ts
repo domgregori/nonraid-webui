@@ -3,6 +3,7 @@ import { config } from '../config.js';
 import type { CreateContainerProgressCallback, DockerClient, DockerCommandResult, DockerContainerSummary } from '../docker/index.js';
 import { computeElevatedAccessReasons, isAllowedBindPath, isAllowedDevicePath, sanitizeContainerName } from '../docker/planning.js';
 import { HttpError } from '../httpError.js';
+import { provisionArrayDir } from '../system/arrayDir.js';
 import type { CaFeedStore } from './feedStore.js';
 import type {
   AppListQuery,
@@ -187,6 +188,14 @@ export class AppsService {
         400,
         `"${app.Name}" requires elevated host access (${plan.elevatedAccessReasons.join(' ')}). Set privilegedAck: true to confirm and install it.`,
       );
+    }
+
+    // Docker auto-creates a missing bind-mount host path itself the moment the container starts -
+    // as plain root:root with no ACL, since it has no idea about this app's user:users convention.
+    // Provisioning each one first (same treatment mountShare() gives a share's own directories)
+    // means Docker always finds it already there instead of getting the chance to create it wrong.
+    for (const bind of plan.binds) {
+      if (bind.allowed) await provisionArrayDir(bind.hostPath);
     }
 
     const result = await this.docker.createContainer(
