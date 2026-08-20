@@ -69,14 +69,7 @@ export function AppsPage() {
 
       <div className="apps-layout">
         <aside className="apps-sidebar">
-          <div className="apps-sidebar__title">Categories</div>
-          <button
-            type="button"
-            className={`category-item${category === '' && sort === null ? ' category-item--active' : ''}`}
-            onClick={() => handleCategory('')}
-          >
-            All
-          </button>
+          <div className="apps-sidebar__title">Sort by</div>
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.value}
@@ -88,6 +81,14 @@ export function AppsPage() {
             </button>
           ))}
           <div className="apps-sidebar__separator" />
+          <div className="apps-sidebar__title">Categories</div>
+          <button
+            type="button"
+            className={`category-item${category === '' ? ' category-item--active' : ''}`}
+            onClick={() => handleCategory('')}
+          >
+            All
+          </button>
           {categories.map((c) => (
             <button
               key={c}
