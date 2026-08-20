@@ -49,6 +49,7 @@ export class SyncJobStore {
         ...patch,
         schedule: { ...existing.schedule, ...patch.schedule },
         retention: { ...existing.retention, ...patch.retention },
+        encryption: { ...existing.encryption, ...patch.encryption },
       };
       const updated = [...jobs];
       updated[idx] = next;

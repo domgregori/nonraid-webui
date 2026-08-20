@@ -2,8 +2,10 @@ import { Router, type Express } from 'express';
 import type { ActivityStore } from '../activity/index.js';
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
+import type { RcloneClient } from '../rclone/client.js';
+import { redactEncryption, resolveEncryptionPatch } from '../settings/backupEncryption.js';
 import { validateCronExpression } from '../settings/cronMatch.js';
-import { NOTIFICATION_EVENTS, sendAppriseNotification, type SettingsStore } from '../settings/index.js';
+import { NOTIFICATION_EVENTS, sendAppriseNotification, type AppSettings, type SettingsStore } from '../settings/index.js';
 import type { ShareService } from '../shares/index.js';
 
 const KNOWN_EVENT_TYPES = new Set<string>(NOTIFICATION_EVENTS.map((e) => e.id));
@@ -58,12 +60,22 @@ function validateBackupDestination(fieldName: string, destination: Record<string
   }
 }
 
-export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: ActivityStore, shares: ShareService, app: Express): Router {
+// Never round-trips the real (obscured) Local Backups encryption password back to the client -
+// see settings/backupEncryption.ts's redactEncryption() doc comment. The only field this touches;
+// every other AppSettings field passes through unchanged. Returns `unknown` (rather than trying to
+// express "AppSettings but with one nested field's type swapped" generically) since this only ever
+// feeds straight into res.json(), which doesn't care.
+function redactSettings(settings: AppSettings): unknown {
+  const { encryption, ...restSchedule } = settings.backupSchedule;
+  return { ...settings, backupSchedule: { ...restSchedule, encryption: redactEncryption(encryption) } };
+}
+
+export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: ActivityStore, shares: ShareService, app: Express, rclone: RcloneClient): Router {
   const router = Router();
 
   router.get('/settings', async (_req, res) => {
     try {
-      res.json(await store.get());
+      res.json(redactSettings(await store.get()));
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }
@@ -105,7 +117,7 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
       }
       if (patch.backupSchedule) {
         validateSchedulePatch('backupSchedule', patch.backupSchedule);
-        const { scope, destination, retain, retainForever } = patch.backupSchedule;
+        const { scope, destination, retain, retainForever, encryption } = patch.backupSchedule;
         if ('scope' in patch.backupSchedule && scope !== 'config' && scope !== 'configAppdata') {
           throw new Error('backupSchedule.scope must be "config" or "configAppdata".');
         }
@@ -117,6 +129,10 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
         }
         if ('retainForever' in patch.backupSchedule && typeof retainForever !== 'boolean') {
           throw new Error('backupSchedule.retainForever must be a boolean.');
+        }
+        if (encryption) {
+          const existing = (await store.get()).backupSchedule.encryption;
+          patch.backupSchedule.encryption = await resolveEncryptionPatch(rclone, encryption, existing);
         }
       }
       if (patch.notifications?.eventTypes) {
@@ -154,7 +170,7 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
         await shares.remountAll();
         activity.log(`Minimum free space set to ${patch.minFreeSpaceGb} GB`, 'blue').catch(() => {});
       }
-      res.json(updated);
+      res.json(redactSettings(updated));
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

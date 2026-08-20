@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { unlink } from 'node:fs/promises';
+import { copyFile, unlink } from 'node:fs/promises';
 import os from 'node:os';
+import path from 'node:path';
 import { Router } from 'express';
 import multer from 'multer';
 import type { ActivityStore } from '../activity/store.js';
@@ -14,7 +15,11 @@ import { benchmarkRead, benchmarkWrite, resolveDurationMs } from '../system/benc
 import { resolveConfigBackupPaths, streamBootDiskImage, streamConfigBackup } from '../system/backupStream.js';
 import type { BackupScheduler } from '../system/backupScheduler.js';
 import { categoryForMember, resolveBackupCategories, type BackupCategoryId } from '../system/backupCatalog.js';
+import { looksLikeGzip, passwordErrorCode } from '../system/backupCrypto.js';
+import { readMetaSidecar } from '../system/backupMeta.js';
 import {
+  buildRestorePreview,
+  decryptIfNeeded,
   dropStagedRestore,
   getStagedRestore,
   isArrayBlank,
@@ -109,46 +114,84 @@ export function systemRouter(
       res.status(400).json({ error: 'No file uploaded.' });
       return;
     }
+    const password = typeof req.body?.password === 'string' ? req.body.password : null;
+    let cleanupDecrypted = async () => {};
     try {
-      const members = await listArchiveMembers(file.path);
-      if (members.length === 0) throw new HttpError(400, 'Archive is empty or not a valid config backup.');
-
-      const superblockPath = await nmd.getSuperblockPath();
-      const superblockMember = superblockPath.replace(/^\//, '');
-      const arrayIsBlank = await isArrayBlank(nmd);
-      const status = await nmd.getStatus().catch(() => null);
-      const arrayStopped = status ? status.array.state !== 'STARTED' : true;
-
-      const categories = await resolveBackupCategories(nmd);
-      // Directory members (e.g. "etc/nonraid/") are counted in their category's totals below but
-      // dropped from the flat `entries` shown per-member - same reasoning restoreArchiveMembers()
-      // itself already has for not extracting them: a bare directory carries nothing the file
-      // members inside it don't already imply.
-      const categoryPreviews = categories
-        .map((cat) => ({
-          id: cat.id,
-          label: cat.label,
-          description: cat.description,
-          entries: members.filter((m) => !m.endsWith('/') && categoryForMember(m, categories) === cat.id).map((m) => `/${m}`),
-        }))
-        .filter((c) => c.entries.length > 0);
-
+      // A raw browser upload has no `.meta.json` sidecar of its own to trust (there's no
+      // established destination relationship the way the local/remote pickers have) - whether it
+      // needs a password is instead read straight off the file's own bytes: every unencrypted
+      // archive this app writes starts with gzip's magic, openssl enc's own output never does.
+      const encrypted = !(await looksLikeGzip(file.path));
+      const { path: decryptedPath, cleanup } = await decryptIfNeeded(file.path, encrypted, password);
+      cleanupDecrypted = cleanup;
+      const preview = await buildRestorePreview(nmd, decryptedPath);
       const token = randomUUID();
-      stageRestoreFile(token, file.path);
-
-      res.json({
-        token,
-        entries: members.map((m) => ({ path: `/${m}`, isSuperblock: m === superblockMember })),
-        categories: categoryPreviews,
-        arrayIsBlank,
-        arrayStopped,
-      });
+      stageRestoreFile(token, decryptedPath);
+      // Once decrypted, the original upload at file.path is no longer needed (the plaintext copy
+      // staged above is what everything downstream uses) - only unlinked here, past the point
+      // where a wrong password would otherwise be blamed on a missing file.
+      if (decryptedPath !== file.path) await unlink(file.path).catch(() => {});
+      res.json({ token, ...preview });
     } catch (err) {
+      await cleanupDecrypted();
       await unlink(file.path).catch(() => {});
       if (err instanceof HttpError) {
-        res.status(err.status).json({ error: err.message });
+        res.status(err.status).json({ error: err.message, code: passwordErrorCode(err) });
       } else {
         res.status(502).json({ error: (err as Error).message });
+      }
+    }
+  });
+
+  // Lists what's already sitting at the configured Local Backups destination (Settings -> Local
+  // Backups' own destination picker) - lets "Recover from a local backup" offer a pick-from-list
+  // step instead of making the admin manually re-locate and re-upload a file their own browser
+  // never had a reason to have a local copy of. `destDir: null` covers both "no destination
+  // configured yet" and a destination picker (the 'array' mode) that can't resolve without a disk
+  // slot saved - either way there's nothing to list, not an error.
+  router.get('/system/backup/local/list', async (_req, res) => {
+    try {
+      res.json(await backupScheduler.listBackups());
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  // Same preview shape and staging as the upload route above, sourced from a file already sitting
+  // at the Local Backups destination instead of a fresh browser upload - `name` must be exactly
+  // one of listBackups()'s own entries (backupScheduler.resolveBackupPath() enforces this, no
+  // path traversal accepted). Copied into a private tmp location first, same reasoning as
+  // array.ts's preview-from-path: /system/backup/restore/commit's cleanup unlinks the staged copy
+  // when it's done, and that must never be the admin's own backup file.
+  router.post('/system/backup/local/restore/preview', async (req, res) => {
+    sweepStagedRestores();
+    const name = typeof req.body?.name === 'string' ? req.body.name : '';
+    if (!name) {
+      res.status(400).json({ error: 'name is required.' });
+      return;
+    }
+    const password = typeof req.body?.password === 'string' ? req.body.password : null;
+    let tmpPath: string | null = null;
+    let cleanupDecrypted = async () => {};
+    try {
+      const sourcePath = await backupScheduler.resolveBackupPath(name);
+      const meta = await readMetaSidecar(sourcePath); // sourcePath's own sidecar - missing reads as unencrypted, see backupMeta.ts
+      tmpPath = path.join(os.tmpdir(), `nonraid-restore-${randomUUID()}.tar.gz`);
+      await copyFile(sourcePath, tmpPath);
+      const { path: decryptedPath, cleanup } = await decryptIfNeeded(tmpPath, meta?.encrypted ?? false, password);
+      cleanupDecrypted = cleanup;
+      const preview = await buildRestorePreview(nmd, decryptedPath);
+      const token = randomUUID();
+      stageRestoreFile(token, decryptedPath);
+      if (decryptedPath !== tmpPath) await unlink(tmpPath).catch(() => {}); // see the upload route's own comment on this
+      res.json({ token, ...preview });
+    } catch (err) {
+      await cleanupDecrypted();
+      if (tmpPath) await unlink(tmpPath).catch(() => {});
+      if (err instanceof HttpError) {
+        res.status(err.status).json({ error: err.message, code: passwordErrorCode(err) });
+      } else {
+        res.status(400).json({ error: (err as Error).message });
       }
     }
   });
@@ -173,7 +216,9 @@ export function systemRouter(
       const superblockPath = await nmd.getSuperblockPath();
       const superblockMember = superblockPath.replace(/^\//, '');
       const arrayIsBlank = await isArrayBlank(nmd);
-      const categories = await resolveBackupCategories(nmd);
+      // includeAppdata always on here, matching buildRestorePreview() - see its own doc comment
+      // for why an appdata member with no matching category would otherwise never get restored.
+      const categories = await resolveBackupCategories(nmd, true);
 
       // Missing/malformed `categories` means "everything" (the field didn't exist before this
       // selection feature - old clients, or a plain re-POST of a preview response, still restore

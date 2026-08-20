@@ -3,7 +3,9 @@ import path from 'node:path';
 import { createGzip } from 'node:zlib';
 import type { Response } from 'express';
 import type { ActivityStore } from '../activity/store.js';
-import { spawnMaybeSudo } from './procUtil.js';
+import { config } from '../config.js';
+import { OPENSSL_CIPHER_ARGS, withPasswordFile } from './backupCrypto.js';
+import { spawnMaybeSudo, spawnWithPipedStdin } from './procUtil.js';
 
 const STDERR_TAIL_MAX = 4000;
 
@@ -134,8 +136,20 @@ export { resolveConfigBackupPaths } from './backupCatalog.js';
  * Non-streaming sibling of streamConfigBackup - writes the same gzip-compressed tar to a file on
  * disk instead of an HTTP response, for BackupScheduler's unattended runs. Resolves with the byte
  * count written, rejects with a message built the same way streamConfigBackup's error paths are.
+ *
+ * When `password` is set, tar's stdout is piped through a second `openssl enc` child process
+ * before it ever reaches `destPath` - the plaintext tar stream never touches disk at any point,
+ * only the ciphertext does (see backupCrypto.ts's own doc comment on why openssl was picked and
+ * how the password itself is kept off the process's own command line). `destPath`'s own name/
+ * extension is unaffected either way - see backupMeta.ts for how a `.meta.json` sidecar is what
+ * actually records whether a given archive is encrypted, not its filename.
  */
-export function writeConfigBackupToFile(paths: string[], destPath: string): Promise<number> {
+export function writeConfigBackupToFile(paths: string[], destPath: string, password?: string): Promise<number> {
+  if (!password) return writePlainConfigBackup(paths, destPath);
+  return withPasswordFile(password, (passwordFilePath) => writeEncryptedConfigBackup(paths, destPath, passwordFilePath));
+}
+
+function writePlainConfigBackup(paths: string[], destPath: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const child = spawnMaybeSudo('tar', ['--ignore-failed-read', '-czf', '-', ...paths]);
     const out = createWriteStream(destPath);
@@ -162,6 +176,64 @@ export function writeConfigBackupToFile(paths: string[], destPath: string): Prom
       } else {
         reject(new Error(`tar ${describeExit(code, signal)}: ${stderrTail.trim()}`));
       }
+    });
+  });
+}
+
+function writeEncryptedConfigBackup(paths: string[], destPath: string, passwordFilePath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const tar = spawnMaybeSudo('tar', ['--ignore-failed-read', '-czf', '-', ...paths]);
+    const openssl = spawnWithPipedStdin(config.opensslBin, ['enc', ...OPENSSL_CIPHER_ARGS, '-pass', `file:${passwordFilePath}`]);
+    const out = createWriteStream(destPath);
+    let tarStderrTail = '';
+    let opensslStderrTail = '';
+    let bytes = 0;
+    let settled = false;
+
+    const fail = (err: Error) => {
+      if (settled) return;
+      settled = true;
+      if (!tar.killed) tar.kill();
+      if (!openssl.killed) openssl.kill();
+      reject(err);
+    };
+
+    tar.stderr.on('data', (chunk: Buffer) => {
+      tarStderrTail = (tarStderrTail + chunk.toString('utf8')).slice(-STDERR_TAIL_MAX);
+    });
+    openssl.stderr.on('data', (chunk: Buffer) => {
+      opensslStderrTail = (opensslStderrTail + chunk.toString('utf8')).slice(-STDERR_TAIL_MAX);
+    });
+    openssl.stdout.on('data', (chunk: Buffer) => {
+      bytes += chunk.length;
+    });
+    tar.stdout.pipe(openssl.stdin);
+    openssl.stdout.pipe(out);
+
+    tar.on('error', (err) => fail(new Error(`Failed to start config backup: ${err.message}`)));
+    openssl.on('error', (err) => fail(new Error(`Failed to start openssl: ${err.message}`)));
+    out.on('error', (err) => fail(new Error(`Failed to write config backup file: ${err.message}`)));
+
+    let tarDone: number | null = null;
+    let opensslDone: number | null = null;
+    const maybeFinish = () => {
+      if (settled || tarDone === null || opensslDone === null) return;
+      settled = true;
+      if (tarDone !== 0) {
+        reject(new Error(`tar exited with code ${tarDone}: ${tarStderrTail.trim()}`));
+      } else if (opensslDone !== 0) {
+        reject(new Error(`openssl exited with code ${opensslDone}: ${opensslStderrTail.trim()}`));
+      } else {
+        resolve(bytes);
+      }
+    };
+    tar.on('close', (code) => {
+      tarDone = code ?? -1;
+      maybeFinish();
+    });
+    openssl.on('close', (code) => {
+      opensslDone = code ?? -1;
+      maybeFinish();
     });
   });
 }

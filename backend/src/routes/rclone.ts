@@ -2,13 +2,27 @@ import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
 import { validateCronExpression } from '../settings/cronMatch.js';
 import type { SettingsStore } from '../settings/index.js';
+import { resolveEncryptionPatch, redactEncryption } from '../settings/backupEncryption.js';
+import { passwordErrorCode } from '../system/backupCrypto.js';
 import { runSudoMaybe } from '../system/procUtil.js';
 import type { RcloneClient } from '../rclone/index.js';
 import type { RcloneService } from '../rclone/service.js';
 import type { NewSyncJob, SyncJobPatch } from '../rclone/syncJobStore.js';
+import type { SyncJob } from '../rclone/types.js';
 
 function handleError(err: unknown, res: import('express').Response): void {
   res.status(502).json({ error: (err as Error).message });
+}
+
+function handleRestorePreviewError(err: unknown, res: import('express').Response): void {
+  res.status(400).json({ error: (err as Error).message, code: passwordErrorCode(err) });
+}
+
+// Never round-trips the real (obscured) password back to the client - see
+// settings/backupEncryption.ts's redactEncryption() doc comment.
+function redactSyncJob<T extends SyncJob>(job: T): Omit<T, 'encryption'> & { encryption: { enabled: boolean; hasPassword: boolean } } {
+  const { encryption, ...rest } = job;
+  return { ...rest, encryption: redactEncryption(encryption) };
 }
 
 function validateScheduleBody(schedule: Record<string, unknown>): void {
@@ -169,7 +183,7 @@ export function rcloneRouter(client: RcloneClient, service: RcloneService, setti
 
   router.get('/rclone/jobs', async (_req, res) => {
     try {
-      res.json(await service.listJobsWithRuntime());
+      res.json((await service.listJobsWithRuntime()).map(redactSyncJob));
     } catch (err) {
       handleError(err, res);
     }
@@ -179,6 +193,7 @@ export function rcloneRouter(client: RcloneClient, service: RcloneService, setti
     try {
       validateJobBody(req.body ?? {});
       const body = req.body;
+      const encryption = await resolveEncryptionPatch(client, body.encryption, null);
       const job: NewSyncJob = {
         name: body.name.trim(),
         enabled: body.enabled ?? true,
@@ -188,10 +203,11 @@ export function rcloneRouter(client: RcloneClient, service: RcloneService, setti
         remotePath: body.remotePath ?? '',
         schedule: body.schedule,
         retention: body.retention,
+        encryption: encryption ?? { enabled: false, passwordObscured: null },
       };
       const created = await service.createJob(job);
       activity.log(`Sync job "${created.name}" created`, 'blue').catch(() => {});
-      res.status(201).json(created);
+      res.status(201).json(redactSyncJob(created));
     } catch (err) {
       res.status(400).json({ error: (err as Error).message });
     }
@@ -203,8 +219,12 @@ export function rcloneRouter(client: RcloneClient, service: RcloneService, setti
       if (body.schedule) validateScheduleBody(body.schedule as Record<string, unknown>);
       if (body.retention) validateRetentionBody(body.retention as Record<string, unknown>);
       const patch: SyncJobPatch = { ...body } as SyncJobPatch;
+      if (body.encryption) {
+        const existingJob = await service.store.get(req.params.id);
+        patch.encryption = await resolveEncryptionPatch(client, body.encryption, existingJob?.encryption ?? null);
+      }
       const updated = await service.updateJob(req.params.id, patch);
-      res.json(updated);
+      res.json(redactSyncJob(updated));
     } catch (err) {
       res.status(400).json({ error: (err as Error).message });
     }
@@ -228,7 +248,7 @@ export function rcloneRouter(client: RcloneClient, service: RcloneService, setti
     }
     try {
       const updated = await service.updateJob(req.params.id, { enabled });
-      res.json(updated);
+      res.json(redactSyncJob(updated));
     } catch (err) {
       handleError(err, res);
     }
@@ -249,6 +269,28 @@ export function rcloneRouter(client: RcloneClient, service: RcloneService, setti
       res.json({ ok: true, message: 'Cancel requested.' });
     } catch (err) {
       handleError(err, res);
+    }
+  });
+
+  // Recovery hub's "restore from a remote backup" picker: what a 'config'/'configAppdata' scope
+  // job has already uploaded to its remote target, then (once one's picked) a preview built from
+  // a copy pulled down into private staging - same preview/token shape and downstream
+  // review/commit as every other restore source. Both 400 rather than 502 on failure - a bad job
+  // id/archive name or a 'custom' scope job is a request-shaped error, not an rclone-side one.
+  router.get('/rclone/jobs/:id/backups', async (req, res) => {
+    try {
+      res.json(await service.listJobBackups(req.params.id));
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  });
+
+  router.post('/rclone/jobs/:id/backups/:name/restore-preview', async (req, res) => {
+    try {
+      const password = typeof req.body?.password === 'string' ? req.body.password : null;
+      res.json(await service.previewJobBackup(req.params.id, req.params.name, password));
+    } catch (err) {
+      handleRestorePreviewError(err, res);
     }
   });
 

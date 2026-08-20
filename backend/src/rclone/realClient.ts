@@ -1,9 +1,13 @@
 import { execFile } from 'node:child_process';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
 import type { RcloneClient, RcloneCoreStats, RcloneJobStatus } from './client.js';
+import { revealRcloneObscured } from './obscure.js';
 import { getRcloneRcCredentials } from './rcCredentials.js';
-import type { RcloneProvider, RcloneProviderOption, RcloneRemote } from './types.js';
+import type { RcloneDirEntry, RcloneProvider, RcloneProviderOption, RcloneRemote } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -194,5 +198,33 @@ export class RealRcloneClient implements RcloneClient {
 
   async stopJob(jobId: number): Promise<void> {
     await rcCall('job/stop', { jobid: jobId });
+  }
+
+  async listDir(fs: string): Promise<RcloneDirEntry[]> {
+    const { list } = await rcCall<{ list: { Path: string; Name: string; Size: number; ModTime: string; IsDir: boolean }[] }>('operations/list', { fs, remote: '' });
+    return list.filter((e) => !e.IsDir).map((e) => ({ name: e.Name, path: e.Path, sizeBytes: e.Size, modTime: e.ModTime }));
+  }
+
+  async downloadFile(srcFs: string, srcRemote: string, dstFs: string, dstRemote: string): Promise<void> {
+    await rcCall('operations/copyfile', { srcFs, srcRemote, dstFs, dstRemote });
+  }
+
+  async readFileText(fs: string, remote: string): Promise<string> {
+    const stagingDir = await mkdtemp(path.join(os.tmpdir(), 'nonraid-rclone-read-'));
+    try {
+      await this.downloadFile(fs, remote, stagingDir, remote);
+      return await readFile(path.join(stagingDir, remote), 'utf8');
+    } finally {
+      await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+
+  async obscure(plaintext: string): Promise<string> {
+    const result = await rcCall<{ obscured: string }>('core/obscure', { clear: plaintext });
+    return result.obscured;
+  }
+
+  async reveal(obscured: string): Promise<string> {
+    return revealRcloneObscured(obscured);
   }
 }
