@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdir, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -6,12 +7,14 @@ import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
 import { notifyEvent } from '../settings/notify.js';
-import { resolveConfigBackupPaths } from '../system/backupCatalog.js';
+import { resolveConfigBackupPaths, resolveExistingCategoryIds } from '../system/backupCatalog.js';
+import { buildMeta, META_SUFFIX, metaNameFor, readMetaSidecar, writeMetaSidecar } from '../system/backupMeta.js';
 import { writeConfigBackupToFile } from '../system/backupStream.js';
+import { buildRestorePreview, decryptIfNeeded, stageRestoreFile, type RestorePreviewData } from '../system/configRestore.js';
 import type { RcloneClient } from './client.js';
 import { getRcloneRcCredentials } from './rcCredentials.js';
 import { SyncJobStore, type NewSyncJob, type SyncJobPatch } from './syncJobStore.js';
-import type { SyncJob, SyncJobProgress, SyncJobWithRuntime } from './types.js';
+import type { RemoteBackupEntry, SyncJob, SyncJobProgress, SyncJobWithRuntime } from './types.js';
 
 const ARCHIVE_PREFIX = 'nonraid-remote-backup-';
 const ARCHIVE_SUFFIX = '.tar.gz';
@@ -114,6 +117,93 @@ export class RcloneService {
     await this.client.stopJob(this.running.rcloneJobId);
   }
 
+  /** Archives one of this job's own past runs has already uploaded to its remote target, for the
+   *  Recovery hub's "restore from a remote backup" picker. Only 'config'/'configAppdata' scope
+   *  jobs produce these - a 'custom' scope job mirrors an arbitrary folder live, with nothing
+   *  resembling a single restorable archive sitting at its target path. Each entry is enriched
+   *  with its own `.meta.json` sidecar's `encrypted`/`categories` fields when one exists next to
+   *  it remotely (downloaded and read directly, one small `operations/copyfile` per entry - these
+   *  are plaintext JSON files a few hundred bytes each, never the archive itself) - missing sidecar
+   *  reads as unencrypted/unknown, same rule as the local list (backupMeta.ts's own doc comment). */
+  async listJobBackups(id: string): Promise<RemoteBackupEntry[]> {
+    const job = await this.store.get(id);
+    if (!job) throw new Error('Sync job not found.');
+    if (job.scope === 'custom') {
+      throw new Error("This sync job mirrors a folder directly - it doesn't produce a single config backup archive to restore from.");
+    }
+    const dst = dstFs(job.remoteName, job.remotePath);
+    const entries = await this.client.listDir(dst).catch(() => []);
+    const archiveEntries = entries.filter((e) => e.name.startsWith(ARCHIVE_PREFIX) && e.name.endsWith(ARCHIVE_SUFFIX));
+    const metaNames = new Set(entries.filter((e) => e.name.endsWith(META_SUFFIX)).map((e) => e.name));
+
+    const results = await Promise.all(
+      archiveEntries.map(async (e): Promise<RemoteBackupEntry> => {
+        const metaName = metaNameFor(e.name);
+        if (!metaNames.has(metaName)) return { name: e.name, sizeBytes: e.sizeBytes, modTime: e.modTime, encrypted: false, categories: null };
+        try {
+          const raw = await this.client.readFileText(dst, metaName);
+          const meta = JSON.parse(raw) as { encrypted?: boolean; categories?: RemoteBackupEntry['categories'] };
+          return { name: e.name, sizeBytes: e.sizeBytes, modTime: e.modTime, encrypted: !!meta.encrypted, categories: meta.categories ?? null };
+        } catch {
+          return { name: e.name, sizeBytes: e.sizeBytes, modTime: e.modTime, encrypted: false, categories: null };
+        }
+      }),
+    );
+    return results.sort((a, b) => b.modTime.localeCompare(a.modTime));
+  }
+
+  /**
+   * Downloads one of listJobBackups()'s own archives into a private staging path and builds the
+   * exact same restore preview / staged token the upload and local-backup flows produce -
+   * everything from here on (reviewing categories, committing) is the same POST /system/backup/
+   * backup/restore/commit every other source already feeds into, no separate remote-specific
+   * commit path needed. Its own `.meta.json` sidecar (if any) is pulled down alongside it to
+   * decide whether a password is required - see decryptIfNeeded()'s own doc comment
+   * (configRestore.ts) for why that decrypt stage runs here, ahead of buildRestorePreview(),
+   * rather than inside it.
+   */
+  async previewJobBackup(id: string, name: string, password?: string | null): Promise<{ token: string } & RestorePreviewData> {
+    const job = await this.store.get(id);
+    if (!job) throw new Error('Sync job not found.');
+    if (job.scope === 'custom') {
+      throw new Error("This sync job mirrors a folder directly - it doesn't produce a single config backup archive to restore from.");
+    }
+    if (!name.startsWith(ARCHIVE_PREFIX) || !name.endsWith(ARCHIVE_SUFFIX) || name.includes('/') || name.includes('\\')) {
+      throw new Error('Invalid archive name.');
+    }
+    const stagingDir = path.join(os.tmpdir(), `nonraid-rclone-restore-${job.id}-${Date.now()}`);
+    await mkdir(stagingDir, { recursive: true });
+    let cleanupDecrypted = async () => {};
+    try {
+      const dst = dstFs(job.remoteName, job.remotePath);
+      await this.client.downloadFile(dst, name, stagingDir, name);
+      const filePath = path.join(stagingDir, name);
+      const metaName = metaNameFor(name);
+      await this.client.downloadFile(dst, metaName, stagingDir, metaName).catch(() => {}); // best-effort - no sidecar reads as unencrypted
+      const meta = await readMetaSidecar(filePath); // reads stagingDir/<metaName>, same naming as the just-downloaded file above
+
+      const { path: decryptedPath, cleanup } = await decryptIfNeeded(filePath, meta?.encrypted ?? false, password);
+      cleanupDecrypted = cleanup;
+      const preview = await buildRestorePreview(this.nmd, decryptedPath);
+      const token = randomUUID();
+      stageRestoreFile(token, decryptedPath);
+      // Once decryption actually happened, the staged plaintext copy above lives outside
+      // stagingDir (decryptFileToTemp's own private tmp file) - the original ciphertext archive +
+      // sidecar left in stagingDir are no longer needed, so they're cleaned up now instead of
+      // accumulating. Left in place when nothing was encrypted (decryptedPath === filePath, still
+      // inside stagingDir) - same "cleaned up on error, kept until commit/expiry on success"
+      // precedent this staging dir already had before encryption existed.
+      if (decryptedPath !== filePath) {
+        await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+      }
+      return { token, ...preview };
+    } catch (err) {
+      await cleanupDecrypted();
+      await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+      throw err;
+    }
+  }
+
   /** The actual sync+retention work, shared by RcloneSyncScheduler's ticker and the manual "Sync
    *  now" route - see class doc comment above for what each scope actually does. */
   async runJobNow(id: string, label = 'Manual sync'): Promise<void> {
@@ -141,12 +231,28 @@ export class RcloneService {
         mode = 'sync';
         if (!job.retention.forever) backupDir = dstFs(job.remoteName, path.posix.join(job.remotePath, VERSIONS_SUBDIR));
       } else {
+        // A saved password but encryption switched off is left alone (not cleared - see
+        // BackupEncryption's own doc comment, settings/types.ts), so this only ever reveals it
+        // when actually needed.
+        let password: string | undefined;
+        if (job.encryption.enabled) {
+          if (!job.encryption.passwordObscured) throw new Error('Encryption is on but no password is saved - edit this sync and set one.');
+          password = await this.client.reveal(job.encryption.passwordObscured);
+        }
+
         stagingDir = path.join(os.tmpdir(), `nonraid-rclone-${job.id}-${Date.now()}`);
         await mkdir(stagingDir, { recursive: true });
-        const paths = await resolveConfigBackupPaths(this.nmd, job.scope === 'configAppdata');
+        const includeAppdata = job.scope === 'configAppdata';
+        const paths = await resolveConfigBackupPaths(this.nmd, includeAppdata);
         if (paths.length === 0) throw new Error('No config files found to back up.');
         const archivePath = path.join(stagingDir, `${ARCHIVE_PREFIX}${Date.now()}${ARCHIVE_SUFFIX}`);
-        await writeConfigBackupToFile(paths, archivePath);
+        await writeConfigBackupToFile(paths, archivePath, password);
+        // Written into the same stagingDir as the archive itself, so it rides along on the exact
+        // same rclone copy below - no separate upload call needed (see backupMeta.ts's own doc
+        // comment on this module's split between "build the sidecar" and "get it to the
+        // destination", which for this scope is just "put it next to the archive before syncing").
+        const categories = await resolveExistingCategoryIds(this.nmd, includeAppdata);
+        await writeMetaSidecar(archivePath, buildMeta(job.scope, categories, !!password));
         srcFs = stagingDir;
         mode = 'copy';
       }
@@ -220,6 +326,9 @@ export class RcloneService {
     for (const entry of archives) {
       if (new Date(entry.ModTime).getTime() < cutoff) {
         await this.deleteRemoteFile(remoteFs, entry.Path);
+        // Best-effort - a sidecar that's already gone (or never existed, a legacy pre-feature
+        // archive) 404s from rclone and isn't a failure worth aborting the rest of this prune over.
+        await this.deleteRemoteFile(remoteFs, metaNameFor(entry.Path)).catch(() => {});
       }
     }
   }

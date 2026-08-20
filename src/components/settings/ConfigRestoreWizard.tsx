@@ -1,7 +1,10 @@
 import { useRef, useState } from 'react';
 import { systemApi } from '../../api/systemApi';
+import { CodedError } from '../../api/request';
 import { ProgressBar } from '../shared/ProgressBar';
 import type { BackupCategoryId, RestartServicesResult, RestoreCommitResult, RestorePreview } from '../../types/systemApi';
+
+const PASSWORD_REQUIRED_CODE = 'PASSWORD_REQUIRED';
 
 // getStats() polled every POLL_INTERVAL_MS after triggering a restart, up to POLL_MAX_ATTEMPTS
 // times, to detect nonraid-webui actually coming back - a generous ceiling (2 minutes) since a
@@ -14,9 +17,37 @@ interface ConfigRestoreWizardProps {
   // Same "fires once, right when a commit succeeds" contract as ImportArrayWizard's onImported -
   // the onboarding wizard uses this to know its own step actually finished, not just closed.
   onRestored?: () => void;
+  // Dialog heading - defaults to this component's own original standalone use (Settings ->
+  // Recovery's "from an uploaded file" entry). The local/remote-backup picker wizards below pass
+  // their own, since the "upload" framing doesn't fit a backup that was never uploaded through a
+  // browser in the first place.
+  title?: string;
+  // Skips the upload step entirely, starting straight at 'review' with a preview already fetched
+  // by a caller-owned source picker (a local-backup or remote-backup list) instead of a browser
+  // file upload. `sourceLabel` replaces "Reading {fileName}…"'s filename in the review step's own
+  // header line - e.g. the archive's own name for a local/remote pick, since there's no upload
+  // File object to read a name off of here.
+  initialPreview?: RestorePreview;
+  sourceLabel?: string;
+  // When set, only this one category is offered on the review step (everything else in the
+  // archive is still there, just not shown as pickable) - Settings -> Recovery's "recover just
+  // the array" entry points thread this through as 'array', reusing this exact same
+  // upload/local/remote source flow rather than a sixth, parallel restore path. See
+  // ConfigRestoreWizardProps' own callers in SettingsPage.tsx.
+  focusCategory?: BackupCategoryId;
+  // Present only when this wizard was opened from a caller-owned source picker (RestoreFromLocal/
+  // RemoteWizard) - swaps the review step's "Start over" for "Choose a different backup", going
+  // back to that picker's own list instead of an 'upload' step this instance never has.
+  onChooseDifferentSource?: () => void;
 }
 
 type Step = 'upload' | 'review' | 'confirm' | 'result';
+
+function defaultSelectedCategories(preview: RestorePreview, focusCategory?: BackupCategoryId): Set<BackupCategoryId> {
+  const eligible = preview.categories.filter((c) => c.entries.length > 0 && (c.id !== 'array' || preview.arrayIsBlank));
+  if (!focusCategory) return new Set(eligible.map((c) => c.id));
+  return new Set(eligible.filter((c) => c.id === focusCategory).map((c) => c.id));
+}
 
 /**
  * Restores a config backup archive (same tar.gz ImportArrayWizard's sibling feature,
@@ -30,14 +61,21 @@ type Step = 'upload' | 'review' | 'confirm' | 'result';
  * shows whether the archive's superblock member is present and whether it'll actually be
  * restored, so that's never a surprise sprung at the confirm step.
  */
-export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizardProps) {
-  const [step, setStep] = useState<Step>('upload');
-  const [fileName, setFileName] = useState<string | null>(null);
+export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import config', initialPreview, sourceLabel, focusCategory, onChooseDifferentSource }: ConfigRestoreWizardProps) {
+  const [step, setStep] = useState<Step>(initialPreview ? 'review' : 'upload');
+  const [fileName, setFileName] = useState<string | null>(sourceLabel ?? null);
   const [previewing, setPreviewing] = useState(false);
-  const [preview, setPreview] = useState<RestorePreview | null>(null);
+  const [preview, setPreview] = useState<RestorePreview | null>(initialPreview ?? null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  // A raw browser upload has no `.meta.json` sidecar of its own to check ahead of time (unlike
+  // the local/remote pickers, which already know before ever calling preview) - the first attempt
+  // is always password-less, and a PASSWORD_REQUIRED-coded error is what tells this step to keep
+  // the selected file around and ask, rather than making the admin re-pick it from their own disk.
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [passwordDraft, setPasswordDraft] = useState('');
 
-  const [selectedCategories, setSelectedCategories] = useState<Set<BackupCategoryId>>(new Set());
+  const [selectedCategories, setSelectedCategories] = useState<Set<BackupCategoryId>>(initialPreview ? defaultSelectedCategories(initialPreview, focusCategory) : new Set());
 
   const [acknowledged, setAcknowledged] = useState(false);
   const [committing, setCommitting] = useState(false);
@@ -84,26 +122,37 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
     setRestarting(false);
   };
 
-  const handleFileSelected = async (file: File) => {
+  const handleFileSelected = async (file: File, password?: string) => {
     setFileName(file.name);
     setPreviewing(true);
     setPreviewError(null);
     try {
-      const result = await systemApi.previewConfigRestore(file);
+      const result = await systemApi.previewConfigRestore(file, password);
       setPreview(result);
+      setPendingFile(null);
+      setNeedsPassword(false);
       // Default to everything selected, except the array category when it can't actually be
       // restored (array already has disks assigned) - leaving it checked-but-disabled would read
-      // as "this will happen" when it won't.
-      setSelectedCategories(
-        new Set(result.categories.filter((c) => c.entries.length > 0 && (c.id !== 'array' || result.arrayIsBlank)).map((c) => c.id)),
-      );
+      // as "this will happen" when it won't. Narrowed to just focusCategory when set (see this
+      // component's own doc comment on that prop).
+      setSelectedCategories(defaultSelectedCategories(result, focusCategory));
       setStep('review');
     } catch (err) {
-      setPreviewError((err as Error).message);
+      if (err instanceof CodedError && err.code === PASSWORD_REQUIRED_CODE) {
+        setPendingFile(file);
+        setNeedsPassword(true);
+        setPreviewError(password ? err.message : null); // only show as an error once a (wrong) password was actually tried
+      } else {
+        setPreviewError((err as Error).message);
+      }
     } finally {
       setPreviewing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const submitPassword = () => {
+    if (pendingFile && passwordDraft) void handleFileSelected(pendingFile, passwordDraft);
   };
 
   const handleCommit = async () => {
@@ -139,6 +188,9 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
     setCommitResult(null);
     setCommitError(null);
     setFileName(null);
+    setPendingFile(null);
+    setNeedsPassword(false);
+    setPasswordDraft('');
     setStep('upload');
   };
 
@@ -151,14 +203,14 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog import-array-wizard">
         <div className="dialog__head">
-          <div className="dialog__title">Import config</div>
+          <div className="dialog__title">{title}</div>
           <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
             &#10005;
           </button>
         </div>
 
         <div className="dialog__body">
-          {step === 'upload' && (
+          {step === 'upload' && !needsPassword && (
             <>
               <div className="toggle-row__desc">
                 Pick a config backup archive - from "Back up now" or "Download a copy" in Settings → Backups, or
@@ -169,7 +221,7 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".gz,.tar.gz"
+                accept=".gz,.tar.gz,.enc"
                 className="file-input"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -183,6 +235,36 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
                   Cancel
+                </button>
+              </div>
+            </>
+          )}
+
+          {step === 'upload' && needsPassword && pendingFile && (
+            <>
+              <div className="toggle-row__desc">
+                <strong>{pendingFile.name}</strong> is password-encrypted. Enter its password to read what's inside.
+              </div>
+              <input
+                className="history-input"
+                type="password"
+                autoFocus
+                value={passwordDraft}
+                onChange={(e) => setPasswordDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') submitPassword();
+                }}
+                placeholder="Password"
+                disabled={previewing}
+              />
+              {previewing && <div className="status-note">Reading {fileName}…</div>}
+              {previewError && <div className="status-note status-note--error">{previewError}</div>}
+              <div className="dialog__actions">
+                <button type="button" className="btn" onClick={startOver} disabled={previewing}>
+                  Choose a different file
+                </button>
+                <button type="button" className="btn btn--primary-sm" disabled={!passwordDraft || previewing} onClick={submitPassword}>
+                  Continue
                 </button>
               </div>
             </>
@@ -215,10 +297,15 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
                 </div>
               )}
 
+              {focusCategory === 'array' && !hasSuperblock && (
+                <div className="status-note status-note--error">This backup doesn't have an array superblock recorded in it - there's nothing here to recover the array from.</div>
+              )}
+
               <div className="toggle-row__desc">Select what to restore:</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {preview.categories
                   .filter((cat) => cat.entries.length > 0)
+                  .filter((cat) => !focusCategory || cat.id === focusCategory)
                   .map((cat) => {
                     const disabled = cat.id === 'array' && !preview.arrayIsBlank;
                     return (
@@ -257,8 +344,8 @@ export function ConfigRestoreWizard({ onClose, onRestored }: ConfigRestoreWizard
               </details>
 
               <div className="dialog__actions">
-                <button type="button" className="btn" onClick={startOver}>
-                  Start over
+                <button type="button" className="btn" onClick={initialPreview ? (onChooseDifferentSource ?? onClose) : startOver}>
+                  {initialPreview ? (onChooseDifferentSource ? 'Choose a different backup' : 'Cancel') : 'Start over'}
                 </button>
                 <button type="button" className="btn--primary" disabled={!preview.arrayStopped} onClick={() => setStep('confirm')}>
                   Continue

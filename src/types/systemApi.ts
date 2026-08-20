@@ -43,7 +43,7 @@ export interface RestoreArchiveEntry {
 }
 
 // Mirrors backend/src/system/backupCatalog.ts's BackupCategoryId.
-export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory';
+export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory' | 'appdata';
 
 export interface RestoreCategoryPreview {
   id: BackupCategoryId;
@@ -93,4 +93,23 @@ export interface RestartServicesResult {
   // actually part of what was just restored.
   docker: RestartServicesStepResult | null;
   message: string;
+}
+
+// GET /system/backup/local/list - what's already sitting at Settings -> Local Backups' own
+// configured destination. `destDir: null` covers "nothing configured yet" as well as a
+// destination picker that can't resolve without more setup - either way there's nothing to list.
+// `encrypted`/`categories` come from the archive's own `.meta.json` sidecar (backend's
+// backupMeta.ts) - a missing sidecar (a backup made before this feature shipped) reads as
+// `encrypted: false, categories: null`, not an error.
+export interface LocalBackupEntry {
+  name: string;
+  sizeBytes: number;
+  modifiedAt: number;
+  encrypted: boolean;
+  categories: BackupCategoryId[] | null;
+}
+
+export interface LocalBackupList {
+  destDir: string | null;
+  backups: LocalBackupEntry[];
 }

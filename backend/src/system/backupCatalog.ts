@@ -66,6 +66,17 @@ export async function resolveConfigBackupPaths(nmd: NmdClient, includeAppdata = 
   return existing.filter((p): p is string => p !== null);
 }
 
+/** Category ids that actually contributed at least one existing path to a backup archive - what
+ *  the `.meta.json` sidecar's own `categories` field records (see backupMeta.ts), computed at
+ *  backup-creation time so nothing ever needs to read the archive back to produce it. */
+export async function resolveExistingCategoryIds(nmd: NmdClient, includeAppdata = false): Promise<BackupCategoryId[]> {
+  const categories = await resolveBackupCategories(nmd, includeAppdata);
+  const withExistence = await Promise.all(
+    categories.map(async (c) => ({ id: c.id, exists: (await Promise.all(c.paths.map(pathExists))).some(Boolean) })),
+  );
+  return withExistence.filter((c) => c.exists).map((c) => c.id);
+}
+
 async function pathExists(p: string): Promise<boolean> {
   try {
     await stat(p);

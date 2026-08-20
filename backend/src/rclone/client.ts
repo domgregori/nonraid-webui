@@ -1,4 +1,4 @@
-import type { RcloneProvider, RcloneRemote } from './types.js';
+import type { RcloneDirEntry, RcloneProvider, RcloneRemote } from './types.js';
 
 export interface RcloneCoreStats {
   bytes: number;
@@ -63,4 +63,30 @@ export interface RcloneClient {
    *  the global aggregate across every currently-running transfer. */
   coreStats(group?: string): Promise<RcloneCoreStats>;
   stopJob(jobId: number): Promise<void>;
+  /** Non-recursive `operations/list` against a remote path (`fs`, a full "remote:path" string) -
+   *  directories are filtered out, only files. Used by the Recovery hub's "restore from a remote
+   *  backup" picker to show what's already sitting at a sync job's own target path. */
+  listDir(fs: string): Promise<RcloneDirEntry[]>;
+  /** `operations/copyfile` - copies exactly one file from `srcFs`/`srcRemote` to `dstFs`/
+   *  `dstRemote` (a bare local directory path, no "remote:" prefix, works fine as `dstFs` - rclone
+   *  treats an unprefixed path as the local filesystem backend). Used to pull one archive down to
+   *  a private staging path before it's handed to the same restore-preview flow every other source
+   *  feeds into. */
+  downloadFile(srcFs: string, srcRemote: string, dstFs: string, dstRemote: string): Promise<void>;
+  /** Reads a small remote file's own text content straight into memory (no local temp file left
+   *  behind) - `operations/copyfile` into a throwaway staging dir, read, delete. Used to fetch a
+   *  `.meta.json` sidecar's content when listing what a Remote Backup sync job has already
+   *  uploaded (see backupMeta.ts) - archive files themselves are never read this way, only these
+   *  small plaintext sidecars. */
+  readFileText(fs: string, remote: string): Promise<string>;
+  /** rclone's own `core/obscure` RC call - the same obscuring this app already trusts for every
+   *  remote provider secret (see this file's own doc comment above on getRemoteConfig). Used to
+   *  store an encryption password for a Local Backups schedule or Remote Backup sync job so a
+   *  scheduled/unattended run can use it without a human retyping it each time - see the handoff
+   *  doc's "Password storage" decision for the trust boundary this accepts. */
+  obscure(plaintext: string): Promise<string>;
+  /** Reverses obscure() - see rclone/obscure.ts's own doc comment for why this is implemented
+   *  locally rather than as another RC call (rclone's RC API has no reveal/unobscure endpoint to
+   *  call, confirmed live). */
+  reveal(obscured: string): Promise<string>;
 }

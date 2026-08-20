@@ -13,6 +13,8 @@ import { LogsSection } from '../components/settings/LogsSection';
 import { NotificationEventToggles } from '../components/settings/NotificationEventToggles';
 import { PasskeySection } from '../components/settings/PasskeySection';
 import { RemoteBackupSection } from '../components/settings/RemoteBackupSection';
+import { RestoreFromLocalWizard } from '../components/settings/RestoreFromLocalWizard';
+import { RestoreFromRemoteWizard } from '../components/settings/RestoreFromRemoteWizard';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ServicesSection } from '../components/settings/ServicesSection';
 import { StorageLocationField } from '../components/settings/StorageLocationField';
@@ -29,6 +31,7 @@ import { deriveProtection } from '../selectors/status';
 import { useOnboarding } from '../state/OnboardingContext';
 import { useArrayStatus } from '../state/useArrayStatus';
 import type { NotificationChannelToggle, NotificationEventType } from '../types/settingsApi';
+import type { BackupCategoryId } from '../types/systemApi';
 import { formatMemLabel, formatUptime } from '../utils/format';
 
 const SECTIONS = [
@@ -38,7 +41,6 @@ const SECTIONS = [
   { id: 'backups', label: 'Backups' },
   { id: 'cache', label: 'Cache' },
   { id: 'docker-lxc', label: 'Docker & LXC Storage' },
-  { id: 'import', label: 'Import Existing Array' },
   { id: 'network', label: 'Network' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'parity', label: 'Parity' },
@@ -58,7 +60,12 @@ const SECTION_IDS = new Set<string>(SECTIONS.map((s) => s.id));
 export function SettingsPage() {
   const location = useLocation();
   const [activeSection, setActiveSection] = useState<(typeof SECTIONS)[number]['id']>('about');
-  const [showConfigRestoreWizard, setShowConfigRestoreWizard] = useState(false);
+  // Which Recovery-hub restore dialog is open, if any - `source` picks upload vs. local vs. remote
+  // (ConfigRestoreWizard vs. RestoreFromLocalWizard vs. RestoreFromRemoteWizard, all three sharing
+  // the same review/confirm/result flow once a preview comes back), `focusCategory` set to 'array'
+  // for the "recover just the array" entry points, which reuse the exact same three sources rather
+  // than a separate sixth flow - see ConfigRestoreWizard's own doc comment on that prop.
+  const [restoreDialog, setRestoreDialog] = useState<{ source: 'upload' | 'local' | 'remote'; focusCategory?: BackupCategoryId } | null>(null);
   // Deep-linking, e.g. the "Recovery ->" links on the Backups cards: /settings#recovery. Reacts to
   // location.hash rather than only running once on mount, since clicking a Link to a new hash
   // while already on /settings is a same-component navigation (no remount) in this SPA.
@@ -167,6 +174,13 @@ export function SettingsPage() {
   const [backupDestCustomPath, setBackupDestCustomPath] = useState('');
   const [backupRetainDraft, setBackupRetainDraft] = useState('7');
   const [backupRetainForever, setBackupRetainForever] = useState(false);
+  // `backupHadPassword` isn't itself editable - it's what was already saved (settings.backupSchedule.
+  // encryption.hasPassword), driving the "leave blank to keep the current password" placeholder vs.
+  // "required" validation. `backupEncryptPassword` is always blank to start, even when a password's
+  // already saved - never round-tripped from the server (see BackupEncryption's own doc comment).
+  const [backupEncryptEnabled, setBackupEncryptEnabled] = useState(false);
+  const [backupEncryptPassword, setBackupEncryptPassword] = useState('');
+  const [backupHadPassword, setBackupHadPassword] = useState(false);
   const [backupSchedSaving, setBackupSchedSaving] = useState(false);
   const [backupSchedError, setBackupSchedError] = useState<string | null>(null);
   const [backupRunning, setBackupRunning] = useState(false);
@@ -283,6 +297,8 @@ export function SettingsPage() {
       setBackupDestCustomPath(settings.backupSchedule.destination.customPath);
       setBackupRetainDraft(String(settings.backupSchedule.retain));
       setBackupRetainForever(settings.backupSchedule.retainForever);
+      setBackupEncryptEnabled(settings.backupSchedule.encryption.enabled);
+      setBackupHadPassword(settings.backupSchedule.encryption.hasPassword);
       backupSchedInitialized.current = true;
     }
   }, [settings]);
@@ -481,6 +497,10 @@ export function SettingsPage() {
       setBackupSchedError('Enter a cron expression.');
       return;
     }
+    if (backupEncryptEnabled && !backupEncryptPassword.trim() && !backupHadPassword) {
+      setBackupSchedError('Enter a password to enable encryption.');
+      return;
+    }
     setBackupSchedSaving(true);
     setBackupSchedError(null);
     await update({
@@ -499,8 +519,14 @@ export function SettingsPage() {
         },
         retain: backupRetainForever ? 1 : retain,
         retainForever: backupRetainForever,
+        encryption: { enabled: backupEncryptEnabled, password: backupEncryptPassword.trim() || undefined },
       },
     });
+    // Never keeps a just-typed password sitting in this draft field past a successful save - the
+    // next save (e.g. just changing the schedule) should mean "keep the current password" by
+    // default, same as reopening this card fresh would.
+    if (backupEncryptPassword.trim()) setBackupHadPassword(true);
+    setBackupEncryptPassword('');
     setBackupSchedSaving(false);
   };
 
@@ -841,18 +867,6 @@ export function SettingsPage() {
             </div>
           </div>
 
-          <div className={`settings-card${activeSection === 'import' ? '' : ' settings-hidden'}`}>
-            <div className="settings-card__title">Import Array</div>
-            <div className="toggle-row__desc">Migrate from a previous NonRAID or Unraid array.</div>
-            <div className="settings-field__row">
-              <button type="button" className="btn" onClick={() => setShowImportWizard(true)}>
-                Import array…
-              </button>
-            </div>
-          </div>
-
-          {showImportWizard && <ImportArrayWizard onClose={() => setShowImportWizard(false)} />}
-
           <div className={`settings-card${activeSection === 'shares' ? '' : ' settings-hidden'}`}>
             <div className="settings-card__title">Pools</div>
             <div className="settings-field">
@@ -946,6 +960,33 @@ export function SettingsPage() {
                     <label htmlFor="local-keep-forever">Keep all backups forever</label>
                   </div>
 
+                  <div className="toggle-row__title" style={{ marginTop: 10 }}>
+                    Encryption
+                  </div>
+                  <div className="keep-forever-row" style={{ marginTop: 0 }}>
+                    <input
+                      className="round-checkbox"
+                      type="checkbox"
+                      id="local-backup-encrypt"
+                      checked={backupEncryptEnabled}
+                      onChange={(e) => setBackupEncryptEnabled(e.target.checked)}
+                      disabled={!settings}
+                    />
+                    <label htmlFor="local-backup-encrypt">Password-encrypt these backup archives</label>
+                  </div>
+                  {backupEncryptEnabled && (
+                    <div className="settings-field__row" style={{ marginTop: 8 }}>
+                      <input
+                        className="history-input"
+                        type="password"
+                        value={backupEncryptPassword}
+                        onChange={(e) => setBackupEncryptPassword(e.target.value)}
+                        placeholder={backupHadPassword ? 'Leave blank to keep the current password' : 'Password'}
+                        disabled={!settings}
+                      />
+                    </div>
+                  )}
+
                   <div className="schedule-row" style={{ marginTop: 10 }}>
                     <div className="schedule-row__label">Schedule</div>
                     <ScheduleFields frequency={backupSchedFrequency} onFrequencyChange={setBackupSchedFrequency} dayOfWeek={backupSchedDay} onDayOfWeekChange={setBackupSchedDay} dayOfMonth={backupSchedDayOfMonth} onDayOfMonthChange={setBackupSchedDayOfMonth} hour={backupSchedHour} onHourChange={setBackupSchedHour} hour12={settings?.timeFormat !== '24h'} disabled={!settings} allowCron cronExpression={backupCronExpression} onCronExpressionChange={setBackupCronExpression} />
@@ -982,20 +1023,69 @@ export function SettingsPage() {
 
           <div className={`settings-card${activeSection === 'recovery' ? '' : ' settings-hidden'}`}>
             <div className="settings-card__title">Recovery</div>
-            {showConfigRestoreWizard ? (
-              <ConfigRestoreWizard onClose={() => setShowConfigRestoreWizard(false)} />
-            ) : (
-              <div className="settings-field toggle-row--bordered">
-                <div className="toggle-row__title">Import config</div>
-                <div className="toggle-row__desc">Restore this app's settings/pools/shares/users, Samba/NFS config, and the array superblock from a previously-saved config backup.</div>
-                <div className="settings-field__row">
-                  <button type="button" className="btn" onClick={() => setShowConfigRestoreWizard(true)}>
-                    Import config…
-                  </button>
-                </div>
+
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Restore configuration</div>
+              <div className="toggle-row__desc">
+                Bring back this app's settings/pools/shares/users, Samba/NFS config, and (only while the array is currently blank) the array superblock, from a
+                previously-saved config backup.
               </div>
-            )}
+              <div className="settings-field__row">
+                <button type="button" className="btn" onClick={() => setRestoreDialog({ source: 'upload' })}>
+                  From an uploaded file…
+                </button>
+                <button type="button" className="btn" onClick={() => setRestoreDialog({ source: 'local' })}>
+                  From a local backup…
+                </button>
+                <button type="button" className="btn" onClick={() => setRestoreDialog({ source: 'remote' })}>
+                  From a remote backup…
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Recover just the array</div>
+              <div className="toggle-row__desc">
+                Restores only the array superblock - disk assignments and parity configuration - out of a config backup, leaving every other setting untouched.
+                Only takes effect while this array currently has nothing assigned; stop and clear the array first if it isn't already blank.
+              </div>
+              <div className="settings-field__row">
+                <button type="button" className="btn" onClick={() => setRestoreDialog({ source: 'upload', focusCategory: 'array' })}>
+                  From an uploaded file…
+                </button>
+                <button type="button" className="btn" onClick={() => setRestoreDialog({ source: 'local', focusCategory: 'array' })}>
+                  From a local backup…
+                </button>
+                <button type="button" className="btn" onClick={() => setRestoreDialog({ source: 'remote', focusCategory: 'array' })}>
+                  From a remote backup…
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Import an existing array</div>
+              <div className="toggle-row__desc">
+                Migrate the disks and configuration from a previous NonRAID or Unraid array in directly, using its own <code>.dat</code> superblock file rather
+                than a config backup.
+              </div>
+              <div className="settings-field__row">
+                <button type="button" className="btn" onClick={() => setShowImportWizard(true)}>
+                  Import array…
+                </button>
+              </div>
+            </div>
           </div>
+
+          {restoreDialog?.source === 'upload' && (
+            <ConfigRestoreWizard
+              onClose={() => setRestoreDialog(null)}
+              focusCategory={restoreDialog.focusCategory}
+              title={restoreDialog.focusCategory === 'array' ? 'Recover the array from an uploaded file' : 'Restore from an uploaded file'}
+            />
+          )}
+          {restoreDialog?.source === 'local' && <RestoreFromLocalWizard onClose={() => setRestoreDialog(null)} focusCategory={restoreDialog.focusCategory} />}
+          {restoreDialog?.source === 'remote' && <RestoreFromRemoteWizard onClose={() => setRestoreDialog(null)} focusCategory={restoreDialog.focusCategory} />}
+          {showImportWizard && <ImportArrayWizard onClose={() => setShowImportWizard(false)} />}
 
           <div className={`settings-card${activeSection === 'notifications' ? '' : ' settings-hidden'}`}>
             <div className="settings-card__title">Notifications</div>

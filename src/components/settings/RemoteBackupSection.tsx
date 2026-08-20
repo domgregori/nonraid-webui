@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { rcloneApi } from '../../api/rcloneApi';
 import { useSettings } from '../../hooks/useSettings';
-import type { RcloneProvider, RcloneRemote, RcloneStatus, SyncJobWithRuntime, SyncScope } from '../../types/rcloneApi';
+import type { RcloneProvider, RcloneRemote, RcloneStatus, RemoteBackupEntry, SyncJobWithRuntime, SyncScope } from '../../types/rcloneApi';
 import { PathAutocomplete } from '../shared/PathAutocomplete';
 import { ToggleSwitch } from '../shared/ToggleSwitch';
 import { ScheduleFields } from './ScheduleFields';
@@ -49,6 +49,28 @@ function formatEta(seconds: number | null): string {
   return `${m}m ${s}s`;
 }
 
+/**
+ * The "existing backups found" notice's own message - handles all three mix edge cases the same
+ * way (surface it, never block): the new job's own encryption setting agrees with everything
+ * already there (nothing extra to say), disagrees entirely (a nudge, since it's likely a mistake -
+ * two jobs pointed at the same path, or "meant to turn encryption on/off"), or it's a genuine mix
+ * of both (report the real split, not a collapsed single state).
+ */
+function describeExistingBackups(count: number, encryptedCount: number, jobEncryptionEnabled: boolean): string {
+  const unencryptedCount = count - encryptedCount;
+  if (encryptedCount === 0 && unencryptedCount === 0) return '';
+  if (encryptedCount > 0 && unencryptedCount > 0) {
+    return `(${encryptedCount} encrypted, ${unencryptedCount} unencrypted)`;
+  }
+  if (jobEncryptionEnabled && unencryptedCount > 0) {
+    return `(${unencryptedCount} unencrypted) - this job will add encrypted backups alongside them`;
+  }
+  if (!jobEncryptionEnabled && encryptedCount > 0) {
+    return `(${encryptedCount} encrypted) - this job won't encrypt its own backups, so they'll sit alongside these`;
+  }
+  return '';
+}
+
 const SCOPE_LABELS: Record<SyncScope, string> = {
   config: 'Config backups',
   configAppdata: 'Config backups + appdata',
@@ -68,6 +90,14 @@ interface JobDraft {
   cronExpression: string;
   keepDays: string;
   forever: boolean;
+  // Only meaningful when scope !== 'custom' - see SyncJob.encryption's own doc comment (backend's
+  // rclone/types.ts) for why a 'custom' scope (live folder mirror) never offers this. `encryptPassword`
+  // is always blank to start, even when editing an already-encrypted job - never round-tripped
+  // from the server (see SyncJobEncryption's own doc comment); `hadPassword` (not itself editable)
+  // is what drives the "leave blank to keep the current password" placeholder vs. "required" hint.
+  encryptEnabled: boolean;
+  encryptPassword: string;
+  hadPassword: boolean;
 }
 
 function draftFromJob(job: SyncJobWithRuntime): JobDraft {
@@ -84,6 +114,9 @@ function draftFromJob(job: SyncJobWithRuntime): JobDraft {
     cronExpression: job.schedule.cronExpression,
     keepDays: String(job.retention.keepDays),
     forever: job.retention.forever,
+    encryptEnabled: job.encryption.enabled,
+    encryptPassword: '',
+    hadPassword: job.encryption.hasPassword,
   };
 }
 
@@ -100,6 +133,9 @@ const NEW_JOB_DRAFT: JobDraft = {
   cronExpression: '',
   keepDays: '30',
   forever: false,
+  encryptEnabled: false,
+  encryptPassword: '',
+  hadPassword: false,
 };
 
 export function RemoteBackupSection() {
@@ -141,6 +177,13 @@ export function RemoteBackupSection() {
   const [jobSaving, setJobSaving] = useState(false);
   const [jobError, setJobError] = useState<string | null>(null);
   const [jobActionError, setJobActionError] = useState<string | null>(null);
+  // Set right after creating a new job whose target already has archives sitting in it from
+  // some other source (a prior install, a job pointed at the same remote/path, etc.) - jobs don't
+  // know about each other's history, so without this a fresh job silently starts adding to
+  // whatever's already there with no indication it's not the first thing to ever land here.
+  // `encryptedCount`/`jobEncryptionEnabled` are what let the notice call out an
+  // encrypted/unencrypted mix (see describeExistingBackups() below) - not just a plain count.
+  const [existingBackupsFound, setExistingBackupsFound] = useState<{ jobName: string; count: number; encryptedCount: number; jobEncryptionEnabled: boolean } | null>(null);
 
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -355,6 +398,14 @@ export function RemoteBackupSection() {
       setJobError('Enter a cron expression.');
       return;
     }
+    // Custom-scope jobs mirror a folder file-by-file, never a single archive - encryption isn't
+    // offered for them (see SyncJob.encryption's own doc comment), so it's always off regardless
+    // of whatever the toggle happened to show before the scope was switched.
+    const encryptionEnabled = jobDraft.scope !== 'custom' && jobDraft.encryptEnabled;
+    if (encryptionEnabled && !jobDraft.encryptPassword.trim() && !jobDraft.hadPassword) {
+      setJobError('Enter a password to enable encryption.');
+      return;
+    }
     setJobSaving(true);
     setJobError(null);
     const body = {
@@ -373,10 +424,29 @@ export function RemoteBackupSection() {
         cronExpression: jobDraft.cronExpression.trim(),
       },
       retention: { keepDays: keepDays || 1, forever: jobDraft.forever },
+      encryption: { enabled: encryptionEnabled, password: jobDraft.encryptPassword.trim() || undefined },
     };
     try {
       if (editingJobId === 'new') {
-        await rcloneApi.createJob(body);
+        const created = await rcloneApi.createJob(body);
+        setExistingBackupsFound(null);
+        // Only 'config'/'configAppdata' jobs produce a listable archive at all (see
+        // listJobBackups' own scope check) - a fresh 'custom' mirror job has nothing to probe for.
+        if (created.scope !== 'custom') {
+          rcloneApi
+            .listJobBackups(created.id)
+            .then((entries: RemoteBackupEntry[]) => {
+              if (entries.length > 0) {
+                setExistingBackupsFound({
+                  jobName: created.name,
+                  count: entries.length,
+                  encryptedCount: entries.filter((e) => e.encrypted).length,
+                  jobEncryptionEnabled: created.encryption.enabled,
+                });
+              }
+            })
+            .catch(() => {});
+        }
       } else if (editingJobId) {
         await rcloneApi.updateJob(editingJobId, body);
       }
@@ -630,6 +700,23 @@ export function RemoteBackupSection() {
 
           <div className="settings-field" style={{ paddingTop: 0 }}>
             <div className="settings-field__label">Syncs</div>
+            {existingBackupsFound && (
+              <div className="status-note">
+                Found {existingBackupsFound.count} existing backup{existingBackupsFound.count === 1 ? '' : 's'}{' '}
+                {describeExistingBackups(existingBackupsFound.count, existingBackupsFound.encryptedCount, existingBackupsFound.jobEncryptionEnabled)} already at "
+                {existingBackupsFound.jobName}"'s destination - restorable from{' '}
+                <Link to="/settings#recovery">Settings → Recovery</Link>.{' '}
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setExistingBackupsFound(null);
+                  }}
+                >
+                  Dismiss
+                </a>
+              </div>
+            )}
             {jobActionError && <div className="status-note status-note--error">{jobActionError}</div>}
             <div className="sync-job-list">
               {(jobs ?? []).map((job) => (editingJobId === job.id ? <JobEditor key={job.id} draft={jobDraft} setDraft={setJobDraft} remotes={remotes ?? []} hour12={hour12} saving={jobSaving} error={jobError} onSave={saveJob} onCancel={cancelJobEdit} /> : <JobCard key={job.id} job={job} remoteMissing={remotes !== null && !remotes.some((r) => r.name === job.remoteName)} onEdit={() => startEditJob(job)} onDelete={() => deleteJob(job.id)} onToggleEnabled={() => toggleJobEnabled(job)} onSyncNow={() => syncNow(job.id)} onCancelSync={() => cancelSync(job.id)} />))}
@@ -682,6 +769,11 @@ function JobCard({
           <span className="sync-job__name">
             {destLabel} → {job.remoteName || '…'}
           </span>
+          {job.encryption.enabled && (
+            <span className="job-badge job-badge--encrypted" title="Archives from this job are password-encrypted">
+              Encrypted
+            </span>
+          )}
           {job.state === 'syncing' ? (
             <span className="job-badge job-badge--syncing">
               <span className="status-dot status-dot--pulse" style={{ background: 'var(--color-blue)' }} />
@@ -787,7 +879,18 @@ function JobEditor({ draft, setDraft, remotes, hour12, saving, error, onSave, on
         </label>
         <label className="field">
           <span>What to sync</span>
-          <select className="history-input" value={draft.scope} onChange={(e) => setDraft((d) => ({ ...d, scope: e.target.value as SyncScope }))}>
+          <select
+            className="history-input"
+            value={draft.scope}
+            onChange={(e) => {
+              const scope = e.target.value as SyncScope;
+              // Encryption isn't offered for 'custom' scope (a live file-by-file mirror, not a
+              // single archive - see SyncJob.encryption's own doc comment) - switching to it turns
+              // the toggle back off rather than leaving a stale "on" that saveJob() would silently
+              // ignore anyway.
+              setDraft((d) => ({ ...d, scope, encryptEnabled: scope === 'custom' ? false : d.encryptEnabled }));
+            }}
+          >
             <option value="config">Config backups</option>
             <option value="configAppdata">Config backups + appdata</option>
             <option value="custom">Custom…</option>
@@ -831,6 +934,33 @@ function JobEditor({ draft, setDraft, remotes, hour12, saving, error, onSave, on
             <label htmlFor={`forever-${draft.name || 'new'}`}>Keep all versions forever</label>
           </div>
         </label>
+
+        {/* Not offered for 'custom' scope - see the scope <select>'s own onChange comment above. */}
+        {draft.scope !== 'custom' && (
+          <label className="field field-grid--full">
+            <span>Encryption</span>
+            <div className="keep-forever-row" style={{ marginTop: 0 }}>
+              <input
+                className="round-checkbox"
+                type="checkbox"
+                id={`encrypt-${draft.name || 'new'}`}
+                checked={draft.encryptEnabled}
+                onChange={(e) => setDraft((d) => ({ ...d, encryptEnabled: e.target.checked }))}
+              />
+              <label htmlFor={`encrypt-${draft.name || 'new'}`}>Password-encrypt this job's backup archives</label>
+            </div>
+            {draft.encryptEnabled && (
+              <input
+                className="history-input"
+                type="password"
+                style={{ marginTop: 8 }}
+                value={draft.encryptPassword}
+                onChange={(e) => setDraft((d) => ({ ...d, encryptPassword: e.target.value }))}
+                placeholder={draft.hadPassword ? 'Leave blank to keep the current password' : 'Password'}
+              />
+            )}
+          </label>
+        )}
       </div>
 
       <div className="schedule-row">
