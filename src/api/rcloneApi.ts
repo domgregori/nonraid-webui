@@ -7,9 +7,11 @@ import type {
   RcloneRemoteConfig,
   RcloneRemoteSetupResult,
   RcloneStatus,
+  RemoteBackupEntry,
   SyncJob,
   SyncJobWithRuntime,
 } from '../types/rcloneApi';
+import type { RestorePreview } from '../types/systemApi';
 
 export const rcloneApi = {
   getStatus: () => request<RcloneStatus>('/api/rclone/status'),
@@ -64,4 +66,12 @@ export const rcloneApi = {
   deleteJob: (id: string) => request<CommandResult>(`/api/rclone/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   syncNow: (id: string) => request<CommandResult>(`/api/rclone/jobs/${encodeURIComponent(id)}/sync`, { method: 'POST' }),
   cancelSync: (id: string) => request<CommandResult>(`/api/rclone/jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
+
+  listJobBackups: (id: string) => request<RemoteBackupEntry[]>(`/api/rclone/jobs/${encodeURIComponent(id)}/backups`),
+  previewJobBackupRestore: (id: string, name: string, password?: string) =>
+    request<RestorePreview>(`/api/rclone/jobs/${encodeURIComponent(id)}/backups/${encodeURIComponent(name)}/restore-preview`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password }),
+    }),
 };

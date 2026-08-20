@@ -3,15 +3,20 @@ import { request } from './request';
 import type { BenchmarkResult } from '../types/benchmark';
 import type { ImportResult } from '../types/nmdApi';
 import type { CommandResult } from '../types/settingsApi';
-import type { BackupCategoryId, NetLiveRate, RestartServicesResult, RestoreCommitResult, RestorePreview, SystemStats } from '../types/systemApi';
+import type { BackupCategoryId, LocalBackupList, NetLiveRate, RestartServicesResult, RestoreCommitResult, RestorePreview, SystemStats } from '../types/systemApi';
 
 export const systemApi = {
   getStats: () => request<SystemStats>('/api/system'),
   getNetLive: () => request<NetLiveRate>('/api/system/net-live'),
   runBackupNow: () => request<{ bytes: number }>('/api/system/backup/run-now', { method: 'POST' }),
-  previewConfigRestore: (file: File) => {
+  // `password` is only ever needed for an encrypted archive - the raw-upload flow has no
+  // `.meta.json` sidecar of its own to check ahead of time (see backend's own comment on this
+  // route), so the first call is always made without one; a PASSWORD_REQUIRED-coded error (see
+  // api/request.ts's CodedError) is what tells the caller to ask and retry with one.
+  previewConfigRestore: (file: File, password?: string) => {
     const form = new FormData();
     form.append('file', file);
+    if (password) form.append('password', password);
     return request<RestorePreview>('/api/system/backup/restore/preview', { method: 'POST', body: form });
   },
   commitConfigRestore: (token: string, categories: BackupCategoryId[]) =>
@@ -19,6 +24,13 @@ export const systemApi = {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ token, categories }),
+    }),
+  listLocalBackups: () => request<LocalBackupList>('/api/system/backup/local/list'),
+  previewLocalBackupRestore: (name: string, password?: string) =>
+    request<RestorePreview>('/api/system/backup/local/restore/preview', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, password }),
     }),
   // Manual retry for the reload a restore already attempts automatically - see
   // backend/src/routes/system.ts's own comment on why this needs its own endpoint.

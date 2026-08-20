@@ -891,6 +891,14 @@ label.field > span:first-child {
   border-color: var(--color-red);
   background: var(--color-red-tint);
 }
+/* Informational, not a run-state - shown alongside (never instead of) the active/disabled/syncing
+ * badge above, so it deliberately doesn't reuse green/blue/red's own "this is the job's state"
+ * meaning. */
+.job-badge--encrypted {
+  color: var(--color-chart-purple);
+  border-color: var(--color-chart-purple);
+  background: transparent;
+}
 
 .progress-track {
   border-radius: var(--radius-pill);

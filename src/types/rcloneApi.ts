@@ -1,5 +1,6 @@
 // Mirrors backend/src/rclone/types.ts plus routes/rclone.ts's response shapes. Keep in sync.
 import type { RecurringSchedule } from './settingsApi';
+import type { BackupCategoryId } from './systemApi';
 
 export interface RcloneStatus {
   installed: boolean;
@@ -55,6 +56,25 @@ export interface SyncJobRetention {
   forever: boolean;
 }
 
+// What the server actually returns for a job's own encryption state - never the real (obscured)
+// password, see backend/src/settings/backupEncryption.ts's redactEncryption() doc comment.
+// `hasPassword` is all the UI needs to show a "leave blank to keep the current password"
+// placeholder instead of an empty-looks-unset field when editing an already-encrypted job.
+export interface SyncJobEncryption {
+  enabled: boolean;
+  hasPassword: boolean;
+}
+
+// The write shape sent on job create/update - `password` is plaintext and write-only (never
+// round-tripped back, see SyncJobEncryption above), and only actually required the first time
+// `enabled` turns on with nothing saved yet; blank/omitted on an edit means "keep the current
+// saved password". Only meaningful for 'config'/'configAppdata' scope - see SyncJob.encryption's
+// own doc comment (backend/src/rclone/types.ts) for why 'custom' scope never offers this.
+export interface SyncJobEncryptionInput {
+  enabled: boolean;
+  password?: string;
+}
+
 export interface SyncJob {
   id: string;
   name: string;
@@ -65,6 +85,7 @@ export interface SyncJob {
   remotePath: string;
   schedule: RecurringSchedule;
   retention: SyncJobRetention;
+  encryption: SyncJobEncryption;
   lastSyncedAt: number | null;
   lastSizeBytes: number | null;
   lastFileCount: number | null;
@@ -89,4 +110,20 @@ export interface SyncJobWithRuntime extends SyncJob {
   progress: SyncJobProgress | null;
 }
 
-export type NewSyncJobInput = Omit<SyncJob, 'id' | 'lastSyncedAt' | 'lastSizeBytes' | 'lastFileCount' | 'lastErrorCount' | 'lastError'>;
+export type NewSyncJobInput = Omit<SyncJob, 'id' | 'lastSyncedAt' | 'lastSizeBytes' | 'lastFileCount' | 'lastErrorCount' | 'lastError' | 'encryption'> & {
+  encryption: SyncJobEncryptionInput;
+};
+
+// GET /rclone/jobs/:id/backups - one archive a 'config'/'configAppdata' scope job has already
+// uploaded to its remote target. Only meaningful for those two scopes - a 'custom' scope job
+// mirrors a folder live and has nothing resembling this to list (the route 400s instead).
+// `encrypted`/`categories` come from the archive's own `.meta.json` sidecar when one exists next
+// to it remotely - missing sidecar reads as `encrypted: false, categories: null`, not an error
+// (see backend's backupMeta.ts).
+export interface RemoteBackupEntry {
+  name: string;
+  sizeBytes: number;
+  modTime: string; // ISO 8601, straight from rclone
+  encrypted: boolean;
+  categories: BackupCategoryId[] | null;
+}
