@@ -5,6 +5,7 @@ import { useSettings } from '../../hooks/useSettings';
 import type { RcloneProvider, RcloneRemote, RcloneStatus, RemoteBackupEntry, SyncJobWithRuntime, SyncScope } from '../../types/rcloneApi';
 import { PathAutocomplete } from '../shared/PathAutocomplete';
 import { ToggleSwitch } from '../shared/ToggleSwitch';
+import { AddRemoteForm } from './AddRemoteForm';
 import { ScheduleFields } from './ScheduleFields';
 
 const POLL_INTERVAL_MS = 3000;
@@ -152,25 +153,13 @@ export function RemoteBackupSection() {
   const [jobs, setJobs] = useState<SyncJobWithRuntime[] | null>(null);
 
   const [showAddRemote, setShowAddRemote] = useState(false);
-  const [remoteType, setRemoteType] = useState('');
-  const [remoteName, setRemoteName] = useState('');
-  const [remoteFields, setRemoteFields] = useState<Record<string, string>>({});
-  const [remoteSaving, setRemoteSaving] = useState(false);
-  const [remoteError, setRemoteError] = useState<string | null>(null);
-  const [remoteAuth, setRemoteAuth] = useState<{
-    name: string;
-    type: string;
-    authUrl: string | null;
-    state: string;
-  } | null>(null);
   const [removingRemote, setRemovingRemote] = useState<string | null>(null);
-  // Set while editing an existing remote (as opposed to adding a new one) - reuses the same
-  // provider-fields form as Add remote, just with `name`/`remoteType` fixed and pre-filled fields.
-  // rclone has no "rename" or "change provider" operation on an existing remote (that's delete +
-  // recreate in its own real-world model), so both stay read-only here; config/update only ever
-  // touches the provider's own parameters.
-  const [editingRemoteName, setEditingRemoteName] = useState<string | null>(null);
-  const [remoteConfigLoading, setRemoteConfigLoading] = useState(false);
+  const [removeRemoteError, setRemoveRemoteError] = useState<string | null>(null);
+  // Set while editing an existing remote (as opposed to adding a new one) - passed straight
+  // through to AddRemoteForm's own `editingRemote` prop, which pre-fills and locks the
+  // name/provider fields. rclone has no "rename" or "change provider" operation on an existing
+  // remote (that's delete + recreate in its own real-world model), so both stay read-only there.
+  const [editingRemote, setEditingRemote] = useState<RcloneRemote | null>(null);
 
   const [editingJobId, setEditingJobId] = useState<string | 'new' | null>(null);
   const [jobDraft, setJobDraft] = useState<JobDraft>(NEW_JOB_DRAFT);
@@ -240,120 +229,33 @@ export function RemoteBackupSection() {
   };
 
   const startAddRemote = () => {
-    setEditingRemoteName(null);
+    setEditingRemote(null);
     setShowAddRemote(true);
-    setRemoteType(providers?.[0]?.name ?? '');
-    setRemoteName('');
-    setRemoteFields({});
-    setRemoteError(null);
-    setRemoteAuth(null);
   };
 
-  const startEditRemote = async (remote: RcloneRemote) => {
+  const startEditRemote = (remote: RcloneRemote) => {
+    setEditingRemote(remote);
     setShowAddRemote(true);
-    setEditingRemoteName(remote.name);
-    setRemoteType(remote.type);
-    setRemoteName(remote.name);
-    setRemoteFields({});
-    setRemoteError(null);
-    setRemoteAuth(null);
-    setRemoteConfigLoading(true);
-    try {
-      const cfg = await rcloneApi.getRemoteConfig(remote.name);
-      // Never pre-fill a password/secret field with its saved (obscured) value - leave it blank
-      // with a placeholder instead; only send it back if the admin actually types a new value.
-      const provider = providers?.find((p) => p.name === cfg.type);
-      const prefill: Record<string, string> = {};
-      for (const opt of provider?.options ?? []) {
-        if (opt.isPassword) continue;
-        if (cfg.parameters[opt.name] !== undefined) prefill[opt.name] = cfg.parameters[opt.name];
-      }
-      setRemoteFields(prefill);
-    } catch (err) {
-      setRemoteError((err as Error).message);
-    } finally {
-      setRemoteConfigLoading(false);
-    }
   };
 
   const cancelRemoteForm = () => {
     setShowAddRemote(false);
-    setEditingRemoteName(null);
-    setRemoteAuth(null);
-    setRemoteError(null);
+    setEditingRemote(null);
   };
 
-  const submitRemote = async () => {
-    if (editingRemoteName) {
-      setRemoteSaving(true);
-      setRemoteError(null);
-      try {
-        await rcloneApi.updateRemote(editingRemoteName, remoteFields);
-        cancelRemoteForm();
-        await loadRemotes();
-      } catch (err) {
-        setRemoteError((err as Error).message);
-      } finally {
-        setRemoteSaving(false);
-      }
-      return;
-    }
-    if (!remoteName.trim() || !remoteType) {
-      setRemoteError('Provider and name are required.');
-      return;
-    }
-    setRemoteSaving(true);
-    setRemoteError(null);
-    try {
-      const result = await rcloneApi.createRemote(remoteName.trim(), remoteType, remoteFields);
-      if (result.done) {
-        cancelRemoteForm();
-        await loadRemotes();
-      } else {
-        setRemoteAuth({
-          name: remoteName.trim(),
-          type: remoteType,
-          authUrl: result.authUrl,
-          state: result.state ?? '',
-        });
-      }
-    } catch (err) {
-      setRemoteError((err as Error).message);
-    } finally {
-      setRemoteSaving(false);
-    }
-  };
-
-  const continueRemoteAuth = async () => {
-    if (!remoteAuth) return;
-    setRemoteSaving(true);
-    setRemoteError(null);
-    try {
-      const result = await rcloneApi.continueRemoteSetup(remoteAuth.name, remoteAuth.type, remoteAuth.state);
-      if (result.done) {
-        cancelRemoteForm();
-        await loadRemotes();
-      } else {
-        setRemoteAuth({
-          ...remoteAuth,
-          authUrl: result.authUrl,
-          state: result.state ?? '',
-        });
-      }
-    } catch (err) {
-      setRemoteError((err as Error).message);
-    } finally {
-      setRemoteSaving(false);
-    }
+  const handleRemoteAdded = async () => {
+    cancelRemoteForm();
+    await loadRemotes();
   };
 
   const removeRemote = async (name: string) => {
     setRemovingRemote(name);
+    setRemoveRemoteError(null);
     try {
       await rcloneApi.deleteRemote(name);
       await loadRemotes();
     } catch (err) {
-      setRemoteError((err as Error).message);
+      setRemoveRemoteError((err as Error).message);
     } finally {
       setRemovingRemote(null);
     }
@@ -520,8 +422,6 @@ export function RemoteBackupSection() {
     );
   }
 
-  const selectedProvider = providers?.find((p) => p.name === remoteType) ?? null;
-
   return (
     <div className="settings-card">
       <div className="settings-card__title settings-card__title--with-link">
@@ -590,6 +490,7 @@ export function RemoteBackupSection() {
               ))}
               {remotes?.length === 0 && <div className="status-note">No remotes configured yet.</div>}
             </div>
+            {removeRemoteError && <div className="status-note status-note--error">{removeRemoteError}</div>}
 
             {!showAddRemote && (
               <button type="button" className="add-sync-btn" style={{ marginTop: 8 }} onClick={startAddRemote}>
@@ -597,103 +498,7 @@ export function RemoteBackupSection() {
               </button>
             )}
 
-            {showAddRemote && (
-              <div className="add-remote-panel">
-                <div className="add-remote-panel__title">{editingRemoteName ? `Edit remote: ${editingRemoteName}` : 'Add remote'}</div>
-                {remoteConfigLoading ? (
-                  <div className="status-note">Loading…</div>
-                ) : !remoteAuth ? (
-                  <>
-                    <div className="field-grid">
-                      <label className="field">
-                        <span>Provider</span>
-                        {editingRemoteName ? (
-                          // rclone has no "change provider" on an existing remote - that's delete +
-                          // recreate in its own real-world model, not an edit - so this is fixed.
-                          <input className="history-input" value={selectedProvider?.description ?? remoteType} disabled />
-                        ) : (
-                          <select
-                            className="history-input"
-                            value={remoteType}
-                            onChange={(e) => {
-                              setRemoteType(e.target.value);
-                              setRemoteFields({});
-                            }}
-                          >
-                            {(providers ?? []).map((p) => (
-                              <option key={p.name} value={p.name}>
-                                {p.description}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </label>
-                      <label className="field">
-                        <span>Name</span>
-                        <input className="history-input" value={remoteName} onChange={(e) => setRemoteName(e.target.value)} placeholder="e.g. offsite-b2" disabled={!!editingRemoteName} />
-                      </label>
-                      {selectedProvider?.options.map((opt) => (
-                        <label className="field" key={opt.name}>
-                          <span>{opt.help.split('\n')[0]}</span>
-                          {opt.type === 'bool' ? (
-                            <input
-                              className="round-checkbox"
-                              type="checkbox"
-                              checked={remoteFields[opt.name] === 'true'}
-                              onChange={(e) =>
-                                setRemoteFields((prev) => ({
-                                  ...prev,
-                                  [opt.name]: String(e.target.checked),
-                                }))
-                              }
-                            />
-                          ) : (
-                            <input
-                              className="history-input"
-                              type={opt.isPassword ? 'password' : 'text'}
-                              value={remoteFields[opt.name] ?? ''}
-                              onChange={(e) =>
-                                setRemoteFields((prev) => ({
-                                  ...prev,
-                                  [opt.name]: e.target.value,
-                                }))
-                              }
-                              placeholder={editingRemoteName && opt.isPassword ? 'Leave blank to keep the current value' : opt.default || undefined}
-                            />
-                          )}
-                        </label>
-                      ))}
-                    </div>
-                    <div className="settings-field__row">
-                      <button type="button" className="btn btn--primary-sm" disabled={remoteSaving} onClick={submitRemote}>
-                        {remoteSaving ? 'Saving…' : editingRemoteName ? 'Save' : 'Test & Save'}
-                      </button>
-                      <button type="button" className="btn" onClick={cancelRemoteForm}>
-                        Cancel
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="settings-field" style={{ padding: 0 }}>
-                    <div className="toggle-row__desc">This provider needs one more step to authorize. Open the link below, finish signing in, then come back and click Continue.</div>
-                    {remoteAuth.authUrl && (
-                      <a href={remoteAuth.authUrl} target="_blank" rel="noreferrer">
-                        {remoteAuth.authUrl}
-                      </a>
-                    )}
-                    <div className="settings-field__row" style={{ marginTop: 8 }}>
-                      <button type="button" className="btn btn--primary-sm" disabled={remoteSaving} onClick={continueRemoteAuth}>
-                        {remoteSaving ? 'Checking…' : 'Continue'}
-                      </button>
-                      <button type="button" className="btn" onClick={cancelRemoteForm}>
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {remoteError && <div className="status-note status-note--error">{remoteError}</div>}
-              </div>
-            )}
+            {showAddRemote && <AddRemoteForm key={editingRemote?.name ?? 'new'} providers={providers ?? []} editingRemote={editingRemote} onAdded={handleRemoteAdded} onCancel={cancelRemoteForm} />}
           </div>
 
           <hr className="divider" />

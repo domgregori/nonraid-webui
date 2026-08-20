@@ -117,21 +117,16 @@ export class RcloneService {
     await this.client.stopJob(this.running.rcloneJobId);
   }
 
-  /** Archives one of this job's own past runs has already uploaded to its remote target, for the
-   *  Recovery hub's "restore from a remote backup" picker. Only 'config'/'configAppdata' scope
-   *  jobs produce these - a 'custom' scope job mirrors an arbitrary folder live, with nothing
-   *  resembling a single restorable archive sitting at its target path. Each entry is enriched
-   *  with its own `.meta.json` sidecar's `encrypted`/`categories` fields when one exists next to
-   *  it remotely (downloaded and read directly, one small `operations/copyfile` per entry - these
-   *  are plaintext JSON files a few hundred bytes each, never the archive itself) - missing sidecar
+  /** Archives sitting at an arbitrary remote+path - the actual listing logic behind both
+   *  listJobBackups() (a job's own fixed target) and the onboarding disaster-recovery flow's
+   *  browse-backups route (a remote+path picked fresh, with no job record behind it at all, since
+   *  a from-scratch install has no sync jobs yet). Each entry is enriched with its own
+   *  `.meta.json` sidecar's `encrypted`/`categories` fields when one exists next to it remotely
+   *  (downloaded and read directly, one small `operations/copyfile` per entry - these are
+   *  plaintext JSON files a few hundred bytes each, never the archive itself) - missing sidecar
    *  reads as unencrypted/unknown, same rule as the local list (backupMeta.ts's own doc comment). */
-  async listJobBackups(id: string): Promise<RemoteBackupEntry[]> {
-    const job = await this.store.get(id);
-    if (!job) throw new Error('Sync job not found.');
-    if (job.scope === 'custom') {
-      throw new Error("This sync job mirrors a folder directly - it doesn't produce a single config backup archive to restore from.");
-    }
-    const dst = dstFs(job.remoteName, job.remotePath);
+  async listBackupsAt(remoteName: string, remotePath: string): Promise<RemoteBackupEntry[]> {
+    const dst = dstFs(remoteName, remotePath);
     const entries = await this.client.listDir(dst).catch(() => []);
     const archiveEntries = entries.filter((e) => e.name.startsWith(ARCHIVE_PREFIX) && e.name.endsWith(ARCHIVE_SUFFIX));
     const metaNames = new Set(entries.filter((e) => e.name.endsWith(META_SUFFIX)).map((e) => e.name));
@@ -152,30 +147,41 @@ export class RcloneService {
     return results.sort((a, b) => b.modTime.localeCompare(a.modTime));
   }
 
-  /**
-   * Downloads one of listJobBackups()'s own archives into a private staging path and builds the
-   * exact same restore preview / staged token the upload and local-backup flows produce -
-   * everything from here on (reviewing categories, committing) is the same POST /system/backup/
-   * backup/restore/commit every other source already feeds into, no separate remote-specific
-   * commit path needed. Its own `.meta.json` sidecar (if any) is pulled down alongside it to
-   * decide whether a password is required - see decryptIfNeeded()'s own doc comment
-   * (configRestore.ts) for why that decrypt stage runs here, ahead of buildRestorePreview(),
-   * rather than inside it.
-   */
-  async previewJobBackup(id: string, name: string, password?: string | null): Promise<{ token: string } & RestorePreviewData> {
+  /** Archives one of this job's own past runs has already uploaded to its remote target, for the
+   *  Recovery hub's "restore from a remote backup" picker. Only 'config'/'configAppdata' scope
+   *  jobs produce these - a 'custom' scope job mirrors an arbitrary folder live, with nothing
+   *  resembling a single restorable archive sitting at its target path. Thin wrapper around
+   *  listBackupsAt() - see its own doc comment for the actual listing logic. */
+  async listJobBackups(id: string): Promise<RemoteBackupEntry[]> {
     const job = await this.store.get(id);
     if (!job) throw new Error('Sync job not found.');
     if (job.scope === 'custom') {
       throw new Error("This sync job mirrors a folder directly - it doesn't produce a single config backup archive to restore from.");
     }
+    return this.listBackupsAt(job.remoteName, job.remotePath);
+  }
+
+  /**
+   * Downloads one of listBackupsAt()'s own archives (at an arbitrary remote+path) into a private
+   * staging path and builds the exact same restore preview / staged token the upload and
+   * local-backup flows produce - everything from here on (reviewing categories, committing) is
+   * the same POST /system/backup/backup/restore/commit every other source already feeds into, no
+   * separate remote-specific commit path needed. Its own `.meta.json` sidecar (if any) is pulled
+   * down alongside it to decide whether a password is required - see decryptIfNeeded()'s own doc
+   * comment (configRestore.ts) for why that decrypt stage runs here, ahead of
+   * buildRestorePreview(), rather than inside it. `stagingKey` only picks the staging directory's
+   * own name (a job id for the by-job caller, an arbitrary tag for the path-based one) - it has no
+   * bearing on where the archive itself is read from.
+   */
+  async previewBackupAt(remoteName: string, remotePath: string, name: string, password: string | null | undefined, stagingKey: string): Promise<{ token: string } & RestorePreviewData> {
     if (!name.startsWith(ARCHIVE_PREFIX) || !name.endsWith(ARCHIVE_SUFFIX) || name.includes('/') || name.includes('\\')) {
       throw new Error('Invalid archive name.');
     }
-    const stagingDir = path.join(os.tmpdir(), `nonraid-rclone-restore-${job.id}-${Date.now()}`);
+    const stagingDir = path.join(os.tmpdir(), `nonraid-rclone-restore-${stagingKey}-${Date.now()}`);
     await mkdir(stagingDir, { recursive: true });
     let cleanupDecrypted = async () => {};
     try {
-      const dst = dstFs(job.remoteName, job.remotePath);
+      const dst = dstFs(remoteName, remotePath);
       await this.client.downloadFile(dst, name, stagingDir, name);
       const filePath = path.join(stagingDir, name);
       const metaName = metaNameFor(name);
@@ -202,6 +208,17 @@ export class RcloneService {
       await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
       throw err;
     }
+  }
+
+  /** Thin wrapper around previewBackupAt() for one of this job's own archives - see its own doc
+   *  comment for the actual download/decrypt/preview logic. */
+  async previewJobBackup(id: string, name: string, password?: string | null): Promise<{ token: string } & RestorePreviewData> {
+    const job = await this.store.get(id);
+    if (!job) throw new Error('Sync job not found.');
+    if (job.scope === 'custom') {
+      throw new Error("This sync job mirrors a folder directly - it doesn't produce a single config backup archive to restore from.");
+    }
+    return this.previewBackupAt(job.remoteName, job.remotePath, name, password, job.id);
   }
 
   /** The actual sync+retention work, shared by RcloneSyncScheduler's ticker and the manual "Sync
