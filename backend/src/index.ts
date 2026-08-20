@@ -35,6 +35,7 @@ import { logsRouter } from './routes/logs.js';
 import { lxcRouter } from './routes/lxc.js';
 import { metricsRouter } from './routes/metrics.js';
 import { parityRouter } from './routes/parity.js';
+import { rcloneRouter } from './routes/rclone.js';
 import { servicesRouter } from './routes/services.js';
 import { settingsRouter } from './routes/settings.js';
 import { sharesRouter } from './routes/shares.js';
@@ -44,6 +45,9 @@ import { systemRouter } from './routes/system.js';
 import { tailscaleRouter } from './routes/tailscale.js';
 import { tlsRouter } from './routes/tls.js';
 import { usersRouter } from './routes/users.js';
+import { createRcloneClient } from './rclone/index.js';
+import { RcloneService } from './rclone/service.js';
+import { RcloneSyncScheduler } from './rclone/syncScheduler.js';
 import { SettingsStore } from './settings/index.js';
 import { createShareApplier, ShareAccessStore, ShareService, ShareStore } from './shares/index.js';
 import { createSmartClient, SmartService } from './smart/index.js';
@@ -79,6 +83,9 @@ async function main() {
   await authStore.get(); // fail fast at boot on a corrupt auth.json
   const tlsStore = new TlsStore();
   const tailscale = createTailscaleClient();
+  const rclone = createRcloneClient();
+  const rcloneService = new RcloneService(rclone, nmd, activity, settingsStore);
+  new RcloneSyncScheduler(rcloneService, settingsStore);
   const tlsRecord = await tlsStore.get(); // fail fast at boot on a corrupt tls.json
   if (config.serveFrontend && !existsSync(path.join(config.frontendDistPath, 'index.html'))) {
     throw new Error(`serveFrontend is true but no index.html at ${config.frontendDistPath} - did the frontend build run?`);
@@ -204,6 +211,7 @@ async function main() {
   app.use('/api', activityRouter(activity));
   app.use('/api', tlsRouter(tlsStore, activity, authService));
   app.use('/api', tailscaleRouter(tailscale, settingsStore, activity));
+  app.use('/api', rcloneRouter(rclone, rcloneService, settingsStore, activity));
 
   // Protocol is chosen once at boot from the persisted TLS config, same "config changes need a
   // restart" model as everything else in this app - see backend/src/tls/. Falls open to plain
