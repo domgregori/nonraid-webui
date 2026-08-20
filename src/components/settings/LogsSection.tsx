@@ -143,20 +143,14 @@ export function LogsSection({ active }: LogsSectionProps) {
 
   return (
     <div>
-      <div className="smart-tabs">
-        {sources.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            className={`smart-tabs__btn${s.id === sourceId ? ' smart-tabs__btn--active' : ''}`}
-            onClick={() => selectSource(s.id)}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
       <div className="docker-logs-toolbar">
+        <select className="history-input" value={sourceId ?? ''} onChange={(e) => selectSource(e.target.value)}>
+          {sources.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
+            </option>
+          ))}
+        </select>
         <select className="history-input" value={tail} disabled={live} onChange={(e) => setTail(Number(e.target.value))}>
           {TAIL_OPTIONS.map((n) => (
             <option key={n} value={n}>
