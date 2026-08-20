@@ -2,19 +2,23 @@ import { Router, type Express } from 'express';
 import type { ActivityStore } from '../activity/index.js';
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
+import { validateCronExpression } from '../settings/cronMatch.js';
 import { NOTIFICATION_EVENTS, sendAppriseNotification, type SettingsStore } from '../settings/index.js';
 import type { ShareService } from '../shares/index.js';
 
 const KNOWN_EVENT_TYPES = new Set<string>(NOTIFICATION_EVENTS.map((e) => e.id));
 
-/** Shared by paritySchedule, backupSchedule, and cacheSchedule - all three are RecurringSchedule patches. */
+/** Shared by paritySchedule, backupSchedule, and cacheSchedule - all three are RecurringSchedule
+ *  patches. Parity/Cache never actually send frequency: 'cron' (their own ScheduleFields usage
+ *  doesn't offer that option), but the shape allows it structurally the same as Backups/rclone
+ *  sync jobs, so it's validated here too rather than only for backupSchedule. */
 function validateSchedulePatch(fieldName: string, schedule: Record<string, unknown>): void {
-  const { enabled, frequency, dayOfWeek, dayOfMonth, hour } = schedule;
+  const { enabled, frequency, dayOfWeek, dayOfMonth, hour, cronExpression } = schedule;
   if ('enabled' in schedule && typeof enabled !== 'boolean') {
     throw new Error(`${fieldName}.enabled must be a boolean.`);
   }
-  if ('frequency' in schedule && frequency !== 'daily' && frequency !== 'weekly' && frequency !== 'monthly') {
-    throw new Error(`${fieldName}.frequency must be "daily", "weekly", or "monthly".`);
+  if ('frequency' in schedule && frequency !== 'daily' && frequency !== 'weekly' && frequency !== 'monthly' && frequency !== 'cron') {
+    throw new Error(`${fieldName}.frequency must be "daily", "weekly", "monthly", or "cron".`);
   }
   if ('dayOfWeek' in schedule && (!Number.isInteger(dayOfWeek) || (dayOfWeek as number) < 0 || (dayOfWeek as number) > 6)) {
     throw new Error(`${fieldName}.dayOfWeek must be an integer 0-6 (Sunday-Saturday).`);
@@ -24,6 +28,33 @@ function validateSchedulePatch(fieldName: string, schedule: Record<string, unkno
   }
   if ('hour' in schedule && (!Number.isInteger(hour) || (hour as number) < 0 || (hour as number) > 23)) {
     throw new Error(`${fieldName}.hour must be an integer 0-23.`);
+  }
+  if ('cronExpression' in schedule) {
+    if (typeof cronExpression !== 'string') {
+      throw new Error(`${fieldName}.cronExpression must be a string.`);
+    }
+    if (frequency === 'cron' || (frequency === undefined && cronExpression)) {
+      validateCronExpression(cronExpression);
+    }
+  }
+}
+
+function validateBackupDestination(fieldName: string, destination: Record<string, unknown>): void {
+  const { mode, diskSlot, customPath } = destination;
+  if ('mode' in destination && mode !== 'boot' && mode !== 'array' && mode !== 'custom') {
+    throw new Error(`${fieldName}.mode must be "boot", "array", or "custom".`);
+  }
+  if ('diskSlot' in destination && diskSlot !== null && !Number.isInteger(diskSlot)) {
+    throw new Error(`${fieldName}.diskSlot must be an integer or null.`);
+  }
+  if (mode === 'array' && (diskSlot === null || diskSlot === undefined)) {
+    throw new Error(`${fieldName}.diskSlot is required when mode is "array".`);
+  }
+  if ('customPath' in destination && typeof customPath !== 'string') {
+    throw new Error(`${fieldName}.customPath must be a string.`);
+  }
+  if (mode === 'custom' && !(customPath as string | undefined)?.trim()) {
+    throw new Error(`${fieldName}.customPath is required when mode is "custom".`);
   }
 }
 
@@ -74,12 +105,18 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
       }
       if (patch.backupSchedule) {
         validateSchedulePatch('backupSchedule', patch.backupSchedule);
-        const { destDir, retain } = patch.backupSchedule;
-        if ('destDir' in patch.backupSchedule && typeof destDir !== 'string') {
-          throw new Error('backupSchedule.destDir must be a string.');
+        const { scope, destination, retain, retainForever } = patch.backupSchedule;
+        if ('scope' in patch.backupSchedule && scope !== 'config' && scope !== 'configAppdata') {
+          throw new Error('backupSchedule.scope must be "config" or "configAppdata".');
+        }
+        if (destination) {
+          validateBackupDestination('backupSchedule.destination', destination);
         }
         if ('retain' in patch.backupSchedule && (!Number.isInteger(retain) || (retain as number) < 1)) {
           throw new Error('backupSchedule.retain must be a positive integer.');
+        }
+        if ('retainForever' in patch.backupSchedule && typeof retainForever !== 'boolean') {
+          throw new Error('backupSchedule.retainForever must be a boolean.');
         }
       }
       if (patch.notifications?.eventTypes) {

@@ -13,7 +13,7 @@ import type { NmdClient } from '../nmd/index.js';
 // silently swapping out whoever's currently logged in - confirmed live this session: restoring a
 // backup clobbered a freshly-created admin account with the older one saved inside it, with no way
 // to have kept the current login and restored everything else.
-export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory';
+export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory' | 'appdata';
 
 export interface BackupCategory {
   id: BackupCategoryId;
@@ -22,8 +22,18 @@ export interface BackupCategory {
   paths: string[];
 }
 
-export async function resolveBackupCategories(nmd: NmdClient): Promise<BackupCategory[]> {
-  return [
+/**
+ * `includeAppdata` adds the 'appdata' category on top of the fixed six below - opted into by the
+ * "Config backups + appdata" scope (Local Backups' own scope picker, and each Remote Backup sync
+ * job's scope) rather than always included, since it's typically far larger than everything else
+ * here combined. Resolved as config.appsBindRoots as a whole (the same host paths the Docker/Apps
+ * bind-mount allow-list already treats as "where container data lives" - see config.ts's own doc
+ * comment on appsBindRoots) rather than trying to enumerate every individual container's actual
+ * bind mounts - simpler, and still backs up real appdata, just at root granularity rather than
+ * filtered to only-currently-bound subpaths.
+ */
+export async function resolveBackupCategories(nmd: NmdClient, includeAppdata = false): Promise<BackupCategory[]> {
+  const categories: BackupCategory[] = [
     { id: 'array', label: 'Array', description: 'The array superblock - disk assignments and parity configuration.', paths: [await nmd.getSuperblockPath()] },
     { id: 'sharing', label: 'Samba/NFS config', description: 'smb.conf and /etc/exports.', paths: [config.smbConfPath, config.exportsPath] },
     {
@@ -36,12 +46,21 @@ export async function resolveBackupCategories(nmd: NmdClient): Promise<BackupCat
     { id: 'activityHistory', label: 'Activity history', description: 'The event log shown on the Dashboard and History page.', paths: [config.activityConfigPath] },
     { id: 'graphHistory', label: 'Graph history', description: 'Recorded CPU/memory/disk/network metrics behind the History page\'s graphs.', paths: [config.metricsDbPath] },
   ];
+  if (includeAppdata) {
+    categories.push({
+      id: 'appdata',
+      label: 'Appdata',
+      description: "Docker/LXC containers' own persistent data - everything under this host's configured app bind-mount root(s).",
+      paths: [...config.appsBindRoots],
+    });
+  }
+  return categories;
 }
 
 /** Flattened, existing-only path list - what actually gets archived. Shared by the on-demand
  *  backup route and BackupScheduler so both back up exactly the same things. */
-export async function resolveConfigBackupPaths(nmd: NmdClient): Promise<string[]> {
-  const categories = await resolveBackupCategories(nmd);
+export async function resolveConfigBackupPaths(nmd: NmdClient, includeAppdata = false): Promise<string[]> {
+  const categories = await resolveBackupCategories(nmd, includeAppdata);
   const allPaths = categories.flatMap((c) => c.paths);
   const existing = await Promise.all(allPaths.map(async (p) => ((await pathExists(p)) ? p : null)));
   return existing.filter((p): p is string => p !== null);

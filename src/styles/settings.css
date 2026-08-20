@@ -57,6 +57,24 @@
   margin-bottom: 14px;
 }
 
+.settings-card__title--with-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.settings-card__title-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-blue);
+  text-decoration: none;
+}
+
+.settings-card__title-link:hover {
+  text-decoration: underline;
+}
+
 .settings-card .toggle-row,
 .settings-card .toggle-row--bordered {
   padding: 10px 0;
@@ -509,5 +527,433 @@
     font-size: 10px;
     padding: var(--space-sm);
     word-break: break-word;
+  }
+}
+
+/* Local Backups / Remote Backup (Settings -> Backups) - ported from the approved mockup artifact
+   (see the handoff doc this session started from), reusing this file's own tokens/component
+   classes throughout rather than inventing a second set. */
+
+.settings-card__title-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge-new {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-blue);
+  background: var(--color-blue-tint);
+  border: 1px solid var(--color-blue);
+  border-radius: var(--radius-chip);
+  padding: 2px 6px;
+}
+
+.settings-field__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.settings-field__hint {
+  font-size: 11px;
+  color: var(--color-text-dim);
+}
+
+label.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+label.field > span:first-child {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+.field-grid--full {
+  grid-column: 1 / -1;
+}
+
+.schedule-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.schedule-row__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  grid-column: 1 / -1;
+  margin-bottom: -4px;
+}
+
+.keep-forever-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.keep-forever-row label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.retention-input--disabled {
+  opacity: 0.4;
+}
+
+/* --- Remote Backup: remotes list --- */
+.remote-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.remote-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-bg);
+  flex-wrap: wrap;
+}
+
+.remote-row__icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-chip);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.remote-row__body {
+  flex: 1;
+  min-width: 120px;
+}
+
+.remote-row__name {
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.remote-row__meta {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.remote-row__status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.remote-row__actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.status-dot--pulse {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.add-remote-panel {
+  border: 1px dashed var(--color-border-lit);
+  border-radius: var(--radius-btn);
+  padding: var(--space-lg);
+  margin-top: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.add-remote-panel__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.provider-swatch--b2 {
+  background: color-mix(in oklch, var(--color-red) 20%, transparent);
+  color: var(--color-red);
+}
+.provider-swatch--gdrive {
+  background: color-mix(in oklch, var(--color-blue) 20%, transparent);
+  color: var(--color-blue);
+}
+.provider-swatch--sftp {
+  background: color-mix(in oklch, var(--color-amber) 20%, transparent);
+  color: var(--color-amber);
+}
+
+/* --- Remote Backup: sync jobs --- */
+.add-sync-btn {
+  align-self: flex-start;
+  cursor: pointer;
+  font-family: inherit;
+  border: 1px dashed var(--color-border-lit);
+  background: transparent;
+  color: var(--color-blue);
+  border-radius: var(--radius-btn);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 14px;
+}
+
+.add-sync-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sync-job-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* A saved job reads as *placed*, not just outlined - a tinted fill plus a colored left rail, same
+   idea as .import-warning's tinted backgrounds elsewhere in this app. Color/tint changes per state
+   (enabled/syncing/disabled) rather than being one flat "saved" treatment, so the card itself
+   communicates status before you even read the text. */
+.sync-job {
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border-lit);
+  border-radius: var(--radius-btn);
+  padding: var(--space-md) var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.sync-job--enabled {
+  border-left-color: var(--color-blue);
+  background: color-mix(in oklch, var(--color-blue) 6%, var(--color-surface));
+}
+
+.sync-job--syncing {
+  border-left-color: var(--color-blue);
+}
+
+.sync-job--disabled {
+  border-left-color: var(--color-border-lit);
+  background: var(--color-bg);
+  opacity: 0.6;
+}
+
+/* A job whose remote no longer exists (deleted out from under it) - not the same as --disabled
+   (a deliberate off switch), so it gets its own red rail rather than reading as just "off". */
+.sync-job--error {
+  border-left-color: var(--color-red);
+  background: var(--color-red-tint);
+}
+
+/* Solid border + soft glow ring, deliberately not dashed - dashed read as "not saved yet" during
+   design review. */
+.sync-job--editing {
+  border: 1px solid var(--color-blue);
+  border-left: 3px solid var(--color-blue);
+  background: var(--color-surface-elevated);
+  box-shadow: 0 0 0 3px var(--color-blue-tint-soft);
+  opacity: 1;
+}
+
+.sync-job__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.sync-job__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sync-job__name {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.sync-job__schedule {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+}
+
+.sync-job__stats {
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sync-job__stats strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.sync-job__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sync-job__actions .btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.job-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: var(--radius-chip);
+  padding: 2px 7px;
+  border: 1px solid;
+}
+
+.job-badge--active {
+  color: var(--color-green);
+  border-color: var(--color-green);
+  background: var(--color-green-tint);
+}
+.job-badge--syncing {
+  color: var(--color-blue);
+  border-color: var(--color-blue);
+  background: var(--color-blue-tint);
+}
+.job-badge--disabled {
+  color: var(--color-text-dim);
+  border-color: var(--color-border-lit);
+  background: transparent;
+}
+.job-badge--editing {
+  color: var(--color-blue);
+  border-color: var(--color-blue);
+  background: var(--color-blue-tint);
+}
+.job-badge--error {
+  color: var(--color-red);
+  border-color: var(--color-red);
+  background: var(--color-red-tint);
+}
+
+.progress-track {
+  border-radius: var(--radius-pill);
+  background: var(--color-border);
+  overflow: hidden;
+  height: 8px;
+}
+
+.progress-track__fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-blue);
+  transition: width 0.3s ease;
+}
+
+.sync-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+}
+
+.sync-progress__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.sync-progress__file {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .remote-row {
+    align-items: flex-start;
+  }
+
+  .remote-row__status {
+    order: 3;
+    width: 100%;
+  }
+
+  .remote-row__actions {
+    order: 4;
+    width: 100%;
+  }
+
+  .sync-job__actions .btn {
+    flex: 1 1 auto;
   }
 }

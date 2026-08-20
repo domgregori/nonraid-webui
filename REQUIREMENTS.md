@@ -54,6 +54,14 @@ Proxmox VE. Update this list as items change or new items appear.
   (its postinst enables it by default, same as docker.io/samba/nfs-kernel-server - undone here
   since this feature must start off). The webui's own enable toggle (`PUT /tailscale/enabled`)
   starts it back up when someone actually turns the feature on.
+- `rclone` — for the optional Remote Backup settings section (Settings → Backups), disabled by
+  default. Debian 13's repo package is stale (1.60.1); `tools/install-webui.sh`'s `ensure_rclone()`
+  installs from rclone's own official installer instead, then generates a random password for
+  `rclone-rcd` (its own remote-control daemon this feature talks to over HTTP — see
+  `backend/src/rclone/realClient.ts`). `install_rclone_systemd_unit()` installs `rclone-rcd`'s own
+  systemd unit and immediately disables+stops it, same as `tailscaled` above. The webui's own
+  enable toggle (`PUT /rclone/enabled`) starts it back up when someone actually turns Remote Backup
+  on.
 - `docker.io` — Docker Engine, for the Docker tab. `nonraid-webui` talks to `/var/run/docker.sock`
   directly (`dockerode`); no separate install step exists for this anywhere else, so it must be
   installed explicitly.

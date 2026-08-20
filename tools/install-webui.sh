@@ -197,6 +197,37 @@ ensure_tailscale() {
   systemctl disable --now tailscaled >/dev/null 2>&1 || true
 }
 
+# rclone, for the optional Remote Backup settings section - Debian 13's own repo package is stale
+# (1.60.1, confirmed live via `apt-cache policy rclone` on the test rig), same situation as
+# mergerfs above, so this installs from rclone's own official installer instead (which, on a
+# Debian/apt host, itself downloads and installs the latest upstream .deb - confirmed live, no
+# `unzip` dependency needed the way the installer's generic zip-based path would). Idempotent:
+# skips straight to generating the RC daemon's credentials if `rclone` is already on PATH, so a
+# re-run doesn't reinstall (and doesn't regenerate an already-configured install's rcd password).
+ensure_rclone() {
+  log "Checking rclone"
+  if ! command -v rclone >/dev/null 2>&1; then
+    log "Installing rclone from the official installer"
+    curl -fsSL https://rclone.org/install.sh | bash
+  else
+    log "rclone already installed ($(rclone version | head -1))"
+  fi
+
+  log "Checking rclone-rcd credentials"
+  mkdir -p /etc/rclone
+  local rc_env_file=/etc/default/rclone-rcd
+  if [ ! -e "$rc_env_file" ]; then
+    log "Generating rclone-rcd RC credentials"
+    {
+      echo "RCLONE_RC_USER=nonraid"
+      echo "RCLONE_RC_PASS=$(openssl rand -hex 24)"
+    } > "$rc_env_file"
+    chmod 600 "$rc_env_file"
+  else
+    log "$rc_env_file already exists - leaving it as-is"
+  fi
+}
+
 install_node() {
   log "Installing Node.js 22.x from NodeSource"
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
@@ -374,6 +405,17 @@ install_webui_systemd_unit() {
   fi
 }
 
+# Own systemd unit, not a child process of the webui backend - same reasoning as tailscaled: the
+# webui restarts itself for TLS/timezone-change flows, and an in-progress remote sync shouldn't die
+# because of that. Installed-but-off by default, same as tailscaled - the webui's own enable
+# toggle (`PUT /rclone/enabled`) is what actually starts it once someone turns Remote Backup on.
+install_rclone_systemd_unit() {
+  log "Installing rclone-rcd systemd unit"
+  install -m 644 "$REPO_ROOT/tools/systemd/rclone-rcd.service" /etc/systemd/system/rclone-rcd.service
+  systemctl daemon-reload
+  systemctl disable --now rclone-rcd >/dev/null 2>&1 || true
+}
+
 start_system_services() {
   log "Starting system services"
   # samba/nfs-kernel-server/docker.io/avahi-daemon's own postinst scripts already enable+start their
@@ -457,6 +499,7 @@ STEPS=(
   install_smb_conf
   ensure_mergerfs
   ensure_tailscale
+  ensure_rclone
   ensure_node
   install_nonraid_driver
   install_nmdctl_and_units
@@ -465,6 +508,7 @@ STEPS=(
   build_frontend
   stage_install
   install_webui_systemd_unit
+  install_rclone_systemd_unit
   start_services
   print_summary
 )

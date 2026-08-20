@@ -16,6 +16,7 @@ const WARNINGS: Record<string, string> = {
   ssh: 'Stopping or restarting this may drop your current SSH session and any other active SSH connections.',
   avahi: 'Stopping or restarting this may drop network discovery',
   tailscale: 'Stopping or restarting this will drop the Tailscale connection.',
+  'rclone-rcd': 'Stopping or restarting this will interrupt any Remote Backup sync currently in progress.',
 };
 
 const HEALTH_POLL_INTERVAL_MS = 2000;

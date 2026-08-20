@@ -1,0 +1,19 @@
+[Unit]
+Description=rclone remote control daemon (backs Remote Backup in nonraid-webui)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/rclone-rcd
+# Loopback-only (127.0.0.1) - nonraid-webui's own backend is the only intended client, talking to
+# it as a thin HTTP client (see backend/src/rclone/realClient.ts), same as tailscaled's own local
+# API isn't exposed beyond this host either. RCLONE_RC_USER/RCLONE_RC_PASS come from the
+# EnvironmentFile above (generated once by tools/install-webui.sh's ensure_rclone step) - the
+# backend reads that same file to authenticate its own RC calls, so the two always agree.
+ExecStart=/usr/bin/rclone rcd --rc-addr=127.0.0.1:5572 --rc-user=${RCLONE_RC_USER} --rc-pass=${RCLONE_RC_PASS} --rc-no-auth=false --config=/etc/rclone/rclone.conf
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

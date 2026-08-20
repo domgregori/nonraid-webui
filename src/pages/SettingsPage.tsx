@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { authApi } from '../api/authApi';
 import { cacheApi } from '../api/cacheApi';
 import { dockerApi } from '../api/dockerApi';
@@ -11,6 +12,7 @@ import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
 import { LogsSection } from '../components/settings/LogsSection';
 import { NotificationEventToggles } from '../components/settings/NotificationEventToggles';
 import { PasskeySection } from '../components/settings/PasskeySection';
+import { RemoteBackupSection } from '../components/settings/RemoteBackupSection';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ServicesSection } from '../components/settings/ServicesSection';
 import { StorageLocationField } from '../components/settings/StorageLocationField';
@@ -41,14 +43,29 @@ const SECTIONS = [
   { id: 'notifications', label: 'Notifications' },
   { id: 'parity', label: 'Parity' },
   { id: 'shares', label: 'Pools' },
+  { id: 'recovery', label: 'Recovery' },
   { id: 'security', label: 'Security' },
   { id: 'services', label: 'Services' },
   { id: 'logs', label: 'System Logs' },
   { id: 'tailscale', label: 'Tailscale' },
 ] as const;
 
+// Every valid deep-link target, e.g. /settings#recovery - kept as a real Set (not just trusting
+// the hash) so an arbitrary/stale/typo'd hash falls back to the default section instead of
+// silently leaving the sidebar on "About" while some other card is actually showing.
+const SECTION_IDS = new Set<string>(SECTIONS.map((s) => s.id));
+
 export function SettingsPage() {
+  const location = useLocation();
   const [activeSection, setActiveSection] = useState<(typeof SECTIONS)[number]['id']>('about');
+  const [showConfigRestoreWizard, setShowConfigRestoreWizard] = useState(false);
+  // Deep-linking, e.g. the "Recovery ->" links on the Backups cards: /settings#recovery. Reacts to
+  // location.hash rather than only running once on mount, since clicking a Link to a new hash
+  // while already on /settings is a same-component navigation (no remount) in this SPA.
+  useEffect(() => {
+    const id = location.hash.replace(/^#/, '');
+    if (id && SECTION_IDS.has(id)) setActiveSection(id as (typeof SECTIONS)[number]['id']);
+  }, [location.hash]);
   const { settings, loadState, error, saving, saveError, update } = useSettings();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const stats = useSystemStats();
@@ -103,9 +120,7 @@ export function SettingsPage() {
   const [rebootError, setRebootError] = useState<string | null>(null);
 
   const [appriseDraft, setAppriseDraft] = useState('');
-  const [eventTypesDraft, setEventTypesDraft] = useState<Record<NotificationEventType, NotificationChannelToggle>>(
-    {} as Record<NotificationEventType, NotificationChannelToggle>,
-  );
+  const [eventTypesDraft, setEventTypesDraft] = useState<Record<NotificationEventType, NotificationChannelToggle>>({} as Record<NotificationEventType, NotificationChannelToggle>);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
   const [testSending, setTestSending] = useState(false);
@@ -115,7 +130,7 @@ export function SettingsPage() {
   const [minFreeSpaceError, setMinFreeSpaceError] = useState<string | null>(null);
 
   const [paritySchedEnabled, setParitySchedEnabled] = useState(false);
-  const [paritySchedFrequency, setParitySchedFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [paritySchedFrequency, setParitySchedFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'cron'>('weekly');
   const [paritySchedDay, setParitySchedDay] = useState(0);
   const [paritySchedDayOfMonth, setParitySchedDayOfMonth] = useState(1);
   const [paritySchedHour, setParitySchedHour] = useState(2);
@@ -132,7 +147,7 @@ export function SettingsPage() {
   const [cacheEnabledSaving, setCacheEnabledSaving] = useState(false);
   const [cacheEnabledError, setCacheEnabledError] = useState<string | null>(null);
   const [cacheSchedEnabled, setCacheSchedEnabled] = useState(false);
-  const [cacheSchedFrequency, setCacheSchedFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [cacheSchedFrequency, setCacheSchedFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'cron'>('weekly');
   const [cacheSchedDay, setCacheSchedDay] = useState(0);
   const [cacheSchedDayOfMonth, setCacheSchedDayOfMonth] = useState(1);
   const [cacheSchedHour, setCacheSchedHour] = useState(3);
@@ -141,12 +156,17 @@ export function SettingsPage() {
   const [cacheMoverError, setCacheMoverError] = useState<string | null>(null);
 
   const [backupSchedEnabled, setBackupSchedEnabled] = useState(false);
-  const [backupSchedFrequency, setBackupSchedFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [backupSchedScope, setBackupSchedScope] = useState<'config' | 'configAppdata'>('config');
+  const [backupSchedFrequency, setBackupSchedFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'cron'>('weekly');
   const [backupSchedDay, setBackupSchedDay] = useState(0);
   const [backupSchedDayOfMonth, setBackupSchedDayOfMonth] = useState(1);
   const [backupSchedHour, setBackupSchedHour] = useState(3);
-  const [backupDestDirDraft, setBackupDestDirDraft] = useState('');
+  const [backupCronExpression, setBackupCronExpression] = useState('');
+  const [backupDestMode, setBackupDestMode] = useState<'boot' | 'array' | 'custom'>('custom');
+  const [backupDestDiskSlot, setBackupDestDiskSlot] = useState<number | null>(null);
+  const [backupDestCustomPath, setBackupDestCustomPath] = useState('');
   const [backupRetainDraft, setBackupRetainDraft] = useState('7');
+  const [backupRetainForever, setBackupRetainForever] = useState(false);
   const [backupSchedSaving, setBackupSchedSaving] = useState(false);
   const [backupSchedError, setBackupSchedError] = useState<string | null>(null);
   const [backupRunning, setBackupRunning] = useState(false);
@@ -165,7 +185,6 @@ export function SettingsPage() {
   const [timezoneError, setTimezoneError] = useState<string | null>(null);
 
   const [showImportWizard, setShowImportWizard] = useState(false);
-  const [showConfigRestoreWizard, setShowConfigRestoreWizard] = useState(false);
 
   const [currentPasswordDraft, setCurrentPasswordDraft] = useState('');
   const [newPasswordDraft, setNewPasswordDraft] = useState('');
@@ -210,7 +229,10 @@ export function SettingsPage() {
   }, [stats]);
 
   useEffect(() => {
-    systemApi.getTimezones().then(setTimezones).catch(() => {});
+    systemApi
+      .getTimezones()
+      .then(setTimezones)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -250,12 +272,17 @@ export function SettingsPage() {
   useEffect(() => {
     if (settings && !backupSchedInitialized.current) {
       setBackupSchedEnabled(settings.backupSchedule.enabled);
+      setBackupSchedScope(settings.backupSchedule.scope);
       setBackupSchedFrequency(settings.backupSchedule.frequency);
       setBackupSchedDay(settings.backupSchedule.dayOfWeek);
       setBackupSchedDayOfMonth(settings.backupSchedule.dayOfMonth);
       setBackupSchedHour(settings.backupSchedule.hour);
-      setBackupDestDirDraft(settings.backupSchedule.destDir);
+      setBackupCronExpression(settings.backupSchedule.cronExpression);
+      setBackupDestMode(settings.backupSchedule.destination.mode);
+      setBackupDestDiskSlot(settings.backupSchedule.destination.diskSlot);
+      setBackupDestCustomPath(settings.backupSchedule.destination.customPath);
       setBackupRetainDraft(String(settings.backupSchedule.retain));
+      setBackupRetainForever(settings.backupSchedule.retainForever);
       backupSchedInitialized.current = true;
     }
   }, [settings]);
@@ -371,11 +398,19 @@ export function SettingsPage() {
     }
   };
 
-  const saveNotifications = () => update({ notifications: { appriseUrls: appriseDraft, eventTypes: eventTypesDraft } });
+  const saveNotifications = () =>
+    update({
+      notifications: { appriseUrls: appriseDraft, eventTypes: eventTypesDraft },
+    });
 
   const toggleEventChannel = (eventType: NotificationEventType, channel: keyof NotificationChannelToggle, enabled: boolean) => {
-    setEventTypesDraft((prev) => ({ ...prev, [eventType]: { ...prev[eventType], [channel]: enabled } }));
-    update({ notifications: { eventTypes: { [eventType]: { [channel]: enabled } } } });
+    setEventTypesDraft((prev) => ({
+      ...prev,
+      [eventType]: { ...prev[eventType], [channel]: enabled },
+    }));
+    update({
+      notifications: { eventTypes: { [eventType]: { [channel]: enabled } } },
+    });
   };
 
   const saveMinFreeSpace = async () => {
@@ -430,12 +465,20 @@ export function SettingsPage() {
 
   const saveBackupSchedule = async () => {
     const retain = Number(backupRetainDraft);
-    if (!Number.isInteger(retain) || retain < 1) {
-      setBackupSchedError('Enter a positive whole number for how many backups to keep.');
+    if (!backupRetainForever && (!Number.isInteger(retain) || retain < 1)) {
+      setBackupSchedError('Enter a positive whole number for how many backups to keep, or check "Keep all backups forever".');
       return;
     }
-    if (backupSchedEnabled && !backupDestDirDraft.trim()) {
-      setBackupSchedError('Enter a destination directory before enabling the schedule.');
+    if (backupDestMode === 'array' && backupDestDiskSlot === null) {
+      setBackupSchedError('Pick a disk for the destination.');
+      return;
+    }
+    if (backupDestMode === 'custom' && !backupDestCustomPath.trim()) {
+      setBackupSchedError('Enter a destination path.');
+      return;
+    }
+    if (backupSchedFrequency === 'cron' && !backupCronExpression.trim()) {
+      setBackupSchedError('Enter a cron expression.');
       return;
     }
     setBackupSchedSaving(true);
@@ -443,12 +486,19 @@ export function SettingsPage() {
     await update({
       backupSchedule: {
         enabled: backupSchedEnabled,
+        scope: backupSchedScope,
         frequency: backupSchedFrequency,
         dayOfWeek: backupSchedDay,
         dayOfMonth: backupSchedDayOfMonth,
         hour: backupSchedHour,
-        destDir: backupDestDirDraft.trim(),
-        retain,
+        cronExpression: backupCronExpression.trim(),
+        destination: {
+          mode: backupDestMode,
+          diskSlot: backupDestMode === 'array' ? backupDestDiskSlot : null,
+          customPath: backupDestCustomPath.trim(),
+        },
+        retain: backupRetainForever ? 1 : retain,
+        retainForever: backupRetainForever,
       },
     });
     setBackupSchedSaving(false);
@@ -513,691 +563,556 @@ export function SettingsPage() {
       <div className="settings-layout">
         <aside className="settings-sidebar">
           {SECTIONS.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              className={`category-item${activeSection === s.id ? ' category-item--active' : ''}`}
-              onClick={() => setActiveSection(s.id)}
-            >
+            <button key={s.id} type="button" className={`category-item${activeSection === s.id ? ' category-item--active' : ''}`} onClick={() => setActiveSection(s.id)}>
               {s.label}
             </button>
           ))}
         </aside>
 
         <div className="settings-main">
-      <div className={`settings-card${activeSection === 'about' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">About</div>
-        <div className="settings-info-grid">
-          <InfoRow label="Hostname" value={stats?.hostname ?? '-'} />
-          <InfoRow label="Uptime" value={stats ? formatUptime(stats.uptimeSeconds) : '-'} />
-          <InfoRow label="CPU" value={stats ? `${Math.round(stats.cpuPercent)}%` : '-'} />
-          <InfoRow label="Memory" value={stats ? formatMemLabel(stats.memUsedBytes, stats.memTotalBytes) : '-'} />
-          <InfoRow label="Array label" value={status?.array.label || '(unset)'} />
-          <InfoRow label="Array health" value={status ? deriveProtection(status).short : '-'} />
-          <InfoRow
-            label="Array size"
-            value={
-              status
-                ? `${status.array.size.data_disk_count} data disk${status.array.size.data_disk_count === 1 ? '' : 's'}, ${status.array.size.data_gb} GB`
-                : '-'
-            }
-          />
-          <InfoRow label="Superblock" value={status?.array.superblock ?? '-'} mono />
-          <InfoRow label="Version" value={stats ? `v${stats.version}${stats.buildVersion ? ` (${stats.buildVersion})` : ''}` : '-'} mono />
-        </div>
-
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Hostname</div>
-          <div className="settings-field__row">
-            <input
-              className="history-input"
-              style={{ width: '100%' }}
-              value={hostnameDraft}
-              onChange={(e) => setHostnameDraft(e.target.value)}
-              disabled={!stats}
-            />
-            <button type="button" className="btn" disabled={hostnameSaving || !stats} onClick={saveHostname}>
-              {hostnameSaving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-          {hostnameResult && <div className="status-note">{hostnameResult}</div>}
-          {hostnameError && <div className="status-note status-note--error">{hostnameError}</div>}
-        </div>
-
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Timezone</div>
-          <div className="settings-field__row">
-            <select className="history-input" style={{ width: '100%' }} value={timezoneDraft} onChange={(e) => setTimezoneDraft(e.target.value)} disabled={!stats}>
-              {!timezones.includes(timezoneDraft) && timezoneDraft && <option value={timezoneDraft}>{timezoneDraft}</option>}
-              {timezones.map((tz) => (
-                <option key={tz} value={tz}>
-                  {tz}
-                </option>
-              ))}
-            </select>
-            <button type="button" className="btn" disabled={timezoneSaving || !stats} onClick={saveTimezone}>
-              {timezoneSaving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-          {timezoneResult && <div className="status-note">{timezoneResult}</div>}
-          {timezoneError && <div className="status-note status-note--error">{timezoneError}</div>}
-        </div>
-
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Time format</div>
-          <div className="settings-field__row">
-            <select
-              className="history-input"
-              style={{ width: '100%' }}
-              value={settings?.timeFormat ?? '12h'}
-              onChange={(e) => update({ timeFormat: e.target.value as '12h' | '24h' })}
-              disabled={!settings || saving}
-            >
-              <option value="12h">12-hour (2:30 PM)</option>
-              <option value="24h">24-hour (14:30)</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Setup tour</div>
-          <div className="toggle-row__desc">Walk back through array setup, cache, and the Apps/Docker/LXC/Notifications tour.</div>
-          <button type="button" className="btn" style={{ marginTop: 6 }} onClick={replay}>
-            Replay setup tour
-          </button>
-        </div>
-
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Reboot system</div>
-          <div className="toggle-row__desc">
-            Reboots the whole host, not just this app. The array stops and unmounts cleanly first (the normal
-            shutdown sequence - same as if you ran this at the console), then Docker, LXC, Samba, and NFS all stop
-            too. Everything comes back on its own once the host finishes booting; this page reconnects
-            automatically, no need to refresh by hand.
-          </div>
-          {!rebootConfirming ? (
-            <div className="settings-field__row">
-              <button type="button" className="btn" onClick={() => setRebootConfirming(true)}>
-                Reboot System
-              </button>
+          <div className={`settings-card${activeSection === 'about' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">About</div>
+            <div className="settings-info-grid">
+              <InfoRow label="Hostname" value={stats?.hostname ?? '-'} />
+              <InfoRow label="Uptime" value={stats ? formatUptime(stats.uptimeSeconds) : '-'} />
+              <InfoRow label="CPU" value={stats ? `${Math.round(stats.cpuPercent)}%` : '-'} />
+              <InfoRow label="Memory" value={stats ? formatMemLabel(stats.memUsedBytes, stats.memTotalBytes) : '-'} />
+              <InfoRow label="Array label" value={status?.array.label || '(unset)'} />
+              <InfoRow label="Array health" value={status ? deriveProtection(status).short : '-'} />
+              <InfoRow label="Array size" value={status ? `${status.array.size.data_disk_count} data disk${status.array.size.data_disk_count === 1 ? '' : 's'}, ${status.array.size.data_gb} GB` : '-'} />
+              <InfoRow label="Superblock" value={status?.array.superblock ?? '-'} mono />
+              <InfoRow label="Version" value={stats ? `v${stats.version}${stats.buildVersion ? ` (${stats.buildVersion})` : ''}` : '-'} mono />
             </div>
-          ) : (
-            <div className="settings-field__row">
-              <button type="button" className="btn" disabled={rebootRunning} onClick={() => setRebootConfirming(false)}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn--danger" disabled={rebootRunning} onClick={handleReboot}>
-                {rebootRunning ? 'Rebooting…' : 'Confirm Reboot'}
-              </button>
-            </div>
-          )}
-          {rebootResult && <div className="status-note">{rebootResult}</div>}
-          {rebootError && <div className="status-note status-note--error">{rebootError}</div>}
-        </div>
-      </div>
 
-      <div className={`settings-card${activeSection === 'network' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Network</div>
-        <div className="toggle-row__desc" style={{ marginBottom: 10 }}>
-          Interface addresses
-        </div>
-        {!stats ? (
-          <div className="status-note">Loading…</div>
-        ) : stats.networkInterfaces.length === 0 ? (
-          <div className="status-note">No network interfaces detected.</div>
-        ) : (
-          stats.networkInterfaces.map((iface, i) => (
-            <div key={iface.name} className={`toggle-row${i > 0 ? ' toggle-row--bordered' : ''}`}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
-                <div className="toggle-row__title">{iface.name}</div>
-                <InfoRow label="IPv4" value={iface.ipv4.join(', ') || '-'} mono />
-                <InfoRow label="IPv6" value={iface.ipv6.join(', ') || '-'} mono />
-                <InfoRow label="MAC" value={iface.mac ?? '-'} mono />
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Hostname</div>
+              <div className="settings-field__row">
+                <input className="history-input" style={{ width: '100%' }} value={hostnameDraft} onChange={(e) => setHostnameDraft(e.target.value)} disabled={!stats} />
+                <button type="button" className="btn" disabled={hostnameSaving || !stats} onClick={saveHostname}>
+                  {hostnameSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+              {hostnameResult && <div className="status-note">{hostnameResult}</div>}
+              {hostnameError && <div className="status-note status-note--error">{hostnameError}</div>}
+            </div>
+
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Timezone</div>
+              <div className="settings-field__row">
+                <select className="history-input" style={{ width: '100%' }} value={timezoneDraft} onChange={(e) => setTimezoneDraft(e.target.value)} disabled={!stats}>
+                  {!timezones.includes(timezoneDraft) && timezoneDraft && <option value={timezoneDraft}>{timezoneDraft}</option>}
+                  {timezones.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="btn" disabled={timezoneSaving || !stats} onClick={saveTimezone}>
+                  {timezoneSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+              {timezoneResult && <div className="status-note">{timezoneResult}</div>}
+              {timezoneError && <div className="status-note status-note--error">{timezoneError}</div>}
+            </div>
+
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Time format</div>
+              <div className="settings-field__row">
+                <select className="history-input" style={{ width: '100%' }} value={settings?.timeFormat ?? '12h'} onChange={(e) => update({ timeFormat: e.target.value as '12h' | '24h' })} disabled={!settings || saving}>
+                  <option value="12h">12-hour (2:30 PM)</option>
+                  <option value="24h">24-hour (14:30)</option>
+                </select>
               </div>
             </div>
-          ))
-        )}
-      </div>
 
-      <div className={`settings-card${activeSection === 'appearance' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Appearance</div>
-        <div className="settings-field">
-          <div className="toggle-row__title">Theme</div>
-          <div className="settings-field__row">
-            <select className="history-input" value={themePreference} onChange={(e) => setThemePreference(e.target.value as ThemePreference)}>
-              <option value="system">System</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-          </div>
-        </div>
-      </div>
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Setup tour</div>
+              <div className="toggle-row__desc">Walk back through array setup, cache, and the Apps/Docker/LXC/Notifications tour.</div>
+              <button type="button" className="btn" style={{ marginTop: 6 }} onClick={replay}>
+                Replay setup tour
+              </button>
+            </div>
 
-      <div className={`settings-card${activeSection === 'array' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Array</div>
-        <div className="toggle-row">
-          <div>
-            <div className="toggle-row__title">Turbo write</div>
-            <div className="toggle-row__desc">
-              Faster writes but at the expense of more power draw and all drives must be spun up on HDDs.
-              Best for large transfters, rebuilds, and parity checks.
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Reboot system</div>
+              <div className="toggle-row__desc">Reboots the whole host, not just this app. The array stops and unmounts cleanly first (the normal shutdown sequence - same as if you ran this at the console), then Docker, LXC, Samba, and NFS all stop too. Everything comes back on its own once the host finishes booting; this page reconnects automatically, no need to refresh by hand.</div>
+              {!rebootConfirming ? (
+                <div className="settings-field__row">
+                  <button type="button" className="btn" onClick={() => setRebootConfirming(true)}>
+                    Reboot System
+                  </button>
+                </div>
+              ) : (
+                <div className="settings-field__row">
+                  <button type="button" className="btn" disabled={rebootRunning} onClick={() => setRebootConfirming(false)}>
+                    Cancel
+                  </button>
+                  <button type="button" className="btn btn--danger" disabled={rebootRunning} onClick={handleReboot}>
+                    {rebootRunning ? 'Rebooting…' : 'Confirm Reboot'}
+                  </button>
+                </div>
+              )}
+              {rebootResult && <div className="status-note">{rebootResult}</div>}
+              {rebootError && <div className="status-note status-note--error">{rebootError}</div>}
             </div>
           </div>
-          <ToggleSwitch
-            on={settings?.turboWrite ?? false}
-            onToggle={() => settings && update({ turboWrite: !settings.turboWrite })}
-            label="Turbo write"
-            disabled={!settings || saving}
-          />
-        </div>
-        {saveError && <div className="status-note status-note--error">{saveError}</div>}
 
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Array label</div>
-          <div className="settings-field__row">
-            <input
-              className="history-input"
-              style={{ width: '100%' }}
-              value={labelDraft}
-              onChange={(e) => setLabelDraft(e.target.value)}
-              placeholder="(unset)"
-              disabled={!status}
-            />
-            <button type="button" className="btn" disabled={labelSaving || !status} onClick={saveLabel}>
-              {labelSaving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-          {arrayStarted && (
-            <div className="toggle-row__desc">Array must be stopped first.</div>
-          )}
-          {labelResult && <div className="status-note">{labelResult}</div>}
-          {labelError && <div className="status-note status-note--error">{labelError}</div>}
-        </div>
-
-        <div className="toggle-row toggle-row--bordered">
-          <div>
-            <div className="toggle-row__title">Superblock path</div>
-            <div className="toggle-row__desc toggle-row__desc--mono">{status?.array.superblock ?? '-'}</div>
-          </div>
-        </div>
-
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Reload driver</div>
-          <div className="toggle-row__desc">Resets stale internal counters - doesn't change array disks.</div>
-          <div className="settings-field__row" style={{ marginTop: 8 }}>
-            <ReloadDriverPrompt
-              description="Resets stale internal counters - doesn't change array disks. May leave the array briefly down; let it finish."
-              onReloaded={refreshArrayStatus}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className={`settings-card${activeSection === 'cache' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Cache</div>
-        <div className="toggle-row">
-          <div>
-            <div className="toggle-row__title">Use cache for pools</div>
-            <div className="toggle-row__desc">
-              Writes to the cache mirror first. A scheduled mover then drains cache onto the array below. Speeds up read/writes.
+          <div className={`settings-card${activeSection === 'network' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Network</div>
+            <div className="toggle-row__desc" style={{ marginBottom: 10 }}>
+              Interface addresses
             </div>
-          </div>
-          <ToggleSwitch on={cacheEnabled} onToggle={toggleCacheEnabled} label="Use cache for shares" disabled={!settings || cacheEnabledSaving} />
-        </div>
-        {cacheEnabledError && <div className="status-note status-note--error">{cacheEnabledError}</div>}
-
-        <div className="toggle-row toggle-row--bordered">
-          <div>
-            <div className="toggle-row__title">Automatic mover</div>
-            <div className="toggle-row__desc">
-              Moves everything on cache onto the array.
-            </div>
-          </div>
-          <ToggleSwitch on={cacheSchedEnabled} onToggle={() => setCacheSchedEnabled((v) => !v)} label="Automatic mover" disabled={!settings} />
-        </div>
-        <div className="settings-field toggle-row--bordered">
-          <ScheduleFields
-            frequency={cacheSchedFrequency}
-            onFrequencyChange={setCacheSchedFrequency}
-            dayOfWeek={cacheSchedDay}
-            onDayOfWeekChange={setCacheSchedDay}
-            dayOfMonth={cacheSchedDayOfMonth}
-            onDayOfMonthChange={setCacheSchedDayOfMonth}
-            hour={cacheSchedHour}
-            onHourChange={setCacheSchedHour}
-            hour12={settings?.timeFormat !== '24h'}
-            disabled={!settings}
-          />
-          <div className="settings-field__row">
-            <button type="button" className="btn" disabled={cacheSchedSaving || !settings} onClick={saveCacheSchedule}>
-              {cacheSchedSaving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        </div>
-
-        <div className="settings-field toggle-row--bordered">
-          <div>
-            <div className="toggle-row__title">Run mover now</div>
-            <div className="toggle-row__desc">
-              Moves cache onto the array now.
-              <br />
-              A file that's currently open (e.g. by a running Docker container) is skipped rather than failing the whole
-              run.
-              <br />
-              Stop anything actively using cache-hosted paths first for a complete move.
-            </div>
-          </div>
-          <div className="settings-field__row">
-            <button type="button" className="btn" disabled={cacheMoverSaving} onClick={runCacheMover}>
-              {cacheMoverSaving ? 'Starting…' : 'Move'}
-            </button>
-          </div>
-        </div>
-        {cacheMoverError && <div className="status-note status-note--error">{cacheMoverError}</div>}
-      </div>
-
-      <div className={`settings-card${activeSection === 'docker-lxc' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Docker &amp; LXC Storage</div>
-        <StorageLocationField
-          title="Docker"
-          desc="Location of docker system and image file storage."
-          dataDisks={dataDisks}
-          getStorage={dockerApi.getStorage}
-          moveStorage={dockerApi.moveStorage}
-        />
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Prune unused Docker images</div>
-          <div className="toggle-row__desc">
-            Remove unused docker images.
-          </div>
-          <button type="button" className="btn" disabled={dockerPruneSaving} onClick={handlePruneImages}>
-            {dockerPruneSaving ? 'Pruning…' : 'Prune Images'}
-          </button>
-          {dockerPruneResult && <div className="status-note">{dockerPruneResult}</div>}
-          {dockerPruneError && <div className="status-note status-note--error">{dockerPruneError}</div>}
-        </div>
-        <StorageLocationField
-          title="LXC"
-          desc="Where LXC container storage lives."
-          dataDisks={dataDisks}
-          getStorage={lxcApi.getStorage}
-          moveStorage={lxcApi.moveStorage}
-        />
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Clear LXC template cache</div>
-          <div className="toggle-row__desc">
-            Remove LXC distro cache.
-          </div>
-          <button type="button" className="btn" disabled={lxcPruneSaving} onClick={handlePruneTemplateCache}>
-            {lxcPruneSaving ? 'Clearing…' : 'Clear Cache'}
-          </button>
-          {lxcPruneResult && <div className="status-note">{lxcPruneResult}</div>}
-          {lxcPruneError && <div className="status-note status-note--error">{lxcPruneError}</div>}
-        </div>
-      </div>
-
-      <div className={`settings-card${activeSection === 'services' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Services</div>
-        <ServicesSection />
-      </div>
-
-      <div className={`settings-card${activeSection === 'logs' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">System Logs</div>
-        <LogsSection active={activeSection === 'logs'} />
-      </div>
-
-      <div className={`settings-card${activeSection === 'parity' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Parity</div>
-        <div className="toggle-row">
-          <div>
-            <div className="toggle-row__title">Automatic check</div>
-            <div className="toggle-row__desc">
-              Schedule a parity check.
-            </div>
-          </div>
-          <ToggleSwitch
-            on={paritySchedEnabled}
-            onToggle={() => setParitySchedEnabled((v) => !v)}
-            label="Automatic check"
-            disabled={!settings}
-          />
-        </div>
-        <div className="settings-field toggle-row--bordered">
-          <ScheduleFields
-            frequency={paritySchedFrequency}
-            onFrequencyChange={setParitySchedFrequency}
-            dayOfWeek={paritySchedDay}
-            onDayOfWeekChange={setParitySchedDay}
-            dayOfMonth={paritySchedDayOfMonth}
-            onDayOfMonthChange={setParitySchedDayOfMonth}
-            hour={paritySchedHour}
-            onHourChange={setParitySchedHour}
-            hour12={settings?.timeFormat !== '24h'}
-            disabled={!settings}
-          />
-          <div className="settings-field__row">
-            <button type="button" className="btn" disabled={paritySchedSaving || !settings} onClick={saveParitySchedule}>
-              {paritySchedSaving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className={`settings-card${activeSection === 'import' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Import Array</div>
-        <div className="toggle-row__desc">
-          Migrate from a previous NonRAID or Unraid array.
-        </div>
-        <div className="settings-field__row">
-          <button type="button" className="btn" onClick={() => setShowImportWizard(true)}>
-            Import array…
-          </button>
-        </div>
-      </div>
-
-      {showImportWizard && <ImportArrayWizard onClose={() => setShowImportWizard(false)} />}
-      {showConfigRestoreWizard && <ConfigRestoreWizard onClose={() => setShowConfigRestoreWizard(false)} />}
-
-      <div className={`settings-card${activeSection === 'shares' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Pools</div>
-        <div className="settings-field">
-          <div className="toggle-row__title">Minimum free space (GB)</div>
-          <div className="toggle-row__desc">
-            When a pool spans multiple disks, mergerfs won't pick a disk with less free space than this for a new
-            file. Its own default is 4GB.
-          </div>
-          <div className="settings-field__row">
-            <input
-              className="history-input"
-              type="number"
-              min={0}
-              step={1}
-              value={minFreeSpaceDraft}
-              onChange={(e) => setMinFreeSpaceDraft(e.target.value)}
-              disabled={!settings}
-            />
-            <button type="button" className="btn" disabled={minFreeSpaceSaving || !settings} onClick={saveMinFreeSpace}>
-              {minFreeSpaceSaving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-          {minFreeSpaceError && <div className="status-note status-note--error">{minFreeSpaceError}</div>}
-        </div>
-      </div>
-
-      <div className={`settings-card${activeSection === 'backups' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Backups</div>
-        <div className="toggle-row">
-          <div>
-            <div className="toggle-row__title">Automatic config backup</div>
-            <div className="toggle-row__desc">
-              Backsup Samba/NFS config, this app's settings/pools/shares/users, the array superblock, and docker config.
-              <br />
-              Set schedule and and location below. 
-            </div>
-          </div>
-          <ToggleSwitch on={backupSchedEnabled} onToggle={() => setBackupSchedEnabled((v) => !v)} label="Automatic config backup" disabled={!settings} />
-        </div>
-        <div className="settings-field toggle-row--bordered">
-          <ScheduleFields
-            frequency={backupSchedFrequency}
-            onFrequencyChange={setBackupSchedFrequency}
-            dayOfWeek={backupSchedDay}
-            onDayOfWeekChange={setBackupSchedDay}
-            dayOfMonth={backupSchedDayOfMonth}
-            onDayOfMonthChange={setBackupSchedDayOfMonth}
-            hour={backupSchedHour}
-            onHourChange={setBackupSchedHour}
-            hour12={settings?.timeFormat !== '24h'}
-            disabled={!settings}
-          />
-          <div className="toggle-row__title" style={{ marginTop: 10 }}>
-            Destination directory
-          </div>
-          <div className="settings-field__row">
-            <PathAutocomplete
-              scope="browse"
-              value={backupDestDirDraft}
-              onChange={setBackupDestDirDraft}
-              placeholder="/mnt/user/backups"
-              disabled={!settings}
-            />
-          </div>
-          <div className="toggle-row__title" style={{ marginTop: 10 }}>
-            Keep last
-          </div>
-          <div className="settings-field__row">
-            <input
-              className="history-input"
-              type="number"
-              min={1}
-              step={1}
-              value={backupRetainDraft}
-              onChange={(e) => setBackupRetainDraft(e.target.value)}
-              disabled={!settings}
-            />
-          </div>
-          <div className="settings-field__row">
-            <button type="button" className="btn" disabled={backupSchedSaving || !settings} onClick={saveBackupSchedule}>
-              {backupSchedSaving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-          {backupSchedError && <div className="status-note status-note--error">{backupSchedError}</div>}
-        </div>
-
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Back up config now</div>
-          <div className="settings-field__row">
-            <button type="button" className="btn" disabled={backupRunning || !settings} onClick={runBackupNow} title="Writes a config backup into the destination directory above, right now.">
-              {backupRunning ? 'Backing up…' : 'Back up now'}
-            </button>
-            <a
-              className="btn"
-              href={systemApi.bootDiskConfigBackupUrl()}
-              download
-              title="Downloads a config backup straight to this device's browser downloads - doesn't touch the array or its destination directory."
-            >
-              Download a copy
-            </a>
-          </div>
-          {backupRunResult && <div className="status-note">{backupRunResult}</div>}
-          {backupRunError && <div className="status-note status-note--error">{backupRunError}</div>}
-        </div>
-
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Import config</div>
-          <div className="toggle-row__desc">
-            Restores a previously saved config backup
-            <br />
-            Requires the array to be stopped first.
-            <br />
-            Note: this is not for restoring an array.
-          </div>
-          <div className="settings-field__row">
-            <button type="button" className="btn" onClick={() => setShowConfigRestoreWizard(true)}>
-              Import config
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className={`settings-card${activeSection === 'notifications' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Notifications</div>
-        <div className="toggle-row">
-          <div>
-            <div className="toggle-row__title">Apprise notifications</div>
-            <div className="toggle-row__desc">
-              Master switch for the Apprise channel below - the in-app bell/toast (Webui column) has no master
-              switch of its own, it's controlled purely per-event.
-            </div>
-          </div>
-          <ToggleSwitch
-            on={settings?.notifications.enabled ?? false}
-            onToggle={() => settings && update({ notifications: { enabled: !settings.notifications.enabled } })}
-            label="Apprise notifications"
-            disabled={!settings || saving}
-          />
-        </div>
-
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Which events notify</div>
-          <NotificationEventToggles
-            eventTypes={eventTypesDraft}
-            onChange={toggleEventChannel}
-            disabled={!settings}
-            renderExtra={(eventId) => {
-              if (eventId === 'tempAlertCpu') {
-                return (
-                  <div style={{ paddingLeft: 12, paddingBottom: 8 }}>
-                    <div className="settings-field__row">
-                      <input
-                        className="history-input"
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={1}
-                        value={cpuTempThresholdDraft}
-                        onChange={(e) => setCpuTempThresholdDraft(e.target.value)}
-                        disabled={!settings}
-                        style={{ width: 70 }}
-                      />
-                      <span className="toggle-row__desc">°C</span>
-                      <button type="button" className="btn" disabled={cpuTempThresholdSaving || !settings} onClick={saveCpuTempThreshold}>
-                        {cpuTempThresholdSaving ? 'Saving…' : 'Save'}
-                      </button>
-                    </div>
-                    {cpuTempThresholdError && <div className="status-note status-note--error">{cpuTempThresholdError}</div>}
+            {!stats ? (
+              <div className="status-note">Loading…</div>
+            ) : stats.networkInterfaces.length === 0 ? (
+              <div className="status-note">No network interfaces detected.</div>
+            ) : (
+              stats.networkInterfaces.map((iface, i) => (
+                <div key={iface.name} className={`toggle-row${i > 0 ? ' toggle-row--bordered' : ''}`}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 4,
+                      width: '100%',
+                    }}
+                  >
+                    <div className="toggle-row__title">{iface.name}</div>
+                    <InfoRow label="IPv4" value={iface.ipv4.join(', ') || '-'} mono />
+                    <InfoRow label="IPv6" value={iface.ipv6.join(', ') || '-'} mono />
+                    <InfoRow label="MAC" value={iface.mac ?? '-'} mono />
                   </div>
-                );
-              }
-              if (eventId === 'tempAlertDisk') {
-                return (
-                  <div style={{ paddingLeft: 12, paddingBottom: 8 }}>
-                    <div className="settings-field__row">
-                      <input
-                        className="history-input"
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={1}
-                        value={diskTempThresholdDraft}
-                        onChange={(e) => setDiskTempThresholdDraft(e.target.value)}
-                        disabled={!settings}
-                        style={{ width: 70 }}
-                      />
-                      <span className="toggle-row__desc">°C</span>
-                      <button type="button" className="btn" disabled={diskTempThresholdSaving || !settings} onClick={saveDiskTempThreshold}>
-                        {diskTempThresholdSaving ? 'Saving…' : 'Save'}
-                      </button>
-                    </div>
-                    {diskTempThresholdError && <div className="status-note status-note--error">{diskTempThresholdError}</div>}
-                  </div>
-                );
-              }
-              return null;
-            }}
-          />
-        </div>
-
-        <div className="settings-field toggle-row--bordered">
-          <div className="toggle-row__title">Apprise target URLs</div>
-          <div className="toggle-row__desc">
-            One or more{' '}
-            <a href="https://github.com/caronc/apprise#popular-notification-services" target="_blank" rel="noreferrer">
-              apprise service URLs
-            </a>
-            , space or newline separated (e.g. mailto://, discord://, pushover://).
+                </div>
+              ))
+            )}
           </div>
-          <textarea
-            className="history-input settings-textarea"
-            value={appriseDraft}
-            onChange={(e) => setAppriseDraft(e.target.value)}
-            placeholder="mailto://user:pass@gmail.com"
-            rows={3}
-          />
-          <div className="settings-field__row">
-            <button type="button" className="btn" disabled={saving} onClick={saveNotifications}>
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-            <button type="button" className="btn" disabled={testSending} onClick={sendTest}>
-              {testSending ? 'Sending…' : 'Send test notification'}
-            </button>
-          </div>
-          {testResult && <div className="status-note">{testResult}</div>}
-          {testError && <div className="status-note status-note--error">{testError}</div>}
-        </div>
-      </div>
 
-      <div className={`settings-card${activeSection === 'security' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Security</div>
-        <TlsSection />
-        <div className="toggle-row">
-          <div>
-            <div className="toggle-row__title">Trust reverse proxy</div>
-            <div className="toggle-row__desc">
-              Only enable if a reverse proxy is the sole way to reach this backend (it's firewalled off from any
-              other direct access) and that proxy always sets/overwrites X-Forwarded-Proto/Host/For itself -
-              otherwise a direct client could spoof those headers to fake an HTTPS connection or dodge login/TOTP
-              rate limiting. Once enabled, the session cookie's Secure flag and passkey RP ID/origin are detected
-              from the request automatically, no need to set them by hand.
+          <div className={`settings-card${activeSection === 'appearance' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Appearance</div>
+            <div className="settings-field">
+              <div className="toggle-row__title">Theme</div>
+              <div className="settings-field__row">
+                <select className="history-input" value={themePreference} onChange={(e) => setThemePreference(e.target.value as ThemePreference)}>
+                  <option value="system">System</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                </select>
+              </div>
             </div>
           </div>
-          <ToggleSwitch
-            on={settings?.trustProxy ?? false}
-            onToggle={() => settings && update({ trustProxy: !settings.trustProxy })}
-            label="Trust reverse proxy"
-            disabled={!settings || saving}
-          />
-        </div>
-        <div className="settings-field">
-          <div className="toggle-row__title">Change admin password</div>
-          <div className="toggle-row__desc">
-            Also signs out every other session.
-            early.
-          </div>
-          <input
-            type="password"
-            className="history-input"
-            style={{ width: '100%' }}
-            value={currentPasswordDraft}
-            onChange={(e) => setCurrentPasswordDraft(e.target.value)}
-            placeholder="Current password"
-            autoComplete="current-password"
-          />
-          <input
-            type="password"
-            className="history-input"
-            style={{ width: '100%' }}
-            value={newPasswordDraft}
-            onChange={(e) => setNewPasswordDraft(e.target.value)}
-            placeholder="New password"
-            autoComplete="new-password"
-          />
-          <input
-            type="password"
-            className="history-input"
-            style={{ width: '100%' }}
-            value={confirmPasswordDraft}
-            onChange={(e) => setConfirmPasswordDraft(e.target.value)}
-            placeholder="Confirm new password"
-            autoComplete="new-password"
-          />
-          <div className="settings-field__row">
-            <button type="button" className="btn" disabled={passwordSaving} onClick={changePassword}>
-              {passwordSaving ? 'Changing…' : 'Change password'}
-            </button>
-          </div>
-          {passwordResult && <div className="status-note">{passwordResult}</div>}
-          {passwordError && <div className="status-note status-note--error">{passwordError}</div>}
-        </div>
 
-        <TwoFactorSection />
-        <PasskeySection />
-      </div>
+          <div className={`settings-card${activeSection === 'array' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Array</div>
+            <div className="toggle-row">
+              <div>
+                <div className="toggle-row__title">Turbo write</div>
+                <div className="toggle-row__desc">Faster writes but at the expense of more power draw and all drives must be spun up on HDDs. Best for large transfters, rebuilds, and parity checks.</div>
+              </div>
+              <ToggleSwitch on={settings?.turboWrite ?? false} onToggle={() => settings && update({ turboWrite: !settings.turboWrite })} label="Turbo write" disabled={!settings || saving} />
+            </div>
+            {saveError && <div className="status-note status-note--error">{saveError}</div>}
 
-      <div className={`settings-card${activeSection === 'tailscale' ? '' : ' settings-hidden'}`}>
-        <div className="settings-card__title">Tailscale</div>
-        <TailscaleSection />
-      </div>
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Array label</div>
+              <div className="settings-field__row">
+                <input className="history-input" style={{ width: '100%' }} value={labelDraft} onChange={(e) => setLabelDraft(e.target.value)} placeholder="(unset)" disabled={!status} />
+                <button type="button" className="btn" disabled={labelSaving || !status} onClick={saveLabel}>
+                  {labelSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+              {arrayStarted && <div className="toggle-row__desc">Array must be stopped first.</div>}
+              {labelResult && <div className="status-note">{labelResult}</div>}
+              {labelError && <div className="status-note status-note--error">{labelError}</div>}
+            </div>
+
+            <div className="toggle-row toggle-row--bordered">
+              <div>
+                <div className="toggle-row__title">Superblock path</div>
+                <div className="toggle-row__desc toggle-row__desc--mono">{status?.array.superblock ?? '-'}</div>
+              </div>
+            </div>
+
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Reload driver</div>
+              <div className="toggle-row__desc">Resets stale internal counters - doesn't change array disks.</div>
+              <div className="settings-field__row" style={{ marginTop: 8 }}>
+                <ReloadDriverPrompt description="Resets stale internal counters - doesn't change array disks. May leave the array briefly down; let it finish." onReloaded={refreshArrayStatus} />
+              </div>
+            </div>
+          </div>
+
+          <div className={`settings-card${activeSection === 'cache' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Cache</div>
+            <div className="toggle-row">
+              <div>
+                <div className="toggle-row__title">Use cache for pools</div>
+                <div className="toggle-row__desc">Writes to the cache mirror first. A scheduled mover then drains cache onto the array below. Speeds up read/writes.</div>
+              </div>
+              <ToggleSwitch on={cacheEnabled} onToggle={toggleCacheEnabled} label="Use cache for shares" disabled={!settings || cacheEnabledSaving} />
+            </div>
+            {cacheEnabledError && <div className="status-note status-note--error">{cacheEnabledError}</div>}
+
+            <div className="toggle-row toggle-row--bordered">
+              <div>
+                <div className="toggle-row__title">Automatic mover</div>
+                <div className="toggle-row__desc">Moves everything on cache onto the array.</div>
+              </div>
+              <ToggleSwitch on={cacheSchedEnabled} onToggle={() => setCacheSchedEnabled((v) => !v)} label="Automatic mover" disabled={!settings} />
+            </div>
+            <div className="settings-field toggle-row--bordered">
+              <ScheduleFields frequency={cacheSchedFrequency} onFrequencyChange={setCacheSchedFrequency} dayOfWeek={cacheSchedDay} onDayOfWeekChange={setCacheSchedDay} dayOfMonth={cacheSchedDayOfMonth} onDayOfMonthChange={setCacheSchedDayOfMonth} hour={cacheSchedHour} onHourChange={setCacheSchedHour} hour12={settings?.timeFormat !== '24h'} disabled={!settings} />
+              <div className="settings-field__row">
+                <button type="button" className="btn" disabled={cacheSchedSaving || !settings} onClick={saveCacheSchedule}>
+                  {cacheSchedSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-field toggle-row--bordered">
+              <div>
+                <div className="toggle-row__title">Run mover now</div>
+                <div className="toggle-row__desc">
+                  Moves cache onto the array now.
+                  <br />
+                  A file that's currently open (e.g. by a running Docker container) is skipped rather than failing the whole run.
+                  <br />
+                  Stop anything actively using cache-hosted paths first for a complete move.
+                </div>
+              </div>
+              <div className="settings-field__row">
+                <button type="button" className="btn" disabled={cacheMoverSaving} onClick={runCacheMover}>
+                  {cacheMoverSaving ? 'Starting…' : 'Move'}
+                </button>
+              </div>
+            </div>
+            {cacheMoverError && <div className="status-note status-note--error">{cacheMoverError}</div>}
+          </div>
+
+          <div className={`settings-card${activeSection === 'docker-lxc' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Docker &amp; LXC Storage</div>
+            <StorageLocationField title="Docker" desc="Location of docker system and image file storage." dataDisks={dataDisks} getStorage={dockerApi.getStorage} moveStorage={dockerApi.moveStorage} />
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Prune unused Docker images</div>
+              <div className="toggle-row__desc">Remove unused docker images.</div>
+              <button type="button" className="btn" disabled={dockerPruneSaving} onClick={handlePruneImages}>
+                {dockerPruneSaving ? 'Pruning…' : 'Prune Images'}
+              </button>
+              {dockerPruneResult && <div className="status-note">{dockerPruneResult}</div>}
+              {dockerPruneError && <div className="status-note status-note--error">{dockerPruneError}</div>}
+            </div>
+            <StorageLocationField title="LXC" desc="Where LXC container storage lives." dataDisks={dataDisks} getStorage={lxcApi.getStorage} moveStorage={lxcApi.moveStorage} />
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Clear LXC template cache</div>
+              <div className="toggle-row__desc">Remove LXC distro cache.</div>
+              <button type="button" className="btn" disabled={lxcPruneSaving} onClick={handlePruneTemplateCache}>
+                {lxcPruneSaving ? 'Clearing…' : 'Clear Cache'}
+              </button>
+              {lxcPruneResult && <div className="status-note">{lxcPruneResult}</div>}
+              {lxcPruneError && <div className="status-note status-note--error">{lxcPruneError}</div>}
+            </div>
+          </div>
+
+          <div className={`settings-card${activeSection === 'services' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Services</div>
+            <ServicesSection />
+          </div>
+
+          <div className={`settings-card${activeSection === 'logs' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">System Logs</div>
+            <LogsSection active={activeSection === 'logs'} />
+          </div>
+
+          <div className={`settings-card${activeSection === 'parity' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Parity</div>
+            <div className="toggle-row">
+              <div>
+                <div className="toggle-row__title">Automatic check</div>
+                <div className="toggle-row__desc">Schedule a parity check.</div>
+              </div>
+              <ToggleSwitch on={paritySchedEnabled} onToggle={() => setParitySchedEnabled((v) => !v)} label="Automatic check" disabled={!settings} />
+            </div>
+            <div className="settings-field toggle-row--bordered">
+              <ScheduleFields frequency={paritySchedFrequency} onFrequencyChange={setParitySchedFrequency} dayOfWeek={paritySchedDay} onDayOfWeekChange={setParitySchedDay} dayOfMonth={paritySchedDayOfMonth} onDayOfMonthChange={setParitySchedDayOfMonth} hour={paritySchedHour} onHourChange={setParitySchedHour} hour12={settings?.timeFormat !== '24h'} disabled={!settings} />
+              <div className="settings-field__row">
+                <button type="button" className="btn" disabled={paritySchedSaving || !settings} onClick={saveParitySchedule}>
+                  {paritySchedSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className={`settings-card${activeSection === 'import' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Import Array</div>
+            <div className="toggle-row__desc">Migrate from a previous NonRAID or Unraid array.</div>
+            <div className="settings-field__row">
+              <button type="button" className="btn" onClick={() => setShowImportWizard(true)}>
+                Import array…
+              </button>
+            </div>
+          </div>
+
+          {showImportWizard && <ImportArrayWizard onClose={() => setShowImportWizard(false)} />}
+
+          <div className={`settings-card${activeSection === 'shares' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Pools</div>
+            <div className="settings-field">
+              <div className="toggle-row__title">Minimum free space (GB)</div>
+              <div className="toggle-row__desc">When a pool spans multiple disks, mergerfs won't pick a disk with less free space than this for a new file. Its own default is 4GB.</div>
+              <div className="settings-field__row">
+                <input className="history-input" type="number" min={0} step={1} value={minFreeSpaceDraft} onChange={(e) => setMinFreeSpaceDraft(e.target.value)} disabled={!settings} />
+                <button type="button" className="btn" disabled={minFreeSpaceSaving || !settings} onClick={saveMinFreeSpace}>
+                  {minFreeSpaceSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+              {minFreeSpaceError && <div className="status-note status-note--error">{minFreeSpaceError}</div>}
+            </div>
+          </div>
+
+          <div className={`settings-card${activeSection === 'backups' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title settings-card__title--with-link">
+              <span>Local Backups</span>
+              <Link to="/settings#recovery" className="settings-card__title-link">
+                Recovery →
+              </Link>
+            </div>
+            <div className="toggle-row">
+              <div>
+                <div className="toggle-row__title">Automatic config backup</div>
+                <div className="toggle-row__desc">
+                  Backs up Samba/NFS config, this app's settings/pools/shares/users, the array superblock, and Docker config.
+                  <br />
+                  Set schedule and location below.
+                </div>
+              </div>
+              <ToggleSwitch on={backupSchedEnabled} onToggle={() => setBackupSchedEnabled((v) => !v)} label="Automatic config backup" disabled={!settings} />
+            </div>
+            {backupSchedEnabled && (
+              <>
+                <div className="settings-field toggle-row--bordered">
+                  <label className="field" style={{ maxWidth: 280 }}>
+                    <span className="settings-field__label">What to back up</span>
+                    <select className="history-input" value={backupSchedScope} onChange={(e) => setBackupSchedScope(e.target.value as 'config' | 'configAppdata')} disabled={!settings}>
+                      <option value="config">Config backups</option>
+                      <option value="configAppdata">Config backups + appdata</option>
+                    </select>
+                  </label>
+
+                  <div className="toggle-row__title" style={{ marginTop: 10 }}>
+                    Destination
+                  </div>
+                  <div className="settings-field__row">
+                    <select
+                      className="history-input"
+                      value={backupDestMode === 'array' ? `disk-${backupDestDiskSlot}` : backupDestMode}
+                      onChange={(e) => {
+                        if (e.target.value === 'boot' || e.target.value === 'custom') {
+                          setBackupDestMode(e.target.value);
+                          setBackupDestDiskSlot(null);
+                        } else {
+                          setBackupDestMode('array');
+                          setBackupDestDiskSlot(Number(e.target.value.replace('disk-', '')));
+                        }
+                      }}
+                      disabled={!settings}
+                    >
+                      <option value="boot">Boot Disk</option>
+                      {dataDisks.map((d) => (
+                        <option key={d.slot} value={`disk-${d.slot}`}>
+                          {d.label}
+                        </option>
+                      ))}
+                      <option value="custom">Custom…</option>
+                    </select>
+                  </div>
+                  {backupDestMode === 'custom' && (
+                    <>
+                      <div className="toggle-row__title" style={{ marginTop: 10 }}>
+                        Path
+                      </div>
+                      <div className="settings-field__row">
+                        <PathAutocomplete scope="browse" value={backupDestCustomPath} onChange={setBackupDestCustomPath} placeholder="/mnt/user/backups" disabled={!settings} />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="toggle-row__title" style={{ marginTop: 10 }}>
+                    Keep last
+                  </div>
+                  <div className="settings-field__row">
+                    <input className="history-input" type="number" min={1} step={1} value={backupRetainDraft} onChange={(e) => setBackupRetainDraft(e.target.value)} disabled={!settings || backupRetainForever} style={backupRetainForever ? { opacity: 0.4 } : undefined} />
+                  </div>
+                  <div className="keep-forever-row">
+                    <input className="round-checkbox" type="checkbox" id="local-keep-forever" checked={backupRetainForever} onChange={(e) => setBackupRetainForever(e.target.checked)} disabled={!settings} />
+                    <label htmlFor="local-keep-forever">Keep all backups forever</label>
+                  </div>
+
+                  <div className="schedule-row" style={{ marginTop: 10 }}>
+                    <div className="schedule-row__label">Schedule</div>
+                    <ScheduleFields frequency={backupSchedFrequency} onFrequencyChange={setBackupSchedFrequency} dayOfWeek={backupSchedDay} onDayOfWeekChange={setBackupSchedDay} dayOfMonth={backupSchedDayOfMonth} onDayOfMonthChange={setBackupSchedDayOfMonth} hour={backupSchedHour} onHourChange={setBackupSchedHour} hour12={settings?.timeFormat !== '24h'} disabled={!settings} allowCron cronExpression={backupCronExpression} onCronExpressionChange={setBackupCronExpression} />
+                  </div>
+
+                  <div className="settings-field__row" style={{ marginTop: 10 }}>
+                    <button type="button" className="btn" disabled={backupSchedSaving || !settings} onClick={saveBackupSchedule}>
+                      {backupSchedSaving ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                  {backupSchedError && <div className="status-note status-note--error">{backupSchedError}</div>}
+                </div>
+
+                <div className="settings-field toggle-row--bordered">
+                  <div className="toggle-row__title">Back up config now</div>
+                  <div className="settings-field__row">
+                    <button type="button" className="btn" disabled={backupRunning || !settings} onClick={runBackupNow} title="Writes a config backup into the destination directory above, right now.">
+                      {backupRunning ? 'Backing up…' : 'Back up now'}
+                    </button>
+                    <a className="btn" href={systemApi.bootDiskConfigBackupUrl()} download title="Downloads a config backup straight to this device's browser downloads - doesn't touch the array or its destination directory.">
+                      Download a copy
+                    </a>
+                  </div>
+                  {backupRunResult && <div className="status-note">{backupRunResult}</div>}
+                  {backupRunError && <div className="status-note status-note--error">{backupRunError}</div>}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className={activeSection === 'backups' ? '' : 'settings-hidden'}>
+            <RemoteBackupSection />
+          </div>
+
+          <div className={`settings-card${activeSection === 'recovery' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Recovery</div>
+            {showConfigRestoreWizard ? (
+              <ConfigRestoreWizard onClose={() => setShowConfigRestoreWizard(false)} />
+            ) : (
+              <div className="settings-field toggle-row--bordered">
+                <div className="toggle-row__title">Import config</div>
+                <div className="toggle-row__desc">Restore this app's settings/pools/shares/users, Samba/NFS config, and the array superblock from a previously-saved config backup.</div>
+                <div className="settings-field__row">
+                  <button type="button" className="btn" onClick={() => setShowConfigRestoreWizard(true)}>
+                    Import config…
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className={`settings-card${activeSection === 'notifications' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Notifications</div>
+            <div className="toggle-row">
+              <div>
+                <div className="toggle-row__title">Apprise notifications</div>
+                <div className="toggle-row__desc">Master switch for the Apprise channel below - the in-app bell/toast (Webui column) has no master switch of its own, it's controlled purely per-event.</div>
+              </div>
+              <ToggleSwitch
+                on={settings?.notifications.enabled ?? false}
+                onToggle={() =>
+                  settings &&
+                  update({
+                    notifications: { enabled: !settings.notifications.enabled },
+                  })
+                }
+                label="Apprise notifications"
+                disabled={!settings || saving}
+              />
+            </div>
+
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Which events notify</div>
+              <NotificationEventToggles
+                eventTypes={eventTypesDraft}
+                onChange={toggleEventChannel}
+                disabled={!settings}
+                renderExtra={(eventId) => {
+                  if (eventId === 'tempAlertCpu') {
+                    return (
+                      <div style={{ paddingLeft: 12, paddingBottom: 8 }}>
+                        <div className="settings-field__row">
+                          <input className="history-input" type="number" min={0} max={100} step={1} value={cpuTempThresholdDraft} onChange={(e) => setCpuTempThresholdDraft(e.target.value)} disabled={!settings} style={{ width: 70 }} />
+                          <span className="toggle-row__desc">°C</span>
+                          <button type="button" className="btn" disabled={cpuTempThresholdSaving || !settings} onClick={saveCpuTempThreshold}>
+                            {cpuTempThresholdSaving ? 'Saving…' : 'Save'}
+                          </button>
+                        </div>
+                        {cpuTempThresholdError && <div className="status-note status-note--error">{cpuTempThresholdError}</div>}
+                      </div>
+                    );
+                  }
+                  if (eventId === 'tempAlertDisk') {
+                    return (
+                      <div style={{ paddingLeft: 12, paddingBottom: 8 }}>
+                        <div className="settings-field__row">
+                          <input className="history-input" type="number" min={0} max={100} step={1} value={diskTempThresholdDraft} onChange={(e) => setDiskTempThresholdDraft(e.target.value)} disabled={!settings} style={{ width: 70 }} />
+                          <span className="toggle-row__desc">°C</span>
+                          <button type="button" className="btn" disabled={diskTempThresholdSaving || !settings} onClick={saveDiskTempThreshold}>
+                            {diskTempThresholdSaving ? 'Saving…' : 'Save'}
+                          </button>
+                        </div>
+                        {diskTempThresholdError && <div className="status-note status-note--error">{diskTempThresholdError}</div>}
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+            </div>
+
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">Apprise target URLs</div>
+              <div className="toggle-row__desc">
+                One or more{' '}
+                <a href="https://github.com/caronc/apprise#popular-notification-services" target="_blank" rel="noreferrer">
+                  apprise service URLs
+                </a>
+                , space or newline separated (e.g. mailto://, discord://, pushover://).
+              </div>
+              <textarea className="history-input settings-textarea" value={appriseDraft} onChange={(e) => setAppriseDraft(e.target.value)} placeholder="mailto://user:pass@gmail.com" rows={3} />
+              <div className="settings-field__row">
+                <button type="button" className="btn" disabled={saving} onClick={saveNotifications}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button type="button" className="btn" disabled={testSending} onClick={sendTest}>
+                  {testSending ? 'Sending…' : 'Send test notification'}
+                </button>
+              </div>
+              {testResult && <div className="status-note">{testResult}</div>}
+              {testError && <div className="status-note status-note--error">{testError}</div>}
+            </div>
+          </div>
+
+          <div className={`settings-card${activeSection === 'security' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Security</div>
+            <TlsSection />
+            <div className="toggle-row">
+              <div>
+                <div className="toggle-row__title">Trust reverse proxy</div>
+                <div className="toggle-row__desc">Only enable if a reverse proxy is the sole way to reach this backend (it's firewalled off from any other direct access) and that proxy always sets/overwrites X-Forwarded-Proto/Host/For itself - otherwise a direct client could spoof those headers to fake an HTTPS connection or dodge login/TOTP rate limiting. Once enabled, the session cookie's Secure flag and passkey RP ID/origin are detected from the request automatically, no need to set them by hand.</div>
+              </div>
+              <ToggleSwitch on={settings?.trustProxy ?? false} onToggle={() => settings && update({ trustProxy: !settings.trustProxy })} label="Trust reverse proxy" disabled={!settings || saving} />
+            </div>
+            <div className="settings-field">
+              <div className="toggle-row__title">Change admin password</div>
+              <div className="toggle-row__desc">Also signs out every other session. early.</div>
+              <input type="password" className="history-input" style={{ width: '100%' }} value={currentPasswordDraft} onChange={(e) => setCurrentPasswordDraft(e.target.value)} placeholder="Current password" autoComplete="current-password" />
+              <input type="password" className="history-input" style={{ width: '100%' }} value={newPasswordDraft} onChange={(e) => setNewPasswordDraft(e.target.value)} placeholder="New password" autoComplete="new-password" />
+              <input type="password" className="history-input" style={{ width: '100%' }} value={confirmPasswordDraft} onChange={(e) => setConfirmPasswordDraft(e.target.value)} placeholder="Confirm new password" autoComplete="new-password" />
+              <div className="settings-field__row">
+                <button type="button" className="btn" disabled={passwordSaving} onClick={changePassword}>
+                  {passwordSaving ? 'Changing…' : 'Change password'}
+                </button>
+              </div>
+              {passwordResult && <div className="status-note">{passwordResult}</div>}
+              {passwordError && <div className="status-note status-note--error">{passwordError}</div>}
+            </div>
+
+            <TwoFactorSection />
+            <PasskeySection />
+          </div>
+
+          <div className={`settings-card${activeSection === 'tailscale' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Tailscale</div>
+            <TailscaleSection />
+          </div>
         </div>
       </div>
     </div>
