@@ -64,11 +64,30 @@ export interface BackupDestination {
   customPath: string;
 }
 
+// What the server actually returns for Local Backups' own encryption state - never the real
+// (obscured) password, see backend/src/settings/backupEncryption.ts's redactEncryption() doc
+// comment. `hasPassword` drives a "leave blank to keep the current password" placeholder instead
+// of an empty-looks-unset field when a password's already saved.
+export interface BackupEncryption {
+  enabled: boolean;
+  hasPassword: boolean;
+}
+
+// The write shape sent on PUT /settings - `password` is plaintext and write-only (never
+// round-tripped back, see BackupEncryption above), and only actually required the first time
+// `enabled` turns on with nothing saved yet; blank/omitted on a later save means "keep the
+// current saved password".
+export interface BackupEncryptionInput {
+  enabled?: boolean;
+  password?: string;
+}
+
 export interface BackupSchedule extends RecurringSchedule {
   scope: BackupScope;
   destination: BackupDestination;
   retain: number;
   retainForever: boolean;
+  encryption: BackupEncryption;
 }
 
 export type CacheSchedule = RecurringSchedule;
@@ -112,7 +131,7 @@ export type AppSettingsUpdate = Partial<{
   };
   minFreeSpaceGb: number;
   paritySchedule: Partial<ParitySchedule>;
-  backupSchedule: Partial<BackupSchedule>;
+  backupSchedule: Partial<Omit<BackupSchedule, 'encryption'>> & { encryption?: BackupEncryptionInput };
   tempAlerts: Partial<TempAlertSettings>;
   lxcStorage: Partial<StorageLocation>;
   cache: Partial<CacheSettings>;
