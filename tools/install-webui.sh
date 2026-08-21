@@ -39,7 +39,10 @@ LOG_DIR=/var/log/nonraid-webui
 LOG_FILE="$LOG_DIR/install-$(date +%Y%m%d-%H%M%S).log"
 
 log() { echo "==> $*"; }
-fail() { echo "ERROR: $*" >&2; exit 1; }
+fail() {
+  echo "ERROR: $*" >&2
+  exit 1
+}
 
 require_root() {
   [ "$(id -u)" = 0 ] || fail "must be run as root (sudo tools/install-webui.sh)."
@@ -143,9 +146,9 @@ install_smb_conf() {
   if [ -f "$smb_conf" ] && grep -q '# === nonraid-webui:managed-shares:begin ===' "$smb_conf"; then
     local smb_tmp
     smb_tmp="$(mktemp)"
-    sed -n '1,/# === nonraid-webui:managed-shares:begin ===/p' "$smb_template" > "$smb_tmp"
-    sed -n '/# === nonraid-webui:managed-shares:begin ===/,/# === nonraid-webui:managed-shares:end ===/p' "$smb_conf" | sed '1d;$d' >> "$smb_tmp"
-    sed -n '/# === nonraid-webui:managed-shares:end ===/,$p' "$smb_template" >> "$smb_tmp"
+    sed -n '1,/# === nonraid-webui:managed-shares:begin ===/p' "$smb_template" >"$smb_tmp"
+    sed -n '/# === nonraid-webui:managed-shares:begin ===/,/# === nonraid-webui:managed-shares:end ===/p' "$smb_conf" | sed '1d;$d' >>"$smb_tmp"
+    sed -n '/# === nonraid-webui:managed-shares:end ===/,$p' "$smb_template" >>"$smb_tmp"
     install -m 644 "$smb_tmp" "$smb_conf"
     rm -f "$smb_tmp"
   else
@@ -181,8 +184,8 @@ ensure_mergerfs() {
     local arch mergerfs_deb_url mergerfs_tmp
     arch="$(dpkg --print-architecture)"
     log "Installing mergerfs from the upstream GitHub release (arch: $arch)"
-    mergerfs_deb_url="$(curl -fsSL https://api.github.com/repos/trapexit/mergerfs/releases/latest \
-      | grep -oP '"browser_download_url":\s*"\K[^"]+debian-trixie_'"$arch"'\.deb' | head -1)"
+    mergerfs_deb_url="$(curl -fsSL https://api.github.com/repos/trapexit/mergerfs/releases/latest |
+      grep -oP '"browser_download_url":\s*"\K[^"]+debian-trixie_'"$arch"'\.deb' | head -1)"
     [ -n "$mergerfs_deb_url" ] || fail "Could not find a mergerfs debian-trixie_$arch.deb in the latest GitHub release — check https://github.com/trapexit/mergerfs/releases manually."
     mergerfs_tmp="$(mktemp --suffix=.deb)"
     curl -fsSL -o "$mergerfs_tmp" "$mergerfs_deb_url"
@@ -234,7 +237,7 @@ ensure_rclone() {
     {
       echo "RCLONE_RC_USER=nonraid"
       echo "RCLONE_RC_PASS=$(openssl rand -hex 24)"
-    } > "$rc_env_file"
+    } >"$rc_env_file"
     chmod 600 "$rc_env_file"
   else
     log "$rc_env_file already exists - leaving it as-is"
@@ -242,9 +245,18 @@ ensure_rclone() {
 }
 
 install_node() {
-  log "Installing Node.js 22.x from NodeSource"
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-  apt-get install -y nodejs
+  log "Installing Node.js 22.x from Nodejs"
+  mkdir -p /usr/local/lib/nodejs
+  wget -q -O /tmp/nodejs.tar.xz 'https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.xz'
+  tar -xJf /tmp/nodejs.tar.xz -C /usr/local/lib/nodejs
+
+  ln -sfn /usr/local/lib/nodejs/node-v22.23.2-linux-x64 /usr/local/lib/nodejs/current
+
+  ln -sfn /usr/local/lib/nodejs/current/bin/node /usr/bin/node
+  ln -sfn /usr/local/lib/nodejs/current/bin/npm /usr/bin/npm
+  ln -sfn /usr/local/lib/nodejs/current/bin/npx /usr/bin/npx
+  ln -sfn /usr/local/lib/nodejs/current/bin/corepack /usr/bin/corepack
+
 }
 
 check_node_version() {
@@ -288,12 +300,14 @@ fetch_nonraid_source() {
     # there rather than aborting the whole install.
     if git -C "$NONRAID_SRC_DIR" fetch origin main; then
       git -C "$NONRAID_SRC_DIR" reset --hard origin/main
+      chown -R root:root "$NONRAID_SRC_DIR"
     else
       log "Could not reach $NONRAID_REPO_URL (offline?) — building from the existing checkout at $NONRAID_SRC_DIR as-is"
     fi
   else
     rm -rf "$NONRAID_SRC_DIR"
     git clone --branch main "$NONRAID_REPO_URL" "$NONRAID_SRC_DIR"
+    chown -R root:root "$NONRAID_SRC_DIR"
   fi
 }
 
@@ -505,6 +519,7 @@ update_driver() {
 # afterward to actually rebuild and redeploy from it.
 update_script() {
   log "Pulling latest nonraid-webui in $REPO_ROOT"
+  chown -R root:root "$NONRAID_SRC_DIR"
   git -C "$REPO_ROOT" pull
 }
 
@@ -610,22 +625,22 @@ main() {
   local -a selected=()
   while [ $# -gt 0 ]; do
     case "$1" in
-      --step)
-        [ -n "${2:-}" ] || fail "--step requires a step name — see --list-steps."
-        add_selected_step "$2"
-        shift 2
-        ;;
-      --list-steps)
-        printf '%s\n' "${STEPS[@]}" "${SHORTCUTS[@]}"
-        exit 0
-        ;;
-      -h | --help)
-        usage
-        exit 0
-        ;;
-      *)
-        fail "unknown argument '$1' — see --help."
-        ;;
+    --step)
+      [ -n "${2:-}" ] || fail "--step requires a step name — see --list-steps."
+      add_selected_step "$2"
+      shift 2
+      ;;
+    --list-steps)
+      printf '%s\n' "${STEPS[@]}" "${SHORTCUTS[@]}"
+      exit 0
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      fail "unknown argument '$1' — see --help."
+      ;;
     esac
   done
 
