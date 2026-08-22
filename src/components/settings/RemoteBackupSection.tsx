@@ -412,7 +412,7 @@ export function RemoteBackupSection() {
       <div className="settings-card">
         <div className="settings-card__title">
           <span className="settings-card__title-text">
-            Remote Backup <span className="badge-new">New</span>
+            Remote Backup
           </span>
         </div>
         <div className="toggle-row__desc">
