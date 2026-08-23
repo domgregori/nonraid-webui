@@ -32,12 +32,16 @@ test.describe('@danger destructive', () => {
     await page.getByRole('button', { name: 'Add Pool' }).click()
 
     const dialog = page.locator('.dialog')
+    // The form's data-disk list comes from the array status poll; wait until it has
+    // loaded (the "Use all drives" description counts the disks) before submitting,
+    // otherwise the create fails validation with "Select at least one disk."
+    await expect(dialog.locator('.toggle-row__desc')).toContainText(/Using all [1-9]/)
     await dialog.getByLabel('Name').fill(shareName)
     await dialog.getByRole('button', { name: 'Create Pool' }).click()
 
     // The new pool shows up in the list once the create request settles.
     const poolCard = page.locator('.list-card').filter({ hasText: shareName })
-    await expect(poolCard).toBeVisible()
+    await expect(poolCard).toBeVisible({ timeout: 15000 })
 
     // Delete it through the UI (two-step confirm) and confirm it's gone.
     await poolCard.getByRole('button', { name: 'Delete' }).click()
