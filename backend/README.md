@@ -310,6 +310,12 @@ since it now manages credentials, not just infrastructure.
   doc this was built from for how the reference plugin this was modeled on implements those.
   Stats-poller CPU% is a `/proc/<pid>`-based approximation, not real cgroup accounting (see the LXC
   section above).
+- LXC stop hardening: `lxc-stop` can return success while the container's init + child processes survive
+  as an orphaned process tree (`lxc-ls` then reports the container as not running), leaving the rootfs
+  overlay mounted on the array disk. The array driver then correctly refuses to stop (`nmdctl stop` ->
+  "N devices still in use", EBUSY). Harden the stop path to confirm the container's init PID has actually
+  exited and clean up the orphaned mount namespace before reporting success. Observed on the test rig
+  (Aug 2026) with container "alpiney".
 - SMART: only temperature is read today; SMART pass/fail health, reallocated sectors, etc. aren't
   surfaced
 - Shares: the guest-access permission issue noted above, no validation that a share name doesn't
