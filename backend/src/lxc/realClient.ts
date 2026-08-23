@@ -126,6 +126,56 @@ export class RealLxcClient implements LxcClient {
     }
   }
 
+  private async pidAlive(pid: number): Promise<boolean> {
+    try {
+      await fs.access(`/proc/${pid}`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Stops a container and confirms its init process actually exited. `lxc-stop`
+   * can return while the container's init + children survive as an orphaned
+   * process tree (`lxc-ls` then reports it as not running), leaving the rootfs
+   * overlay mounted and holding the array disk "in use" - which then blocks
+   * `nmdctl stop` with EBUSY. Escalates graceful -> `lxc-stop --kill` -> a
+   * direct SIGKILL of the init PID (killing a PID namespace's init makes the
+   * kernel SIGKILL every other process in that namespace, tearing down the
+   * orphaned mounts). Observed on the test rig (Aug 2026) with container
+   * "alpiney".
+   */
+  private async stopAndVerify(name: string, force: boolean): Promise<void> {
+    // Capture the init PID *before* stopping - lxc-info reports it reliably while
+    // the container is running, but after lxc-stop has (mis)reported success it can
+    // claim "not running" even though the init is orphaned, so a post-stop query
+    // can't be trusted to detect the leak.
+    const initPid = await this.getPid(name);
+
+    const args = ['-P', config.lxcDefaultPath, '-n', name];
+    args.push(force ? '--kill' : `--timeout=${config.lxcStopTimeoutSec}`);
+    // Node's own process timeout must outlast the `--timeout` we just told lxc-stop to honor -
+    // otherwise Node kills the still-gracefully-shutting-down process first and reports a bogus
+    // failure (observed live: a container took a little over lxcTimeoutMs's default 15s to stop,
+    // Node SIGTERM'd lxc-stop before its own 30s grace period ended, and a manual immediate retry
+    // then succeeded in under a second since the container was already stopping).
+    await this.run('lxc-stop', args, (config.lxcStopTimeoutSec + 5) * 1000);
+
+    if (initPid === null) return;
+
+    if (await this.pidAlive(initPid)) {
+      await this.run('lxc-stop', ['-P', config.lxcDefaultPath, '-n', name, '--kill']).catch(() => {});
+      if (await this.pidAlive(initPid)) {
+        try {
+          process.kill(initPid, 'SIGKILL');
+        } catch {
+          // exited between the liveness check and the kill
+        }
+      }
+    }
+  }
+
   private async readMetadata(
     name: string,
   ): Promise<{ description: string | null; webUiUrl: string | null; autostart: boolean; distribution: string | null }> {
@@ -196,19 +246,12 @@ export class RealLxcClient implements LxcClient {
   }
 
   async stopContainer(name: string, options?: { force?: boolean }): Promise<LxcCommandResult> {
-    const args = ['-P', config.lxcDefaultPath, '-n', name];
-    args.push(options?.force ? '--kill' : `--timeout=${config.lxcStopTimeoutSec}`);
-    // Node's own process timeout must outlast the `--timeout` we just told lxc-stop to honor -
-    // otherwise Node kills the still-gracefully-shutting-down process first and reports a bogus
-    // failure (observed live: a container took a little over lxcTimeoutMs's default 15s to stop,
-    // Node SIGTERM'd lxc-stop before its own 30s grace period ended, and a manual immediate retry
-    // then succeeded in under a second since the container was already stopping).
-    await this.run('lxc-stop', args, (config.lxcStopTimeoutSec + 5) * 1000);
+    await this.stopAndVerify(name, options?.force ?? false);
     return { ok: true, message: `Container "${name}" stopped` };
   }
 
   async restartContainer(name: string): Promise<LxcCommandResult> {
-    await this.run('lxc-stop', ['-P', config.lxcDefaultPath, '-n', name, `--timeout=${config.lxcStopTimeoutSec}`], (config.lxcStopTimeoutSec + 5) * 1000);
+    await this.stopAndVerify(name, false);
     await this.run('lxc-start', ['-P', config.lxcDefaultPath, '-n', name]);
     return { ok: true, message: `Container "${name}" restarted` };
   }
@@ -219,7 +262,7 @@ export class RealLxcClient implements LxcClient {
   }
 
   async destroyContainer(name: string): Promise<LxcCommandResult> {
-    await this.run('lxc-stop', ['-P', config.lxcDefaultPath, '-n', name, '--kill']).catch(() => {});
+    await this.stopAndVerify(name, true).catch(() => {});
     // -s: also destroy any snapshots - without it, lxc-destroy refuses outright ("container has
     // snapshots") the moment a container has ever been snapshotted, confirmed live. A snapshot is
     // this app's own feature now, so cascading its cleanup into the normal Destroy flow is the
