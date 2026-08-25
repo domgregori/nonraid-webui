@@ -44,6 +44,8 @@ import { statusRouter } from './routes/status.js';
 import { systemRouter } from './routes/system.js';
 import { tailscaleRouter } from './routes/tailscale.js';
 import { tlsRouter } from './routes/tls.js';
+import { updateRouter } from './routes/update.js';
+import { UpdateScheduler } from './update/scheduler.js';
 import { usersRouter } from './routes/users.js';
 import { createRcloneClient } from './rclone/index.js';
 import { RcloneService } from './rclone/service.js';
@@ -91,6 +93,7 @@ async function main() {
   const tailscale = createTailscaleClient();
   const rcloneService = new RcloneService(rclone, nmd, activity, settingsStore);
   new RcloneSyncScheduler(rcloneService, settingsStore);
+  new UpdateScheduler(activity, settingsStore);
   const tlsRecord = await tlsStore.get(); // fail fast at boot on a corrupt tls.json
   if (config.serveFrontend && !existsSync(path.join(config.frontendDistPath, 'index.html'))) {
     throw new Error(`serveFrontend is true but no index.html at ${config.frontendDistPath} - did the frontend build run?`);
@@ -210,6 +213,7 @@ async function main() {
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
   app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics));
+  app.use('/api', updateRouter(activity));
   app.use('/api', servicesRouter(activity, settingsStore));
   app.use('/api', usersRouter(users));
   app.use('/api', appsRouter(apps));

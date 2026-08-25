@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi';
 import { cacheApi } from '../api/cacheApi';
 import { dockerApi } from '../api/dockerApi';
@@ -19,6 +19,7 @@ import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ServicesSection } from '../components/settings/ServicesSection';
 import { StorageLocationField } from '../components/settings/StorageLocationField';
 import { TailscaleSection } from '../components/settings/TailscaleSection';
+import { UpdateSection } from '../components/settings/UpdateSection';
 import { TlsSection } from '../components/settings/TlsSection';
 import { TwoFactorSection } from '../components/settings/TwoFactorSection';
 import { PathAutocomplete } from '../components/shared/PathAutocomplete';
@@ -50,6 +51,7 @@ const SECTIONS = [
   { id: 'services', label: 'Services' },
   { id: 'logs', label: 'System Logs' },
   { id: 'tailscale', label: 'Tailscale' },
+  { id: 'update', label: 'Update' },
 ] as const;
 
 // Every valid deep-link target, e.g. /settings#recovery - kept as a real Set (not just trusting
@@ -57,9 +59,20 @@ const SECTIONS = [
 // silently leaving the sidebar on "About" while some other card is actually showing.
 const SECTION_IDS = new Set<string>(SECTIONS.map((s) => s.id));
 
+// Resolves the section a hash like "#cache" names, falling back to the default when the hash is
+// absent or doesn't match a real section (a stale link, a typo). Shared by the initial state (so a
+// direct load of /settings#cache renders straight into Cache, no flash of About first) and the
+// location.hash effect below (so a Link/back-forward navigation while already on /settings, which
+// doesn't remount, still lands on the right section).
+function sectionFromHash(hash: string): (typeof SECTIONS)[number]['id'] {
+  const id = hash.replace(/^#/, '');
+  return id && SECTION_IDS.has(id) ? (id as (typeof SECTIONS)[number]['id']) : 'about';
+}
+
 export function SettingsPage() {
   const location = useLocation();
-  const [activeSection, setActiveSection] = useState<(typeof SECTIONS)[number]['id']>('about');
+  const navigate = useNavigate();
+  const [activeSection, setActiveSection] = useState<(typeof SECTIONS)[number]['id']>(() => sectionFromHash(window.location.hash));
   // Which Recovery-hub restore dialog is open, if any - `source` picks upload vs. local vs. remote
   // (ConfigRestoreWizard vs. RestoreFromLocalWizard vs. RestoreFromRemoteWizard, all three sharing
   // the same review/confirm/result flow once a preview comes back), `focusCategory` set to 'array'
@@ -68,11 +81,20 @@ export function SettingsPage() {
   const [restoreDialog, setRestoreDialog] = useState<{ source: 'upload' | 'local' | 'remote'; focusCategory?: BackupCategoryId } | null>(null);
   // Deep-linking, e.g. the "Recovery ->" links on the Backups cards: /settings#recovery. Reacts to
   // location.hash rather than only running once on mount, since clicking a Link to a new hash
-  // while already on /settings is a same-component navigation (no remount) in this SPA.
+  // while already on /settings is a same-component navigation (no remount) in this SPA. Also
+  // catches browser back/forward between sections, since selectSection() below pushes a real
+  // history entry per section.
   useEffect(() => {
-    const id = location.hash.replace(/^#/, '');
-    if (id && SECTION_IDS.has(id)) setActiveSection(id as (typeof SECTIONS)[number]['id']);
+    setActiveSection(sectionFromHash(location.hash));
   }, [location.hash]);
+  // The other direction: picking a section from the sidebar updates the URL to match, so a reload
+  // (or just copying the address bar) lands back on the same section instead of always resetting to
+  // About. A real history entry per section (not `replace`) so back/forward step through them too,
+  // consistent with the "Recovery ->" links already doing a normal push navigation.
+  const selectSection = (id: (typeof SECTIONS)[number]['id']) => {
+    setActiveSection(id);
+    navigate(`#${id}`);
+  };
   const { settings, loadState, error, saving, saveError, update } = useSettings();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const stats = useSystemStats();
@@ -589,7 +611,7 @@ export function SettingsPage() {
       <div className="settings-layout">
         <aside className="settings-sidebar">
           {SECTIONS.map((s) => (
-            <button key={s.id} type="button" className={`category-item${activeSection === s.id ? ' category-item--active' : ''}`} onClick={() => setActiveSection(s.id)}>
+            <button key={s.id} type="button" className={`category-item${activeSection === s.id ? ' category-item--active' : ''}`} onClick={() => selectSection(s.id)}>
               {s.label}
             </button>
           ))}
@@ -1202,6 +1224,11 @@ export function SettingsPage() {
           <div className={`settings-card${activeSection === 'tailscale' ? '' : ' settings-hidden'}`}>
             <div className="settings-card__title">Tailscale</div>
             <TailscaleSection />
+          </div>
+
+          <div className={`settings-card${activeSection === 'update' ? '' : ' settings-hidden'}`}>
+            <div className="settings-card__title">Update</div>
+            <UpdateSection />
           </div>
         </div>
       </div>
