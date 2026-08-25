@@ -27,6 +27,14 @@ export interface UpdateStatus {
 
 export type UpdateComponent = 'nonraid' | 'nonraidWebui';
 
+// Mirrors backend/src/routes/update.ts's GET /update/changelog response shape.
+export interface ChangelogResult {
+  tag: string;
+  /** The GitHub Release's Markdown body, or null when that tag has no associated Release (a
+   *  plain pushed tag with nothing published through GitHub's own Releases UI/API). */
+  body: string | null;
+}
+
 // Mirrors backend/src/update/apply.ts's ApplyResult.
 export interface ApplyResult {
   ok: boolean;

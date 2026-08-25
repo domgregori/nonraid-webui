@@ -148,6 +148,17 @@
   font-size: 11px;
 }
 
+.settings-info-row__link {
+  font: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 8px;
+  color: var(--color-blue);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .settings-field {
   padding: 10px 0;
   display: flex;

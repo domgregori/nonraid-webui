@@ -8,9 +8,7 @@ const execFileAsync = promisify(execFile);
 // Versioning convention for both repos, decided explicitly (not the "track main's tip" scheme
 // this originally shipped with): a manually-pushed, semver git tag (v0.1.0, v0.2.0, ...) marks a
 // real release. Nothing else counts - not PACKAGE_VERSION (doesn't reliably bump on every fix,
-// see tools/install-webui.sh's build_nonraid_driver comment), not a bare commit hash. Neither repo
-// has ever pushed one of these tags as of this writing - see readInstalledDriverTag()/BUILD_TAG's
-// own comments for what "no tags yet" means for each side of this comparison.
+// see tools/install-webui.sh's build_nonraid_driver comment), not a bare commit hash.
 const NONRAID_REPO_URL = 'https://github.com/domgregori/nonraid.git';
 const NONRAID_WEBUI_REPO_URL = 'https://github.com/domgregori/nonraid-webui.git';
 
@@ -113,6 +111,46 @@ async function latestTag(repoUrl: string): Promise<string | null> {
     .map((ref) => ref.replace(/^refs\/tags\//, ''))
     .filter((tag) => SEMVER_TAG_RE.test(tag));
   return tags[0] ?? null;
+}
+
+export type UpdateComponentKey = 'nonraid' | 'nonraidWebui';
+
+/** Keeps NONRAID_REPO_URL/NONRAID_WEBUI_REPO_URL themselves private to this module (every other
+ *  caller already goes through checkForUpdates instead) while still letting routes/update.ts turn
+ *  a request's ?component= into the right repo for fetchReleaseNotes below. */
+export function repoUrlForComponent(component: UpdateComponentKey): string {
+  return component === 'nonraid' ? NONRAID_REPO_URL : NONRAID_WEBUI_REPO_URL;
+}
+
+const GITHUB_API_TIMEOUT_MS = 10_000;
+
+/** The rendered Markdown body of the GitHub Release for `tag` on `repoUrl`, or null when that tag
+ *  has no associated Release object (e.g. a plain pushed tag with nothing published through
+ *  GitHub's own Releases UI/API) - "nothing to show," not an error. Only ever called on demand
+ *  (Settings > Update's "Changelog" link), not part of checkForUpdates' own cached/polled check -
+ *  release notes are opt-in reading, not something worth a live GitHub call on every status poll. */
+export async function fetchReleaseNotes(repoUrl: string, tag: string): Promise<string | null> {
+  const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/);
+  if (!match) throw new Error(`Not a github.com repo URL: ${repoUrl}`);
+  const [, owner, repo] = match;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GITHUB_API_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/tags/${encodeURIComponent(tag)}`, {
+      headers: { Accept: 'application/vnd.github+json' },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    throw new Error(`could not reach api.github.com: ${(err as Error).message}`);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
+  const data = (await res.json()) as { body?: string | null };
+  return data.body?.trim() || null;
 }
 
 async function checkComponent(installed: string | null, repoUrl: string, runningMatchesInstalled: boolean | null = null): Promise<ComponentUpdateStatus> {

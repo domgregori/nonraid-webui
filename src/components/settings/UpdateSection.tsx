@@ -3,6 +3,7 @@ import { systemApi } from '../../api/systemApi';
 import { updateApi } from '../../api/updateApi';
 import type { ApplyResult, ComponentUpdateStatus, UpdateComponent, UpdateStatus } from '../../types/updateApi';
 import { formatRelativeTime } from '../../utils/format';
+import { ChangelogModal } from './ChangelogModal';
 
 const COMPONENTS: { key: UpdateComponent; label: string }[] = [
   { key: 'nonraid', label: 'NonRAID driver' },
@@ -42,6 +43,8 @@ export function UpdateSection() {
 
   // Which component's confirm modal is open, if any.
   const [confirming, setConfirming] = useState<UpdateComponent | null>(null);
+  // Which component's changelog modal is open, if any.
+  const [viewingChangelog, setViewingChangelog] = useState<UpdateComponent | null>(null);
   const [applying, setApplying] = useState(false);
   const [applyResult, setApplyResult] = useState<ApplyResult | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
@@ -120,6 +123,8 @@ export function UpdateSection() {
     }
   };
 
+  const changelogTag = viewingChangelog ? status?.[viewingChangelog]?.latest : null;
+
   return (
     <div>
       <div className="toggle-row__desc">
@@ -169,7 +174,14 @@ export function UpdateSection() {
               )}
               <div className="settings-info-row">
                 <span className="settings-info-row__label">Latest</span>
-                <span className="settings-info-row__value settings-info-row__value--mono">{component.latest ?? 'No releases published yet'}</span>
+                <span className="settings-info-row__value settings-info-row__value--mono">
+                  {component.latest ?? 'No releases published yet'}
+                  {component.latest && (
+                    <button type="button" className="settings-info-row__link" onClick={() => setViewingChangelog(key)}>
+                      Changelog
+                    </button>
+                  )}
+                </span>
               </div>
               {component.checkError && <div className="status-note status-note--error">{component.checkError}</div>}
               {component.upToDate === false && (
@@ -228,6 +240,10 @@ export function UpdateSection() {
             </div>
           </div>
         </>
+      )}
+
+      {viewingChangelog && changelogTag && (
+        <ChangelogModal component={viewingChangelog} label={componentLabel(viewingChangelog)} tag={changelogTag} onClose={() => setViewingChangelog(null)} />
       )}
     </div>
   );

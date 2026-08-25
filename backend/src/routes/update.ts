@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
 import { applyDriverUpdate, applyWebuiUpdate } from '../update/apply.js';
-import { checkForUpdates, lastKnownUpdateStatus, type ComponentUpdateStatus, type UpdateStatus } from '../update/service.js';
+import { checkForUpdates, fetchReleaseNotes, lastKnownUpdateStatus, repoUrlForComponent, type ComponentUpdateStatus, type UpdateStatus } from '../update/service.js';
 
 const COMPONENT_LABELS = { nonraid: 'NonRAID driver', nonraidWebui: 'NonRAID WebUI' } as const;
 type ComponentKey = keyof typeof COMPONENT_LABELS;
@@ -23,6 +23,25 @@ export function updateRouter(activity: ActivityStore): Router {
   router.post('/update/check', async (_req, res) => {
     const status = await checkForUpdates(true);
     res.json(status);
+  });
+
+  // On-demand only (Settings > Update's "Changelog" link) - not part of checkForUpdates' own
+  // cached/polled check, see fetchReleaseNotes's own comment. `tag` comes from the client's own
+  // already-fetched status (component.latest) rather than being re-derived here, so this can
+  // fetch notes for whatever tag is actually shown, not just always "the latest known right now".
+  router.get('/update/changelog', async (req, res) => {
+    const component = req.query.component;
+    const tag = req.query.tag;
+    if (!isComponentKey(component) || typeof tag !== 'string' || !tag) {
+      res.status(400).json({ error: "component must be 'nonraid' or 'nonraidWebui', and tag is required" });
+      return;
+    }
+    try {
+      const body = await fetchReleaseNotes(repoUrlForComponent(component), tag);
+      res.json({ tag, body });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
   });
 
   // Actually applies an update - see backend/src/update/apply.ts for exactly what each component
