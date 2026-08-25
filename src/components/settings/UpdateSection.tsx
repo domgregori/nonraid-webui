@@ -155,6 +155,18 @@ export function UpdateSection() {
                 <span className="settings-info-row__label">Installed</span>
                 <span className="settings-info-row__value settings-info-row__value--mono">{component.installed ?? 'Not a tagged release'}</span>
               </div>
+              {key === 'nonraid' && (
+                <div className="settings-info-row">
+                  <span className="settings-info-row__label">Running</span>
+                  <span className="settings-info-row__value settings-info-row__value--mono">
+                    {component.runningMatchesInstalled === true
+                      ? (component.installed ?? 'Not a tagged release')
+                      : component.runningMatchesInstalled === false
+                        ? 'Older build - reload from Settings > Services'
+                        : 'Unknown'}
+                  </span>
+                </div>
+              )}
               <div className="settings-info-row">
                 <span className="settings-info-row__label">Latest</span>
                 <span className="settings-info-row__value settings-info-row__value--mono">{component.latest ?? 'No releases published yet'}</span>

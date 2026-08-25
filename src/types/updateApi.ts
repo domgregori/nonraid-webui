@@ -11,6 +11,11 @@ export interface ComponentUpdateStatus {
   /** null (not false) when installed or latest couldn't be determined - "unknown", not "no". */
   upToDate: boolean | null;
   checkError: string | null;
+  /** Whether the currently-loaded kernel module is the one actually on disk right now - null when
+   *  the distinction doesn't apply (nonraidWebui, which restarts itself in place on update) or
+   *  can't be determined. false means a build happened since the module was last (re)loaded -
+   *  Settings > Services' reload picks it up. Only ever meaningful for nonraid. */
+  runningMatchesInstalled: boolean | null;
 }
 
 export interface UpdateStatus {
