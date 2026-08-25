@@ -280,4 +280,14 @@ export const config = {
   // same 1-minute cadence as BackupScheduler/ParityScheduler, fine-grained enough for a 'cron'
   // schedule's minute-level precision.
   rcloneSchedulerTickIntervalMs: num('RCLONE_SCHEDULER_TICK_INTERVAL_MS', t('rclone', 'scheduler_tick_interval_ms'), 60_000),
+  // How often UpdateScheduler re-checks GitHub for a newer tagged release of nonraid/nonraid-webui
+  // (see update/service.ts) - a git ls-remote per component, not worth doing anywhere near as
+  // often as the minute-granularity schedulers above; once a day is plenty for something a human
+  // finds out about via a notification, not a live status they're staring at.
+  updateSchedulerTickIntervalMs: num('UPDATE_SCHEDULER_TICK_INTERVAL_MS', t('update', 'scheduler_tick_interval_ms'), 24 * 60 * 60 * 1000),
+  // Absolute path to the nonraid-webui git checkout's own tools/install-webui.sh - what "Update
+  // Now" (POST /update/apply) spawns to actually pull/build/stage an update. Defaults to
+  // nonraid-os's first-boot script's own CHECKOUT_DIR, the real location on an actual deployed
+  // image - override for any other checkout location (e.g. a dev/test box).
+  updateInstallScriptPath: str('UPDATE_INSTALL_SCRIPT_PATH', t('update', 'install_script_path'), '/opt/nonraid-webui-src/tools/install-webui.sh'),
 };

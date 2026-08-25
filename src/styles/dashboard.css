@@ -521,6 +521,18 @@
   align-items: flex-start;
 }
 
+.activity-item--link {
+  color: inherit;
+  text-decoration: none;
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-btn);
+}
+
+.activity-item--link:hover {
+  background: var(--color-surface-elevated);
+}
+
 .activity-dot {
   width: 6px;
   height: 6px;

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useNotifications } from '../../state/useNotifications';
 import { COLORS } from '../../styles/colors';
 import { formatRelativeTime } from '../../utils/format';
+import { NOTIFICATION_EVENT_LINKS } from '../../utils/notificationLinks';
 import { ActivityHistoryDialog } from '../activity/ActivityHistoryDialog';
 
 const DROPDOWN_LIMIT = 10;
@@ -52,15 +54,27 @@ export function NotificationBell() {
           {recent.length === 0 && <div className="status-note">Nothing yet.</div>}
           {recent.length > 0 && (
             <div className="activity-list">
-              {recent.map((entry) => (
-                <div className="activity-item" key={entry.id}>
-                  <div className="activity-dot" style={{ background: COLORS[entry.color] }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div className="activity-text">{entry.text}</div>
-                    <div className="activity-time">{formatRelativeTime(entry.timestamp)}</div>
+              {recent.map((entry) => {
+                const link = entry.eventType ? NOTIFICATION_EVENT_LINKS[entry.eventType] : undefined;
+                const row = (
+                  <>
+                    <div className="activity-dot" style={{ background: COLORS[entry.color] }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div className="activity-text">{entry.text}</div>
+                      <div className="activity-time">{formatRelativeTime(entry.timestamp)}</div>
+                    </div>
+                  </>
+                );
+                return link ? (
+                  <Link to={link} className="activity-item activity-item--link" key={entry.id} onClick={() => setOpen(false)}>
+                    {row}
+                  </Link>
+                ) : (
+                  <div className="activity-item" key={entry.id}>
+                    {row}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
           <button

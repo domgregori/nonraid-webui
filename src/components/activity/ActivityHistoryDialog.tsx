@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useActivity } from '../../hooks/useActivity';
 import { COLORS } from '../../styles/colors';
 import { formatRelativeTime } from '../../utils/format';
+import { NOTIFICATION_EVENT_LINKS } from '../../utils/notificationLinks';
 
 interface ActivityHistoryDialogProps {
   onClose: () => void;
@@ -48,15 +50,27 @@ export function ActivityHistoryDialog({ onClose }: ActivityHistoryDialogProps) {
 
           {entries.length > 0 && (
             <div className="activity-list activity-list--dialog" ref={listRef}>
-              {entries.map((entry) => (
-                <div className="activity-item" key={entry.id}>
-                  <div className="activity-dot" style={{ background: COLORS[entry.color] }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div className="activity-text">{entry.text}</div>
-                    <div className="activity-time">{formatRelativeTime(entry.timestamp)}</div>
+              {entries.map((entry) => {
+                const link = entry.eventType ? NOTIFICATION_EVENT_LINKS[entry.eventType] : undefined;
+                const row = (
+                  <>
+                    <div className="activity-dot" style={{ background: COLORS[entry.color] }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div className="activity-text">{entry.text}</div>
+                      <div className="activity-time">{formatRelativeTime(entry.timestamp)}</div>
+                    </div>
+                  </>
+                );
+                return link ? (
+                  <Link to={link} className="activity-item activity-item--link" key={entry.id} onClick={onClose}>
+                    {row}
+                  </Link>
+                ) : (
+                  <div className="activity-item" key={entry.id}>
+                    {row}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

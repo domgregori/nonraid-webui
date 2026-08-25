@@ -37,6 +37,15 @@ ARRAY_DATA_UID=99
 NFSD_THREADS=32
 LOG_DIR=/var/log/nonraid-webui
 LOG_FILE="$LOG_DIR/install-$(date +%Y%m%d-%H%M%S).log"
+# snapshot_before_update below - how many pre-update btrfs snapshots (and their GRUB rescue
+# entries) to keep around at once. Overridable via env for anyone who wants more/less history;
+# not exposed as a --step-level flag since every other tunable here is a top-of-file constant too.
+NONRAID_SNAPSHOT_KEEP="${NONRAID_SNAPSHOT_KEEP:-2}"
+NONRAID_SNAPSHOT_TOPVOL_MNT=/mnt/nonraid-topvol
+# The exact release tag (e.g. "v0.2.0") build_nonraid_driver() last successfully installed - see
+# backend/src/update/service.ts's own comment on the matching NONRAID_DRIVER_VERSION_FILE constant
+# for why a tag, not PACKAGE_VERSION or a raw commit hash.
+NONRAID_DRIVER_VERSION_FILE=/etc/nonraid/driver-version
 
 log() { echo "==> $*"; }
 fail() {
@@ -56,6 +65,100 @@ setup_logging() {
   mkdir -p "$LOG_DIR"
   exec > >(tee -a "$LOG_FILE") 2>&1
   log "Logging this run to $LOG_FILE"
+}
+
+# Runs first, before anything else touches the system: takes a read-only btrfs snapshot of the
+# live root subvolume and registers it as a real, selectable GRUB menu entry
+# (/boot/grub/custom.cfg) that boots straight into it via rootflags=subvol=<snapshot> - so a bad
+# update has a boot-time way back to exactly this moment, not just a manual rollback after the
+# fact. No `update-grub`/`grub-mkconfig` run needed: Debian's stock /etc/grub.d/41_custom sources
+# custom.cfg live at every boot (confirmed against a real grub.cfg) rather than baking its
+# contents into grub.cfg itself, so update-grub never touches or overwrites what this writes here.
+#
+# Silently skips (doesn't fail the run) on a non-btrfs root - this script is also documented to
+# work on plain Debian/Ubuntu installs that predate nonraid-os's btrfs-by-default preseed, and a
+# missing rescue snapshot on those is a shrug, not a reason to abort an otherwise-normal update.
+snapshot_before_update() {
+  if [ "$(findmnt -no FSTYPE /)" != "btrfs" ]; then
+    log "Root filesystem isn't btrfs - skipping pre-update snapshot/GRUB rescue entry"
+    return 0
+  fi
+  command -v grub-script-check >/dev/null 2>&1 || {
+    log "grub-script-check not found - skipping pre-update snapshot/GRUB rescue entry"
+    return 0
+  }
+
+  local root_src root_dev fs_uuid kver grub_root_hint stamp snap_name
+  root_src="$(findmnt -no SOURCE /)"
+  root_dev="${root_src%%[*}"
+  fs_uuid="$(findmnt -no UUID /)"
+  kver="$(uname -r)"
+  grub_root_hint="$(grep -m1 "set root=" /boot/grub/grub.cfg | sed -n "s/.*set root='\([^']*\)'.*/\1/p")"
+  [ -n "$root_dev" ] && [ -n "$fs_uuid" ] && [ -n "$grub_root_hint" ] || {
+    log "WARNING: could not determine root device/uuid/GRUB root hint - skipping pre-update snapshot/GRUB rescue entry"
+    return 0
+  }
+
+  mkdir -p "$NONRAID_SNAPSHOT_TOPVOL_MNT"
+  mountpoint -q "$NONRAID_SNAPSHOT_TOPVOL_MNT" || mount -o subvolid=5 "$root_dev" "$NONRAID_SNAPSHOT_TOPVOL_MNT"
+  # Intentionally expand $NONRAID_SNAPSHOT_TOPVOL_MNT now (double quotes), not at trap-fire time.
+  # shellcheck disable=SC2064
+  trap "umount '$NONRAID_SNAPSHOT_TOPVOL_MNT' 2>/dev/null || true" RETURN
+  mkdir -p "$NONRAID_SNAPSHOT_TOPVOL_MNT/@snapshots"
+
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  snap_name="@snapshots/pre-update-${stamp}"
+  log "Taking pre-update snapshot $snap_name"
+  btrfs subvolume snapshot -r / "$NONRAID_SNAPSHOT_TOPVOL_MNT/$snap_name"
+
+  if [ ! -f "$NONRAID_SNAPSHOT_TOPVOL_MNT/$snap_name/boot/vmlinuz-$kver" ] \
+    || [ ! -f "$NONRAID_SNAPSHOT_TOPVOL_MNT/$snap_name/boot/initrd.img-$kver" ]; then
+    log "WARNING: snapshot is missing vmlinuz-$kver/initrd.img-$kver - leaving it on disk but not adding a GRUB entry for it"
+    return 0
+  fi
+
+  local old_snaps count to_delete i snap
+  mapfile -t old_snaps < <(btrfs subvolume list -o "$NONRAID_SNAPSHOT_TOPVOL_MNT" 2>/dev/null \
+    | awk '{print $NF}' | grep "^@snapshots/pre-update-" | sort)
+  count="${#old_snaps[@]}"
+  if [ "$count" -gt "$NONRAID_SNAPSHOT_KEEP" ]; then
+    to_delete=$((count - NONRAID_SNAPSHOT_KEEP))
+    for ((i = 0; i < to_delete; i++)); do
+      log "Pruning old pre-update snapshot ${old_snaps[$i]}"
+      btrfs subvolume delete "$NONRAID_SNAPSHOT_TOPVOL_MNT/${old_snaps[$i]}"
+    done
+  fi
+
+  local retained tmp_cfg snap_kver
+  mapfile -t retained < <(btrfs subvolume list -o "$NONRAID_SNAPSHOT_TOPVOL_MNT" 2>/dev/null \
+    | awk '{print $NF}' | grep "^@snapshots/pre-update-" | sort -r)
+  tmp_cfg="$(mktemp)"
+  {
+    echo "# Managed by nonraid-webui's install-webui.sh (snapshot_before_update) - regenerated on every update, don't hand-edit."
+    echo "submenu 'NonRAID rescue snapshots' {"
+    for snap in "${retained[@]}"; do
+      snap_kver="$(basename "$(ls "$NONRAID_SNAPSHOT_TOPVOL_MNT/$snap"/boot/vmlinuz-* 2>/dev/null | head -1)" | sed 's/^vmlinuz-//')"
+      [ -n "$snap_kver" ] || continue
+      cat <<EOF
+  menuentry 'NonRAID rescue: $snap (Linux $snap_kver)' {
+    insmod part_msdos
+    insmod btrfs
+    set root='$grub_root_hint'
+    search --no-floppy --fs-uuid --set=root $fs_uuid
+    echo 'Loading Linux $snap_kver from $snap ...'
+    linux /$snap/boot/vmlinuz-$snap_kver root=UUID=$fs_uuid ro rootflags=subvol=$snap
+    echo 'Loading initial ramdisk ...'
+    initrd /$snap/boot/initrd.img-$snap_kver
+  }
+EOF
+    done
+    echo "}"
+  } >"$tmp_cfg"
+
+  grub-script-check "$tmp_cfg"
+  install -m 644 "$tmp_cfg" /boot/grub/custom.cfg
+  rm -f "$tmp_cfg"
+  log "Registered ${#retained[@]} rescue snapshot(s) in /boot/grub/custom.cfg (no update-grub needed)"
 }
 
 # nonraid-webui itself runs as root (see nonraid-webui.service — no User= override), the same way
@@ -282,31 +385,48 @@ ensure_node() {
   fi
   check_node_version
   if [ "$node_ok" -ne 1 ]; then
-    log "Node.js $node_version doesn't satisfy the version floor — reinstalling from NodeSource"
+    log "Node.js $node_version doesn't satisfy the version floor — reinstalling the pinned Node.js binary"
     install_node
     check_node_version
-    [ "$node_ok" -eq 1 ] || fail "$NODE_BIN is still v$node_version after installing from NodeSource — need 20.6+ or 21.7+ (not 18.x, not 21.0-21.6). See ../REQUIREMENTS.md."
+    [ "$node_ok" -eq 1 ] || fail "$NODE_BIN is still v$node_version after reinstalling — need 20.6+ or 21.7+ (not 18.x, not 21.0-21.6). See ../REQUIREMENTS.md."
   fi
   log "Node.js v$node_version OK"
 }
 
+# Versioning convention (see backend/src/update/service.ts's own top comment for the full
+# rationale): a manually-pushed semver tag (v0.1.0, v0.2.0, ...) marks a real release - nothing
+# else counts, and this deliberately never falls back to "just track main" the way it used to.
+# Finds the newest such tag on $NONRAID_SRC_DIR's own already-fetched refs and echoes it, or
+# nothing if there isn't one yet.
+latest_semver_tag() {
+  git -C "$NONRAID_SRC_DIR" tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1
+}
+
 fetch_nonraid_source() {
-  log "Fetching NonRAID from $NONRAID_REPO_URL (main branch)"
+  log "Fetching NonRAID from $NONRAID_REPO_URL (tagged releases only)"
+  local latest_tag
   if [ -d "$NONRAID_SRC_DIR/.git" ]; then
     # An existing checkout only shows up here on a re-run/update, or when one was pre-seeded onto
     # an install image (see nonraid-os's build/build-image.sh) so the install still has something
-    # to build against with no network at all. Either way, a failed fetch isn't fatal the way it
-    # is below when there's nothing to fall back on: warn and keep building from what's already
-    # there rather than aborting the whole install.
-    if git -C "$NONRAID_SRC_DIR" fetch origin main; then
-      git -C "$NONRAID_SRC_DIR" reset --hard origin/main
+    # to build against with no network at all. A failed fetch isn't fatal the way it is below when
+    # there's nothing to fall back on: warn and keep building from whatever tag is already checked
+    # out rather than aborting the whole install.
+    if git -C "$NONRAID_SRC_DIR" fetch --tags origin; then
+      latest_tag="$(latest_semver_tag)"
+      [ -n "$latest_tag" ] || fail "No tagged NonRAID release exists at $NONRAID_REPO_URL yet - push one (e.g. \`git tag v0.1.0 <commit> && git push origin v0.1.0\`) before installing/updating."
+      log "Checking out $latest_tag"
+      git -C "$NONRAID_SRC_DIR" checkout --detach "$latest_tag"
       chown -R root:root "$NONRAID_SRC_DIR"
     else
       log "Could not reach $NONRAID_REPO_URL (offline?) — building from the existing checkout at $NONRAID_SRC_DIR as-is"
     fi
   else
     rm -rf "$NONRAID_SRC_DIR"
-    git clone --branch main "$NONRAID_REPO_URL" "$NONRAID_SRC_DIR"
+    git clone --no-checkout "$NONRAID_REPO_URL" "$NONRAID_SRC_DIR"
+    latest_tag="$(latest_semver_tag)"
+    [ -n "$latest_tag" ] || fail "No tagged NonRAID release exists at $NONRAID_REPO_URL yet - push one (e.g. \`git tag v0.1.0 <commit> && git push origin v0.1.0\`) before installing/updating."
+    log "Checking out $latest_tag"
+    git -C "$NONRAID_SRC_DIR" checkout --detach "$latest_tag"
     chown -R root:root "$NONRAID_SRC_DIR"
   fi
 }
@@ -330,6 +450,19 @@ build_nonraid_driver() {
   mkdir -p "$dkms_src_dir"
   cp -r "$NONRAID_SRC_DIR/md_nonraid" "$NONRAID_SRC_DIR/raid6" "$NONRAID_SRC_DIR/dkms.conf" "$NONRAID_SRC_DIR/Makefile" "$dkms_src_dir/"
   dkms install "nonraid-dkms/$nonraid_version" -k "$kversion"
+
+  # PACKAGE_VERSION above doesn't reliably bump on every real fix landing in this fork (see this
+  # function's own top comment), so it's not a usable "what's actually installed" indicator - the
+  # exact release tag fetch_nonraid_source() checked out is. --exact-match fails loudly (via `fail`
+  # below, not silently) if that checkout somehow isn't exactly at a tag - it always should be,
+  # since fetch_nonraid_source() never leaves it anywhere else. Stamped only now, after `dkms
+  # install` has actually succeeded, so nonraid-webui's update-check UI never claims a release is
+  # installed when the build that would have installed it actually failed partway through.
+  local installed_tag
+  installed_tag="$(git -C "$NONRAID_SRC_DIR" describe --tags --exact-match 2>/dev/null)" \
+    || fail "$NONRAID_SRC_DIR isn't checked out exactly at a release tag - can't stamp $NONRAID_DRIVER_VERSION_FILE. This shouldn't happen; re-run fetch_nonraid_source."
+  mkdir -p "$(dirname "$NONRAID_DRIVER_VERSION_FILE")"
+  echo "$installed_tag" > "$NONRAID_DRIVER_VERSION_FILE"
 }
 
 # Kept as its own canonical step (unchanged name/position) for a full install - just a thin wrapper
@@ -518,9 +651,17 @@ update_driver() {
 # work is the right default here. Only pulls the latest source - run update_backend/update_frontend
 # afterward to actually rebuild and redeploy from it.
 update_script() {
-  log "Pulling latest nonraid-webui in $REPO_ROOT"
-  chown -R root:root "$NONRAID_SRC_DIR"
-  git -C "$REPO_ROOT" pull
+  log "Fetching nonraid-webui releases in $REPO_ROOT (tagged releases only)"
+  git -C "$REPO_ROOT" fetch --tags
+  local latest_tag
+  latest_tag="$(git -C "$REPO_ROOT" tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)"
+  [ -n "$latest_tag" ] || fail "No tagged nonraid-webui release exists yet - push one (e.g. \`git tag v0.1.0 <commit> && git push origin v0.1.0\`) before updating."
+  log "Checking out $latest_tag"
+  # A plain checkout (not reset --hard) refuses and fails loudly if it would clobber uncommitted
+  # local changes - this is quite possibly a checkout someone's actively developing in, same
+  # "don't silently discard work" reasoning fetch_nonraid_source() has for the driver's own repo.
+  git -C "$REPO_ROOT" checkout --detach "$latest_tag"
+  chown -R root:root "$REPO_ROOT"
 }
 
 # Canonical run order, and the full set of names --step accepts - deliberately just the
@@ -528,6 +669,7 @@ update_script() {
 # (install_node/check_node_version are internal to ensure_node and wouldn't do anything useful
 # run alone, so they're not listed here).
 STEPS=(
+  snapshot_before_update
   ensure_array_data_account
   install_system_packages
   install_smb_conf

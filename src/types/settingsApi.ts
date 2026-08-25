@@ -20,7 +20,8 @@ export type NotificationEventType =
   | 'arrayStopped'
   | 'cacheMirrorDegraded'
   | 'cacheMoverFailed'
-  | 'cacheMoverCompleted';
+  | 'cacheMoverCompleted'
+  | 'updateAvailable';
 
 export type NotificationSeverity = 'high' | 'medium' | 'low';
 
