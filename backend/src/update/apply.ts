@@ -61,12 +61,20 @@ function runInstallScript(steps: string[]): Promise<ApplyResult> {
 // routes/update.ts's own comment on why applyWebuiUpdate()'s caller does the restart itself
 // instead, the same way routes/system.ts's restart-services route does). This only builds and
 // stages the new code; the caller restarts once this resolves ok.
+//
+// install_system_packages and pin_kernel_minor are included here (not just in a full install run)
+// for the same reason: a release that bumps a package version this app cares about (a security fix
+// in apprise, say - install_system_packages's own apt-get install re-resolves to whatever's newest
+// in the repo, no per-package code needed) or KERNEL_TARGET_MINOR (tools/install-webui.sh) should
+// apply that to every already-installed system the moment its admin updates the webui, not just on
+// a fresh install. This is only as fast as the underlying distro's own package repo, though - if a
+// fix hasn't landed there yet, re-running this does nothing until it has.
 export function applyWebuiUpdate(): Promise<ApplyResult> {
   return runInstallScriptGroups([
     ['snapshot_before_update'],
     ['update_script'], // a SHORTCUT - must run alone, before the STEPS group below, so the build
     // actually picks up what this just pulled (see runInstallScriptGroups's own comment).
-    ['build_backend', 'build_frontend', 'stage_install'],
+    ['install_system_packages', 'build_backend', 'build_frontend', 'stage_install', 'pin_kernel_minor'],
   ]);
 }
 

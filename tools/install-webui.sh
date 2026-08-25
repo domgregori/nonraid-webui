@@ -27,6 +27,13 @@ BACKEND_DIR="$REPO_ROOT/backend"
 INSTALL_ROOT=/opt/nonraid-webui
 NODE_BIN=/usr/bin/node
 MERGERFS_MIN="2.42.0"
+# The kernel minor line (major.minor, e.g. "6.12") this install targets - see pin_kernel_minor()
+# below for what this actually does. Bump this deliberately, in its own nonraid-webui commit/
+# release, only once build_nonraid_driver() is confirmed to build clean against the new minor.
+# Existing installs pick up a bumped value the same way they pick up any other install-webui.sh
+# change - via Settings -> Update's "NonRAID WebUI" component, which re-runs pin_kernel_minor as
+# part of applying that update (see backend/src/update/apply.ts's applyWebuiUpdate).
+KERNEL_TARGET_MINOR="6.12"
 NONRAID_REPO_URL="https://github.com/domgregori/nonraid.git"
 NONRAID_SRC_DIR=/usr/src/nonraid
 ARRAY_DATA_GROUP=users
@@ -224,6 +231,49 @@ install_system_packages() {
   apt-get install -y --no-install-recommends \
     curl git e2fsprogs \
     samba nfs-kernel-server
+}
+
+# Pins kernel packages to the KERNEL_TARGET_MINOR line above (e.g. 6.12.x) and installs/upgrades to
+# the newest patch release apt currently has within it - both parts driven by the same pin file, so
+# "which minor" and "let patches float" are one mechanism, not two. Why pin at all: the NonRAID
+# driver is built via DKMS against the exact running kernel's ABI (see build_nonraid_driver()
+# below) - an unattended jump to a new minor (a routine apt upgrade would otherwise be free to make)
+# could leave the module unable to load until manually rebuilt. A patch-level bump within the same
+# minor doesn't have that problem (DKMS's own dpkg trigger rebuilds automatically on every kernel
+# package install) and is exactly what stays allowed - both right here and via any later apt
+# upgrade/unattended-upgrades run, since it's the pin file's own priority that prefers the whole
+# minor *line*, not one specific version.
+#
+# A deliberate minor-version bump only ever happens by raising KERNEL_TARGET_MINOR itself, in its
+# own nonraid-webui release - see that constant's own comment for why. This function just applies
+# whatever it's currently set to.
+#
+# Debian-specific (linux-image-amd64/linux-headers-amd64 are Debian's own kernel meta-package
+# names - Ubuntu's are different, e.g. linux-image-generic) - skips with a clear log line rather
+# than guessing at unverified naming on any other distro. Safe to re-run: this is exactly what
+# Settings -> Update's "NonRAID WebUI" component re-runs to pick up a bumped KERNEL_TARGET_MINOR.
+pin_kernel_minor() {
+  if ! apt-cache show linux-image-amd64 >/dev/null 2>&1; then
+    log "linux-image-amd64 not available (not Debian's kernel meta-package naming) - skipping kernel version pin."
+    return
+  fi
+
+  log "Pinning kernel packages to the ${KERNEL_TARGET_MINOR}.x line"
+  cat > /etc/apt/preferences.d/nonraid-kernel-pin <<EOF
+# Managed by nonraid-webui's install-webui.sh - regenerated on every install/update run. Do not
+# hand-edit; changes here get overwritten. See pin_kernel_minor() in tools/install-webui.sh.
+Package: linux-image-amd64 linux-image-*-amd64 linux-headers-amd64 linux-headers-*-amd64 linux-headers-*-common
+Pin: version ${KERNEL_TARGET_MINOR}.*
+Pin-Priority: 990
+
+Package: linux-image-amd64 linux-image-*-amd64 linux-headers-amd64 linux-headers-*-amd64 linux-headers-*-common
+Pin: version *
+Pin-Priority: -1
+EOF
+
+  log "Installing/upgrading to the newest available ${KERNEL_TARGET_MINOR}.x kernel"
+  apt-get update -qq
+  apt-get install -y linux-image-amd64 linux-headers-amd64
 }
 
 # samba's own postinst drops a stock sample smb.conf with [homes]/[printers]/[print$] shares
@@ -655,6 +705,22 @@ update_script() {
   chown -R root:root "$REPO_ROOT"
 }
 
+# A full OS package upgrade (everything apt already has installed, not just the specific packages
+# this script itself cares about) - deliberately never part of a normal install/update run, only
+# reachable via --step, unlike every apt-get install/upgrade call elsewhere in this file, which
+# only ever touches specific named packages. Safe from the one scenario that actually worried us
+# here (an unattended kernel *minor* jump breaking the NonRAID driver's DKMS build) regardless of
+# whether this runs - pin_kernel_minor's own pin already blocks that on its own. A blanket upgrade
+# of everything else installed can still change behavior in smaller ways (a Samba/Docker/etc point
+# release), which is exactly why this stays an explicit, deliberate action rather than something
+# every run does on its own.
+update_packages() {
+  log "Updating package lists"
+  apt-get update -qq
+  log "Upgrading installed packages"
+  apt-get upgrade -y
+}
+
 # Canonical run order, and the full set of names --step accepts - deliberately just the
 # "top-level" steps main() would otherwise call directly, not every helper function in this file
 # (install_node/check_node_version are internal to ensure_node and wouldn't do anything useful
@@ -663,6 +729,7 @@ STEPS=(
   snapshot_before_update
   ensure_array_data_account
   install_system_packages
+  pin_kernel_minor
   install_smb_conf
   configure_nfs_threads
   ensure_mergerfs
@@ -689,6 +756,7 @@ SHORTCUTS=(
   update_frontend
   update_driver
   update_script
+  update_packages
 )
 
 usage() {
