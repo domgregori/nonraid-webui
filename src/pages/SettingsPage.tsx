@@ -7,6 +7,7 @@ import { lxcApi } from '../api/lxcApi';
 import { nmdApi } from '../api/nmdApi';
 import { settingsApi } from '../api/settingsApi';
 import { systemApi } from '../api/systemApi';
+import { AppriseTargetsField } from '../components/settings/AppriseTargetsField';
 import { ConfigRestoreWizard } from '../components/settings/ConfigRestoreWizard';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
 import { LogsSection } from '../components/settings/LogsSection';
@@ -1178,7 +1179,7 @@ export function SettingsPage() {
                 </a>
                 , space or newline separated (e.g. mailto://, discord://, pushover://).
               </div>
-              <textarea className="history-input settings-textarea" value={appriseDraft} onChange={(e) => setAppriseDraft(e.target.value)} placeholder="mailto://user:pass@gmail.com" rows={3} />
+              <AppriseTargetsField value={appriseDraft} onChange={setAppriseDraft} />
               <div className="settings-field__row">
                 <button type="button" className="btn" disabled={saving} onClick={saveNotifications}>
                   {saving ? 'Saving…' : 'Save'}
