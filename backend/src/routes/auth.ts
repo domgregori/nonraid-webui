@@ -73,10 +73,10 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
     res.json({ configured: true, authenticated: false });
   });
 
-  router.put('/auth/password', async (req, res) => {
+  router.put('/auth/password', totpVerifyRateLimiter, async (req, res) => {
     try {
-      const { currentPassword, newPassword } = validatePasswordChangeInput(req.body);
-      const { cookie, body } = await authService.changePassword(req.headers.cookie, currentPassword, newPassword, requestOrigin(req));
+      const { currentPassword, newPassword, totpCode } = validatePasswordChangeInput(req.body);
+      const { cookie, body } = await authService.changePassword(req.headers.cookie, currentPassword, newPassword, totpCode, requestOrigin(req));
       res.append('Set-Cookie', cookie);
       res.json(body);
     } catch (err) {

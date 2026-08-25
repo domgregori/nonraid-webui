@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { servicesApi } from '../../api/servicesApi';
+import { sshApi } from '../../api/sshApi';
 import { deriveServiceStatusView } from '../../selectors/services';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { COLORS } from '../../styles/colors';
 import type { ServiceStatus } from '../../types/servicesApi';
 import { ReloadDriverPrompt } from '../shared/ReloadDriverPrompt';
+import { ToggleSwitch } from '../shared/ToggleSwitch';
 
 type Action = 'start' | 'stop' | 'restart';
 
@@ -36,15 +38,38 @@ export function ServicesSection() {
   const [webuiReconnecting, setWebuiReconnecting] = useState(false);
   const [webuiReconnectFailed, setWebuiReconnectFailed] = useState(false);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Whether sshd starts on boot - distinct from the service's live active/inactive state above
+  // (systemctl is-enabled vs is-active), so it's fetched and toggled separately from the rest of
+  // this list.
+  const [sshBootEnabled, setSshBootEnabled] = useState<boolean | null>(null);
+  const [sshBootSaving, setSshBootSaving] = useState(false);
 
   const load = () => servicesApi.list().then(setServices).catch((err) => setLoadError((err as Error).message));
 
   useEffect(() => {
     load();
+    sshApi
+      .getStatus()
+      .then((s) => setSshBootEnabled(s.enabled))
+      .catch(() => {});
     return () => {
       if (pollTimer.current) clearInterval(pollTimer.current);
     };
   }, []);
+
+  const toggleSshBoot = async () => {
+    if (sshBootEnabled === null) return;
+    setSshBootSaving(true);
+    try {
+      await sshApi.setEnabled(!sshBootEnabled);
+      setSshBootEnabled(!sshBootEnabled);
+      await refresh();
+    } catch (err) {
+      setActionError((err as Error).message);
+    } finally {
+      setSshBootSaving(false);
+    }
+  };
 
   const refresh = async () => {
     try {
@@ -142,6 +167,17 @@ export function ServicesSection() {
               </div>
             </div>
             {WARNINGS[service.id] && <div className="status-note">{WARNINGS[service.id]}</div>}
+            {service.id === 'ssh' && (
+              <div className="toggle-row">
+                <div>
+                  <div className="toggle-row__title">Start on boot</div>
+                  <div className="toggle-row__desc">
+                    Disabling only stops sshd from starting next boot - it won't drop this or any other currently-open SSH session. Use Stop above for that.
+                  </div>
+                </div>
+                <ToggleSwitch on={sshBootEnabled ?? false} onToggle={toggleSshBoot} label="SSH start on boot" disabled={sshBootEnabled === null || sshBootSaving} />
+              </div>
+            )}
           </div>
         );
       })}

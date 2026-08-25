@@ -48,6 +48,7 @@ export function validateLoginInput(input: unknown): Credentials {
 export interface PasswordChange {
   currentPassword: string;
   newPassword: string;
+  totpCode: string | undefined;
 }
 
 // Shared by validatePasswordChangeInput below and the 2FA disable/regenerate-backup-codes
@@ -69,7 +70,7 @@ export function validatePasswordChangeInput(input: unknown): PasswordChange {
   if (typeof i.newPassword !== 'string' || i.newPassword.length < MIN_PASSWORD_LENGTH || i.newPassword.length > MAX_PASSWORD_LENGTH) {
     throw new HttpError(400, `newPassword must be ${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH} characters.`);
   }
-  return { currentPassword, newPassword: i.newPassword };
+  return { currentPassword, newPassword: i.newPassword, totpCode: typeof i.totpCode === 'string' ? i.totpCode : undefined };
 }
 
 // Loose on purpose - the verify endpoint tries the input as a TOTP code, then falls back to

@@ -18,6 +18,7 @@ import { RestoreFromLocalWizard } from '../components/settings/RestoreFromLocalW
 import { RestoreFromRemoteWizard } from '../components/settings/RestoreFromRemoteWizard';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ServicesSection } from '../components/settings/ServicesSection';
+import { SshKeysSection } from '../components/settings/SshKeysSection';
 import { StorageLocationField } from '../components/settings/StorageLocationField';
 import { TailscaleSection } from '../components/settings/TailscaleSection';
 import { UpdateSection } from '../components/settings/UpdateSection';
@@ -25,6 +26,7 @@ import { TlsSection } from '../components/settings/TlsSection';
 import { TwoFactorSection } from '../components/settings/TwoFactorSection';
 import { PathAutocomplete } from '../components/shared/PathAutocomplete';
 import { ReloadDriverPrompt } from '../components/shared/ReloadDriverPrompt';
+import { StepUpModal } from '../components/shared/StepUpModal';
 import { ToggleSwitch } from '../components/shared/ToggleSwitch';
 import { useSettings } from '../hooks/useSettings';
 import { useSystemStats } from '../hooks/useSystemStats';
@@ -32,6 +34,7 @@ import { type ThemePreference, useTheme } from '../hooks/useTheme';
 import { deriveProtection } from '../selectors/status';
 import { useOnboarding } from '../state/OnboardingContext';
 import { useArrayStatus } from '../state/useArrayStatus';
+import { useAuth } from '../state/useAuth';
 import type { NotificationChannelToggle, NotificationEventType } from '../types/settingsApi';
 import type { BackupCategoryId } from '../types/systemApi';
 import { formatMemLabel, formatUptime } from '../utils/format';
@@ -101,6 +104,7 @@ export function SettingsPage() {
   const stats = useSystemStats();
   const { status, refresh: refreshArrayStatus } = useArrayStatus();
   const { replay } = useOnboarding();
+  const { refreshStatus: refreshAuthStatus } = useAuth();
   const dataDisks = (status?.disks ?? []).filter((d) => d.type === 'data').map((d) => ({ slot: d.slot, label: `Disk ${d.slot}` }));
 
   const [dockerPruneSaving, setDockerPruneSaving] = useState(false);
@@ -223,12 +227,10 @@ export function SettingsPage() {
 
   const [showImportWizard, setShowImportWizard] = useState(false);
 
-  const [currentPasswordDraft, setCurrentPasswordDraft] = useState('');
   const [newPasswordDraft, setNewPasswordDraft] = useState('');
   const [confirmPasswordDraft, setConfirmPasswordDraft] = useState('');
-  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [confirmingPasswordChange, setConfirmingPasswordChange] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordResult, setPasswordResult] = useState<string | null>(null);
 
   // Only seed the drafts the first time data arrives - re-syncing on every
   // later status/settings poll would clobber whatever the user is mid-typing
@@ -582,25 +584,15 @@ export function SettingsPage() {
     }
   };
 
-  const changePassword = async () => {
+  // Validates the new/confirm pair client-side, then hands off to the StepUpModal for the actual
+  // current-password(+2FA) re-verification - see changePassword's onConfirm in the JSX below.
+  const startPasswordChange = () => {
     if (newPasswordDraft !== confirmPasswordDraft) {
       setPasswordError('New passwords do not match.');
       return;
     }
-    setPasswordSaving(true);
     setPasswordError(null);
-    setPasswordResult(null);
-    try {
-      await authApi.changePassword(currentPasswordDraft, newPasswordDraft);
-      setCurrentPasswordDraft('');
-      setNewPasswordDraft('');
-      setConfirmPasswordDraft('');
-      setPasswordResult('Password changed. Any other signed-in session has been logged out.');
-    } catch (err) {
-      setPasswordError((err as Error).message);
-    } finally {
-      setPasswordSaving(false);
-    }
+    setConfirmingPasswordChange(true);
   };
 
   return (
@@ -1205,21 +1197,38 @@ export function SettingsPage() {
             </div>
             <div className="settings-field">
               <div className="toggle-row__title">Change admin password</div>
-              <div className="toggle-row__desc">Also signs out every other session. early.</div>
-              <input type="password" className="history-input" style={{ width: '100%' }} value={currentPasswordDraft} onChange={(e) => setCurrentPasswordDraft(e.target.value)} placeholder="Current password" autoComplete="current-password" />
+              <div className="toggle-row__desc">Also signs out every other session.</div>
               <input type="password" className="history-input" style={{ width: '100%' }} value={newPasswordDraft} onChange={(e) => setNewPasswordDraft(e.target.value)} placeholder="New password" autoComplete="new-password" />
               <input type="password" className="history-input" style={{ width: '100%' }} value={confirmPasswordDraft} onChange={(e) => setConfirmPasswordDraft(e.target.value)} placeholder="Confirm new password" autoComplete="new-password" />
               <div className="settings-field__row">
-                <button type="button" className="btn" disabled={passwordSaving} onClick={changePassword}>
-                  {passwordSaving ? 'Changing…' : 'Change password'}
+                <button type="button" className="btn" onClick={startPasswordChange}>
+                  Change password
                 </button>
               </div>
-              {passwordResult && <div className="status-note">{passwordResult}</div>}
               {passwordError && <div className="status-note status-note--error">{passwordError}</div>}
+              {confirmingPasswordChange && (
+                <StepUpModal
+                  title="Confirm it's you"
+                  description="Changing your password signs you out of every session, including this one."
+                  confirmLabel="Change password"
+                  onClose={() => setConfirmingPasswordChange(false)}
+                  onConfirm={async (password, totpCode) => {
+                    await authApi.changePassword(password, newPasswordDraft, totpCode);
+                    setNewPasswordDraft('');
+                    setConfirmPasswordDraft('');
+                    // The response already cleared this session's own cookie too (see
+                    // auth/service.ts's changePassword) - resync context state so AuthGate swaps
+                    // straight to the login screen instead of leaving this page showing stale
+                    // "authenticated" UI against a cookie that no longer verifies.
+                    await refreshAuthStatus();
+                  }}
+                />
+              )}
             </div>
 
             <TwoFactorSection />
             <PasskeySection />
+            <SshKeysSection />
           </div>
 
           <div className={`settings-card${activeSection === 'tailscale' ? '' : ' settings-hidden'}`}>

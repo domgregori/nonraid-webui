@@ -98,17 +98,27 @@ export class AuthService {
     return { cookie: serializeClearCookie(origin) };
   }
 
-  async changePassword(cookieHeader: string | undefined, currentPassword: string, newPassword: string, origin: RequestOrigin): Promise<AuthResult> {
+  // Step-up gated the same way SSH-key-add is (see verifyStepUp/verifyPasswordAndTotp below) -
+  // changing the password is itself a way to lock out every other session, sensitive enough to
+  // want the second factor re-checked too when one's enrolled, not just the password being
+  // changed.
+  async changePassword(
+    cookieHeader: string | undefined,
+    currentPassword: string,
+    newPassword: string,
+    totpCode: string | undefined,
+    origin: RequestOrigin,
+  ): Promise<AuthResult> {
     const record = await this.requireSession(cookieHeader);
-    if (!(await verifyPassword(currentPassword, record.passwordHash))) {
-      throw new HttpError(401, 'Current password is incorrect.');
-    }
+    await this.verifyPasswordAndTotp(record, currentPassword, totpCode);
     const newHash = await hashPassword(newPassword);
-    const updated = await this.store.updatePassword(newHash);
-    // Regenerated secret invalidates the cookie that authenticated this very
-    // request too - issue a fresh one against the new secret so this session
-    // keeps working, while every other open session is now logged out.
-    return this.issueSession(updated.sessionSecret, origin);
+    await this.store.updatePassword(newHash);
+    // updatePassword regenerates the session secret, which already invalidates every existing
+    // session cookie including this very request's - clear it and report logged-out rather than
+    // issuing a fresh one for this session, so a password change always means "log out
+    // everywhere, no exceptions" and the admin has to log back in with the new password to prove
+    // it actually works.
+    return { cookie: serializeClearCookie(origin), body: { configured: true, authenticated: false } };
   }
 
   // --- Two-factor: TOTP ---
@@ -176,6 +186,35 @@ export class AuthService {
       throw new HttpError(401, 'Incorrect code.');
     }
     return this.issueSession(record.sessionSecret, origin);
+  }
+
+  /**
+   * Password + TOTP-if-enrolled re-verification for an already-logged-in session, for an action
+   * sensitive enough to want more than "has a valid session cookie" - e.g. adding an SSH
+   * authorized_keys entry (grants full root shell access), or changing the password itself (see
+   * changePassword above). Both call the shared verifyPasswordAndTotp helper below; this method
+   * is the standalone form for actions (like SSH-key-add) that don't otherwise need requireSession
+   * themselves - see requireStepUp in middleware.ts for the route-level gate built on top of it.
+   */
+  async verifyStepUp(cookieHeader: string | undefined, currentPassword: string, totpCode: string | undefined): Promise<void> {
+    const record = await this.requireSession(cookieHeader);
+    await this.verifyPasswordAndTotp(record, currentPassword, totpCode);
+  }
+
+  // Passkey-only accounts (TOTP not enrolled) only get the password check here: there's no
+  // form-field equivalent of a WebAuthn ceremony to run from a plain step-up form, and
+  // disableTotp/regenerateBackupCodes above already establish "password re-entry" as this
+  // codebase's baseline for step-up regardless of which 2FA method is in use.
+  private async verifyPasswordAndTotp(record: AuthRecord, currentPassword: string, totpCode: string | undefined): Promise<void> {
+    if (!(await verifyPassword(currentPassword, record.passwordHash))) {
+      throw new HttpError(401, 'Current password is incorrect.');
+    }
+    if (record.totp) {
+      if (!totpCode) throw new HttpError(401, 'Two-factor code is required.');
+      const totpOk = await verifyTotpCode(record.totp.secret, totpCode);
+      const backupOk = totpOk ? false : await this.store.consumeBackupCodeIfValid(totpCode);
+      if (!totpOk && !backupOk) throw new HttpError(401, 'Incorrect code.');
+    }
   }
 
   // --- Two-factor: passkeys ---

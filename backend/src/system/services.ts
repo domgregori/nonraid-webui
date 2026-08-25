@@ -91,3 +91,33 @@ export async function restartService(def: ServiceDef): Promise<void> {
   await stopService(def);
   await startService(def);
 }
+
+// SSH-specific boot-enable, distinct from the generic start/stop above (is it running right now)
+// - this is "should it come back after a reboot", same concept as TailscaleSettings.enabled, but
+// deliberately NOT mirrored into settings.json: unlike Tailscale, systemd itself is already the
+// only source of truth here (`systemctl is-enabled` answers this directly), so shadowing it in a
+// second place would just be one more thing that could drift. Kept SSH-specific rather than
+// generalized onto ServiceDef since no other service needs this yet - see the "System" card's SSH
+// tasks this was built for.
+export async function isSshEnabled(): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const child = spawnMaybeSudo('systemctl', ['is-enabled', 'ssh']);
+    let stdout = '';
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    });
+    child.on('error', (err) => reject(err));
+    // Same non-zero-is-not-a-failure handling as isActive() above - "disabled"/"static"/"masked"
+    // are all valid answers, not errors.
+    child.on('close', () => resolve(stdout.trim() === 'enabled'));
+  });
+}
+
+// Enabling also starts it immediately (--now) - no reason to make someone wait for a reboot to
+// actually get SSH access. Disabling deliberately does NOT stop it right now: this toggle is
+// "should it come back after a reboot", not "kill it this instant" - the admin flipping it is
+// quite possibly connected over the very session it would drop. Use the Stop button below (which
+// already carries its own explicit warning) for that.
+export function setSshEnabled(enabled: boolean): Promise<{ stdout: string; stderr: string }> {
+  return runSudoMaybe('systemctl', enabled ? ['enable', '--now', 'ssh'] : ['disable', 'ssh']);
+}

@@ -23,11 +23,13 @@ export const authApi = {
       body: JSON.stringify({ username, password }),
     }),
   logout: () => request<AuthStatusResponse>('/api/auth/logout', { method: 'POST' }),
-  changePassword: (currentPassword: string, newPassword: string) =>
+  // currentPassword and (if the account has TOTP enrolled) totpCode required - step-up gated
+  // server-side the same way SSH-key-add is (see auth/service.ts's changePassword).
+  changePassword: (currentPassword: string, newPassword: string, totpCode?: string) =>
     request<AuthStatusResponse>('/api/auth/password', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ currentPassword, newPassword }),
+      body: JSON.stringify({ currentPassword, newPassword, totpCode }),
     }),
   verifyTotp: (code: string) =>
     request<AuthStatusResponse>('/api/auth/2fa/totp/verify', {
