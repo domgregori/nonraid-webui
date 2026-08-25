@@ -43,7 +43,7 @@ export interface RestoreArchiveEntry {
 }
 
 // Mirrors backend/src/system/backupCatalog.ts's BackupCategoryId.
-export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory' | 'appdata';
+export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory' | 'appdata' | 'remoteBackup';
 
 export interface RestoreCategoryPreview {
   id: BackupCategoryId;
@@ -88,6 +88,11 @@ export interface RestartServicesResult {
   smb: RestartServicesStepResult;
   nfs: RestartServicesStepResult;
   driverReload: RestartServicesStepResult;
+  // Re-syncs rclone-rcd's running state with the (possibly just-restored) settings.json - starts
+  // it if Remote Backup is enabled (so a freshly-restored rclone.conf actually gets read), stops it
+  // otherwise. Not gated behind an opt-in like Docker below: unlike bouncing Docker, this can't
+  // orphan anything, at worst it interrupts one in-flight sync.
+  rcloneRcd: RestartServicesStepResult;
   // Null when the caller didn't opt in via restartDocker (see systemApi.restartServices) - Docker
   // stops every running container on restart, so it's never bounced unless daemon.json was
   // actually part of what was just restored.

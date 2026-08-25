@@ -8,14 +8,12 @@ export function servicesRouter(activity: ActivityStore, settingsStore: SettingsS
 
   router.get('/services', async (_req, res) => {
     try {
-      // Tailscale's and rclone-rcd's rows only make sense once their own feature's been switched
-      // on in its own Settings section (see settings/types.ts's TailscaleSettings/
-      // RemoteBackupSettings doc comments) - showing them unconditionally would put a
-      // permanently-relevant-looking row in front of installs that never turn either on.
+      // rclone-rcd's row only makes sense once Remote Backup's been switched on in its own
+      // Settings section (see settings/types.ts's RemoteBackupSettings doc comment) - showing it
+      // unconditionally would put a permanently-relevant-looking row in front of installs that
+      // never turn it on. Tailscale has no such gate - always listed.
       const settings = await settingsStore.get();
-      const defs = SERVICE_DEFS.filter(
-        (def) => (def.id !== 'tailscale' || settings.tailscale.enabled) && (def.id !== 'rclone-rcd' || settings.remoteBackup.enabled),
-      );
+      const defs = SERVICE_DEFS.filter((def) => def.id !== 'rclone-rcd' || settings.remoteBackup.enabled);
       const rows: Array<{ id: string; label: string; state: ServiceState }> = await Promise.all(
         defs.map(async (def) => ({ id: def.id, label: def.label, state: await getServiceState(def) })),
       );

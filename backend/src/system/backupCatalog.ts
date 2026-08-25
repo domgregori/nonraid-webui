@@ -13,7 +13,7 @@ import type { NmdClient } from '../nmd/index.js';
 // silently swapping out whoever's currently logged in - confirmed live this session: restoring a
 // backup clobbered a freshly-created admin account with the older one saved inside it, with no way
 // to have kept the current login and restored everything else.
-export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory' | 'appdata';
+export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory' | 'appdata' | 'remoteBackup';
 
 export interface BackupCategory {
   id: BackupCategoryId;
@@ -45,6 +45,12 @@ export async function resolveBackupCategories(nmd: NmdClient, includeAppdata = f
     { id: 'adminAccount', label: 'Admin account', description: 'The login used to sign into this dashboard.', paths: [config.authConfigPath] },
     { id: 'activityHistory', label: 'Activity history', description: 'The event log shown on the Dashboard and History page.', paths: [config.activityConfigPath] },
     { id: 'graphHistory', label: 'Graph history', description: 'Recorded CPU/memory/disk/network metrics behind the History page\'s graphs.', paths: [config.metricsDbPath] },
+    {
+      id: 'remoteBackup',
+      label: 'Remote Backup',
+      description: "Configured rclone remotes (provider credentials) and sync job definitions - without these, Remote Backup comes back from a restore with no remotes or jobs configured, even if it's still switched on.",
+      paths: [config.rcloneConfigPath, config.rcloneSyncJobsConfigPath],
+    },
   ];
   if (includeAppdata) {
     categories.push({

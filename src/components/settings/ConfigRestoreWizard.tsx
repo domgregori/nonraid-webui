@@ -414,8 +414,8 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
                 ) : (
                   <>
                     <div className="toggle-row__desc">
-                      Restarting SMB, NFS, and the driver, then nonraid-webui itself - this page will reconnect
-                      automatically once it's back.
+                      Restarting SMB, NFS, the driver, and Remote Backup, then nonraid-webui itself - this page will
+                      reconnect automatically once it's back.
                     </div>
                     <ProgressBar indeterminate color="var(--color-blue)" height={6} />
                   </>
@@ -427,6 +427,9 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
                     <li style={restartSteps.nfs.ok ? undefined : { color: 'var(--color-red)' }}>NFS: {restartSteps.nfs.message}</li>
                     <li style={restartSteps.driverReload.ok ? undefined : { color: 'var(--color-red)' }}>
                       Driver: {restartSteps.driverReload.message}
+                    </li>
+                    <li style={restartSteps.rcloneRcd.ok ? undefined : { color: 'var(--color-red)' }}>
+                      Remote Backup: {restartSteps.rcloneRcd.message}
                     </li>
                     {restartSteps.docker && (
                       <li style={restartSteps.docker.ok ? undefined : { color: 'var(--color-red)' }}>
