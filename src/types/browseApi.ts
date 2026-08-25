@@ -10,6 +10,7 @@ export interface BrowseEntry {
   modifiedAt: string;
   locations?: string[];
   locationType?: BrowseLocationType;
+  editable?: boolean;
 }
 
 export interface BrowseListing {
@@ -21,6 +22,10 @@ export interface BrowseListing {
 export interface BrowseCommandResult {
   ok: boolean;
   message: string;
+}
+
+export interface BrowseFileContent {
+  content: string;
 }
 
 export interface PathSuggestions {

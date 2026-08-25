@@ -91,7 +91,12 @@
 .browse-table__head,
 .browse-row {
   display: grid;
-  grid-template-columns: 24px 1fr 100px 160px 140px auto;
+  /* Fixed, not auto - each row is its own independent grid (not shared rows of one grid), so an
+   * auto-sized last column would size to that row's own button count (a file row's Download+
+   * Rename+Copy+Move+Delete vs. a directory row's Rename+Copy+Move+Delete only), pushing the
+   * SIZE/MODIFIED/LOCATION columns before it to a different width on every row. Fixed keeps every
+   * row's columns lined up with the header regardless of how many action buttons that row has. */
+  grid-template-columns: 24px 1fr 100px 160px 140px 400px;
   gap: var(--space-md);
   align-items: center;
   padding: 10px var(--space-lg);
@@ -145,6 +150,20 @@
 
 .browse-row__name-text--file {
   color: var(--color-text);
+}
+
+.browse-row__name-text--editable {
+  font: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-chart-purple);
+  text-align: left;
+}
+
+.browse-row__name-text--editable:hover {
+  text-decoration: underline;
 }
 
 .browse-row__name-text--symlink {
@@ -255,4 +274,34 @@
     justify-content: flex-start;
     flex-wrap: wrap;
   }
+}
+
+.dialog.browse-editor-dialog {
+  width: 900px;
+}
+
+.browse-editor-body .cm-editor {
+  border-radius: var(--radius-btn);
+  overflow: hidden;
+}
+
+.browse-editor-head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.browse-editor-mode-toggle {
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+.browse-editor-dirty-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-amber);
+  margin-left: 8px;
+  vertical-align: middle;
 }

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import { BulkActionBar } from '../components/browse/BulkActionBar';
 import { BulkProgressDialog } from '../components/browse/BulkProgressDialog';
 import { Breadcrumbs } from '../components/browse/Breadcrumbs';
@@ -9,6 +9,11 @@ import { useBrowse } from '../hooks/useBrowse';
 import { LOCATION_TYPE_COLOR, LOCATION_TYPE_LABEL } from '../selectors/browse';
 import type { BrowseEntry, BrowseLocationType } from '../types/browseApi';
 import { formatFileSize } from '../utils/format';
+
+// Lazy - CodeMirror's core (not just its per-language chunks, which already code-split on their
+// own) is real weight, and this app has no other route-level code-splitting today. Loading it
+// only when someone actually opens a file keeps it out of every other page's shared bundle.
+const EditFileDialog = lazy(() => import('../components/browse/EditFileDialog').then((m) => ({ default: m.EditFileDialog })));
 
 function formatModified(iso: string): string {
   const d = new Date(iso);
@@ -24,6 +29,7 @@ export function BrowsePage() {
   const [transfer, setTransfer] = useState<{ op: 'copy' | 'move'; entries: BrowseEntry[] } | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [calculating, setCalculating] = useState<Set<string>>(new Set());
+  const [editingEntry, setEditingEntry] = useState<{ path: string; name: string } | null>(null);
 
   const ready = browse.status === 'ready';
   const entries = browse.listing?.entries ?? [];
@@ -179,7 +185,20 @@ export function BrowsePage() {
                     title={LOCATION_TYPE_LABEL[entry.locationType]}
                   />
                 )}
-                <span className={`browse-row__name-text--${entry.type}`}>{entry.name}</span>
+                {entry.type === 'file' && entry.editable ? (
+                  <button
+                    type="button"
+                    className="browse-row__name-text--file browse-row__name-text--editable"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingEntry({ path: absPath, name: entry.name });
+                    }}
+                  >
+                    {entry.name}
+                  </button>
+                ) : (
+                  <span className={`browse-row__name-text--${entry.type}`}>{entry.name}</span>
+                )}
                 {isFileConflict(entry) && (
                   <span
                     className="browse-conflict-icon"
@@ -270,6 +289,12 @@ export function BrowsePage() {
       )}
 
       {browse.bulkJob && <BulkProgressDialog job={browse.bulkJob} onCancel={browse.cancelBulk} onDismiss={browse.dismissBulk} />}
+
+      {editingEntry && (
+        <Suspense fallback={<div className="detail-overlay" />}>
+          <EditFileDialog path={editingEntry.path} fileName={editingEntry.name} onClose={() => setEditingEntry(null)} />
+        </Suspense>
+      )}
     </div>
   );
 }

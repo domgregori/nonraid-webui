@@ -75,6 +75,23 @@ export function browseRouter(browse: BrowseService): Router {
     }
   });
 
+  router.get('/browse/read', async (req, res) => {
+    try {
+      res.json(await browse.readFile(queryPath(req)));
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  router.post('/browse/write', async (req, res) => {
+    try {
+      const { path: relPath, content } = req.body ?? {};
+      res.json(await browse.writeFile(relPath ?? '', content ?? ''));
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   router.post('/browse/mkdir', async (req, res) => {
     try {
       const { path: parentPath, name } = req.body ?? {};
