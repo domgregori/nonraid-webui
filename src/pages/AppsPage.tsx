@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AppCard } from '../components/apps/AppCard';
 import { AppDetailPanel } from '../components/apps/AppDetailPanel';
 import { InstallDialog } from '../components/apps/InstallDialog';
@@ -9,9 +9,34 @@ const PAGE_SIZE = 60;
 
 const SORT_OPTIONS: { value: AppSort; label: string }[] = [
   { value: 'trending', label: 'Trending' },
+  { value: 'popular', label: 'Most downloaded' },
   { value: 'latest', label: 'Newly updated' },
   { value: 'new', label: 'New apps' },
 ];
+
+type DisplayOrder = '' | 'newest' | 'oldest' | 'downloads' | 'rating';
+
+const DISPLAY_ORDER_OPTIONS: { value: DisplayOrder; label: string }[] = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+  { value: 'downloads', label: 'Downloads' },
+  { value: 'rating', label: 'Rating' },
+];
+
+// Independent of the category/sort dropdown above - re-orders whatever's currently in `apps`
+// (the full already-fetched, already-filtered list, not just the paginated `visible` slice)
+// purely client-side. No backend round trip: every field it sorts by (firstSeenAt, downloads,
+// stars) already ships on AppSummary. Missing values always sort last, regardless of direction -
+// an app the feed has no signal for isn't meaningfully "oldest" or "unrated", it's just unknown.
+function applyDisplayOrder(apps: AppSummary[], order: DisplayOrder): AppSummary[] {
+  if (!order) return apps;
+  const sorted = [...apps];
+  if (order === 'newest') sorted.sort((a, b) => (b.firstSeenAt ?? -Infinity) - (a.firstSeenAt ?? -Infinity));
+  else if (order === 'oldest') sorted.sort((a, b) => (a.firstSeenAt ?? Infinity) - (b.firstSeenAt ?? Infinity));
+  else if (order === 'downloads') sorted.sort((a, b) => (b.downloads ?? -Infinity) - (a.downloads ?? -Infinity));
+  else if (order === 'rating') sorted.sort((a, b) => (b.stars ?? -Infinity) - (a.stars ?? -Infinity));
+  return sorted;
+}
 
 function formatLastUpdated(meta: { lastUpdated: string } | null): string {
   if (!meta) return '';
@@ -24,25 +49,36 @@ export function AppsPage() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [installingApp, setInstallingApp] = useState<AppSummary | null>(null);
   const [viewingApp, setViewingApp] = useState<AppSummary | null>(null);
+  // Independent of category/search/sort above - deliberately not reset when any of those change,
+  // so picking e.g. "Downloads" keeps reordering whatever set of apps ends up displayed.
+  const [displayOrder, setDisplayOrder] = useState<DisplayOrder>('');
 
-  const visible = apps.slice(0, visibleCount);
-  const hasMore = visibleCount < apps.length;
+  const orderedApps = useMemo(() => applyDisplayOrder(apps, displayOrder), [apps, displayOrder]);
+  const visible = orderedApps.slice(0, visibleCount);
+  const hasMore = visibleCount < orderedApps.length;
 
   const handleSearch = (value: string) => {
     setSearch(value);
     setVisibleCount(PAGE_SIZE);
   };
 
-  const handleCategory = (value: string) => {
-    setSort(null);
-    setCategory(value === category ? '' : value);
-    setVisibleCount(PAGE_SIZE);
-  };
+  // Sort and category are mutually exclusive server-side filters, but presented as one combined
+  // dropdown - encode which kind a given selection is in the option value itself ("sort:trending",
+  // "category:MediaServer:Video") since a category name could otherwise collide with a sort value.
+  const filterValue = sort ? `sort:${sort}` : category ? `category:${category}` : '';
 
-  const handleSort = (value: AppSort) => {
-    setCategory('');
-    setSort(sort === value ? null : value);
+  const handleFilterChange = (value: string) => {
     setVisibleCount(PAGE_SIZE);
+    if (value.startsWith('sort:')) {
+      setSort(value.slice(5) as AppSort);
+      setCategory('');
+    } else if (value.startsWith('category:')) {
+      setCategory(value.slice(9));
+      setSort(null);
+    } else {
+      setSort(null);
+      setCategory('');
+    }
   };
 
   const handleViewNamespace = (namespace: string) => {
@@ -68,39 +104,6 @@ export function AppsPage() {
       </div>
 
       <div className="apps-layout">
-        <aside className="apps-sidebar">
-          <div className="apps-sidebar__title">Sort by</div>
-          {SORT_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              className={`category-item${sort === opt.value ? ' category-item--active' : ''}`}
-              onClick={() => handleSort(opt.value)}
-            >
-              {opt.label}
-            </button>
-          ))}
-          <div className="apps-sidebar__separator" />
-          <div className="apps-sidebar__title">Categories</div>
-          <button
-            type="button"
-            className={`category-item${category === '' ? ' category-item--active' : ''}`}
-            onClick={() => handleCategory('')}
-          >
-            All
-          </button>
-          {categories.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={`category-item${category === c ? ' category-item--active' : ''}`}
-              onClick={() => handleCategory(c)}
-            >
-              {c.replace(/-/g, ' ')}
-            </button>
-          ))}
-        </aside>
-
         <div className="apps-main">
           <div className="apps-toolbar">
             <input
@@ -110,6 +113,35 @@ export function AppsPage() {
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
             />
+            <select className="apps-filter-select" value={filterValue} onChange={(e) => handleFilterChange(e.target.value)}>
+              <option value="">All apps</option>
+              <optgroup label="Sort by">
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={`sort:${opt.value}`}>
+                    {opt.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Categories">
+                {categories.map((c) => (
+                  <option key={c} value={`category:${c}`}>
+                    {c.replace(/-/g, ' ')}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+            <select
+              className="apps-filter-select"
+              value={displayOrder}
+              onChange={(e) => setDisplayOrder(e.target.value as DisplayOrder)}
+            >
+              <option value="">Order by…</option>
+              {DISPLAY_ORDER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           {status === 'loading' && <div className="status-note">Loading catalog…</div>}
@@ -131,7 +163,7 @@ export function AppsPage() {
           {hasMore && (
             <div className="apps-load-more">
               <button type="button" className="btn" onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}>
-                Show more ({apps.length - visibleCount} remaining)
+                Show more ({orderedApps.length - visibleCount} remaining)
               </button>
             </div>
           )}

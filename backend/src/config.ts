@@ -299,4 +299,8 @@ export const config = {
   // nonraid-os's first-boot script's own CHECKOUT_DIR, the real location on an actual deployed
   // image - override for any other checkout location (e.g. a dev/test box).
   updateInstallScriptPath: str('UPDATE_INSTALL_SCRIPT_PATH', t('update', 'install_script_path'), '/opt/nonraid-webui-src/tools/install-webui.sh'),
+  // How often DockerUpdateScheduler re-pulls every container's image to check for a newer one
+  // (see docker/updateCheck.ts) - a real registry hit per container, so daily by default like the
+  // update scheduler above, not the minute-granularity schedulers.
+  dockerUpdateSchedulerTickIntervalMs: num('DOCKER_UPDATE_SCHEDULER_TICK_INTERVAL_MS', t('docker', 'update_scheduler_tick_interval_ms'), 24 * 60 * 60 * 1000),
 };

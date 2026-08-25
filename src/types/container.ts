@@ -16,10 +16,14 @@ export interface ContainerViewModel {
   caAppName: string | null; // set when installed via the Apps (Community Applications) catalog; null for a manually-added container
   webUiUrl: string | null; // best-effort link built from the first published host port; null when nothing is published
   autostart: boolean;
+  // null = not yet checked (or the last check failed) - see docker/updateCheck.ts on the backend.
+  updateAvailable: boolean | null;
   onToggle: () => void;
   onRestart: () => void;
   onEdit: () => void;
   onViewLogs: () => void;
   onDestroy: () => void;
   onToggleAutostart: () => void;
+  onCheckUpdate: () => void;
+  onUpdateNow: () => void;
 }

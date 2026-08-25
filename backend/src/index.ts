@@ -15,6 +15,7 @@ import { CacheService } from './cache/service.js';
 import { config } from './config.js';
 import { DiskQueueService } from './diskQueue/service.js';
 import { createDockerClient } from './docker/index.js';
+import { DockerUpdateScheduler } from './docker/updateScheduler.js';
 import { EmptyDiskService } from './emptyDisk/index.js';
 import { createLxcClient } from './lxc/index.js';
 import { resolveLxcPath } from './lxc/storagePath.js';
@@ -94,6 +95,7 @@ async function main() {
   const rcloneService = new RcloneService(rclone, nmd, activity, settingsStore);
   new RcloneSyncScheduler(rcloneService, settingsStore);
   new UpdateScheduler(activity, settingsStore);
+  new DockerUpdateScheduler(docker, activity, settingsStore);
   const tlsRecord = await tlsStore.get(); // fail fast at boot on a corrupt tls.json
   if (config.serveFrontend && !existsSync(path.join(config.frontendDistPath, 'index.html'))) {
     throw new Error(`serveFrontend is true but no index.html at ${config.frontendDistPath} - did the frontend build run?`);

@@ -21,7 +21,8 @@ export type NotificationEventType =
   | 'cacheMirrorDegraded'
   | 'cacheMoverFailed'
   | 'cacheMoverCompleted'
-  | 'updateAvailable';
+  | 'updateAvailable'
+  | 'dockerUpdateAvailable';
 
 export type NotificationSeverity = 'high' | 'medium' | 'low';
 

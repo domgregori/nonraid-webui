@@ -18,7 +18,8 @@ export type NotificationEventType =
   | 'cacheMoverCompleted'
   | 'arrayError'
   | 'diskNeedsFormat'
-  | 'updateAvailable';
+  | 'updateAvailable'
+  | 'dockerUpdateAvailable';
 
 export type NotificationSeverity = 'high' | 'medium' | 'low';
 
@@ -62,6 +63,7 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { id: 'arrayReconfigured', label: 'Array reconfigured (disk dropped)', severity: 'medium', defaultEnabled: true },
   { id: 'diskNeedsFormat', label: 'Disk needs formatting', severity: 'medium', defaultEnabled: true },
   { id: 'updateAvailable', label: 'Software update available', severity: 'medium', defaultEnabled: true },
+  { id: 'dockerUpdateAvailable', label: 'Docker container update available', severity: 'medium', defaultEnabled: true },
   { id: 'parityStarted', label: 'Parity check started', severity: 'low', defaultEnabled: false },
   { id: 'parityCompleted', label: 'Parity check finished with no errors', severity: 'low', defaultEnabled: false },
   { id: 'backupCompleted', label: 'Scheduled backup completed', severity: 'low', defaultEnabled: false },

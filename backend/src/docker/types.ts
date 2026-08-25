@@ -10,6 +10,11 @@ export interface DockerContainerSummary {
   id: string;
   name: string;
   image: string;
+  // The resolved sha256 digest of the image this container is actually running (Docker's own
+  // top-level `Image` field on inspect - distinct from `image` above, which is the reference used
+  // to create it, e.g. "repo:tag"). Used to detect an update: pull `image` again and compare its
+  // freshly-resolved id against this one - see docker/updateCheck.ts.
+  imageId: string;
   state: ContainerRuntimeState;
   status: string; // human string from Docker, e.g. "Up 2 hours" / "Exited (0) 3 days ago"
   cpuPercent: number | null; // null when stopped (no stats available)
@@ -124,6 +129,7 @@ export interface ContainerDetail {
   id: string;
   name: string;
   image: string;
+  imageId: string; // see DockerContainerSummary's own doc comment
   network: string;
   privileged: boolean;
   env: ContainerEnvVar[];

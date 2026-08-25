@@ -24,6 +24,12 @@ export interface DockerClient {
   // result message, not thrown.
   destroyContainer(id: string): Promise<DockerCommandResult>;
   createContainer(options: CreateContainerOptions, onProgress?: CreateContainerProgressCallback): Promise<DockerCommandResult>;
+  // Always hits the registry, unlike createContainer's own internal ensureImagePulled (which
+  // skips pulling when the image is already present locally, so it can't detect an update) - used
+  // by docker/updateCheck.ts to both check for and pre-fetch a newer image in one call. Docker's
+  // own layer-diffing means this costs almost nothing when nothing changed (just a manifest
+  // fetch) and only downloads real bytes when there's a real update to get anyway.
+  pullImage(image: string): Promise<{ id: string }>;
   // `since` (unix seconds, fractional for sub-second precision) fetches only log lines newer than
   // that cursor - used for the live-tail poll loop instead of `tail`. `nextSince` in the result is
   // the cursor to pass on the next poll (null when nothing came back to derive it from).
