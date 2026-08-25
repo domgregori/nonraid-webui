@@ -113,6 +113,7 @@ export interface AppSettings {
   timeFormat: '12h' | '24h';
   turboWrite: boolean;
   trustProxy: boolean;
+  trustProxyAddress: string;
   notifications: NotificationSettings;
   minFreeSpaceGb: number;
   paritySchedule: ParitySchedule;
@@ -128,6 +129,7 @@ export type AppSettingsUpdate = Partial<{
   timeFormat: '12h' | '24h';
   turboWrite: boolean;
   trustProxy: boolean;
+  trustProxyAddress: string;
   notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {
     eventTypes?: Partial<Record<NotificationEventType, Partial<NotificationChannelToggle>>>;
   };

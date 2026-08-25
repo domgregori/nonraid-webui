@@ -7,7 +7,7 @@ import https from 'node:https';
 import path from 'node:path';
 import { ActivityStore, ActivityWatcher } from './activity/index.js';
 import { AppsService, CaFeedStore } from './apps/index.js';
-import { AuthService, AuthStore, requireAuth } from './auth/index.js';
+import { AuthService, AuthStore, requireAuth, resolveTrustProxyValue } from './auth/index.js';
 import { BrowseService } from './browse/service.js';
 import { CacheMoverService } from './cache/mover.js';
 import { CacheMoverScheduler } from './cache/moverScheduler.js';
@@ -156,9 +156,19 @@ async function main() {
   const app = express();
   // Only set when config.trustProxy is explicitly opted into (see its doc comment in config.ts) -
   // makes req.secure/req.hostname/req.ip trust X-Forwarded-Proto/Host/For, which cookies.ts and
-  // webauthn.ts rely on via requestOrigin.ts to auto-detect HTTPS behind a reverse proxy.
+  // webauthn.ts rely on via requestOrigin.ts to auto-detect HTTPS behind a reverse proxy. When a
+  // specific trusted proxy address is configured (Settings > Security), only requests actually
+  // arriving via that address get their forwarded headers honored - address left blank falls back
+  // to trusting every hop, same as before this existed. A resolution failure at boot (bad
+  // hostname, DNS unavailable) falls open to blanket trust rather than crashing - same
+  // "misconfiguration shouldn't brick the NAS" reasoning as the TLS cert-read fallback above.
   if (config.trustProxy) {
-    app.set('trust proxy', true);
+    try {
+      app.set('trust proxy', (await resolveTrustProxyValue(persistedSettings.trustProxyAddress)) ?? true);
+    } catch (err) {
+      console.error(`Trusted proxy address could not be resolved (${(err as Error).message}) - trusting any hop instead. Fix it in Settings > Security.`);
+      app.set('trust proxy', true);
+    }
   }
   app.use(cors({ origin: config.corsOrigin, credentials: true }));
   app.use(express.json());

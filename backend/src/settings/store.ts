@@ -44,6 +44,7 @@ const DEFAULTS: AppSettings = {
   timeFormat: '12h',
   turboWrite: false,
   trustProxy: false,
+  trustProxyAddress: '',
   notifications: { enabled: false, appriseUrls: '', eventTypes: DEFAULT_EVENT_TYPES },
   minFreeSpaceGb: 4,
   paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2, cronExpression: '' },

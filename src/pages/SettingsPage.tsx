@@ -163,6 +163,8 @@ export function SettingsPage() {
   const [minFreeSpaceSaving, setMinFreeSpaceSaving] = useState(false);
   const [minFreeSpaceError, setMinFreeSpaceError] = useState<string | null>(null);
 
+  const [trustProxyAddressDraft, setTrustProxyAddressDraft] = useState('');
+
   const [paritySchedEnabled, setParitySchedEnabled] = useState(false);
   const [paritySchedFrequency, setParitySchedFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'cron'>('weekly');
   const [paritySchedDay, setParitySchedDay] = useState(0);
@@ -239,6 +241,7 @@ export function SettingsPage() {
   const labelInitialized = useRef(false);
   const appriseInitialized = useRef(false);
   const minFreeSpaceInitialized = useRef(false);
+  const trustProxyAddressInitialized = useRef(false);
   const paritySchedInitialized = useRef(false);
   const tempThresholdInitialized = useRef(false);
   const backupSchedInitialized = useRef(false);
@@ -286,6 +289,13 @@ export function SettingsPage() {
     if (settings && !minFreeSpaceInitialized.current) {
       setMinFreeSpaceDraft(String(settings.minFreeSpaceGb));
       minFreeSpaceInitialized.current = true;
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    if (settings && !trustProxyAddressInitialized.current) {
+      setTrustProxyAddressDraft(settings.trustProxyAddress);
+      trustProxyAddressInitialized.current = true;
     }
   }, [settings]);
 
@@ -465,6 +475,12 @@ export function SettingsPage() {
     await update({ minFreeSpaceGb: value });
     setMinFreeSpaceSaving(false);
   };
+
+  // Validation itself happens server-side (resolveTrustProxyValue, backend/src/auth/trustProxy.ts
+  // - a hostname needs a real DNS lookup, not something worth duplicating here) - update() itself
+  // never throws (it swallows failures into the shared saving/saveError below), so that's what
+  // actually surfaces a bad address, same as every other settings field in this file.
+  const saveTrustProxyAddress = () => update({ trustProxyAddress: trustProxyAddressDraft.trim() });
 
   const saveParitySchedule = async () => {
     setParitySchedSaving(true);
@@ -1194,6 +1210,26 @@ export function SettingsPage() {
                 <div className="toggle-row__desc">Only enable if a reverse proxy is the sole way to reach this backend (it's firewalled off from any other direct access) and that proxy always sets/overwrites X-Forwarded-Proto/Host/For itself - otherwise a direct client could spoof those headers to fake an HTTPS connection or dodge login/TOTP rate limiting. Once enabled, the session cookie's Secure flag and passkey RP ID/origin are detected from the request automatically, no need to set them by hand.</div>
               </div>
               <ToggleSwitch on={settings?.trustProxy ?? false} onToggle={() => settings && update({ trustProxy: !settings.trustProxy })} label="Trust reverse proxy" disabled={!settings || saving} />
+            </div>
+            <div className="settings-field">
+              <div className="toggle-row__title">Trusted proxy address</div>
+              <div className="toggle-row__desc">
+                Optional - an IP, CIDR range, or hostname for the reverse proxy itself. Only forwarded headers arriving via this address are trusted; left blank, any hop is trusted once the toggle above is on. Multiple addresses can be comma-separated.
+              </div>
+              <div className="settings-field__row">
+                <input
+                  className="history-input"
+                  style={{ flex: 1, minWidth: 200 }}
+                  value={trustProxyAddressDraft}
+                  onChange={(e) => setTrustProxyAddressDraft(e.target.value)}
+                  placeholder="e.g. 192.168.1.10 or proxy.example.com"
+                  disabled={!settings}
+                />
+                <button type="button" className="btn" disabled={!settings || saving} onClick={saveTrustProxyAddress}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+              {saveError && <div className="status-note status-note--error">{saveError}</div>}
             </div>
             <div className="settings-field">
               <div className="toggle-row__title">Change admin password</div>

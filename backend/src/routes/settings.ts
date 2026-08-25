@@ -1,5 +1,6 @@
 import { Router, type Express } from 'express';
 import type { ActivityStore } from '../activity/index.js';
+import { resolveTrustProxyValue } from '../auth/index.js';
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { RcloneClient } from '../rclone/client.js';
@@ -98,11 +99,16 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
       }
       // Express re-reads 'trust proxy' on every request, so this takes effect immediately -
       // no restart needed, unlike TLS enable/disable. config.trustProxy is updated too since
-      // webauthn.ts's requireWebauthnConfig() reads it directly, not via app.get().
-      if (typeof patch.trustProxy === 'boolean') {
-        app.set('trust proxy', patch.trustProxy);
-        config.trustProxy = patch.trustProxy;
-        activity.log(patch.trustProxy ? 'Trust reverse proxy enabled' : 'Trust reverse proxy disabled', 'blue').catch(() => {});
+      // webauthn.ts's requireWebauthnConfig() reads it directly, not via app.get(). Runs before
+      // store.update() below persists anything, so an address that fails to resolve (bad
+      // hostname) rejects the whole request rather than saving a value that wouldn't actually work.
+      if (typeof patch.trustProxy === 'boolean' || typeof patch.trustProxyAddress === 'string') {
+        const current = await store.get();
+        const trustProxy = typeof patch.trustProxy === 'boolean' ? patch.trustProxy : current.trustProxy;
+        const trustProxyAddress = typeof patch.trustProxyAddress === 'string' ? patch.trustProxyAddress : current.trustProxyAddress;
+        app.set('trust proxy', trustProxy ? (await resolveTrustProxyValue(trustProxyAddress)) ?? true : false);
+        config.trustProxy = trustProxy;
+        activity.log(trustProxy ? 'Trust reverse proxy enabled' : 'Trust reverse proxy disabled', 'blue').catch(() => {});
       }
       if ('minFreeSpaceGb' in patch) {
         if (typeof patch.minFreeSpaceGb !== 'number' || !Number.isInteger(patch.minFreeSpaceGb) || patch.minFreeSpaceGb < 0) {

@@ -157,6 +157,12 @@ export interface AppSettings {
   // via app.set('trust proxy', ...) in routes/settings.ts's PUT handler, no restart needed -
   // unlike TLS enable/disable, Express re-reads this setting on every request.
   trustProxy: boolean;
+  // Which upstream hop actually gets its X-Forwarded-* headers trusted - IPs/CIDR ranges/the
+  // named subnet keywords Express's trust-proxy setting understands, or a hostname (resolved to
+  // its current IP at apply time, see auth/trustProxy.ts), comma/space-separated for more than
+  // one. Empty string (the default) falls back to trusting every hop, same as trustProxy always
+  // has - this only narrows that once actually filled in.
+  trustProxyAddress: string;
   notifications: NotificationSettings;
   // mergerfs's `minfreespace`, in MB, applied to every pooled share mount
   // (see shares/applier/realApplier.ts). mergerfs excludes any branch below
@@ -179,6 +185,7 @@ export type AppSettingsUpdate = Partial<{
   timeFormat: '12h' | '24h';
   turboWrite: boolean;
   trustProxy: boolean;
+  trustProxyAddress: string;
   notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {
     eventTypes?: Partial<Record<NotificationEventType, Partial<NotificationChannelToggle>>>;
   };
