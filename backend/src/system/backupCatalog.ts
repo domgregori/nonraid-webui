@@ -39,8 +39,8 @@ export async function resolveBackupCategories(nmd: NmdClient, includeAppdata = f
     {
       id: 'appConfig',
       label: 'App settings & shares',
-      description: 'This app\'s own config.toml, settings, shares, share permissions, and Docker\'s storage location.',
-      paths: ['/etc/nonraid', config.settingsConfigPath, config.sharesConfigPath, config.shareAccessConfigPath, DAEMON_JSON_PATH],
+      description: 'This app\'s own settings, shares, share permissions, and Docker\'s storage location.',
+      paths: [config.settingsConfigPath, config.sharesConfigPath, config.shareAccessConfigPath, DAEMON_JSON_PATH],
     },
     { id: 'adminAccount', label: 'Admin account', description: 'The login used to sign into this dashboard.', paths: [config.authConfigPath] },
     { id: 'activityHistory', label: 'Activity history', description: 'The event log shown on the Dashboard and History page.', paths: [config.activityConfigPath] },
@@ -94,7 +94,7 @@ async function pathExists(p: string): Promise<boolean> {
 
 /** Which category (if any) an archive member - a tar path like "etc/samba/smb.conf", relative,
  *  no leading "/" - belongs to. A category's own paths are absolute; matched either as an exact
- *  file or as a member living under a directory category ('appConfig''s "/etc/nonraid"). */
+ *  file or as a member living under a directory category ('appdata''s bind-mount roots). */
 export function categoryForMember(member: string, categories: BackupCategory[]): BackupCategoryId | null {
   for (const cat of categories) {
     for (const p of cat.paths) {

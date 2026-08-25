@@ -152,8 +152,8 @@ export interface AppSettings {
   // "turbo write") - see nmd/client.ts's setWriteMethod doc comment for why
   // this has to be persisted here rather than read back from the driver.
   turboWrite: boolean;
-  // Mirrors config.trustProxy (see its doc comment) - either one being true enables it (an
-  // env var/config.toml deployment can still force it on without touching the UI). Applied live
+  // Mirrors config.trustProxy (see its doc comment) - either one being true enables it (a
+  // TRUST_PROXY env var can still force it on without touching the UI). Applied live
   // via app.set('trust proxy', ...) in routes/settings.ts's PUT handler, no restart needed -
   // unlike TLS enable/disable, Express re-reads this setting on every request.
   trustProxy: boolean;

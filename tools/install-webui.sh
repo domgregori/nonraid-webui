@@ -6,9 +6,8 @@
 # always re-pulls and rebuilds from the latest commit on that repo's main branch (a personal fork
 # with fixes landing ahead of any version bump — see its own comment below for why this can't
 # just skip-if-already-built like mergerfs/Node below do), this checkout's own node_modules is
-# never touched (a staged copy in /opt is pruned instead), an already-customized
-# /etc/nonraid/config.toml is never overwritten, and it always ends with `systemctl restart` so
-# first-install and every later update take the same code path.
+# never touched (a staged copy in /opt is pruned instead), and it always ends with `systemctl
+# restart` so first-install and every later update take the same code path.
 #
 # Run from inside a nonraid-webui checkout, as root:
 #   sudo tools/install-webui.sh
@@ -555,14 +554,6 @@ install_webui_systemd_unit() {
   log "Installing Avahi service-type file for SMB share discovery"
   mkdir -p /etc/avahi/services
   install -m 644 "$REPO_ROOT/tools/config/avahi-samba.service" /etc/avahi/services/samba.service
-
-  if [ ! -e /etc/nonraid/config.toml ]; then
-    log "Installing default config (/etc/nonraid/config.toml)"
-    mkdir -p /etc/nonraid
-    install -m 644 "$REPO_ROOT/tools/config/nonraid-webui.toml.example" /etc/nonraid/config.toml
-  else
-    log "/etc/nonraid/config.toml already exists — leaving it as-is"
-  fi
 }
 
 # Own systemd unit, not a child process of the webui backend - same reasoning as tailscaled: the
@@ -616,7 +607,7 @@ print_summary() {
   systemctl status nonraid-webui --no-pager || true
   echo
   log "Done. Visit http://<this-host>:3001/ — first boot shows the admin account setup screen."
-  log "Reminder: HTTPS can be enabled from Settings -> Security once you're ready — the session cookie's Secure flag auto-flips at boot once this app's own TLS is enabled, no manual config.toml edit needed."
+  log "Reminder: HTTPS can be enabled from Settings -> Security once you're ready — the session cookie's Secure flag auto-flips at boot once this app's own TLS is enabled, no manual config edit needed."
 }
 
 # Convenience shortcuts for updating one already-installed piece without re-running (or even

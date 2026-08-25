@@ -211,9 +211,7 @@ npm install
 npm run dev        # tsx watch
 ```
 
-Config comes from (in order of precedence) environment variables, a TOML file
-(`$HOME/.config/nonraid/config.toml` or `/etc/nonraid/config.toml` — see
-`tools/config/nonraid-webui.toml.example`), then hardcoded defaults. No `.env`
+Config comes from environment variables, falling back to hardcoded defaults when unset. No `.env`
 file support — set an env var directly for a quick one-off override.
 
 ## API
@@ -226,7 +224,7 @@ errors as `{ error: string }` (usually `400`/`404`/`409`/`502`). A handful of lo
 operations (image pulls, container creation, storage migrations) stream newline-delimited JSON
 progress events instead of a single response - see API.md's "Conventions" section.
 
-## Config (env vars, see `tools/config/nonraid-webui.toml.example` for the TOML equivalents)
+## Config (env vars)
 
 - `PORT` (default `3001`)
 - `CORS_ORIGIN` (default `http://localhost:5183`, the frontend's Vite dev server)

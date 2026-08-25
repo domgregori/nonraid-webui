@@ -6,6 +6,12 @@ After=network.target nonraid.service
 Type=simple
 StateDirectory=nonraid-webui
 WorkingDirectory=/var/lib/nonraid-webui
+# Production shape: this same process also serves the built frontend (see config.ts's
+# serveFrontend doc comment) - previously set via the auto-installed /etc/nonraid/config.toml,
+# now a plain env var like everything else in config.ts now that TOML config support is gone.
+# Must match install-webui.sh's stage_install() staging path.
+Environment=SERVE_FRONTEND=true
+Environment=FRONTEND_DIST_PATH=/opt/nonraid-webui/frontend-dist
 ExecStart=/usr/bin/node /opt/nonraid-webui/backend/dist/index.js
 Restart=on-failure
 RestartSec=5

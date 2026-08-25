@@ -124,8 +124,8 @@ async function main() {
     await nmd.setWriteMethod(true).catch(() => {});
   }
 
-  // Either source enables it - lets a deployment force this on via env var/config.toml without
-  // touching the UI, while still letting the UI toggle (routes/settings.ts) turn it on/off live.
+  // Either source enables it - lets a deployment force this on via the TRUST_PROXY env var
+  // without touching the UI, while still letting the UI toggle (routes/settings.ts) turn it on/off live.
   if (persistedSettings.trustProxy) {
     config.trustProxy = true;
   }
