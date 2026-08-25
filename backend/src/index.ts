@@ -212,7 +212,7 @@ async function main() {
   app.use('/api', smartRouter(nmd, smart, system));
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
-  app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics));
+  app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics, settingsStore));
   app.use('/api', updateRouter(activity));
   app.use('/api', servicesRouter(activity, settingsStore));
   app.use('/api', usersRouter(users));

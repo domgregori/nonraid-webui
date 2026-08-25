@@ -273,6 +273,15 @@ export const config = {
   rcloneRcEnvFilePath: str('RCLONE_RC_ENV_FILE_PATH', t('rclone', 'rc_env_file_path'), '/etc/default/rclone-rcd'),
   rcloneRcTimeoutMs: num('RCLONE_RC_TIMEOUT_MS', t('rclone', 'rc_timeout_ms'), 15_000),
   rcloneBin: str('RCLONE_BIN', t('rclone', 'bin'), 'rclone'),
+  // rclone's own config file - every configured remote (S3/B2/SFTP/etc credentials, obscured not
+  // encrypted) lives here, entirely outside this app's own settings.json. Must match rclone-rcd's
+  // own --config= flag (tools/systemd/rclone-rcd.service) and install-webui.sh's `mkdir -p` for
+  // it - not templated from this value since the systemd unit file is static, so keep both in
+  // sync by hand if this ever changes. Included in config backups (see backupCatalog.ts's
+  // 'remoteBackup' category) alongside rcloneSyncJobsConfigPath below - restoring one without the
+  // other leaves either orphaned sync jobs with no matching remote, or remotes with no job using
+  // them.
+  rcloneConfigPath: str('RCLONE_CONFIG_PATH', t('rclone', 'config_path'), '/etc/rclone/rclone.conf'),
   // The sync-job list (rclone/syncJobStore.ts) - a growing list of structured records, same reason
   // shares.json/tls.json get their own file instead of living inside settings.json.
   rcloneSyncJobsConfigPath: str('RCLONE_SYNC_JOBS_CONFIG_PATH', t('rclone', 'sync_jobs_config_path'), path.join(process.cwd(), 'data', 'rclone-sync-jobs.json')),

@@ -29,8 +29,10 @@ import {
   sweepStagedRestores,
 } from '../system/configRestore.js';
 import { listTimezones, rebootHost, setHostname, setTimezone } from '../system/hostConfig.js';
+import { runSudoMaybe } from '../system/procUtil.js';
 import type { SystemStatsService } from '../system/service.js';
 import { restartService, SERVICE_DEFS } from '../system/services.js';
+import type { SettingsStore } from '../settings/store.js';
 
 // Config backups are small text files plus the 4KB superblock, but a long-lived activity log or
 // many shares' worth of config could add up - generous but bounded, matching the same "don't
@@ -43,6 +45,7 @@ export function systemRouter(
   activity: ActivityStore,
   backupScheduler: BackupScheduler,
   metrics: MetricsService,
+  settingsStore: SettingsStore,
 ): Router {
   const router = Router();
 
@@ -318,12 +321,12 @@ export function systemRouter(
   });
 
   // The config-restore result screen's single "make everything take effect" action - SMB, NFS,
-  // driver reload, and nonraid-webui itself, instead of four separate buttons for what's really
-  // one "apply what was just restored" step. Order matters: SMB/NFS/driver run first so their own
-  // outcomes can still be reported in this response; the webui restart runs last (self-exit, same
-  // pattern as /services/webui/restart) since it drops this connection. Each step is independent
-  // and best-effort - one failing doesn't skip the rest, since e.g. a driver reload failure
-  // shouldn't leave Samba serving a stale smb.conf just because it ran second.
+  // driver reload, rclone-rcd, and nonraid-webui itself, instead of five separate buttons for
+  // what's really one "apply what was just restored" step. Order matters: SMB/NFS/driver/rclone-rcd
+  // run first so their own outcomes can still be reported in this response; the webui restart runs
+  // last (self-exit, same pattern as /services/webui/restart) since it drops this connection. Each
+  // step is independent and best-effort - one failing doesn't skip the rest, since e.g. a driver
+  // reload failure shouldn't leave Samba serving a stale smb.conf just because it ran second.
   router.post('/system/restart-services', async (req, res) => {
     const runStep = async (label: string, step: () => Promise<string>): Promise<{ ok: boolean; message: string }> => {
       try {
@@ -350,6 +353,18 @@ export function systemRouter(
     const driverReload = await runStep('Driver reload', async () => {
       const result = await nmd.reloadModuleAndImport();
       return `Driver reloaded, ${result.importedCount} disk(s) re-imported`;
+    });
+    // rclone-rcd only reads rclone.conf at startup, so a freshly-restored one (see backupCatalog.ts's
+    // 'remoteBackup' category) is inert until the daemon restarts - same category of problem as
+    // Docker's daemon.json above, but not destructive the way bouncing Docker is (at worst this
+    // interrupts one in-flight sync, always safely re-runnable), so it always runs here rather than
+    // needing its own opt-in flag. Re-runs the same enable/disable --now toggle PUT /rclone/enabled
+    // already uses rather than a plain restart, so it also correctly stops the daemon if the
+    // restored settings.json turned Remote Backup off, and correctly (re)starts it if turned on.
+    const rcloneRcd = await runStep('rclone-rcd resync', async () => {
+      const settings = await settingsStore.get();
+      await runSudoMaybe('systemctl', [settings.remoteBackup.enabled ? 'enable' : 'disable', '--now', 'rclone-rcd']);
+      return `rclone-rcd ${settings.remoteBackup.enabled ? 'started' : 'stopped'}`;
     });
     // Docker only reads daemon.json at startup, and restarting it stops every running container -
     // an explicit opt-in from the caller, not run by default, so a restore that never touched
@@ -382,6 +397,7 @@ export function systemRouter(
       smb,
       nfs,
       driverReload,
+      rcloneRcd,
       docker: dockerResult,
       message: 'Restarting nonraid-webui - this page will reconnect automatically in a few seconds.',
     });
