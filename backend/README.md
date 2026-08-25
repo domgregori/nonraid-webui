@@ -226,7 +226,8 @@ progress events instead of a single response - see API.md's "Conventions" sectio
 
 ## Config (env vars)
 
-- `PORT` (default `3001`)
+- `HTTP_PORT` (default `80`) — also doubles as the http->https redirect port once TLS is enabled
+- `HTTPS_PORT` (default `443`) — only used once TLS is enabled (Settings > Security)
 - `CORS_ORIGIN` (default `http://localhost:5183`, the frontend's Vite dev server)
 - `NMD_BIN` — path/name of the nmdctl binary (default `nmdctl`)
 - `NMD_SUPERBLOCK` — optional, passed as `-s <path>` to every nmdctl call

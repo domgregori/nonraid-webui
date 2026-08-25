@@ -35,7 +35,14 @@ function strArray(envName: string, fallback: string[]): string[] {
 const shareMountRoot = str('SHARE_MOUNT_ROOT', '/mnt/user');
 
 export const config = {
-  port: num('PORT', 3001),
+  // Standard ports, not a dev-tool-style high port - this app runs as root (see procUtil.ts's own
+  // doc comment; needed anyway for raw disk/SMART/SMB access, nothing new for this) so binding
+  // 80/443 needs no special privilege setup. Only httpPort is ever actually listened on directly;
+  // httpsPort only matters once TLS is enabled (see index.ts's server-startup block), at which
+  // point httpPort's own listener switches roles from "the app" to "redirect to httpsPort" - see
+  // its own comment there.
+  httpPort: num('HTTP_PORT', 80),
+  httpsPort: num('HTTPS_PORT', 443),
   corsOrigin: str('CORS_ORIGIN', 'http://localhost:5183'),
   // When true, this backend also serves the frontend's built static files
   // (and falls back to index.html for client-side routes) from this same

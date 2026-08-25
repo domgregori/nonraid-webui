@@ -48,8 +48,9 @@ function handleError(err: unknown, res: Response) {
 }
 
 function originFor(scheme: 'http' | 'https', hostname: string): string {
-  const isDefaultPort = (scheme === 'https' && config.port === 443) || (scheme === 'http' && config.port === 80);
-  return `${scheme}://${hostname}${isDefaultPort ? '' : `:${config.port}`}`;
+  const port = scheme === 'https' ? config.httpsPort : config.httpPort;
+  const isDefaultPort = (scheme === 'https' && port === 443) || (scheme === 'http' && port === 80);
+  return `${scheme}://${hostname}${isDefaultPort ? '' : `:${port}`}`;
 }
 
 // Best-effort CN extraction from an openssl subject string ("CN = nonraid.lan" or
@@ -74,6 +75,12 @@ function statusPayload(record: TlsRecord | null) {
     suggestedCommonName: suggestCommonName(),
     suggestedSans: suggestSans(commonName),
     currentOrigin: originFor(record?.enabled ? 'https' : 'http', commonName),
+    // http and https no longer share one port (see config.ts's httpPort/httpsPort) - the frontend
+    // needs both to build a fallback origin itself (TlsSection.tsx's apply()) for when the
+    // backend's own response never arrives (it exits mid-restart), since guessing from
+    // window.location.port would be wrong as soon as the two diverge.
+    httpPort: config.httpPort,
+    httpsPort: config.httpsPort,
   };
 }
 

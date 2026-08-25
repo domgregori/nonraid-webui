@@ -606,7 +606,7 @@ print_summary() {
   echo
   systemctl status nonraid-webui --no-pager || true
   echo
-  log "Done. Visit http://<this-host>:3001/ — first boot shows the admin account setup screen."
+  log "Done. Visit http://<this-host>/ — first boot shows the admin account setup screen."
   log "Reminder: HTTPS can be enabled from Settings -> Security once you're ready — the session cookie's Secure flag auto-flips at boot once this app's own TLS is enabled, no manual config edit needed."
 }
 

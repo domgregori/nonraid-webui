@@ -12,6 +12,8 @@ export interface TlsStatus {
   suggestedCommonName: string;
   suggestedSans: string[];
   currentOrigin: string;
+  httpPort: number;
+  httpsPort: number;
 }
 
 export interface TlsApplyResult {

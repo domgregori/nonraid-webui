@@ -78,7 +78,7 @@ npm run dev
 ```bash
 cd backend
 npm install
-npm run dev   # http://localhost:3001
+npm run dev   # http://localhost
 ```
 
 Run both, then open the frontend. Users

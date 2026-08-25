@@ -228,20 +228,22 @@ async function main() {
 
   // Protocol is chosen once at boot from the persisted TLS config, same "config changes need a
   // restart" model as everything else in this app - see backend/src/tls/. Falls open to plain
-  // HTTP if the configured cert/key can't be read, rather than crashing: a bad cert combined with
-  // a crash-on-boot would brick the admin's only path back into Settings to fix it (systemd would
-  // just crash-loop into the same broken tls.json forever). cookieSecure/WebAuthn config is only
-  // flipped inside the success branch below - flipping it unconditionally on tlsRecord.enabled
-  // would force Secure cookies even on the HTTP fallback, silently breaking login (see
-  // config.ts's cookieSecure doc comment).
+  // HTTP (on httpPort, same as if TLS were off) if the configured cert/key can't be read, rather
+  // than crashing: a bad cert combined with a crash-on-boot would brick the admin's only path back
+  // into Settings to fix it (systemd would just crash-loop into the same broken tls.json forever).
+  // cookieSecure/WebAuthn config is only flipped inside the success branch below - flipping it
+  // unconditionally on tlsRecord.enabled would force Secure cookies even on the HTTP fallback,
+  // silently breaking login (see config.ts's cookieSecure doc comment).
   let server: http.Server | https.Server = http.createServer(app);
+  let listenPort = config.httpPort;
   if (tlsRecord?.enabled) {
     try {
       const [cert, key] = await Promise.all([readFile(tlsRecord.certPath, 'utf8'), readFile(tlsRecord.keyPath, 'utf8')]);
       server = https.createServer({ cert, key }, app);
+      listenPort = config.httpsPort;
       config.cookieSecure = true;
       if (!config.webauthnRpId) config.webauthnRpId = tlsRecord.commonName;
-      if (!config.webauthnOrigin) config.webauthnOrigin = `https://${tlsRecord.commonName}${config.port === 443 ? '' : `:${config.port}`}`;
+      if (!config.webauthnOrigin) config.webauthnOrigin = `https://${tlsRecord.commonName}${config.httpsPort === 443 ? '' : `:${config.httpsPort}`}`;
     } catch (err) {
       console.error(
         `TLS is enabled but the cert/key at ${tlsRecord.certPath}/${tlsRecord.keyPath} could not be read (${(err as Error).message}) - falling back to plain HTTP. Fix or regenerate the certificate in Settings.`,
@@ -250,9 +252,30 @@ async function main() {
     }
   }
 
-  server.listen(config.port, () => {
-    console.log(`nonraid-webui backend listening on ${server instanceof https.Server ? 'https' : 'http'}://localhost:${config.port}`);
+  server.listen(listenPort, () => {
+    console.log(`nonraid-webui backend listening on ${server instanceof https.Server ? 'https' : 'http'}://localhost:${listenPort}`);
   });
+
+  // Only once TLS actually came up (not the plain-HTTP fallback above) - httpPort's listener
+  // switches roles from "the app itself" (the plain-HTTP case above) to "redirect to httpsPort",
+  // a separate minimal listener whose only job is bouncing a plain http:// request over to the
+  // real https:// origin. Skipped entirely if it would collide with httpsPort (both set to the
+  // same custom value) - same port for both makes no sense, and would otherwise just fail to bind
+  // with a less clear error.
+  if (server instanceof https.Server && config.httpPort !== config.httpsPort) {
+    const portSuffix = config.httpsPort === 443 ? '' : `:${config.httpsPort}`;
+    const redirectServer = http.createServer((req, res) => {
+      const hostname = (req.headers.host ?? '').split(':')[0] || 'localhost';
+      res.writeHead(301, { Location: `https://${hostname}${portSuffix}${req.url ?? '/'}` });
+      res.end();
+    });
+    redirectServer.on('error', (err) => {
+      console.error(`HTTP->HTTPS redirect listener could not bind on port ${config.httpPort} (${err.message}) - continuing without it.`);
+    });
+    redirectServer.listen(config.httpPort, () => {
+      console.log(`HTTP->HTTPS redirect listening on http://localhost:${config.httpPort}`);
+    });
+  }
 }
 
 main().catch((err) => {

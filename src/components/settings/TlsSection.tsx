@@ -103,7 +103,12 @@ export function TlsSection() {
     // Best-effort fallback if the backend's response never arrives (it may exit mid-response,
     // same as the plain webui restart) - this flow can't poll for it, since switching http<->https
     // changes the page's origin and a fetch can never succeed across that change either direction.
-    const port = window.location.port ? `:${window.location.port}` : '';
+    // http and https no longer share one port (see config.ts's httpPort/httpsPort), so this has to
+    // come from the backend's own status (fetched before this flow ever started) rather than
+    // window.location.port - reusing whatever port the *current* page happens to be on would be
+    // wrong as soon as the target scheme's port differs from it.
+    const targetPort = enable ? status.httpsPort : status.httpPort;
+    const port = (enable ? targetPort === 443 : targetPort === 80) ? '' : `:${targetPort}`;
     const fallbackOrigin = `${enable ? 'https' : 'http'}://${status.commonName ?? status.suggestedCommonName}${port}`;
     let newOrigin = fallbackOrigin;
     try {
