@@ -5,6 +5,7 @@
 <p align="center"><img src="./public/Screenshot.png"><img src="./public/Screenshot2.png"></p>
 
 ### Disclaimer: **$\color{red}{\textsf{EXPERIMENTAL!}}$ HAVE ANOTHER BACKUP OF YOUR DATA!**
+
 **Not responsible for lost of data!**
 
 ## Notes
@@ -12,7 +13,7 @@
 - **This webui was AI coded.**
 - The backbone nonraid kernel driver from [qvr/nonraid](https://github.com/qvr/nonraid) is based on the unraid kernel driver, not AI coded.
 - The nonraid tool (nmdctl) was written by [qvr](https://github.com/qvr/nonraid)
-- I am using my own [fork](https://github.com/domgregori/nonraid) of nonraid that has fixes to the nmdctl tool, the service files, and one fix to the driver.
+- I am using my own [fork](https://github.com/domgregori/nonraid) of nonraid that has fixes to the nmdctl tool, the service files, and to the driver.
 - Logo was designed by me.
 - I have been testing this on a real metal rig at every step.
 
@@ -50,9 +51,9 @@ containers, LXC containers, historical metrics, and array management.
 ## Requirements
 
 - Debian 13 new install
-    * Boot disk needs to be btrfs
+  - Boot disk needs to be btrfs
   - NonRAID has specific kernel needs.
-  - Not tested on other distros. 
+  - Not tested on other distros.
   - **Not meant to install alongside anything else.**
 - Install script installs the other requirements. Read [REQUIREMENTS.md](REQUIREMENTS.md) and [install-webui.sh](tools/install-webui.sh)
 
