@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { updateApi } from '../../api/updateApi';
 import type { UpdateComponent } from '../../types/updateApi';
+import { renderSimpleMarkdown } from '../../utils/simpleMarkdown';
 
 interface ChangelogModalProps {
   component: UpdateComponent;
@@ -9,10 +10,9 @@ interface ChangelogModalProps {
   onClose: () => void;
 }
 
-/** Plain preformatted text, not rendered Markdown - GitHub Release bodies are Markdown, but a
- *  renderer means either a new dependency or hand-rolling one, and this is meant as a first,
- *  simple pass. Bullet lists/headers still read fine as plain text; links/emphasis just show
- *  their raw syntax. */
+/** Renders the GitHub Release body through a small hand-rolled Markdown-lite renderer (see
+ *  utils/simpleMarkdown.tsx) rather than pulling in a full Markdown library - this project's own
+ *  release notes only ever use headers, bullet lists, and paragraphs. */
 export function ChangelogModal({ component, label, tag, onClose }: ChangelogModalProps) {
   const [body, setBody] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,9 +44,9 @@ export function ChangelogModal({ component, label, tag, onClose }: ChangelogModa
           {loading && <div className="status-note">Loading…</div>}
           {error && <div className="status-note status-note--error">{error}</div>}
           {!loading && !error && (
-            <pre className="settings-field__hint" style={{ maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap', margin: 0 }}>
-              {body ?? 'No release notes published for this version.'}
-            </pre>
+            <div className="changelog-body" style={{ maxHeight: '60vh', overflow: 'auto' }}>
+              {body ? renderSimpleMarkdown(body) : 'No release notes published for this version.'}
+            </div>
           )}
         </div>
       </div>
