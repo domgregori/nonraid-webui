@@ -41,13 +41,9 @@ export const SERVICE_DEFS: ServiceDef[] = [
   // this entry just gives the daemon itself the same start/stop/restart/status row as everything
   // else here.
   { id: 'avahi', label: 'Avahi/mDNS', statusUnits: ['avahi-daemon.service'], stopArgs: ['avahi-daemon'], startArgs: ['avahi-daemon'] },
-  // Only ever shown when settings.tailscale.enabled is true (filtered in routes/services.ts) -
-  // this daemon can be installed but deliberately unused, and this row would otherwise be a
-  // confusing always-present entry for a feature most installs never turn on.
   { id: 'tailscale', label: 'Tailscale', statusUnits: ['tailscaled.service'], stopArgs: ['tailscaled'], startArgs: ['tailscaled'] },
-  // rclone's own RC daemon backing Remote Backup - same shape and same "only ever shown when its
-  // own feature is switched on" gating as Tailscale above (filtered in routes/services.ts on
-  // settings.remoteBackup.enabled instead).
+  // rclone's own RC daemon backing Remote Backup - always listed, same as every other row here,
+  // regardless of whether settings.remoteBackup.enabled is on.
   { id: 'rclone-rcd', label: 'Remote Backup (rclone)', statusUnits: ['rclone-rcd.service'], stopArgs: ['rclone-rcd'], startArgs: ['rclone-rcd'] },
 ];
 

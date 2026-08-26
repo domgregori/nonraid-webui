@@ -26,6 +26,12 @@ export interface RcloneProvider {
   // has; this app deliberately shows only what's needed to get a working remote, matching the
   // mockup's 2-4 field forms.
   options: RcloneProviderOption[];
+  // True when this provider drives rclone's own OAuth web flow (config/create returns `done:
+  // false` + an authUrl to open) - lets the Add-remote form offer a one-click "Connect with X"
+  // shortcut instead of the generic field form. Computed from the provider's *advanced* options
+  // (auth_url/token_url only ever appear there, filtered out of `options` above by design) rather
+  // than a hardcoded provider-name list, so it stays correct as rclone adds/changes providers.
+  oauth: boolean;
 }
 
 // A configured remote, as reported live by config/listremotes + config/dump - rclone's own
@@ -37,6 +43,32 @@ export interface RcloneRemote {
   type: string; // provider name, e.g. "b2"
   status: 'ok' | 'authExpired' | 'error' | 'unknown';
   statusMessage: string | null;
+}
+
+// Result of createRemote()/continueRemoteSetup() - most providers (B2, S3-compatible, SFTP,
+// WebDAV, ...) finish in one call: `done: true`, everything else null/false. An OAuth provider
+// (Drive, Dropbox, OneDrive, ...) needs more steps: rclone's own config flow always asks a
+// housekeeping "does this machine have a browser?" question first (and Drive asks a second one
+// about its shared client id being retired) before it will ever produce anything - both are
+// auto-answered "No" internally (see realClient.ts's AUTO_ANSWERED_PROMPTS) since this backend
+// always runs headless, with the admin's browser on a different machine. That answer routes
+// rclone to its own `rclone authorize` paste-back mechanism rather than a directly-openable URL -
+// confirmed live (and against rclone's own source, lib/oauthutil/oauthutil.go) that the
+// alternative (answering "Yes") produces a URL hardcoded to 127.0.0.1, unusable by a remote
+// browser, and hangs the request waiting for a local callback that can never arrive.
+export interface RcloneRemoteSetupResult {
+  done: boolean;
+  /** Set only in the rare case a provider hands back a genuinely usable URL without going through
+   *  the config_token step - kept for completeness, but every provider tested so far (Drive,
+   *  Dropbox) goes through needsToken instead. */
+  authUrl: string | null;
+  /** Opaque - pass back into continueRemoteSetup() unchanged, alongside whatever answers the
+   *  pending step (nothing, for the auto-answered ones this backend already resolved; the pasted
+   *  `rclone authorize` output, once needsToken is true). */
+  state: string | null;
+  /** True once the flow has reached rclone's own config_token prompt - the admin needs to run
+   *  `rclone authorize "<type>"` on a machine with a browser and paste the result back. */
+  needsToken: boolean;
 }
 
 export interface RcloneDaemonStatus {

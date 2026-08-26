@@ -233,7 +233,7 @@ async function main() {
   app.use('/api', browseRouter(browse));
   app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics, settingsStore));
   app.use('/api', updateRouter(activity));
-  app.use('/api', servicesRouter(activity, settingsStore));
+  app.use('/api', servicesRouter(activity));
   app.use('/api', sshRouter(activity, authService));
   app.use('/api', usersRouter(users));
   app.use('/api', appsRouter(apps));

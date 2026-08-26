@@ -7,7 +7,7 @@ import { config } from '../config.js';
 import type { RcloneClient, RcloneCoreStats, RcloneJobStatus } from './client.js';
 import { revealRcloneObscured } from './obscure.js';
 import { getRcloneRcCredentials } from './rcCredentials.js';
-import type { RcloneDirEntry, RcloneProvider, RcloneProviderOption, RcloneRemote } from './types.js';
+import type { RcloneDirEntry, RcloneProvider, RcloneProviderOption, RcloneRemote, RcloneRemoteSetupResult } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -58,6 +58,88 @@ async function rcCall<T>(rcPath: string, body: Record<string, unknown> = {}): Pr
   return json as T;
 }
 
+interface RcConfigCreateResponse {
+  State?: string;
+  OAuthURL?: string;
+  Option?: { Name: string; Help: string; Type: string; Exclusive: boolean };
+}
+
+// rclone's own non-OAuth housekeeping yes/no prompts - some come before config_token (deciding how
+// to authorize at all), some after (refining the now-authorized remote) - auto-answered either way
+// so callers of createRemote()/continueRemoteSetup() only ever see a real decision point: done, a
+// genuine authUrl (rare, see RcloneRemoteSetupResult's doc comment), or the config_token prompt.
+const AUTO_ANSWERED_PROMPTS: Record<string, string> = {
+  // "Use web browser to automatically authenticate rclone with remote?" - rclone's default (Yes)
+  // makes it try to open a browser and bind a callback listener on *this* machine, which hangs
+  // forever on a headless server (confirmed live: a real request left running past two minutes
+  // with nothing to ever complete it). Answering No instead routes to config_token, rclone's own
+  // mechanism for exactly this case - see `rclone authorize`'s docs.
+  config_is_local: 'false',
+  // Google Drive-specific: "configure your own client id?" (rclone's shared one is being retired
+  // during 2026) - default to No, same as leaving it blank in interactive `rclone config`. Doesn't
+  // skip client_id/client_secret entirely though - confirmed live, Drive still asks for both right
+  // after this regardless of the answer; those two get resolved below via `parameters` instead.
+  config_shared_client_id: 'false',
+  // Google Drive-specific, asked *after* config_token succeeds: "Configure this as a Shared Drive
+  // (Team Drive)?" - No matches rclone's own default and is the right answer for a normal personal
+  // Drive account, which is what this app's Connect flow is for; a Team Drive is a distinct, more
+  // advanced setup an admin can still reach through the manual fields.
+  config_change_team_drive: 'false',
+};
+
+const MAX_CONFIG_FLOW_STEPS = 8;
+
+/**
+ * Walks rclone's config/create state machine past every prompt this backend knows how to answer
+ * on its own, stopping only once there's a real decision left for the admin: `done`, a genuine
+ * `authUrl` (kept for completeness - no provider tested so far actually reaches this), or
+ * `needsToken` (rclone's own `rclone authorize` paste-back mechanism, the one that actually works
+ * for a remote/headless setup - see RcloneRemoteSetupResult's doc comment in types.ts for the full
+ * reasoning, verified against rclone's own source, lib/oauthutil/oauthutil.go).
+ *
+ * Besides the fixed yes/no prompts in AUTO_ANSWERED_PROMPTS, rclone also asks for each OAuth
+ * credential field (client_id, client_secret, ...) as its own separate step even when driven
+ * non-interactively - confirmed live against Drive, which asks for both right after
+ * config_shared_client_id regardless of that answer. Each one is answered from `parameters` (what
+ * the admin already typed into the manual fields, same values createRemote() was called with) or
+ * an empty string if the admin left it blank - confirmed live that rclone accepts an empty answer
+ * here and falls back to its own shared client, exactly like leaving the field blank in `rclone
+ * config` interactively.
+ */
+async function resolveConfigFlow(first: RcConfigCreateResponse, name: string, type: string, parameters: Record<string, string>): Promise<RcloneRemoteSetupResult> {
+  let res = first;
+  for (let step = 0; step < MAX_CONFIG_FLOW_STEPS; step++) {
+    if (!res.State) return { done: true, authUrl: null, state: null, needsToken: false };
+    if (res.OAuthURL) return { done: false, authUrl: res.OAuthURL, state: res.State, needsToken: false };
+
+    const option = res.Option;
+    const optionName = option?.Name;
+    if (optionName === 'config_token') {
+      return { done: false, authUrl: null, state: res.State, needsToken: true };
+    }
+
+    let answer = optionName ? AUTO_ANSWERED_PROMPTS[optionName] : undefined;
+    // A plain (non yes/no) text field - answer with whatever the admin already typed for it, or
+    // blank. Only for non-`Exclusive` fields (a real yes/no/multiple-choice prompt this app
+    // doesn't recognize by name is a real unknown, not safe to guess blank for).
+    if (answer === undefined && option && !option.Exclusive && option.Type === 'string') {
+      answer = (optionName && parameters[optionName]) || '';
+    }
+    if (answer === undefined) {
+      throw new Error(
+        `"${type}" needs an extra setup step this app doesn't know how to answer automatically ("${optionName ?? 'unknown'}"${option?.Help ? `: ${option.Help.split('\n')[0]}` : ''}).`,
+      );
+    }
+    res = await rcCall<RcConfigCreateResponse>('config/create', {
+      name,
+      type,
+      parameters: {},
+      opt: { nonInteractive: true, continue: true, state: res.State, result: answer },
+    });
+  }
+  throw new Error(`"${type}" needed too many setup steps - aborting.`);
+}
+
 export class RealRcloneClient implements RcloneClient {
   async isInstalled(): Promise<boolean> {
     try {
@@ -92,6 +174,12 @@ export class RealRcloneClient implements RcloneClient {
     return providers.map((p) => ({
       name: p.Name,
       description: p.Description,
+      // auth_url/token_url are rclone's own oauthutil-standard field names, present only on
+      // providers that drive its OAuth web flow - confirmed live (dropbox/drive/onedrive/box/...
+      // have both, always Advanced: true; sftp/s3/mega/sugarsync/... have neither). Checked against
+      // the *raw* Options here, before the !Advanced filter below strips them out of what the
+      // dynamic field form actually renders.
+      oauth: p.Options.some((o) => o.Name === 'auth_url') && p.Options.some((o) => o.Name === 'token_url'),
       options: p.Options.filter((o) => !o.Advanced).map(
         (o): RcloneProviderOption => ({
           name: o.Name,
@@ -135,19 +223,22 @@ export class RealRcloneClient implements RcloneClient {
     }
   }
 
-  async createRemote(name: string, type: string, parameters: Record<string, string>): Promise<{ done: boolean; authUrl: string | null; state: string | null }> {
-    const result = await rcCall<{ State?: string; OAuthURL?: string }>('config/create', { name, type, parameters, opt: { nonInteractive: true } });
-    return { done: !result.State, authUrl: result.OAuthURL ?? null, state: result.State ?? null };
+  async createRemote(name: string, type: string, parameters: Record<string, string>): Promise<RcloneRemoteSetupResult> {
+    const res = await rcCall<RcConfigCreateResponse>('config/create', { name, type, parameters, opt: { nonInteractive: true } });
+    return resolveConfigFlow(res, name, type, parameters);
   }
 
-  async continueRemoteSetup(name: string, type: string, state: string): Promise<{ done: boolean; authUrl: string | null; state: string | null }> {
-    const result = await rcCall<{ State?: string; OAuthURL?: string }>('config/create', {
+  async continueRemoteSetup(name: string, type: string, state: string, result: string): Promise<RcloneRemoteSetupResult> {
+    const res = await rcCall<RcConfigCreateResponse>('config/create', {
       name,
       type,
       parameters: {},
-      opt: { nonInteractive: true, continue: true, state },
+      opt: { nonInteractive: true, continue: true, state, result },
     });
-    return { done: !result.State, authUrl: result.OAuthURL ?? null, state: result.State ?? null };
+    // No `parameters` left to fall back on here - by the time the frontend calls this, the flow
+    // has already reached config_token (the only state it ever hands back to the caller), so any
+    // credential-field prompts (client_id, client_secret, ...) are already behind it.
+    return resolveConfigFlow(res, name, type, {});
   }
 
   async updateRemote(name: string, parameters: Record<string, string>): Promise<void> {

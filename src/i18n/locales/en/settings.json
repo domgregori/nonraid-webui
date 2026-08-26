@@ -12,9 +12,28 @@
     "save": "Save",
     "testAndSave": "Test & Save",
     "cancel": "Cancel",
-    "authInstructions": "This provider needs one more step to authorize. Open the link below, finish signing in, then come back and click Continue.",
+    "connectWith": "Connect with {{provider}}",
+    "showManualFields": "Use my own API credentials…",
+    "hideManualFields": "Hide manual credentials"
+  },
+  "ConnectRemoteModal": {
+    "title": "Connect {{provider}}",
+    "close": "Close",
+    "connecting": "Connecting…",
+    "instructions": "This provider needs one more step. You must run rclone authorize locally, login by your browser, and copy the code rclone outputs. Then paste here. This is a one time setup.",
+    "moreHelp": "More help and alternate methods",
+    "showInstallHelp": "Install rclone instructions",
+    "hideInstallHelp": "Hide install instructions",
+    "installDocs": "Official install docs",
+    "tokenLabel": "Paste the result here",
+    "tokenPlaceholder": "{\"access_token\":\"...\", ...}",
+    "tokenRequired": "Paste the result of the authorize command first.",
     "checking": "Checking…",
-    "continue": "Continue"
+    "submitToken": "Submit",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "connected": "{{name}} is connected.",
+    "done": "Done"
   },
   "AppriseTargetsField": {
     "fieldsRequired": "{{fields}} required.",

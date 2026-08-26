@@ -21,6 +21,9 @@ export interface RcloneProvider {
   name: string;
   description: string;
   options: RcloneProviderOption[];
+  // True for a provider that drives rclone's own OAuth web flow (config/create returns `done:
+  // false` + an authUrl) - lets AddRemoteForm offer a one-click "Connect with X" shortcut.
+  oauth: boolean;
 }
 
 export type RcloneRemoteStatus = 'ok' | 'authExpired' | 'error' | 'unknown';
@@ -39,13 +42,18 @@ export interface RcloneRemoteConfig {
   parameters: Record<string, string>;
 }
 
-/** Result of POST /rclone/remotes or POST /rclone/remotes/:name/continue - `done: false` means an
- *  OAuth-based provider needs the admin to open `authUrl` in a browser first, then this app calls
- *  continue with the same `state` to finish - same two-step shape as TailscaleStatus's login flow. */
+/** Result of POST /rclone/remotes or POST /rclone/remotes/:name/continue. Most providers finish in
+ *  one call (`done: true`). An OAuth provider (Drive, Dropbox, ...) comes back with `needsToken:
+ *  true` - the backend has already answered rclone's own housekeeping prompts (see
+ *  backend/src/rclone/types.ts's doc comment on this same type for the full reasoning); the admin
+ *  runs `rclone authorize "<type>"` on a machine with a browser and pastes the result back via
+ *  continueRemoteSetup(). `authUrl` is kept for completeness but no provider tested so far
+ *  actually reaches it - a directly-openable URL would need a browser on this same headless box. */
 export interface RcloneRemoteSetupResult {
   done: boolean;
   authUrl: string | null;
   state: string | null;
+  needsToken: boolean;
 }
 
 export type SyncScope = 'config' | 'configAppdata' | 'custom';

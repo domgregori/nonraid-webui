@@ -1,4 +1,4 @@
-import type { RcloneDirEntry, RcloneProvider, RcloneRemote } from './types.js';
+import type { RcloneDirEntry, RcloneProvider, RcloneRemote, RcloneRemoteSetupResult } from './types.js';
 
 export interface RcloneCoreStats {
   bytes: number;
@@ -40,14 +40,16 @@ export interface RcloneClient {
   checkRemote(name: string): Promise<{ status: RcloneRemote['status']; message: string | null }>;
   /**
    * Most providers (B2, S3-compatible, SFTP, WebDAV, ...) finish in one call - `done: true`,
-   * `authUrl`/`state` null. OAuth-based providers (Google Drive, Dropbox, OneDrive, ...) come back
-   * with `done: false` and an `authUrl` to open in a browser first (rclone's RC config flow with
-   * `opt.nonInteractive: true`) - the caller then polls/calls continueRemoteSetup() with the
-   * returned `state` once the user's finished that browser step, same two-step shape as
-   * TailscaleClient.login()'s authUrl-then-poll-status flow.
+   * everything else null/false. OAuth-based providers (Google Drive, Dropbox, OneDrive, ...) come
+   * back with `needsToken: true` - the admin runs `rclone authorize "<type>"` on a machine with a
+   * browser and pastes the result back via continueRemoteSetup(). See RcloneRemoteSetupResult's
+   * own doc comment (types.ts) for why this is the actual working mechanism, not a directly-
+   * openable `authUrl` - that would need a browser on this same headless machine.
    */
-  createRemote(name: string, type: string, parameters: Record<string, string>): Promise<{ done: boolean; authUrl: string | null; state: string | null }>;
-  continueRemoteSetup(name: string, type: string, state: string): Promise<{ done: boolean; authUrl: string | null; state: string | null }>;
+  createRemote(name: string, type: string, parameters: Record<string, string>): Promise<RcloneRemoteSetupResult>;
+  /** `result` answers whatever step `state` is currently paused on - the pasted `rclone authorize`
+   *  output once the caller has seen `needsToken: true`. */
+  continueRemoteSetup(name: string, type: string, state: string, result: string): Promise<RcloneRemoteSetupResult>;
   updateRemote(name: string, parameters: Record<string, string>): Promise<void>;
   deleteRemote(name: string): Promise<void>;
   /**

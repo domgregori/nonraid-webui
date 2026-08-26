@@ -274,6 +274,42 @@
   width: 640px;
 }
 
+.dialog.connect-remote-modal {
+  width: 560px;
+}
+
+/* A CLI command, styled like a small terminal - --color-bg (the page's own recessed background
+   tone, darker than --color-surface in both themes) gives it a sunken well look with no new
+   color of its own to keep in sync between light/dark. */
+.cli-block {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-chip);
+  padding: 10px 14px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.cli-block--sm {
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.cli-block__prompt {
+  color: var(--color-text-dim);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.cli-block__command {
+  color: var(--color-green);
+}
+
 /* One-click shortcut for the default superblock path, shown above the upload/locate tabs when
    it's present on disk — see ImportArrayWizard's default-path check. */
 .import-source-pick {
