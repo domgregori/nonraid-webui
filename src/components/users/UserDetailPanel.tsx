@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usersApi } from '../../api/usersApi';
 import { PERMISSION_LABELS } from '../../selectors/users';
 import type { Group, ShareAccessEntry, SharePermission, User } from '../../types/usersApi';
@@ -24,6 +25,7 @@ function sameGroups(a: string[], b: string[]): boolean {
 }
 
 export function UserDetailPanel({ user, groups, pending, onClose, onUpdateGroups, onResetPassword, onDelete }: UserDetailPanelProps) {
+  const { t } = useTranslation('users');
   // `access` is the last-saved baseline (what the system actually has); `draftAccess` is what's
   // shown/edited - nothing here reaches the server until Save is pressed, same as `draftGroups`
   // below. Both reset to the freshly-fetched baseline on load/user switch.
@@ -81,13 +83,13 @@ export function UserDetailPanel({ user, groups, pending, onClose, onUpdateGroups
     try {
       if (groupsDirty) {
         const ok = await onUpdateGroups(draftGroups);
-        if (!ok) throw new Error('Failed to update groups.');
+        if (!ok) throw new Error(t('UserDetailPanel.updateGroupsFailed'));
       }
       for (const entry of changedAccess) {
         await usersApi.setAccess(user.username, entry.shareName, entry.permission);
       }
       if (changedAccess.length > 0) setAccess(draftAccess);
-      setSaveNote('Changes saved.');
+      setSaveNote(t('UserDetailPanel.changesSaved'));
     } catch (err) {
       setAccessError((err as Error).message);
     } finally {
@@ -97,15 +99,15 @@ export function UserDetailPanel({ user, groups, pending, onClose, onUpdateGroups
 
   const handleResetPassword = async () => {
     if (password.length < MIN_PASSWORD_LENGTH) {
-      setPasswordNote(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      setPasswordNote(t('UserDetailPanel.passwordTooShort', { minLength: MIN_PASSWORD_LENGTH }));
       return;
     }
     if (password !== confirmPassword) {
-      setPasswordNote('Passwords do not match.');
+      setPasswordNote(t('UserDetailPanel.passwordsDontMatch'));
       return;
     }
     const ok = await onResetPassword(password);
-    setPasswordNote(ok ? 'Password updated.' : 'Failed to update password.');
+    setPasswordNote(ok ? t('UserDetailPanel.passwordUpdated') : t('UserDetailPanel.passwordUpdateFailed'));
     if (ok) {
       setPassword('');
       setConfirmPassword('');
@@ -126,25 +128,25 @@ export function UserDetailPanel({ user, groups, pending, onClose, onUpdateGroups
       <div className="detail-panel">
         <div className="detail-panel__head">
           <div className="detail-panel__title">{user.username}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('UserDetailPanel.close')}>
             &#10005;
           </button>
         </div>
 
         <div className="detail-panel__body">
           <div className="detail-card">
-            <div className="eyebrow">Info</div>
+            <div className="eyebrow">{t('UserDetailPanel.info')}</div>
             <div className="detail-rows">
               <div className="detail-row">
-                <span className="detail-row__label">UID</span>
+                <span className="detail-row__label">{t('UserDetailPanel.uid')}</span>
                 <span className="detail-row__value">{user.uid}</span>
               </div>
             </div>
           </div>
 
           <div className="detail-card">
-            <div className="eyebrow">Groups</div>
-            {groups.length === 0 && <div className="status-note">No groups yet - create one from the Groups panel.</div>}
+            <div className="eyebrow">{t('UserDetailPanel.groups')}</div>
+            {groups.length === 0 && <div className="status-note">{t('UserDetailPanel.noGroups')}</div>}
             <div className="disk-checkbox-grid">
               {groups.map((g) => (
                 <label key={g.name} className="disk-checkbox">
@@ -156,10 +158,10 @@ export function UserDetailPanel({ user, groups, pending, onClose, onUpdateGroups
           </div>
 
           <div className="detail-card">
-            <div className="eyebrow">Share access</div>
+            <div className="eyebrow">{t('UserDetailPanel.shareAccess')}</div>
             {accessError && <div className="status-note status-note--error">{accessError}</div>}
-            {access === null && !accessError && <div className="status-note">Loading…</div>}
-            {access !== null && access.length === 0 && <div className="status-note">No shares exist yet.</div>}
+            {access === null && !accessError && <div className="status-note">{t('UserDetailPanel.loading')}</div>}
+            {access !== null && access.length === 0 && <div className="status-note">{t('UserDetailPanel.noShares')}</div>}
             <div className="access-rows">
               {draftAccess?.map((entry) => (
                 <div className="access-row" key={entry.shareName}>
@@ -183,17 +185,17 @@ export function UserDetailPanel({ user, groups, pending, onClose, onUpdateGroups
 
           {saveNote && <div className="status-note">{saveNote}</div>}
           <button type="button" className="btn btn--primary btn--block" disabled={!dirty || saving || pending} onClick={handleSave}>
-            {saving ? 'Saving…' : dirty ? 'Save Changes' : 'No Changes'}
+            {saving ? t('UserDetailPanel.saving') : dirty ? t('UserDetailPanel.saveChanges') : t('UserDetailPanel.noChanges')}
           </button>
 
           <div className="detail-card">
-            <div className="eyebrow">Reset password</div>
+            <div className="eyebrow">{t('UserDetailPanel.resetPassword')}</div>
             <div className="form-field">
               <input
                 type="password"
                 className="history-input"
                 style={{ width: '100%' }}
-                placeholder="New password"
+                placeholder={t('UserDetailPanel.newPasswordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -203,21 +205,21 @@ export function UserDetailPanel({ user, groups, pending, onClose, onUpdateGroups
                 type="password"
                 className="history-input"
                 style={{ width: '100%' }}
-                placeholder="Confirm new password"
+                placeholder={t('UserDetailPanel.confirmNewPasswordPlaceholder')}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
             </div>
             {passwordNote && <div className="status-note">{passwordNote}</div>}
             <button type="button" className="btn btn--block" disabled={pending} onClick={handleResetPassword}>
-              {pending ? 'Saving…' : 'Reset Password'}
+              {pending ? t('UserDetailPanel.saving') : t('UserDetailPanel.resetPasswordButton')}
             </button>
           </div>
         </div>
 
         <div className="detail-actions">
           <button type="button" className="btn btn--block btn--danger" disabled={pending} onClick={handleDeleteClick}>
-            {confirmingDelete ? 'Confirm Remove User?' : 'Remove User'}
+            {confirmingDelete ? t('UserDetailPanel.confirmRemove') : t('UserDetailPanel.removeUser')}
           </button>
         </div>
       </div>

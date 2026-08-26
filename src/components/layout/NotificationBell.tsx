@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../state/useNotifications';
 import { COLORS } from '../../styles/colors';
 import { formatRelativeTime } from '../../utils/format';
@@ -15,6 +16,7 @@ const DROPDOWN_LIMIT = 10;
  * for "View all" (still the best full-history view: limit picker, refresh, scroll).
  */
 export function NotificationBell() {
+  const { t } = useTranslation('layout');
   const { entries, unreadCount, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -41,17 +43,17 @@ export function NotificationBell() {
 
   return (
     <div className="notification-bell" ref={rootRef}>
-      <button type="button" className="notification-bell__button" onClick={handleToggle} aria-label="Notifications">
+      <button type="button" className="notification-bell__button" onClick={handleToggle} aria-label={t('NotificationBell.notifications')}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
-        {unreadCount > 0 && <span className="notification-bell__badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+        {unreadCount > 0 && <span className="notification-bell__badge">{unreadCount > 9 ? t('NotificationBell.badgeOverflow') : unreadCount}</span>}
       </button>
 
       {open && (
         <div className="notification-dropdown">
-          {recent.length === 0 && <div className="status-note">Nothing yet.</div>}
+          {recent.length === 0 && <div className="status-note">{t('NotificationBell.nothingYet')}</div>}
           {recent.length > 0 && (
             <div className="activity-list">
               {recent.map((entry) => {
@@ -85,7 +87,7 @@ export function NotificationBell() {
               setHistoryOpen(true);
             }}
           >
-            View all
+            {t('NotificationBell.viewAll')}
           </button>
         </div>
       )}

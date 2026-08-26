@@ -1,0 +1,7 @@
+{
+  "installButtonLabel": {
+    "removing": "Removing old container…",
+    "installing": "Installing…",
+    "installingPercent": "Installing… {{percent}}%"
+  }
+}

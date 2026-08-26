@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrayDisks } from '../components/dashboard/ArrayDisks';
 import { BootDiskCard } from '../components/dashboard/BootDiskCard';
 import { DiskQueueCard } from '../components/dashboard/DiskQueueCard';
@@ -11,16 +12,17 @@ import { ArrayActionErrorBanner } from '../components/shared/ArrayActionErrorBan
 import { useArrayStatus } from '../state/useArrayStatus';
 
 export function DisksPage() {
+  const { t } = useTranslation('pages');
   const { status, loadState, error, actionError, stopBlockedByContainers } = useArrayStatus();
   const [showBootDisk, setShowBootDisk] = useState(false);
 
   return (
     <div className="page">
       <div className="page-header">
-        <div className="page-title">Disks</div>
+        <div className="page-title">{t('DisksPage.title')}</div>
       </div>
 
-      {loadState === 'loading' && !status && <div className="status-note">Loading array status…</div>}
+      {loadState === 'loading' && !status && <div className="status-note">{t('DisksPage.loadingArrayStatus')}</div>}
       {error && <div className="status-note status-note--error">{error}</div>}
       {actionError && <ArrayActionErrorBanner actionError={actionError} stopBlockedByContainers={stopBlockedByContainers} />}
 
@@ -33,7 +35,7 @@ export function DisksPage() {
 
           <div>
             <div className="disk-section-head">
-              <div className="eyebrow disk-section-label">Boot Disk</div>
+              <div className="eyebrow disk-section-label">{t('DisksPage.bootDisk')}</div>
             </div>
             <div className="disk-row">
               <BootDiskCard onClick={() => setShowBootDisk(true)} />

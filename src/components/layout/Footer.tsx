@@ -1,7 +1,6 @@
+import { useTranslation } from 'react-i18next';
+
 export function Footer() {
-  return (
-    <div className="footer">
-      NonRAID WebUI using NonRAID Kernel Driver. GNU General Public Licence.
-    </div>
-  );
+  const { t } = useTranslation('layout');
+  return <div className="footer">{t('Footer.text')}</div>;
 }

@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { logsApi, type LogSource } from '../../api/logsApi';
 
 const TAIL_OPTIONS = [200, 500, 2000, 5000];
-const WINDOW_OPTIONS: Array<{ id: string; label: string }> = [
-  { id: '15m', label: 'Last 15 min' },
-  { id: '1h', label: 'Last hour' },
-  { id: '6h', label: 'Last 6 hours' },
-  { id: '24h', label: 'Last 24 hours' },
-  { id: '7d', label: 'Last 7 days' },
-  { id: 'all', label: 'All available' },
+const WINDOW_OPTIONS: Array<{ id: string; labelKey: string }> = [
+  { id: '15m', labelKey: 'LogsSection.last15Min' },
+  { id: '1h', labelKey: 'LogsSection.lastHour' },
+  { id: '6h', labelKey: 'LogsSection.last6Hours' },
+  { id: '24h', labelKey: 'LogsSection.last24Hours' },
+  { id: '7d', labelKey: 'LogsSection.last7Days' },
+  { id: 'all', labelKey: 'LogsSection.allAvailable' },
 ];
 const LIVE_POLL_MS = 2000;
 
@@ -45,6 +46,7 @@ interface LogsSectionProps {
 }
 
 export function LogsSection({ active }: LogsSectionProps) {
+  const { t } = useTranslation('settings');
   const [sources, setSources] = useState<LogSource[] | null>(null);
   const [sourcesError, setSourcesError] = useState<string | null>(null);
   const [sourceId, setSourceId] = useState<string | null>(null);
@@ -139,7 +141,7 @@ export function LogsSection({ active }: LogsSectionProps) {
   };
 
   if (sourcesError) return <div className="status-note status-note--error">{sourcesError}</div>;
-  if (!sources) return <div className="status-note">Loading log sources…</div>;
+  if (!sources) return <div className="status-note">{t('LogsSection.loadingSources')}</div>;
 
   return (
     <div>
@@ -154,24 +156,24 @@ export function LogsSection({ active }: LogsSectionProps) {
         <select className="history-input" value={tail} disabled={live} onChange={(e) => setTail(Number(e.target.value))}>
           {TAIL_OPTIONS.map((n) => (
             <option key={n} value={n}>
-              Last {n} lines
+              {t('LogsSection.lastNLines', { n })}
             </option>
           ))}
         </select>
         <select className="history-input" value={windowId} disabled={live} onChange={(e) => setWindowId(e.target.value)}>
           {WINDOW_OPTIONS.map((w) => (
             <option key={w.id} value={w.id}>
-              {w.label}
+              {t(w.labelKey)}
             </option>
           ))}
         </select>
         <button type="button" className="btn" disabled={loading} onClick={load}>
-          {loading ? 'Loading…' : 'Refresh'}
+          {loading ? t('LogsSection.loading') : t('LogsSection.refresh')}
         </button>
         <label className="docker-logs-live-toggle">
           <input type="checkbox" checked={live} disabled={logs === null} onChange={(e) => setLive(e.target.checked)} />
           {live && <span className="status-dot" style={{ background: 'var(--color-green)', width: 6, height: 6 }} />}
-          Live
+          {t('LogsSection.live')}
         </label>
       </div>
 
@@ -180,7 +182,7 @@ export function LogsSection({ active }: LogsSectionProps) {
       {logs !== null && (
         <div className="logs-output" ref={outputRef}>
           {logs === '' ? (
-            'No log output for this range.'
+            t('LogsSection.noLogOutput')
           ) : (
             logs.split('\n').map((line, i) => (
               <div key={i} className={`logs-line ${severityClass(line)}`}>

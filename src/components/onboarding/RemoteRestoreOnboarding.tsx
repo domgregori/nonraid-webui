@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { rcloneApi } from '../../api/rcloneApi';
 import type { RcloneProvider, RcloneRemote } from '../../types/rcloneApi';
 import type { BackupCategoryId } from '../../types/systemApi';
@@ -30,6 +31,7 @@ type Step =
  * archive-list/password-prompt/preview UI every other restore source shares.
  */
 export function RemoteRestoreOnboarding({ onClose, onRestored, focusCategory }: RemoteRestoreOnboardingProps) {
+  const { t } = useTranslation('onboarding');
   const [step, setStep] = useState<Step>('loading');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [providers, setProviders] = useState<RcloneProvider[]>([]);
@@ -43,7 +45,7 @@ export function RemoteRestoreOnboarding({ onClose, onRestored, focusCategory }: 
       try {
         const status = await rcloneApi.getStatus();
         if (!status.installed) {
-          if (!cancelled) setLoadError("The rclone package isn't installed on this host - re-run tools/install-webui.sh on it to enable remote backups.");
+          if (!cancelled) setLoadError(t('RemoteRestoreOnboarding.rcloneNotInstalled'));
           return;
         }
         // rclone-rcd starts disabled by default (tools/install-webui.sh) - this is the one place
@@ -63,7 +65,7 @@ export function RemoteRestoreOnboarding({ onClose, onRestored, focusCategory }: 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   const pickRemote = (name: string) => {
     setRemoteName(name);
@@ -87,7 +89,7 @@ export function RemoteRestoreOnboarding({ onClose, onRestored, focusCategory }: 
     return <RestoreFromRemoteWizard onClose={onClose} onRestored={onRestored} focusCategory={focusCategory} browsePath={{ remoteName, remotePath: remotePathDraft.trim() }} onBack={() => setStep('path')} />;
   }
 
-  const title = focusCategory === 'array' ? 'Recover the array from a remote backup' : 'Restore from a remote backup';
+  const title = focusCategory === 'array' ? t('RemoteRestoreOnboarding.titleRecoverArray') : t('RemoteRestoreOnboarding.titleRestore');
 
   return (
     <>
@@ -95,7 +97,7 @@ export function RemoteRestoreOnboarding({ onClose, onRestored, focusCategory }: 
       <div className="dialog import-array-wizard">
         <div className="dialog__head">
           <div className="dialog__title">{title}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('RemoteRestoreOnboarding.close')}>
             &#10005;
           </button>
         </div>
@@ -106,17 +108,17 @@ export function RemoteRestoreOnboarding({ onClose, onRestored, focusCategory }: 
               <div className="status-note status-note--error">{loadError}</div>
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
-                  Cancel
+                  {t('RemoteRestoreOnboarding.cancel')}
                 </button>
               </div>
             </>
           )}
 
-          {!loadError && step === 'loading' && <div className="status-note">Turning on Remote Backup…</div>}
+          {!loadError && step === 'loading' && <div className="status-note">{t('RemoteRestoreOnboarding.turningOn')}</div>}
 
           {!loadError && step === 'remotes' && (
             <>
-              <div className="toggle-row__desc">Pick a remote to browse for backups already sitting on it, or connect a new one.</div>
+              <div className="toggle-row__desc">{t('RemoteRestoreOnboarding.pickRemoteDesc')}</div>
               <div className="import-browser__list">
                 {remotes.map((r) => (
                   <button type="button" key={r.name} className="import-browser__row" onClick={() => pickRemote(r.name)}>
@@ -127,34 +129,45 @@ export function RemoteRestoreOnboarding({ onClose, onRestored, focusCategory }: 
               </div>
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={() => setStep('addRemote')}>
-                  + Add a different remote
+                  {t('RemoteRestoreOnboarding.addDifferentRemote')}
                 </button>
                 <button type="button" className="btn" onClick={onClose}>
-                  Cancel
+                  {t('RemoteRestoreOnboarding.cancel')}
                 </button>
               </div>
             </>
           )}
 
           {!loadError && step === 'addRemote' && (
-            <AddRemoteForm providers={providers} onAdded={handleRemoteAdded} onCancel={() => (remotes.length > 0 ? setStep('remotes') : onClose())} title="Connect a remote" />
+            <AddRemoteForm
+              providers={providers}
+              onAdded={handleRemoteAdded}
+              onCancel={() => (remotes.length > 0 ? setStep('remotes') : onClose())}
+              title={t('RemoteRestoreOnboarding.connectRemoteTitle')}
+            />
           )}
 
           {!loadError && step === 'path' && remoteName && (
             <>
               <div className="toggle-row__desc">
-                Where on <strong>{remoteName}</strong> did the old install's sync job point? Leave blank to browse the remote's own root.
+                {t('RemoteRestoreOnboarding.pathStep.descBefore')} <strong>{remoteName}</strong> {t('RemoteRestoreOnboarding.pathStep.descAfter')}
               </div>
               <label className="field">
-                <span>Remote path (optional)</span>
-                <input className="history-input" value={remotePathDraft} onChange={(e) => setRemotePathDraft(e.target.value)} placeholder="bucket/subfolder" autoFocus />
+                <span>{t('RemoteRestoreOnboarding.pathStep.remotePathLabel')}</span>
+                <input
+                  className="history-input"
+                  value={remotePathDraft}
+                  onChange={(e) => setRemotePathDraft(e.target.value)}
+                  placeholder={t('RemoteRestoreOnboarding.pathStep.remotePathPlaceholder')}
+                  autoFocus
+                />
               </label>
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={() => setStep(remotes.length > 0 ? 'remotes' : 'addRemote')}>
-                  Back
+                  {t('RemoteRestoreOnboarding.back')}
                 </button>
                 <button type="button" className="btn btn--primary-sm" onClick={() => setStep('browse')}>
-                  Browse backups
+                  {t('RemoteRestoreOnboarding.pathStep.browseBackups')}
                 </button>
               </div>
             </>

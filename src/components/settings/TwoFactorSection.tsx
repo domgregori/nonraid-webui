@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { authApi } from '../../api/authApi';
 import type { TwoFactorStatus } from '../../types/authApi';
 import { Disable2faDialog } from './Disable2faDialog';
@@ -6,6 +7,7 @@ import { Disable2faDialog } from './Disable2faDialog';
 type EnrollStep = 'idle' | 'scanning' | 'backup-codes';
 
 export function TwoFactorSection() {
+  const { t } = useTranslation('settings');
   const [status, setStatus] = useState<TwoFactorStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -84,16 +86,13 @@ export function TwoFactorSection() {
   };
 
   if (loadError) return <div className="status-note status-note--error">{loadError}</div>;
-  if (!status) return <div className="status-note">Loading two-factor status…</div>;
+  if (!status) return <div className="status-note">{t('TwoFactorSection.loadingStatus')}</div>;
 
   if (enrollStep === 'backup-codes') {
     return (
       <div className="settings-field">
-        <div className="toggle-row__title">Save your backup codes</div>
-        <div className="toggle-row__desc">
-          Each code works once, if you lose access to your authenticator app. They're shown only this one time - save
-          them somewhere safe before continuing.
-        </div>
+        <div className="toggle-row__title">{t('TwoFactorSection.saveBackupCodesTitle')}</div>
+        <div className="toggle-row__desc">{t('TwoFactorSection.saveBackupCodesDesc')}</div>
         <div className="backup-codes-grid">
           {backupCodes.map((code) => (
             <code key={code}>{code}</code>
@@ -101,11 +100,11 @@ export function TwoFactorSection() {
         </div>
         <label className="form-field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <input type="checkbox" checked={codesSavedAck} onChange={(e) => setCodesSavedAck(e.target.checked)} />
-          <span>I've saved these codes</span>
+          <span>{t('TwoFactorSection.savedCodesAck')}</span>
         </label>
         <div className="settings-field__row">
           <button type="button" className="btn btn--primary" disabled={!codesSavedAck} onClick={dismissBackupCodes}>
-            Done
+            {t('TwoFactorSection.done')}
           </button>
         </div>
       </div>
@@ -115,14 +114,13 @@ export function TwoFactorSection() {
   if (enrollStep === 'scanning') {
     return (
       <div className="settings-field">
-        <div className="toggle-row__title">Scan this code with your authenticator app</div>
+        <div className="toggle-row__title">{t('TwoFactorSection.scanTitle')}</div>
         <div className="toggle-row__desc">
-          Google Authenticator, 1Password, Authy, or any other TOTP app. Can't scan? Enter this secret manually:{' '}
-          <code>{secret}</code>
+          {t('TwoFactorSection.scanDesc')} <code>{secret}</code>
         </div>
-        <img src={qrDataUri} alt="Two-factor authentication QR code" width={180} height={180} />
+        <img src={qrDataUri} alt={t('TwoFactorSection.qrAlt')} width={180} height={180} />
         <label className="form-field">
-          <span className="form-field__label">Code from your app</span>
+          <span className="form-field__label">{t('TwoFactorSection.codeFromApp')}</span>
           <input
             className="history-input"
             value={confirmCode}
@@ -134,10 +132,10 @@ export function TwoFactorSection() {
         {enrollError && <div className="status-note status-note--error">{enrollError}</div>}
         <div className="settings-field__row">
           <button type="button" className="btn" disabled={enrollPending} onClick={() => setEnrollStep('idle')}>
-            Cancel
+            {t('TwoFactorSection.cancel')}
           </button>
           <button type="button" className="btn btn--primary" disabled={enrollPending || !confirmCode} onClick={confirmEnroll}>
-            {enrollPending ? 'Confirming…' : 'Confirm'}
+            {enrollPending ? t('TwoFactorSection.confirming') : t('TwoFactorSection.confirm')}
           </button>
         </div>
       </div>
@@ -146,11 +144,11 @@ export function TwoFactorSection() {
 
   return (
     <div className="settings-field">
-      <div className="toggle-row__title">Authenticator app (TOTP)</div>
+      <div className="toggle-row__title">{t('TwoFactorSection.totpTitle')}</div>
       <div className="toggle-row__desc">
         {status.totpEnabled
-          ? `Enabled - ${status.backupCodesRemaining} backup code${status.backupCodesRemaining === 1 ? '' : 's'} remaining.`
-          : 'Not enabled. Adds a code from an authenticator app as 2FA.'}
+          ? t('TwoFactorSection.enabledRemaining', { count: status.backupCodesRemaining })
+          : t('TwoFactorSection.notEnabled')}
       </div>
       {enrollError && enrollStep === 'idle' && <div className="status-note status-note--error">{enrollError}</div>}
       {status.totpEnabled ? (
@@ -161,24 +159,24 @@ export function TwoFactorSection() {
               className="history-input"
               value={regenPasswordDraft}
               onChange={(e) => setRegenPasswordDraft(e.target.value)}
-              placeholder="Current password"
+              placeholder={t('TwoFactorSection.currentPasswordPlaceholder')}
               autoComplete="current-password"
             />
             <button type="button" className="btn" disabled={regenPending || !regenPasswordDraft} onClick={regenerateBackupCodes}>
-              {regenPending ? 'Regenerating…' : 'Regenerate backup codes'}
+              {regenPending ? t('TwoFactorSection.regenerating') : t('TwoFactorSection.regenerateBackupCodes')}
             </button>
           </div>
           {regenError && <div className="status-note status-note--error">{regenError}</div>}
           <div className="settings-field__row">
             <button type="button" className="btn btn--danger" onClick={() => setShowDisableDialog(true)}>
-              Disable two-factor authentication
+              {t('TwoFactorSection.disableTwoFactor')}
             </button>
           </div>
         </>
       ) : (
         <div className="settings-field__row">
           <button type="button" className="btn btn--primary" disabled={enrollPending} onClick={startEnroll}>
-            {enrollPending ? 'Starting…' : 'Enable'}
+            {enrollPending ? t('TwoFactorSection.starting') : t('TwoFactorSection.enable')}
           </button>
         </div>
       )}

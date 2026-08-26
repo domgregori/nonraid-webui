@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useSystemStats } from '../../hooks/useSystemStats';
 import { COLORS } from '../../styles/colors';
 import { formatMemLabel } from '../../utils/format';
@@ -10,6 +11,7 @@ interface BootDiskCardProps {
  *  parity/data disk model ArrayDisks uses. Driven by the same polling hook SystemCard already
  *  uses; returns null when detection failed, same soft-fail behavior as that card. */
 export function BootDiskCard({ onClick }: BootDiskCardProps) {
+  const { t } = useTranslation('dashboard');
   const stats = useSystemStats();
   const boot = stats?.bootDisk;
   if (!boot) return null;
@@ -19,7 +21,7 @@ export function BootDiskCard({ onClick }: BootDiskCardProps) {
   return (
     <div className="disk-card disk-card--boot" onClick={onClick}>
       <div className="disk-card__head">
-        <span className="disk-card__label">Boot Disk</span>
+        <span className="disk-card__label">{t('BootDiskCard.bootDisk')}</span>
       </div>
       <div className="disk-card__device">{[boot.device, boot.model].filter(Boolean).join(' · ')}</div>
       {usedPct !== null && boot.usedBytes !== null && boot.totalBytes !== null && (

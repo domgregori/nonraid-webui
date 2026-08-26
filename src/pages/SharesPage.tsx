@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../styles/colors';
 import { deriveShareViewModel } from '../selectors/shares';
 import { ProgressBar } from '../components/shared/ProgressBar';
@@ -7,6 +8,7 @@ import { useShares } from '../hooks/useShares';
 import type { Share } from '../types/sharesApi';
 
 export function SharesPage() {
+  const { t } = useTranslation('pages');
   const { shares, status, error, actionError, pendingNames, create, update, remove } = useShares();
   const [editingShare, setEditingShare] = useState<Share | null>(null);
   const [creating, setCreating] = useState(false);
@@ -27,17 +29,17 @@ export function SharesPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <div className="page-title">Pools</div>
+        <div className="page-title">{t('SharesPage.title')}</div>
         <button type="button" className="btn--primary" onClick={() => setCreating(true)}>
-          Add Pool
+          {t('SharesPage.addPool')}
         </button>
       </div>
 
       <div className="toggle-row__desc" style={{ marginBottom: 'var(--space-md)' }}>
-        A pool is a unified folder spanning one or more disks - a place to store files.
+        {t('SharesPage.desc')}
       </div>
 
-      {status === 'loading' && <div className="status-note">Loading pools…</div>}
+      {status === 'loading' && <div className="status-note">{t('SharesPage.loadingPools')}</div>}
       {error && <div className="status-note status-note--error">{error}</div>}
       {actionError && <div className="status-note status-note--error">{actionError}</div>}
 
@@ -50,7 +52,7 @@ export function SharesPage() {
               {share.description && <div className="list-card__subtitle">{share.description}</div>}
             </div>
             <div className="list-card__col">
-              <div>Allocation: {share.allocationLabel}</div>
+              <div>{t('SharesPage.allocationLabel', { value: share.allocationLabel })}</div>
               <div style={{ marginTop: 2 }}>{share.disksLabel}</div>
             </div>
             <div className="list-card__progress">
@@ -66,7 +68,7 @@ export function SharesPage() {
                 disabled={pendingNames.has(share.name)}
                 onClick={() => setEditingShare(shares.find((s) => s.name === share.name) ?? null)}
               >
-                Edit
+                {t('SharesPage.edit')}
               </button>
               <button
                 type="button"
@@ -74,12 +76,12 @@ export function SharesPage() {
                 disabled={pendingNames.has(share.name)}
                 onClick={() => handleDeleteClick(share.name)}
               >
-                {confirmingDelete === share.name ? 'Confirm?' : 'Delete'}
+                {confirmingDelete === share.name ? t('SharesPage.confirmQuestion') : t('SharesPage.delete')}
               </button>
             </div>
           </div>
         ))}
-        {status === 'ready' && views.length === 0 && <div className="status-note">No pools yet.</div>}
+        {status === 'ready' && views.length === 0 && <div className="status-note">{t('SharesPage.noPools')}</div>}
       </div>
 
       {creating && (

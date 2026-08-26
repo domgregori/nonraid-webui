@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { diskQueueApi } from '../../api/diskQueueApi';
 import { useAvailableDevices } from '../../hooks/useAvailableDevices';
 import { formatBytesHuman } from '../../utils/format';
@@ -19,6 +20,7 @@ interface CacheSetupDialogProps {
  * outcome visible on the Disk Queue card / activity log instead of here.
  */
 export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
+  const { t } = useTranslation('diskDetail');
   const { devices, status: devicesStatus, error: devicesError, refresh } = useAvailableDevices();
   const [deviceA, setDeviceA] = useState('');
   const [deviceB, setDeviceB] = useState('');
@@ -38,8 +40,8 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
       const item = await diskQueueApi.enqueueCacheMirror(deviceA, deviceB);
       setResult(
         item.status === 'running'
-          ? 'Added to the queue - starting now.'
-          : 'Added to the queue - will start once the current operation finishes.',
+          ? t('CacheSetupDialog.addedRunning')
+          : t('CacheSetupDialog.addedQueued'),
       );
       onDone();
     } catch (err) {
@@ -54,8 +56,8 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Set up cache mirror</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('CacheSetupDialog.title')}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('CacheSetupDialog.close')}>
             &#10005;
           </button>
         </div>
@@ -64,55 +66,54 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
           {!result && (
             <>
               <div className="status-note status-note--error">
-                This formats both devices as a single btrfs RAID1 filesystem - any existing data on either device is
-                destroyed. Only devices with no recognized filesystem or mounted partition are offered below.
+                {t('CacheSetupDialog.formatWarning')}
               </div>
 
               <div className="disk-section-head">
-                <div className="toggle-row__desc">Pick two different devices for the mirrored pair.</div>
+                <div className="toggle-row__desc">{t('CacheSetupDialog.pickTwoDevices')}</div>
                 <button type="button" className="disk-section-link disk-section-link--btn" onClick={refresh}>
-                  Refresh &#8635;
+                  {t('CacheSetupDialog.refresh')} &#8635;
                 </button>
               </div>
 
-              {devicesStatus === 'loading' && <div className="status-note">Scanning for devices…</div>}
+              {devicesStatus === 'loading' && <div className="status-note">{t('CacheSetupDialog.scanning')}</div>}
               {devicesError && <div className="status-note status-note--error">{devicesError}</div>}
               {devicesStatus === 'ready' && devices.length < 2 && (
                 <div className="status-note">
-                  {devices.length === 0 ? 'No unassigned devices found.' : 'Only one unassigned device found - a mirror needs two.'}
+                  {devices.length === 0 ? t('CacheSetupDialog.noDevicesFound') : t('CacheSetupDialog.onlyOneDevice')}
                 </div>
               )}
 
               {devices.length > 0 && (
                 <div className="settings-field">
-                  <div className="toggle-row__title">First device</div>
+                  <div className="toggle-row__title">{t('CacheSetupDialog.firstDevice')}</div>
                   <select className="history-input" style={{ width: '100%' }} value={deviceA} onChange={(e) => setDeviceA(e.target.value)}>
-                    <option value="">Select a device…</option>
+                    <option value="">{t('CacheSetupDialog.selectDevice')}</option>
                     {devices.map((d) => (
                       <option key={d.device} value={d.device}>
-                        {d.model ?? d.device} · {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : 'unknown size'}
+                        {d.model ?? d.device} · {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : t('CacheSetupDialog.unknownSize')}
                       </option>
                     ))}
                   </select>
                   {selectedA?.locked && (
-                    <div className="status-note status-note--error">This device appears to be locked/in use - setup may fail.</div>
+                    <div className="status-note status-note--error">{t('CacheSetupDialog.lockedWarning')}</div>
                   )}
 
                   <div className="toggle-row__title" style={{ marginTop: 10 }}>
-                    Second device
+                    {t('CacheSetupDialog.secondDevice')}
                   </div>
                   <select className="history-input" style={{ width: '100%' }} value={deviceB} onChange={(e) => setDeviceB(e.target.value)}>
-                    <option value="">Select a device…</option>
+                    <option value="">{t('CacheSetupDialog.selectDevice')}</option>
                     {devices.map((d) => (
                       <option key={d.device} value={d.device}>
-                        {d.model ?? d.device} · {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : 'unknown size'}
+                        {d.model ?? d.device} · {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : t('CacheSetupDialog.unknownSize')}
                       </option>
                     ))}
                   </select>
                   {selectedB?.locked && (
-                    <div className="status-note status-note--error">This device appears to be locked/in use - setup may fail.</div>
+                    <div className="status-note status-note--error">{t('CacheSetupDialog.lockedWarning')}</div>
                   )}
-                  {sameDevice && <div className="status-note status-note--error">Pick two different devices.</div>}
+                  {sameDevice && <div className="status-note status-note--error">{t('CacheSetupDialog.pickDifferent')}</div>}
                 </div>
               )}
 
@@ -120,15 +121,15 @@ export function CacheSetupDialog({ onClose, onDone }: CacheSetupDialogProps) {
             </>
           )}
 
-          {result && <div className="status-note">{result} Watch progress on the Disk Queue card.</div>}
+          {result && <div className="status-note">{result} {t('CacheSetupDialog.watchProgress')}</div>}
 
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onClose}>
-              {result ? 'Close' : 'Cancel'}
+              {result ? t('CacheSetupDialog.close') : t('CacheSetupDialog.cancel')}
             </button>
             {!result && (
               <button type="button" className="btn--primary" disabled={!canSubmit} onClick={handleSetup}>
-                {submitting ? 'Setting up…' : 'Set Up Mirror'}
+                {submitting ? t('CacheSetupDialog.settingUp') : t('CacheSetupDialog.setUpMirror')}
               </button>
             )}
           </div>

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { systemApi } from '../../api/systemApi';
 import { updateApi } from '../../api/updateApi';
 import type { ApplyResult, ComponentUpdateStatus, UpdateComponent, UpdateStatus } from '../../types/updateApi';
 import { formatRelativeTime } from '../../utils/format';
 import { ChangelogModal } from './ChangelogModal';
 
-const COMPONENTS: { key: UpdateComponent; label: string }[] = [
-  { key: 'nonraid', label: 'NonRAID driver' },
-  { key: 'nonraidWebui', label: 'NonRAID WebUI' },
+const COMPONENTS: { key: UpdateComponent; labelKey: string }[] = [
+  { key: 'nonraid', labelKey: 'UpdateSection.nonraidDriver' },
+  { key: 'nonraidWebui', labelKey: 'UpdateSection.nonraidWebui' },
 ];
 
 // Same poll shape as ConfigRestoreWizard.tsx's own restart-reconnect loop - reused here for the
@@ -15,27 +16,27 @@ const COMPONENTS: { key: UpdateComponent; label: string }[] = [
 const RESTART_POLL_INTERVAL_MS = 1500;
 const RESTART_POLL_MAX_ATTEMPTS = 80;
 
-const CONFIRM_TEXT: Record<UpdateComponent, string> = {
-  nonraid:
-    'This rebuilds the NonRAID kernel module via DKMS. It only builds it - the running array keeps using the currently-loaded module until you reload it separately from Settings > Services.',
-  nonraidWebui:
-    'This takes a pre-update snapshot, pulls the new release, rebuilds nonraid-webui, and restarts the backend. Everyone connected will be disconnected for a few seconds while it restarts.',
+const CONFIRM_TEXT_KEYS: Record<UpdateComponent, string> = {
+  nonraid: 'UpdateSection.confirmTextNonraid',
+  nonraidWebui: 'UpdateSection.confirmTextNonraidWebui',
 };
 
 function StatusBadge({ component }: { component: ComponentUpdateStatus }) {
+  const { t } = useTranslation('settings');
   if (component.checkError) {
-    return <span className="job-badge job-badge--error">Check failed</span>;
+    return <span className="job-badge job-badge--error">{t('UpdateSection.checkFailed')}</span>;
   }
   if (component.upToDate === true) {
-    return <span className="job-badge job-badge--active">Up to date</span>;
+    return <span className="job-badge job-badge--active">{t('UpdateSection.upToDate')}</span>;
   }
   if (component.upToDate === false) {
-    return <span className="job-badge job-badge--disabled">Update available</span>;
+    return <span className="job-badge job-badge--disabled">{t('UpdateSection.updateAvailable')}</span>;
   }
-  return <span className="job-badge">Unknown</span>;
+  return <span className="job-badge">{t('UpdateSection.unknown')}</span>;
 }
 
 export function UpdateSection() {
+  const { t } = useTranslation('settings');
   const [status, setStatus] = useState<UpdateStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -125,60 +126,55 @@ export function UpdateSection() {
 
   const changelogTag = viewingChangelog ? status?.[viewingChangelog]?.latest : null;
 
+  const componentLabel = (key: UpdateComponent): string => {
+    const found = COMPONENTS.find((c) => c.key === key);
+    return found ? t(found.labelKey) : key;
+  };
+
   return (
     <div>
-      <div className="toggle-row__desc">
-        Checks each component's real GitHub releases for a newer tagged version - not just the tip of
-        main. Runs automatically about once a day; "Software update available" can also send a
-        notification (Settings → Notifications).
-      </div>
+      <div className="toggle-row__desc">{t('UpdateSection.checkDesc')}</div>
 
       {loadError && <div className="status-note status-note--error">{loadError}</div>}
 
-      {restarting && (
-        <div className="status-note">
-          Restarting nonraid-webui - this page will reconnect automatically in a few seconds…
-        </div>
-      )}
-      {backOnline && <div className="status-note">nonraid-webui is back online.</div>}
-      {restartTimedOut && (
-        <div className="status-note status-note--error">
-          Still not reachable after a couple of minutes - check the service on the host (`systemctl status nonraid-webui`).
-        </div>
-      )}
+      {restarting && <div className="status-note">{t('UpdateSection.restarting')}</div>}
+      {backOnline && <div className="status-note">{t('UpdateSection.backOnline')}</div>}
+      {restartTimedOut && <div className="status-note status-note--error">{t('UpdateSection.restartTimedOut')}</div>}
 
       {status &&
-        COMPONENTS.map(({ key, label }) => {
+        COMPONENTS.map(({ key, labelKey }) => {
           const component = status[key];
           return (
             <div className="settings-field toggle-row--bordered" key={key}>
               <div className="toggle-row__title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {label}
+                {t(labelKey)}
                 <StatusBadge component={component} />
               </div>
               <div className="settings-info-row">
-                <span className="settings-info-row__label">Installed</span>
-                <span className="settings-info-row__value settings-info-row__value--mono">{component.installed ?? 'Not a tagged release'}</span>
+                <span className="settings-info-row__label">{t('UpdateSection.installed')}</span>
+                <span className="settings-info-row__value settings-info-row__value--mono">
+                  {component.installed ?? t('UpdateSection.notTaggedRelease')}
+                </span>
               </div>
               {key === 'nonraid' && (
                 <div className="settings-info-row">
-                  <span className="settings-info-row__label">Running</span>
+                  <span className="settings-info-row__label">{t('UpdateSection.running')}</span>
                   <span className="settings-info-row__value settings-info-row__value--mono">
                     {component.runningMatchesInstalled === true
-                      ? (component.installed ?? 'Not a tagged release')
+                      ? (component.installed ?? t('UpdateSection.notTaggedRelease'))
                       : component.runningMatchesInstalled === false
-                        ? 'Older build - reload from Settings > Services'
-                        : 'Unknown'}
+                        ? t('UpdateSection.olderBuild')
+                        : t('UpdateSection.unknown')}
                   </span>
                 </div>
               )}
               <div className="settings-info-row">
-                <span className="settings-info-row__label">Latest</span>
+                <span className="settings-info-row__label">{t('UpdateSection.latest')}</span>
                 <span className="settings-info-row__value settings-info-row__value--mono">
-                  {component.latest ?? 'No releases published yet'}
+                  {component.latest ?? t('UpdateSection.noReleasesPublished')}
                   {component.latest && (
                     <button type="button" className="settings-info-row__link" onClick={() => setViewingChangelog(key)}>
-                      Changelog
+                      {t('UpdateSection.changelog')}
                     </button>
                   )}
                 </span>
@@ -187,7 +183,7 @@ export function UpdateSection() {
               {component.upToDate === false && (
                 <div className="settings-field__row" style={{ marginTop: 8 }}>
                   <button type="button" className="btn" disabled={restarting} onClick={() => setConfirming(key)}>
-                    Update Now
+                    {t('UpdateSection.updateNow')}
                   </button>
                 </div>
               )}
@@ -197,9 +193,11 @@ export function UpdateSection() {
 
       <div className="settings-field__row" style={{ marginTop: 10 }}>
         <button type="button" className="btn" disabled={checking} onClick={checkNow}>
-          {checking ? 'Checking…' : 'Check for updates'}
+          {checking ? t('UpdateSection.checking') : t('UpdateSection.checkForUpdates')}
         </button>
-        {status?.checkedAt && <span className="settings-field__hint">Last checked {formatRelativeTime(status.checkedAt)}</span>}
+        {status?.checkedAt && (
+          <span className="settings-field__hint">{t('UpdateSection.lastChecked', { time: formatRelativeTime(status.checkedAt) })}</span>
+        )}
       </div>
       {checkError && <div className="status-note status-note--error">{checkError}</div>}
 
@@ -208,14 +206,14 @@ export function UpdateSection() {
           <div className="detail-overlay" onClick={closeConfirm} />
           <div className="dialog">
             <div className="dialog__head">
-              <div className="dialog__title">Update {componentLabel(confirming)}</div>
-              <button type="button" className="detail-panel__close" onClick={closeConfirm} aria-label="Close">
+              <div className="dialog__title">{t('UpdateSection.updateComponent', { component: componentLabel(confirming) })}</div>
+              <button type="button" className="detail-panel__close" onClick={closeConfirm} aria-label={t('UpdateSection.close')}>
                 &#10005;
               </button>
             </div>
             <div className="dialog__body">
               <p className="status-note" style={{ margin: '0 0 8px' }}>
-                {CONFIRM_TEXT[confirming]}
+                {t(CONFIRM_TEXT_KEYS[confirming])}
               </p>
               {applyError && <div className="status-note status-note--error">{applyError}</div>}
               {applyResult && !applyResult.ok && (
@@ -229,11 +227,11 @@ export function UpdateSection() {
               {applyResult?.ok && <div className="status-note">{applyResult.message}</div>}
               <div className="dialog__actions">
                 <button type="button" className="btn" disabled={applying} onClick={closeConfirm}>
-                  {applyResult?.ok ? 'Close' : 'Cancel'}
+                  {applyResult?.ok ? t('UpdateSection.close') : t('UpdateSection.cancel')}
                 </button>
                 {!applyResult?.ok && (
                   <button type="button" className="btn btn--danger" disabled={applying} onClick={() => handleApply(confirming)}>
-                    {applying ? 'Updating…' : 'Update Now'}
+                    {applying ? t('UpdateSection.updating') : t('UpdateSection.updateNow')}
                   </button>
                 )}
               </div>
@@ -247,8 +245,4 @@ export function UpdateSection() {
       )}
     </div>
   );
-}
-
-function componentLabel(key: UpdateComponent): string {
-  return COMPONENTS.find((c) => c.key === key)?.label ?? key;
 }

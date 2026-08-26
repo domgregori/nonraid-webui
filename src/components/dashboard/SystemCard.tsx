@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../../styles/colors';
 import { useSystemStats } from '../../hooks/useSystemStats';
 import { formatMemLabel } from '../../utils/format';
@@ -5,6 +6,7 @@ import { Card } from '../shared/Card';
 import { ProgressBar } from '../shared/ProgressBar';
 
 export function SystemCard() {
+  const { t } = useTranslation('dashboard');
   const stats = useSystemStats();
   if (!stats) return null;
 
@@ -16,18 +18,18 @@ export function SystemCard() {
   return (
     <Card className="bars-card">
       <div className="eyebrow" style={{ marginBottom: 12 }}>
-        System
+        {t('SystemCard.system')}
       </div>
       <div>
         <div className="bar-row__head">
-          <span>CPU</span>
+          <span>{t('SystemCard.cpu')}</span>
           <span className="bar-row__value">{Math.round(stats.cpuPercent)}%</span>
         </div>
         <ProgressBar pct={stats.cpuPercent} color={COLORS.blue} />
       </div>
       <div>
         <div className="bar-row__head">
-          <span>Memory</span>
+          <span>{t('SystemCard.memory')}</span>
           <span className="bar-row__value">{formatMemLabel(stats.memUsedBytes, stats.memTotalBytes)}</span>
         </div>
         <ProgressBar pct={memPct} color={COLORS.blue} />
@@ -35,7 +37,7 @@ export function SystemCard() {
       {boot && bootPct !== null && boot.usedBytes !== null && boot.totalBytes !== null && (
         <div>
           <div className="bar-row__head">
-            <span>Boot Disk</span>
+            <span>{t('SystemCard.bootDisk')}</span>
             <span className="bar-row__value">{formatMemLabel(boot.usedBytes, boot.totalBytes)}</span>
           </div>
           <ProgressBar pct={bootPct} color={COLORS.blue} />

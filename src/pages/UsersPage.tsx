@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ShareExportModal } from '../components/shares/ShareExportModal';
 import { AddGroupModal } from '../components/users/AddGroupModal';
 import { AddUserModal } from '../components/users/AddUserModal';
@@ -12,6 +13,7 @@ import { deriveUserViewModel } from '../selectors/users';
 import type { Share } from '../types/sharesApi';
 
 export function UsersPage() {
+  const { t } = useTranslation('pages');
   const { users, status, error, actionError, pendingUsernames, create, update, remove } = useUsers();
   const groups = useGroups();
   const shares = useShares();
@@ -51,15 +53,15 @@ export function UsersPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <div className="page-title">Sharing</div>
+        <div className="page-title">{t('UsersPage.title')}</div>
       </div>
 
-      <div className="eyebrow disk-section-label">Shares</div>
+      <div className="eyebrow disk-section-label">{t('UsersPage.sharesHeading')}</div>
       <div className="toggle-row__desc" style={{ marginBottom: 'var(--space-sm)' }}>
-        Turn on SMB or NFS access for a pool (created on the Pools tab), and grant per-user permissions below.
+        {t('UsersPage.sharesDesc')}
       </div>
 
-      {shares.status === 'loading' && <div className="status-note">Loading pools…</div>}
+      {shares.status === 'loading' && <div className="status-note">{t('UsersPage.loadingPools')}</div>}
       {shares.error && <div className="status-note status-note--error">{shares.error}</div>}
       {shares.actionError && <div className="status-note status-note--error">{shares.actionError}</div>}
 
@@ -89,25 +91,25 @@ export function UsersPage() {
                 disabled={shares.pendingNames.has(share.name)}
                 onClick={() => setExportingShare(shares.shares.find((s) => s.name === share.name) ?? null)}
               >
-                Configure Sharing
+                {t('UsersPage.configureSharing')}
               </button>
             </div>
           </div>
         ))}
         {shares.status === 'ready' && shareViews.length === 0 && (
-          <div className="status-note">No pools yet - create one from the Pools tab first.</div>
+          <div className="status-note">{t('UsersPage.noPools')}</div>
         )}
       </div>
 
-      <div className="eyebrow disk-section-label">Users</div>
+      <div className="eyebrow disk-section-label">{t('UsersPage.usersHeading')}</div>
       <div className="page-header">
         <div />
         <button type="button" className="btn--primary" onClick={() => setCreating(true)}>
-          Add User
+          {t('UsersPage.addUser')}
         </button>
       </div>
 
-      {status === 'loading' && <div className="status-note">Loading users…</div>}
+      {status === 'loading' && <div className="status-note">{t('UsersPage.loadingUsers')}</div>}
       {error && <div className="status-note status-note--error">{error}</div>}
       {actionError && <div className="status-note status-note--error">{actionError}</div>}
 
@@ -117,12 +119,12 @@ export function UsersPage() {
             <div className="avatar">{u.initial}</div>
             <div className="list-card__col--name">
               <div className="list-card__title">{u.username}</div>
-              <div className="list-card__subtitle">uid {u.uid}</div>
+              <div className="list-card__subtitle">{t('UsersPage.uidLabel', { uid: u.uid })}</div>
             </div>
             <div className="list-card__col--wide">{u.groupsLabel}</div>
             <div className="list-card__actions">
               <button type="button" className="btn" disabled={pendingUsernames.has(u.username)} onClick={() => setSelectedUsername(u.username)}>
-                Manage
+                {t('UsersPage.manage')}
               </button>
               <button
                 type="button"
@@ -130,23 +132,23 @@ export function UsersPage() {
                 disabled={pendingUsernames.has(u.username)}
                 onClick={() => handleDeleteClick(u.username)}
               >
-                {confirmingDelete === u.username ? 'Confirm?' : 'Remove'}
+                {confirmingDelete === u.username ? t('UsersPage.confirmQuestion') : t('UsersPage.remove')}
               </button>
             </div>
           </div>
         ))}
-        {status === 'ready' && views.length === 0 && <div className="status-note">No users yet.</div>}
+        {status === 'ready' && views.length === 0 && <div className="status-note">{t('UsersPage.noUsers')}</div>}
       </div>
 
-      <div className="eyebrow disk-section-label">Groups</div>
+      <div className="eyebrow disk-section-label">{t('UsersPage.groupsHeading')}</div>
       <div className="page-header">
         <div />
         <button type="button" className="btn--primary" onClick={() => setAddingGroup(true)}>
-          Add Group
+          {t('UsersPage.addGroup')}
         </button>
       </div>
 
-      {groups.status === 'loading' && <div className="status-note">Loading groups…</div>}
+      {groups.status === 'loading' && <div className="status-note">{t('UsersPage.loadingGroups')}</div>}
       {groups.error && <div className="status-note status-note--error">{groups.error}</div>}
       {groups.actionError && <div className="status-note status-note--error">{groups.actionError}</div>}
 
@@ -158,12 +160,12 @@ export function UsersPage() {
               <div className="avatar">{g.name[0]?.toUpperCase()}</div>
               <div className="list-card__col--name">
                 <div className="list-card__title">{g.name}</div>
-                <div className="list-card__subtitle">gid {g.gid}</div>
+                <div className="list-card__subtitle">{t('UsersPage.gidLabel', { gid: g.gid })}</div>
               </div>
-              <div className="list-card__col--wide">{memberNames.length > 0 ? memberNames.join(', ') : 'No members'}</div>
+              <div className="list-card__col--wide">{memberNames.length > 0 ? memberNames.join(', ') : t('UsersPage.noMembers')}</div>
               <div className="list-card__actions">
                 <button type="button" className="btn" disabled={groups.pendingNames.has(g.name)} onClick={() => setSelectedGroupName(g.name)}>
-                  Manage
+                  {t('UsersPage.manage')}
                 </button>
                 <button
                   type="button"
@@ -171,13 +173,13 @@ export function UsersPage() {
                   disabled={groups.pendingNames.has(g.name)}
                   onClick={() => handleGroupDeleteClick(g.name)}
                 >
-                  {confirmingGroupDelete === g.name ? 'Confirm?' : 'Remove'}
+                  {confirmingGroupDelete === g.name ? t('UsersPage.confirmQuestion') : t('UsersPage.remove')}
                 </button>
               </div>
             </div>
           );
         })}
-        {groups.status === 'ready' && groups.groups.length === 0 && <div className="status-note">No groups yet.</div>}
+        {groups.status === 'ready' && groups.groups.length === 0 && <div className="status-note">{t('UsersPage.noGroups')}</div>}
       </div>
 
       {creating && (

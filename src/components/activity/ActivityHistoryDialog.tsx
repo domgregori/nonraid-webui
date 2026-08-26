@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useActivity } from '../../hooks/useActivity';
 import { COLORS } from '../../styles/colors';
 import { formatRelativeTime } from '../../utils/format';
@@ -12,6 +13,7 @@ interface ActivityHistoryDialogProps {
 const LIMIT_OPTIONS = [20, 50, 100, 200];
 
 export function ActivityHistoryDialog({ onClose }: ActivityHistoryDialogProps) {
+  const { t } = useTranslation('activity');
   const [limit, setLimit] = useState(50);
   const { entries, loading, error, refresh } = useActivity(limit);
   const listRef = useRef<HTMLDivElement>(null);
@@ -25,8 +27,8 @@ export function ActivityHistoryDialog({ onClose }: ActivityHistoryDialogProps) {
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog activity-history-dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Activity History</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('ActivityHistoryDialog.title')}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('ActivityHistoryDialog.close')}>
             &#10005;
           </button>
         </div>
@@ -36,17 +38,17 @@ export function ActivityHistoryDialog({ onClose }: ActivityHistoryDialogProps) {
             <select className="history-input" value={limit} onChange={(e) => setLimit(Number(e.target.value))}>
               {LIMIT_OPTIONS.map((n) => (
                 <option key={n} value={n}>
-                  Last {n} events
+                  {t('ActivityHistoryDialog.lastNEvents', { count: n })}
                 </option>
               ))}
             </select>
             <button type="button" className="btn" disabled={loading} onClick={refresh}>
-              {loading ? 'Loading…' : 'Refresh'}
+              {loading ? t('ActivityHistoryDialog.loading') : t('ActivityHistoryDialog.refresh')}
             </button>
           </div>
 
           {error && <div className="status-note status-note--error">{error}</div>}
-          {!loading && !error && entries.length === 0 && <div className="status-note">Nothing yet.</div>}
+          {!loading && !error && entries.length === 0 && <div className="status-note">{t('ActivityHistoryDialog.nothingYet')}</div>}
 
           {entries.length > 0 && (
             <div className="activity-list activity-list--dialog" ref={listRef}>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useArrayStatus } from '../../state/useArrayStatus';
 
 /** Global modal for the "Docker/LXC is holding a disk open" stop-array retry prompt. The header's
@@ -7,6 +8,7 @@ import { useArrayStatus } from '../../state/useArrayStatus';
  *  nothing was mounted to show it. Mounted once in AppShell instead, so it works regardless of
  *  which page is active. */
 export function ArrayStopBlockedModal() {
+  const { t } = useTranslation('shared');
   const { stopBlockedByContainers, arrayPending, toggleArray, dismissActionError } = useArrayStatus();
   if (!stopBlockedByContainers) return null;
 
@@ -20,21 +22,21 @@ export function ArrayStopBlockedModal() {
       <div className="detail-overlay" onClick={close} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Stop Array</div>
-          <button type="button" className="detail-panel__close" onClick={close} aria-label="Close">
+          <div className="dialog__title">{t('ArrayStopBlockedModal.title')}</div>
+          <button type="button" className="detail-panel__close" onClick={close} aria-label={t('ArrayStopBlockedModal.close')}>
             &#10005;
           </button>
         </div>
         <div className="dialog__body">
           <p className="status-note" style={{ margin: '0 0 8px' }}>
-            A disk is in use by Docker or LXC. Stop containers?
+            {t('ArrayStopBlockedModal.stopBlockedMessage')}
           </p>
           <div className="dialog__actions">
             <button type="button" className="btn" disabled={arrayPending} onClick={close}>
-              Cancel
+              {t('ArrayStopBlockedModal.cancel')}
             </button>
             <button type="button" className="btn btn--danger" disabled={arrayPending} onClick={() => toggleArray(true)}>
-              {arrayPending ? 'Stopping…' : 'Stop Docker/LXC and retry'}
+              {arrayPending ? t('ArrayStopBlockedModal.stopping') : t('ArrayStopBlockedModal.stopAndRetry')}
             </button>
           </div>
         </div>

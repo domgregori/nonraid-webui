@@ -1,0 +1,66 @@
+{
+  "BulkActionBar": {
+    "selectedCount": "{{count}} selected",
+    "copy": "Copy",
+    "move": "Move",
+    "confirm": "Confirm?",
+    "delete": "Delete",
+    "clear": "Clear"
+  },
+  "BulkProgressDialog": {
+    "verbCopying": "Copying",
+    "verbMoving": "Moving",
+    "verbDeleting": "Deleting",
+    "close": "Close",
+    "cancel": "Cancel",
+    "progressWithName": "{{current}} of {{total}} - {{name}}",
+    "progressNoName": "0 of {{total}}",
+    "cancelledNote": "Cancelled - some items may have completed before it stopped. The listing has been refreshed.",
+    "cancelledAfter": "Cancelled after {{count}} item(s).",
+    "succeededOnly": "{{count}} succeeded.",
+    "succeededWithFailed": "{{succeededCount}} succeeded, {{failedCount}} failed."
+  },
+  "EditFileDialog": {
+    "editTitle": "Edit: {{fileName}}",
+    "unsavedChanges": "Unsaved changes",
+    "toggleThemeTitle": "Toggle editor light/dark theme",
+    "dark": "Dark",
+    "light": "Light",
+    "close": "Close",
+    "loading": "Loading…",
+    "discardChanges": "Discard changes?",
+    "saving": "Saving…",
+    "save": "Save"
+  },
+  "NewFolderModal": {
+    "title": "New Folder",
+    "close": "Close",
+    "folderNameLabel": "Folder name",
+    "folderNamePlaceholder": "new-folder",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "create": "Create",
+    "invalidName": "Enter a valid folder name - no slashes.",
+    "requestFailed": "Could not create the folder - see the page error banner for details."
+  },
+  "RenameModal": {
+    "title": "Rename {{name}}",
+    "close": "Close",
+    "newNameLabel": "New name",
+    "cancel": "Cancel",
+    "renaming": "Renaming…",
+    "rename": "Rename",
+    "invalidName": "Enter a valid name - no slashes.",
+    "requestFailed": "Rename failed - see the page error banner for details."
+  },
+  "TransferModal": {
+    "verbCopy": "Copy",
+    "verbMove": "Move",
+    "itemsCount": "{{count}} items",
+    "dialogTitle": "{{verb}} {{label}}",
+    "close": "Close",
+    "destinationLabel": "Destination folder (absolute path under /mnt)",
+    "destinationPlaceholder": "e.g. /mnt/user/photos/2024",
+    "cancel": "Cancel"
+  }
+}

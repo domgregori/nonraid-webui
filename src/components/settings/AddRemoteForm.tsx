@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { rcloneApi } from '../../api/rcloneApi';
 import type { RcloneProvider, RcloneRemote } from '../../types/rcloneApi';
 
@@ -29,6 +30,7 @@ interface AddRemoteFormProps {
  * forking a second copy of ~150 lines of form rendering.
  */
 export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCancel, title }: AddRemoteFormProps) {
+  const { t } = useTranslation('settings');
   const [remoteType, setRemoteType] = useState(editingRemote?.type ?? providers[0]?.name ?? '');
   const [remoteName, setRemoteName] = useState(editingRemote?.name ?? '');
   const [remoteFields, setRemoteFields] = useState<Record<string, string>>({});
@@ -82,7 +84,7 @@ export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCanc
       return;
     }
     if (!remoteName.trim() || !remoteType) {
-      setRemoteError('Provider and name are required.');
+      setRemoteError(t('AddRemoteForm.providerAndNameRequired'));
       return;
     }
     setRemoteSaving(true);
@@ -123,14 +125,16 @@ export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCanc
 
   return (
     <div className="add-remote-panel">
-      <div className="add-remote-panel__title">{title ?? (editingRemote ? `Edit remote: ${editingRemote.name}` : 'Add remote')}</div>
+      <div className="add-remote-panel__title">
+        {title ?? (editingRemote ? t('AddRemoteForm.editRemoteTitle', { name: editingRemote.name }) : t('AddRemoteForm.addRemoteTitle'))}
+      </div>
       {remoteConfigLoading ? (
-        <div className="status-note">Loading…</div>
+        <div className="status-note">{t('AddRemoteForm.loading')}</div>
       ) : !remoteAuth ? (
         <>
           <div className="field-grid">
             <label className="field">
-              <span>Provider</span>
+              <span>{t('AddRemoteForm.provider')}</span>
               {editingRemote ? (
                 // rclone has no "change provider" on an existing remote - that's delete + recreate
                 // in its own real-world model, not an edit - so this is fixed.
@@ -153,8 +157,14 @@ export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCanc
               )}
             </label>
             <label className="field">
-              <span>Name</span>
-              <input className="history-input" value={remoteName} onChange={(e) => setRemoteName(e.target.value)} placeholder="e.g. offsite-b2" disabled={!!editingRemote} />
+              <span>{t('AddRemoteForm.name')}</span>
+              <input
+                className="history-input"
+                value={remoteName}
+                onChange={(e) => setRemoteName(e.target.value)}
+                placeholder={t('AddRemoteForm.namePlaceholder')}
+                disabled={!!editingRemote}
+              />
             </label>
             {selectedProvider?.options.map((opt) => (
               <label className="field" key={opt.name}>
@@ -182,7 +192,7 @@ export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCanc
                         [opt.name]: e.target.value,
                       }))
                     }
-                    placeholder={editingRemote && opt.isPassword ? 'Leave blank to keep the current value' : opt.default || undefined}
+                    placeholder={editingRemote && opt.isPassword ? t('AddRemoteForm.keepCurrentValue') : opt.default || undefined}
                   />
                 )}
               </label>
@@ -190,16 +200,16 @@ export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCanc
           </div>
           <div className="settings-field__row">
             <button type="button" className="btn btn--primary-sm" disabled={remoteSaving} onClick={submitRemote}>
-              {remoteSaving ? 'Saving…' : editingRemote ? 'Save' : 'Test & Save'}
+              {remoteSaving ? t('AddRemoteForm.saving') : editingRemote ? t('AddRemoteForm.save') : t('AddRemoteForm.testAndSave')}
             </button>
             <button type="button" className="btn" onClick={onCancel}>
-              Cancel
+              {t('AddRemoteForm.cancel')}
             </button>
           </div>
         </>
       ) : (
         <div className="settings-field" style={{ padding: 0 }}>
-          <div className="toggle-row__desc">This provider needs one more step to authorize. Open the link below, finish signing in, then come back and click Continue.</div>
+          <div className="toggle-row__desc">{t('AddRemoteForm.authInstructions')}</div>
           {remoteAuth.authUrl && (
             <a href={remoteAuth.authUrl} target="_blank" rel="noreferrer">
               {remoteAuth.authUrl}
@@ -207,10 +217,10 @@ export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCanc
           )}
           <div className="settings-field__row" style={{ marginTop: 8 }}>
             <button type="button" className="btn btn--primary-sm" disabled={remoteSaving} onClick={continueRemoteAuth}>
-              {remoteSaving ? 'Checking…' : 'Continue'}
+              {remoteSaving ? t('AddRemoteForm.checking') : t('AddRemoteForm.continue')}
             </button>
             <button type="button" className="btn" onClick={onCancel}>
-              Cancel
+              {t('AddRemoteForm.cancel')}
             </button>
           </div>
         </div>

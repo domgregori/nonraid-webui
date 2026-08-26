@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { nmdApi } from '../../api/nmdApi';
 import { smartApi } from '../../api/smartApi';
 import type { AvailableDevice } from '../../types/nmdApi';
@@ -19,6 +20,7 @@ type SmartLoadState = 'loading' | 'ready' | 'error';
  *  no array slot, so this fetches SMART by raw device path instead, same route the boot disk panel
  *  uses. */
 export function UnassignedDeviceDetailPanel({ device, onClose, onAddToArray }: UnassignedDeviceDetailPanelProps) {
+  const { t } = useTranslation('diskDetail');
   const [attrs, setAttrs] = useState<SmartAttributes | null>(null);
   const [loadState, setLoadState] = useState<SmartLoadState>('loading');
 
@@ -47,44 +49,44 @@ export function UnassignedDeviceDetailPanel({ device, onClose, onAddToArray }: U
       <div className="detail-overlay" onClick={onClose} />
       <div className="detail-panel">
         <div className="detail-panel__head">
-          <div className="detail-panel__title">{device.model ?? 'Unassigned Device'}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="detail-panel__title">{device.model ?? t('UnassignedDeviceDetailPanel.title')}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('UnassignedDeviceDetailPanel.close')}>
             &#10005;
           </button>
         </div>
 
         <div className="detail-panel__body">
           <div className="detail-card">
-            <div className="eyebrow">Info</div>
+            <div className="eyebrow">{t('UnassignedDeviceDetailPanel.info')}</div>
             <div className="detail-rows">
               <div className="detail-row">
-                <span className="detail-row__label">Device</span>
+                <span className="detail-row__label">{t('UnassignedDeviceDetailPanel.device')}</span>
                 <span className="detail-row__value">{device.device}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Size</span>
+                <span className="detail-row__label">{t('UnassignedDeviceDetailPanel.size')}</span>
                 <span className="detail-row__value">{device.sizeKb != null ? formatBytesHuman(device.sizeKb * 1024) : '-'}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Filesystem UUID</span>
-                <span className="detail-row__value">{device.uuid ?? 'none (unformatted)'}</span>
+                <span className="detail-row__label">{t('UnassignedDeviceDetailPanel.filesystemUuid')}</span>
+                <span className="detail-row__value">{device.uuid ?? t('UnassignedDeviceDetailPanel.noneUnformatted')}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Serial</span>
+                <span className="detail-row__label">{t('UnassignedDeviceDetailPanel.serial')}</span>
                 <span className="detail-row__value">{device.diskId ?? '-'}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Locked</span>
-                <span className="detail-row__value">{device.locked ? 'Yes - likely in use elsewhere' : 'No'}</span>
+                <span className="detail-row__label">{t('UnassignedDeviceDetailPanel.locked')}</span>
+                <span className="detail-row__value">{device.locked ? t('UnassignedDeviceDetailPanel.lockedYes') : t('UnassignedDeviceDetailPanel.lockedNo')}</span>
               </div>
             </div>
           </div>
 
           <div className="detail-card">
-            <div className="eyebrow">SMART</div>
-            {loadState === 'loading' && <div className="status-note">Loading SMART data…</div>}
-            {loadState === 'error' && <div className="status-note status-note--error">Failed to read SMART data for this device.</div>}
-            {loadState === 'ready' && !attrs && <div className="status-note">No SMART data available for this disk.</div>}
+            <div className="eyebrow">{t('UnassignedDeviceDetailPanel.smart')}</div>
+            {loadState === 'loading' && <div className="status-note">{t('UnassignedDeviceDetailPanel.loadingSmart')}</div>}
+            {loadState === 'error' && <div className="status-note status-note--error">{t('UnassignedDeviceDetailPanel.smartLoadFailed')}</div>}
+            {loadState === 'ready' && !attrs && <div className="status-note">{t('UnassignedDeviceDetailPanel.noSmartData')}</div>}
             {attrs && <SmartOverviewRows attributes={attrs} typeLabel={typeLabel} />}
           </div>
 
@@ -93,7 +95,7 @@ export function UnassignedDeviceDetailPanel({ device, onClose, onAddToArray }: U
 
         <div className="detail-actions">
           <button type="button" className="btn btn--block" onClick={onAddToArray} disabled={device.locked}>
-            Add to Array
+            {t('UnassignedDeviceDetailPanel.addToArray')}
           </button>
         </div>
       </div>

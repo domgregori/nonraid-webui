@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { tlsApi } from '../../api/tlsApi';
 import type { TlsImportPreview, TlsStatus } from '../../types/tlsApi';
 
@@ -12,6 +13,7 @@ function formatExpiry(ms: number): string {
 }
 
 export function TlsSection() {
+  const { t } = useTranslation('settings');
   const [status, setStatus] = useState<TlsStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -130,80 +132,69 @@ export function TlsSection() {
   };
 
   if (loadError) return <div className="status-note status-note--error">{loadError}</div>;
-  if (!status) return <div className="status-note">Loading…</div>;
+  if (!status) return <div className="status-note">{t('TlsSection.loading')}</div>;
 
   return (
     <div className="settings-field toggle-row--bordered">
-      <div className="toggle-row__title">HTTPS</div>
+      <div className="toggle-row__title">{t('TlsSection.https')}</div>
       <div className="toggle-row__desc">
-        HTTPS is <strong>{status.enabled ? 'on' : 'off'}</strong>
+        {t('TlsSection.httpsIs')} <strong>{status.enabled ? t('TlsSection.on') : t('TlsSection.off')}</strong>
         {status.configured && (
           <>
             {' '}
-            - {status.source === 'self-signed' ? 'self-signed' : 'imported'} certificate for{' '}
-            <strong>{status.commonName}</strong>, expires {status.expiresAt ? formatExpiry(status.expiresAt) : '-'}.
+            - {status.source === 'self-signed' ? t('TlsSection.selfSigned') : t('TlsSection.imported')} {t('TlsSection.certificateFor')}{' '}
+            <strong>{status.commonName}</strong>, {t('TlsSection.expires')} {status.expiresAt ? formatExpiry(status.expiresAt) : '-'}.
           </>
         )}
-        {!status.configured && ' - no certificate configured yet.'}
+        {!status.configured && ` - ${t('TlsSection.noCertificateConfigured')}`}
       </div>
 
-      {status.enabled && status.source === 'self-signed' && (
-        <div className="status-note">
-          Self-signed certificate - your browser will show a security warning the first time you
-          visit over HTTPS. This is expected; accept/proceed past it once per browser/device.
-        </div>
-      )}
+      {status.enabled && status.source === 'self-signed' && <div className="status-note">{t('TlsSection.selfSignedWarning')}</div>}
 
       {reconnecting && (
         <div className="status-note">
-          Restarting with the new settings - you'll be redirected to <strong>{reconnecting}</strong> in a few
-          seconds. If this is a self-signed certificate, your browser will show a security warning; this is
-          expected, proceed past it. If it doesn't come back, browse to {reconnecting} directly.
+          {t('TlsSection.restartingRedirect1')} <strong>{reconnecting}</strong> {t('TlsSection.restartingRedirect2', { origin: reconnecting })}
         </div>
       )}
       {applyError && <div className="status-note status-note--error">{applyError}</div>}
 
       <div className="toggle-row__title" style={{ marginTop: 12 }}>
-        Generate a self-signed certificate
+        {t('TlsSection.generateSelfSigned')}
       </div>
-      <div className="toggle-row__desc">
-        Main FQDN, IP, or hostname address. Ex. nonraid.lan
-      </div>
+      <div className="toggle-row__desc">{t('TlsSection.mainFqdnHint')}</div>
       <div className="settings-field__row">
         <input
           className="history-input"
           style={{ width: '100%' }}
           value={commonNameDraft}
           onChange={(e) => setCommonNameDraft(e.target.value)}
-          placeholder="Common name, e.g. nonraid.lan"
+          placeholder={t('TlsSection.commonNamePlaceholder')}
           disabled={!!reconnecting}
         />
       </div>
-      <div className="toggle-row__desc">
-        Additional hostnames/IPs, comma-separated (DNS:host or IP:address)
-      </div>
+      <div className="toggle-row__desc">{t('TlsSection.additionalHostnamesHint')}</div>
       <div className="settings-field__row">
         <input
           className="history-input"
           style={{ width: '100%' }}
           value={sansDraft}
           onChange={(e) => setSansDraft(e.target.value)}
-          placeholder="Additional hostnames/IPs, comma-separated (DNS:host or IP:address)"
+          placeholder={t('TlsSection.additionalHostnamesHint')}
           disabled={!!reconnecting}
         />
         <button type="button" className="btn" disabled={generating || !!reconnecting} onClick={generate}>
-          {generating ? 'Generating…' : 'Generate certificate'}
+          {generating ? t('TlsSection.generating') : t('TlsSection.generateCertificate')}
         </button>
       </div>
       {generateError && <div className="status-note status-note--error">{generateError}</div>}
 
       <div className="toggle-row__title" style={{ marginTop: 12 }}>
-        Import a certificate
+        {t('TlsSection.importCertificate')}
       </div>
-      <div className="toggle-row__desc">A real CA-issued certificate, or one produced by an ACME client run elsewhere.</div>
+      <div className="toggle-row__desc">{t('TlsSection.importCertificateDesc')}</div>
       <div className="settings-field__row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4, paddingTop: 10 }}>
         <label className="form-field__label form-field__label--strong" style={{ display: 'block' }}>
-          Certificate file (.pem, .crt, .cer)
+          {t('TlsSection.certificateFileLabel')}
           <input
             type="file"
             className="file-input"
@@ -216,7 +207,7 @@ export function TlsSection() {
           />
         </label>
         <label className="form-field__label form-field__label--strong" style={{ display: 'block', paddingTop: 10 }}>
-          Private key file (.pem, .key)
+          {t('TlsSection.privateKeyFileLabel')}
           <input
             type="file"
             className="file-input"
@@ -237,28 +228,28 @@ export function TlsSection() {
           disabled={previewing || !certFile || !keyFile || !!reconnecting}
           onClick={previewImport}
         >
-          {previewing ? 'Checking…' : 'Preview'}
+          {previewing ? t('TlsSection.checking') : t('TlsSection.preview')}
         </button>
       </div>
       {previewError && <div className="status-note status-note--error">{previewError}</div>}
       {preview && (
         <div className="status-note">
-          Subject: <strong>{preview.subject}</strong>
+          {t('TlsSection.subject')} <strong>{preview.subject}</strong>
           <br />
-          Issuer: {preview.issuer}
+          {t('TlsSection.issuer')} {preview.issuer}
           <br />
-          Expires: {formatExpiry(preview.notAfter)}
-          {preview.expiringSoon && ' (expiring soon)'}
+          {t('TlsSection.expires')} {formatExpiry(preview.notAfter)}
+          {preview.expiringSoon && ` ${t('TlsSection.expiringSoon')}`}
           <br />
-          Keys match: <strong>{preview.keyMatchesCert ? 'yes' : 'no'}</strong>
-          {!preview.keyMatchesCert && ' - this certificate and key don\'t belong together, cannot import.'}
+          {t('TlsSection.keysMatch')} <strong>{preview.keyMatchesCert ? t('TlsSection.yes') : t('TlsSection.no')}</strong>
+          {!preview.keyMatchesCert && ` - ${t('TlsSection.keysDontMatch')}`}
         </div>
       )}
       {commitError && <div className="status-note status-note--error">{commitError}</div>}
       {preview && (
         <div className="settings-field__row">
           <button type="button" className="btn" disabled={committing || !preview.keyMatchesCert || !!reconnecting} onClick={commitImport}>
-            {committing ? 'Importing…' : 'Confirm import'}
+            {committing ? t('TlsSection.importing') : t('TlsSection.confirmImport')}
           </button>
         </div>
       )}
@@ -270,7 +261,7 @@ export function TlsSection() {
           disabled={applying || !!reconnecting || (!status.configured && !status.enabled)}
           onClick={() => apply(!status.enabled)}
         >
-          {applying || reconnecting ? 'Working…' : status.enabled ? 'Disable HTTPS' : 'Enable HTTPS'}
+          {applying || reconnecting ? t('TlsSection.working') : status.enabled ? t('TlsSection.disableHttps') : t('TlsSection.enableHttps')}
         </button>
       </div>
     </div>

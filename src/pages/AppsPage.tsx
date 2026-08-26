@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AppCard } from '../components/apps/AppCard';
 import { AppDetailPanel } from '../components/apps/AppDetailPanel';
 import { InstallDialog } from '../components/apps/InstallDialog';
@@ -7,20 +8,20 @@ import type { AppSort, AppSummary } from '../types/appsApi';
 
 const PAGE_SIZE = 60;
 
-const SORT_OPTIONS: { value: AppSort; label: string }[] = [
-  { value: 'trending', label: 'Trending' },
-  { value: 'popular', label: 'Most downloaded' },
-  { value: 'latest', label: 'Newly updated' },
-  { value: 'new', label: 'New apps' },
+const SORT_OPTIONS: { value: AppSort; labelKey: string }[] = [
+  { value: 'trending', labelKey: 'AppsPage.sortTrending' },
+  { value: 'popular', labelKey: 'AppsPage.sortPopular' },
+  { value: 'latest', labelKey: 'AppsPage.sortLatest' },
+  { value: 'new', labelKey: 'AppsPage.sortNew' },
 ];
 
 type DisplayOrder = '' | 'newest' | 'oldest' | 'downloads' | 'rating';
 
-const DISPLAY_ORDER_OPTIONS: { value: DisplayOrder; label: string }[] = [
-  { value: 'newest', label: 'Newest' },
-  { value: 'oldest', label: 'Oldest' },
-  { value: 'downloads', label: 'Downloads' },
-  { value: 'rating', label: 'Rating' },
+const DISPLAY_ORDER_OPTIONS: { value: DisplayOrder; labelKey: string }[] = [
+  { value: 'newest', labelKey: 'AppsPage.orderNewest' },
+  { value: 'oldest', labelKey: 'AppsPage.orderOldest' },
+  { value: 'downloads', labelKey: 'AppsPage.orderDownloads' },
+  { value: 'rating', labelKey: 'AppsPage.orderRating' },
 ];
 
 // Independent of the category/sort dropdown above - re-orders whatever's currently in `apps`
@@ -44,6 +45,7 @@ function formatLastUpdated(meta: { lastUpdated: string } | null): string {
 }
 
 export function AppsPage() {
+  const { t } = useTranslation('pages');
   const { apps, categories, meta, status, error, search, setSearch, category, setCategory, sort, setSort, refreshing, refresh } =
     useApps();
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -92,14 +94,14 @@ export function AppsPage() {
     <div className="page">
       <div className="page-header">
         <div>
-          <div className="page-title">Apps</div>
+          <div className="page-title">{t('AppsPage.title')}</div>
           <div className="eyebrow apps-eyebrow">
-            {meta ? `${meta.appCount.toLocaleString()} templates` : '-'}
-            {meta && ` · updated ${formatLastUpdated(meta)}`}
+            {meta ? t('AppsPage.templateCount', { count: meta.appCount.toLocaleString() }) : '-'}
+            {meta && ` · ${t('AppsPage.updatedLabel', { date: formatLastUpdated(meta) })}`}
           </div>
         </div>
         <button type="button" className="btn" onClick={refresh} disabled={refreshing}>
-          {refreshing ? 'Refreshing…' : 'Refresh catalog'}
+          {refreshing ? t('AppsPage.refreshing') : t('AppsPage.refreshCatalog')}
         </button>
       </div>
 
@@ -109,20 +111,20 @@ export function AppsPage() {
             <input
               className="apps-search"
               type="text"
-              placeholder="Search apps…"
+              placeholder={t('AppsPage.searchPlaceholder')}
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
             />
             <select className="apps-filter-select" value={filterValue} onChange={(e) => handleFilterChange(e.target.value)}>
-              <option value="">All apps</option>
-              <optgroup label="Sort by">
+              <option value="">{t('AppsPage.allApps')}</option>
+              <optgroup label={t('AppsPage.sortByGroup')}>
                 {SORT_OPTIONS.map((opt) => (
                   <option key={opt.value} value={`sort:${opt.value}`}>
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </option>
                 ))}
               </optgroup>
-              <optgroup label="Categories">
+              <optgroup label={t('AppsPage.categoriesGroup')}>
                 {categories.map((c) => (
                   <option key={c} value={`category:${c}`}>
                     {c.replace(/-/g, ' ')}
@@ -135,19 +137,19 @@ export function AppsPage() {
               value={displayOrder}
               onChange={(e) => setDisplayOrder(e.target.value as DisplayOrder)}
             >
-              <option value="">Order by…</option>
+              <option value="">{t('AppsPage.orderByPlaceholder')}</option>
               {DISPLAY_ORDER_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
-                  {opt.label}
+                  {t(opt.labelKey)}
                 </option>
               ))}
             </select>
           </div>
 
-          {status === 'loading' && <div className="status-note">Loading catalog…</div>}
+          {status === 'loading' && <div className="status-note">{t('AppsPage.loadingCatalog')}</div>}
           {error && <div className="status-note status-note--error">{error}</div>}
 
-          {status === 'ready' && visible.length === 0 && <div className="status-note">No apps match your search.</div>}
+          {status === 'ready' && visible.length === 0 && <div className="status-note">{t('AppsPage.noMatch')}</div>}
 
           <div className="apps-grid">
             {visible.map((app, i) => (
@@ -163,18 +165,17 @@ export function AppsPage() {
           {hasMore && (
             <div className="apps-load-more">
               <button type="button" className="btn" onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}>
-                Show more ({orderedApps.length - visibleCount} remaining)
+                {t('AppsPage.showMore', { count: orderedApps.length - visibleCount })}
               </button>
             </div>
           )}
 
           <div className="apps-attribution">
-            Catalog data from{' '}
+            {t('AppsPage.attributionPrefix')}{' '}
             <a href="https://github.com/Squidly271/community.applications" target="_blank" rel="noreferrer">
-              Community Applications
+              {t('AppsPage.attributionLinkText')}
             </a>
-            , an independent, community-curated Docker app template repository. Templates are not vetted by this
-            project - review the container's ports, volumes, and image before installing.
+            {t('AppsPage.attributionSuffix')}
           </div>
         </div>
       </div>

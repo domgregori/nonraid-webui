@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { nmdApi } from '../../api/nmdApi';
 import type { DiskMatchStatus, ImportBrowseResult, ImportCommitResponse, ImportDefaultPath, ImportPreview } from '../../types/nmdApi';
 import { formatBytesHuman } from '../../utils/format';
@@ -19,13 +20,17 @@ type Step = 'upload' | 'review' | 'confirm' | 'result';
 // is the same filesystem the backend itself runs on and already reads /nonraid.dat from).
 type Source = 'upload' | 'locate';
 
-const STATUS_LABEL: Record<DiskMatchStatus, string> = {
-  ok: 'OK',
-  'size-mismatch': 'SIZE MISMATCH',
-  missing: 'NOT FOUND',
+const STATUS_LABEL_KEYS: Record<DiskMatchStatus, string> = {
+  ok: 'ImportArrayWizard.statusOk',
+  'size-mismatch': 'ImportArrayWizard.statusSizeMismatch',
+  missing: 'ImportArrayWizard.statusNotFound',
 };
 
-const ROLE_LABEL = { parity: 'Parity (P)', parity2: 'Parity 2 (Q)', data: 'Data' } as const;
+const ROLE_LABEL_KEYS = {
+  parity: 'ImportArrayWizard.roleParity',
+  parity2: 'ImportArrayWizard.roleParity2',
+  data: 'ImportArrayWizard.roleData',
+} as const;
 
 /**
  * Guided flow for bringing in an existing Unraid array: pick the .dat
@@ -38,6 +43,7 @@ const ROLE_LABEL = { parity: 'Parity (P)', parity2: 'Parity 2 (Q)', data: 'Data'
  * guide linked below), so this app doesn't offer a way around it.
  */
 export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProps) {
+  const { t } = useTranslation('settings');
   const [step, setStep] = useState<Step>('upload');
   const [source, setSource] = useState<Source>('upload');
   const [fileName, setFileName] = useState<string | null>(null);
@@ -150,8 +156,8 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog import-array-wizard">
         <div className="dialog__head">
-          <div className="dialog__title">Import array</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('ImportArrayWizard.title')}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('ImportArrayWizard.close')}>
             &#10005;
           </button>
         </div>
@@ -160,24 +166,21 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
           {step === 'upload' && (
             <>
               <div className="toggle-row__desc">
-                Migrating from Unraid, or bringing back a previous nonraid array? Both save the same superblock
-                format - follow{' '}
+                {t('ImportArrayWizard.migratingDesc1')}{' '}
                 <a href="https://github.com/qvr/nonraid#migrating-an-existing-unraid-array" target="_blank" rel="noreferrer">
-                  the migration guide
+                  {t('ImportArrayWizard.migrationGuideLink')}
                 </a>{' '}
-                if you're coming from Unraid (move the disks over first), then pick the original file below - usually
-                named <code>super.dat</code> on an Unraid flash drive, or <code>nonraid.dat</code> from a previous
-                install. This only reads the file to show what it expects; nothing on this host changes until you
-                confirm on the last step.
+                {t('ImportArrayWizard.migratingDesc2')} <code>super.dat</code> {t('ImportArrayWizard.migratingDesc3')} <code>nonraid.dat</code>{' '}
+                {t('ImportArrayWizard.migratingDesc4')}
               </div>
 
               {defaultPath?.exists && source === 'upload' && !browsing && (
                 <button type="button" className="import-source-pick" onClick={() => handlePathSelected(defaultPath.path)} disabled={previewing}>
                   <span className="import-source-pick__body">
-                    <span className="import-source-pick__title">Use {defaultPath.path}</span>
-                    <span className="import-source-pick__desc">Found on this system's own boot disk - the array's current superblock file.</span>
+                    <span className="import-source-pick__title">{t('ImportArrayWizard.useDefaultPath', { path: defaultPath.path })}</span>
+                    <span className="import-source-pick__desc">{t('ImportArrayWizard.foundOnBootDisk')}</span>
                   </span>
-                  <span className="import-source-pick__action">Use this file</span>
+                  <span className="import-source-pick__action">{t('ImportArrayWizard.useThisFile')}</span>
                 </button>
               )}
 
@@ -190,7 +193,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
                     setBrowsing(false);
                   }}
                 >
-                  Upload a file
+                  {t('ImportArrayWizard.uploadAFile')}
                 </button>
                 <button
                   type="button"
@@ -200,7 +203,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
                     if (!browsing) openBrowser();
                   }}
                 >
-                  Locate on this system
+                  {t('ImportArrayWizard.locateOnThisSystem')}
                 </button>
               </div>
 
@@ -220,10 +223,9 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
               {source === 'locate' && (
                 <div className="import-browser">
                   <div className="toggle-row__desc">
-                    Browsing this host's own root filesystem, read-only - useful if a <code>.dat</code> backup is
-                    already sitting somewhere on this same boot disk.
+                    {t('ImportArrayWizard.browsingDesc1')} <code>.dat</code> {t('ImportArrayWizard.browsingDesc2')}
                   </div>
-                  {browseLoading && <div className="status-note">Reading directory…</div>}
+                  {browseLoading && <div className="status-note">{t('ImportArrayWizard.readingDirectory')}</div>}
                   {browseError && <div className="status-note status-note--error">{browseError}</div>}
                   {browseResult && !browseLoading && (
                     <>
@@ -235,7 +237,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
                           </button>
                         )}
                         {browseResult.entries.length === 0 && browseResult.parent === null && (
-                          <div className="status-note">No subdirectories or .dat files here.</div>
+                          <div className="status-note">{t('ImportArrayWizard.noSubdirsOrDatFiles')}</div>
                         )}
                         {browseResult.entries.map((entry) => (
                           <button
@@ -257,11 +259,11 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
                 </div>
               )}
 
-              {previewing && <div className="status-note">Reading {fileName}…</div>}
+              {previewing && <div className="status-note">{t('ImportArrayWizard.reading', { fileName })}</div>}
               {previewError && <div className="status-note status-note--error">{previewError}</div>}
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
-                  Cancel
+                  {t('ImportArrayWizard.cancel')}
                 </button>
               </div>
             </>
@@ -270,39 +272,29 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
           {step === 'review' && preview && (
             <>
               <div className="toggle-row__desc">
-                <strong>{preview.label || 'Unlabeled array'}</strong> - {preview.slots.length} disk(s) recorded in this
-                superblock{preview.sourcePath ? <> (from {preview.sourcePath})</> : null}.
+                <strong>{preview.label || t('ImportArrayWizard.unlabeledArray')}</strong> -{' '}
+                {t('ImportArrayWizard.diskCount', { count: preview.slots.length })}
+                {preview.sourcePath ? <> {t('ImportArrayWizard.fromPath', { path: preview.sourcePath })}</> : null}.
               </div>
 
               {preview.currentArrayActive && (
                 <div className="import-warning import-warning--amber">
-                  <div className="import-warning__title">This will replace the currently active array</div>
-                  <div className="import-warning__desc">
-                    Continuing stops the array, unloads the driver, and reloads it with this superblock instead. The
-                    array's current configuration is not deleted - the existing superblock file is backed up first.
-                  </div>
+                  <div className="import-warning__title">{t('ImportArrayWizard.replaceActiveArrayTitle')}</div>
+                  <div className="import-warning__desc">{t('ImportArrayWizard.replaceActiveArrayDesc')}</div>
                 </div>
               )}
 
               {preview.parityTooSmall && (
                 <div className="import-warning import-warning--amber">
-                  <div className="import-warning__title">Parity is smaller than the largest data disk</div>
-                  <div className="import-warning__desc">
-                    The driver refuses to start an array like this (ERROR:PARITY_NOT_BIGGEST). You can still review
-                    and import, but starting the array afterward will fail until this is corrected.
-                  </div>
+                  <div className="import-warning__title">{t('ImportArrayWizard.parityTooSmallTitle')}</div>
+                  <div className="import-warning__desc">{t('ImportArrayWizard.parityTooSmallDesc')}</div>
                 </div>
               )}
 
               {preview.hasSizeMismatch && (
                 <div className="import-warning import-warning--danger">
-                  <div className="import-warning__title">Size mismatch - import is blocked</div>
-                  <div className="import-warning__desc">
-                    One or more disks below don't match the size recorded in the superblock. Importing anyway can
-                    corrupt filesystems and lose data (see the migration guide), so this app won't do it. Reconnect
-                    the correct disk, or unassign the affected slot in Unraid and regenerate the superblock, then try
-                    again.
-                  </div>
+                  <div className="import-warning__title">{t('ImportArrayWizard.sizeMismatchTitle')}</div>
+                  <div className="import-warning__desc">{t('ImportArrayWizard.sizeMismatchDesc')}</div>
                 </div>
               )}
 
@@ -311,28 +303,28 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
                   <div key={slot.slot} className="unassigned-device-row">
                     <div>
                       <div className="unassigned-device-row__name">
-                        Slot {slot.slot} · {ROLE_LABEL[slot.role]}
+                        {t('ImportArrayWizard.slotLabel', { slot: slot.slot })} · {t(ROLE_LABEL_KEYS[slot.role])}
                       </div>
                       <div className="unassigned-device-row__meta">
-                        Expects {formatBytesHuman(slot.sizeKb * 1024)}
+                        {t('ImportArrayWizard.expects', { size: formatBytesHuman(slot.sizeKb * 1024) })}
                         {slot.matchedDevice
                           ? ` · ${slot.matchedDevice.model ?? slot.matchedDevice.device}${
                               slot.matchedDevice.sizeKb != null ? ` (${formatBytesHuman(slot.matchedDevice.sizeKb * 1024)})` : ''
                             }`
-                          : ' · no matching disk connected'}
+                          : ` · ${t('ImportArrayWizard.noMatchingDisk')}`}
                       </div>
                     </div>
-                    <span className={`import-status-pill import-status-pill--${slot.status}`}>{STATUS_LABEL[slot.status]}</span>
+                    <span className={`import-status-pill import-status-pill--${slot.status}`}>{t(STATUS_LABEL_KEYS[slot.status])}</span>
                   </div>
                 ))}
               </div>
 
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={startOver}>
-                  Start over
+                  {t('ImportArrayWizard.startOver')}
                 </button>
                 <button type="button" className="btn--primary" onClick={() => setStep('confirm')}>
-                  Continue
+                  {t('ImportArrayWizard.continue')}
                 </button>
               </div>
             </>
@@ -341,29 +333,22 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
           {step === 'confirm' && preview && (
             <>
               <div className="status-note status-note--error">
-                {preview.currentArrayActive
-                  ? 'This stops the currently running array, backs up its superblock, and loads this one instead.'
-                  : 'This loads this superblock and imports the disks that match it.'}{' '}
-                The array is not started automatically - review its status afterward and start it from the Dashboard
-                when ready.
+                {preview.currentArrayActive ? t('ImportArrayWizard.confirmStopsCurrentArray') : t('ImportArrayWizard.confirmLoadsSuperblock')}{' '}
+                {t('ImportArrayWizard.arrayNotStartedAutomatically')}
               </div>
 
               <label className="container-form-row__checkbox">
                 <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
-                I understand this changes the array's configuration and want to proceed.
+                {t('ImportArrayWizard.acknowledgeConfigChange')}
               </label>
 
-              {preview.hasSizeMismatch && (
-                <div className="status-note status-note--error">
-                  Import is blocked - see the size mismatch above. Go back and resolve it before continuing.
-                </div>
-              )}
+              {preview.hasSizeMismatch && <div className="status-note status-note--error">{t('ImportArrayWizard.importBlocked')}</div>}
 
               {commitError && <div className="status-note status-note--error">{commitError}</div>}
 
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={() => setStep('review')}>
-                  Back
+                  {t('ImportArrayWizard.back')}
                 </button>
                 <button
                   type="button"
@@ -371,7 +356,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
                   disabled={!acknowledged || preview.hasSizeMismatch || committing}
                   onClick={handleCommit}
                 >
-                  {committing ? 'Importing…' : 'Import array'}
+                  {committing ? t('ImportArrayWizard.importing') : t('ImportArrayWizard.importArray')}
                 </button>
               </div>
             </>
@@ -381,31 +366,26 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
             <div className="import-result">
               {commitResult.importResult.errors.length > 0 || commitResult.status.array.state.startsWith('ERROR:') ? (
                 <div className="import-warning import-warning--amber">
-                  <div className="import-warning__title">Completed with issues</div>
+                  <div className="import-warning__title">{t('ImportArrayWizard.completedWithIssuesTitle')}</div>
                   <div className="import-warning__desc">
-                    Array state is now <strong>{commitResult.status.array.state}</strong>. Check the raw output below
-                    and the array status before starting.
+                    {t('ImportArrayWizard.arrayStateIsNow')} <strong>{commitResult.status.array.state}</strong>. {t('ImportArrayWizard.checkRawOutput')}
                   </div>
                 </div>
               ) : (
-                <div className="status-note">
-                  Imported {commitResult.importResult.importedCount} disk(s). Review the array status, then start the
-                  array from the Dashboard when you're ready. Afterward, run a non-correcting parity check (Parity
-                  Check card) to verify everything lines up before trusting parity.
-                </div>
+                <div className="status-note">{t('ImportArrayWizard.importedDisksDesc', { count: commitResult.importResult.importedCount })}</div>
               )}
               {commitResult.backedUpTo && (
-                <div className="status-note">Previous superblock backed up at {commitResult.backedUpTo}</div>
+                <div className="status-note">{t('ImportArrayWizard.previousSuperblockBackedUp', { path: commitResult.backedUpTo })}</div>
               )}
 
               <button type="button" className="btn" style={{ marginTop: 8 }} onClick={() => setShowRawOutput((v) => !v)}>
-                {showRawOutput ? 'Hide' : 'Show'} raw output
+                {showRawOutput ? t('ImportArrayWizard.hide') : t('ImportArrayWizard.show')} {t('ImportArrayWizard.rawOutput')}
               </button>
               {showRawOutput && <pre className="import-raw-output">{commitResult.importResult.output}</pre>}
 
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
-                  Close
+                  {t('ImportArrayWizard.close')}
                 </button>
               </div>
             </div>

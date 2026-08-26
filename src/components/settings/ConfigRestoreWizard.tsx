@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { systemApi } from '../../api/systemApi';
 import { CodedError } from '../../api/request';
 import { ProgressBar } from '../shared/ProgressBar';
@@ -61,7 +62,9 @@ function defaultSelectedCategories(preview: RestorePreview, focusCategory?: Back
  * shows whether the archive's superblock member is present and whether it'll actually be
  * restored, so that's never a surprise sprung at the confirm step.
  */
-export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import config', initialPreview, sourceLabel, focusCategory, onChooseDifferentSource }: ConfigRestoreWizardProps) {
+export function ConfigRestoreWizard({ onClose, onRestored, title, initialPreview, sourceLabel, focusCategory, onChooseDifferentSource }: ConfigRestoreWizardProps) {
+  const { t } = useTranslation('settings');
+  const dialogTitle = title ?? t('ConfigRestoreWizard.importConfig');
   const [step, setStep] = useState<Step>(initialPreview ? 'review' : 'upload');
   const [fileName, setFileName] = useState<string | null>(sourceLabel ?? null);
   const [previewing, setPreviewing] = useState(false);
@@ -203,8 +206,8 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog import-array-wizard">
         <div className="dialog__head">
-          <div className="dialog__title">{title}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{dialogTitle}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('ConfigRestoreWizard.close')}>
             &#10005;
           </button>
         </div>
@@ -212,11 +215,7 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
         <div className="dialog__body">
           {step === 'upload' && !needsPassword && (
             <>
-              <div className="toggle-row__desc">
-                Pick a config backup archive - from "Back up now" or "Download a copy" in Settings → Backups, or
-                the automatic schedule. This only reads the archive to show what's in it; nothing on this host
-                changes until you confirm on the last step.
-              </div>
+              <div className="toggle-row__desc">{t('ConfigRestoreWizard.pickArchiveDesc')}</div>
 
               <input
                 ref={fileInputRef}
@@ -230,11 +229,11 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
                 disabled={previewing}
               />
 
-              {previewing && <div className="status-note">Reading {fileName}…</div>}
+              {previewing && <div className="status-note">{t('ConfigRestoreWizard.reading', { fileName })}</div>}
               {previewError && <div className="status-note status-note--error">{previewError}</div>}
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
-                  Cancel
+                  {t('ConfigRestoreWizard.cancel')}
                 </button>
               </div>
             </>
@@ -243,7 +242,7 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
           {step === 'upload' && needsPassword && pendingFile && (
             <>
               <div className="toggle-row__desc">
-                <strong>{pendingFile.name}</strong> is password-encrypted. Enter its password to read what's inside.
+                <strong>{pendingFile.name}</strong> {t('ConfigRestoreWizard.passwordEncrypted')}
               </div>
               <input
                 className="history-input"
@@ -254,17 +253,17 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') submitPassword();
                 }}
-                placeholder="Password"
+                placeholder={t('ConfigRestoreWizard.passwordPlaceholder')}
                 disabled={previewing}
               />
-              {previewing && <div className="status-note">Reading {fileName}…</div>}
+              {previewing && <div className="status-note">{t('ConfigRestoreWizard.reading', { fileName })}</div>}
               {previewError && <div className="status-note status-note--error">{previewError}</div>}
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={startOver} disabled={previewing}>
-                  Choose a different file
+                  {t('ConfigRestoreWizard.chooseDifferentFile')}
                 </button>
                 <button type="button" className="btn btn--primary-sm" disabled={!passwordDraft || previewing} onClick={submitPassword}>
-                  Continue
+                  {t('ConfigRestoreWizard.continue')}
                 </button>
               </div>
             </>
@@ -272,36 +271,31 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
 
           {step === 'review' && preview && (
             <>
-              <div className="toggle-row__desc">{preview.entries.length} item(s) recorded in this archive.</div>
+              <div className="toggle-row__desc">{t('ConfigRestoreWizard.itemsRecorded', { count: preview.entries.length })}</div>
 
               {!preview.arrayStopped && (
                 <div className="import-warning import-warning--danger">
-                  <div className="import-warning__title">Stop the array first</div>
-                  <div className="import-warning__desc">
-                    Restoring config while the array is running risks inconsistent Samba/NFS/share state until
-                    services catch up. Stop the array from the Dashboard, then come back and try again.
-                  </div>
+                  <div className="import-warning__title">{t('ConfigRestoreWizard.stopArrayFirst')}</div>
+                  <div className="import-warning__desc">{t('ConfigRestoreWizard.stopArrayFirstDesc')}</div>
                 </div>
               )}
 
               {hasSuperblock && (
                 <div className="import-warning import-warning--amber">
                   <div className="import-warning__title">
-                    Array superblock {superblockWillRestore ? 'will be restored' : 'will be skipped'}
+                    {superblockWillRestore ? t('ConfigRestoreWizard.superblockWillBeRestored') : t('ConfigRestoreWizard.superblockWillBeSkipped')}
                   </div>
                   <div className="import-warning__desc">
-                    {superblockWillRestore
-                      ? "This array has nothing assigned yet, so the archive's own superblock will be restored too, reconstructing the array itself along with the rest of the config."
-                      : "This array already has disks assigned, so the archive's superblock is skipped for safety - restoring it here would bypass the disk-matching checks Settings → Import Existing Array has. Use that instead if you specifically need to restore the array itself."}
+                    {superblockWillRestore ? t('ConfigRestoreWizard.superblockRestoredDesc') : t('ConfigRestoreWizard.superblockSkippedDesc')}
                   </div>
                 </div>
               )}
 
               {focusCategory === 'array' && !hasSuperblock && (
-                <div className="status-note status-note--error">This backup doesn't have an array superblock recorded in it - there's nothing here to recover the array from.</div>
+                <div className="status-note status-note--error">{t('ConfigRestoreWizard.noSuperblockRecorded')}</div>
               )}
 
-              <div className="toggle-row__desc">Select what to restore:</div>
+              <div className="toggle-row__desc">{t('ConfigRestoreWizard.selectWhatToRestore')}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {preview.categories
                   .filter((cat) => cat.entries.length > 0)
@@ -321,8 +315,7 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
                           onChange={() => toggleCategory(cat.id)}
                         />
                         <span>
-                          <strong>{cat.label}</strong> - {cat.description} ({cat.entries.length} file
-                          {cat.entries.length === 1 ? '' : 's'})
+                          <strong>{cat.label}</strong> - {cat.description} ({t('ConfigRestoreWizard.fileCount', { count: cat.entries.length })})
                         </span>
                       </label>
                     );
@@ -331,13 +324,13 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
 
               <details>
                 <summary className="toggle-row__desc" style={{ cursor: 'pointer' }}>
-                  Show all {preview.entries.length} file(s) in this archive
+                  {t('ConfigRestoreWizard.showAllFiles', { count: preview.entries.length })}
                 </summary>
                 <ul className="browse-bulk-failures" style={{ maxHeight: 240 }}>
                   {preview.entries.map((entry) => (
                     <li key={entry.path}>
                       {entry.path}
-                      {entry.isSuperblock ? ' - array superblock' : ''}
+                      {entry.isSuperblock ? ` - ${t('ConfigRestoreWizard.arraySuperblock')}` : ''}
                     </li>
                   ))}
                 </ul>
@@ -345,10 +338,14 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
 
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={initialPreview ? (onChooseDifferentSource ?? onClose) : startOver}>
-                  {initialPreview ? (onChooseDifferentSource ? 'Choose a different backup' : 'Cancel') : 'Start over'}
+                  {initialPreview
+                    ? onChooseDifferentSource
+                      ? t('ConfigRestoreWizard.chooseDifferentBackup')
+                      : t('ConfigRestoreWizard.cancel')
+                    : t('ConfigRestoreWizard.startOver')}
                 </button>
                 <button type="button" className="btn--primary" disabled={!preview.arrayStopped} onClick={() => setStep('confirm')}>
-                  Continue
+                  {t('ConfigRestoreWizard.continue')}
                 </button>
               </div>
             </>
@@ -356,22 +353,18 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
 
           {step === 'confirm' && preview && (
             <>
-              <div className="status-note status-note--error">
-                This overwrites {selectedEntryCount} file(s) at their original locations on this host, covering only
-                what's checked on the previous step. There's no undo beyond restoring a different (or older) backup
-                afterward.
-              </div>
+              <div className="status-note status-note--error">{t('ConfigRestoreWizard.overwriteWarning', { count: selectedEntryCount })}</div>
 
               <label className="container-form-row__checkbox">
                 <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
-                I understand this overwrites live config files and want to proceed.
+                {t('ConfigRestoreWizard.acknowledgeOverwrite')}
               </label>
 
               {commitError && <div className="status-note status-note--error">{commitError}</div>}
 
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={() => setStep('review')}>
-                  Back
+                  {t('ConfigRestoreWizard.back')}
                 </button>
                 <button
                   type="button"
@@ -379,7 +372,7 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
                   disabled={!acknowledged || committing || selectedEntryCount === 0}
                   onClick={handleCommit}
                 >
-                  {committing ? 'Restoring…' : 'Restore config'}
+                  {committing ? t('ConfigRestoreWizard.restoring') : t('ConfigRestoreWizard.restoreConfig')}
                 </button>
               </div>
             </>
@@ -388,19 +381,15 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
           {step === 'result' && commitResult && (
             <div className="import-result">
               <div className="status-note">
-                Restored {commitResult.restoredCount} item(s)
-                {commitResult.skippedSuperblock ? ' - array superblock skipped, array already has disks assigned' : ''}.
-                Samba/NFS, the driver, {commitResult.dockerConfigRestored ? 'Docker, ' : ''}and nonraid-webui itself
-                all need to restart to fully pick up what was just restored - one button below does all of it.
-                {commitResult.dockerConfigRestored
-                  ? ' Restarting Docker stops every currently-running container until it comes back up.'
-                  : ''}
+                {t('ConfigRestoreWizard.restoredItems', { count: commitResult.restoredCount })}
+                {commitResult.skippedSuperblock ? ` - ${t('ConfigRestoreWizard.superblockSkippedNote')}` : ''}.{' '}
+                {t('ConfigRestoreWizard.restartNeeded', { docker: commitResult.dockerConfigRestored ? `${t('ConfigRestoreWizard.dockerWord')} ` : '' })}
+                {commitResult.dockerConfigRestored ? ` ${t('ConfigRestoreWizard.dockerRestartWarning')}` : ''}
               </div>
 
               {commitResult.superblockReloadError && !backOnline && (
                 <div className="status-note status-note--error">
-                  The restored array superblock is on disk, but reloading the driver to pick it up failed:{' '}
-                  {commitResult.superblockReloadError} Restart services below to retry it.
+                  {t('ConfigRestoreWizard.superblockReloadFailed')} {commitResult.superblockReloadError} {t('ConfigRestoreWizard.retryBelow')}
                 </div>
               )}
 
@@ -408,48 +397,44 @@ export function ConfigRestoreWizard({ onClose, onRestored, title = 'Import confi
                 {!restarting ? (
                   <div className="dialog__actions" style={{ justifyContent: 'flex-start' }}>
                     <button type="button" className="btn btn--primary" onClick={handleRestartServices}>
-                      {backOnline ? 'Restart Services Again' : 'Restart Services'}
+                      {backOnline ? t('ConfigRestoreWizard.restartServicesAgain') : t('ConfigRestoreWizard.restartServices')}
                     </button>
                   </div>
                 ) : (
                   <>
-                    <div className="toggle-row__desc">
-                      Restarting SMB, NFS, the driver, and Remote Backup, then nonraid-webui itself - this page will
-                      reconnect automatically once it's back.
-                    </div>
+                    <div className="toggle-row__desc">{t('ConfigRestoreWizard.restartingServicesDesc')}</div>
                     <ProgressBar indeterminate color="var(--color-blue)" height={6} />
                   </>
                 )}
 
                 {restartSteps && (
                   <ul className="browse-bulk-failures">
-                    <li style={restartSteps.smb.ok ? undefined : { color: 'var(--color-red)' }}>SMB: {restartSteps.smb.message}</li>
-                    <li style={restartSteps.nfs.ok ? undefined : { color: 'var(--color-red)' }}>NFS: {restartSteps.nfs.message}</li>
+                    <li style={restartSteps.smb.ok ? undefined : { color: 'var(--color-red)' }}>
+                      {t('ConfigRestoreWizard.smb')} {restartSteps.smb.message}
+                    </li>
+                    <li style={restartSteps.nfs.ok ? undefined : { color: 'var(--color-red)' }}>
+                      {t('ConfigRestoreWizard.nfs')} {restartSteps.nfs.message}
+                    </li>
                     <li style={restartSteps.driverReload.ok ? undefined : { color: 'var(--color-red)' }}>
-                      Driver: {restartSteps.driverReload.message}
+                      {t('ConfigRestoreWizard.driver')} {restartSteps.driverReload.message}
                     </li>
                     <li style={restartSteps.rcloneRcd.ok ? undefined : { color: 'var(--color-red)' }}>
-                      Remote Backup: {restartSteps.rcloneRcd.message}
+                      {t('ConfigRestoreWizard.remoteBackup')} {restartSteps.rcloneRcd.message}
                     </li>
                     {restartSteps.docker && (
                       <li style={restartSteps.docker.ok ? undefined : { color: 'var(--color-red)' }}>
-                        Docker: {restartSteps.docker.message}
+                        {t('ConfigRestoreWizard.docker')} {restartSteps.docker.message}
                       </li>
                     )}
                   </ul>
                 )}
-                {backOnline && <div className="status-note">nonraid-webui is back online.</div>}
-                {restartTimedOut && (
-                  <div className="status-note status-note--error">
-                    nonraid-webui didn't come back within 2 minutes - check `systemctl status nonraid-webui` on the
-                    host, or just reload this page in a bit.
-                  </div>
-                )}
+                {backOnline && <div className="status-note">{t('ConfigRestoreWizard.backOnline')}</div>}
+                {restartTimedOut && <div className="status-note status-note--error">{t('ConfigRestoreWizard.restartTimedOut')}</div>}
               </div>
 
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
-                  Close
+                  {t('ConfigRestoreWizard.closeButton')}
                 </button>
               </div>
             </div>

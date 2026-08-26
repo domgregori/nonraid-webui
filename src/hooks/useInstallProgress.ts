@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { TFunction } from 'i18next';
 import type { CreateContainerProgress } from '../types/dockerApi';
 
 export interface PullLogLine {
@@ -47,8 +48,10 @@ export function useInstallProgress() {
   return { progress, log, logRef, onProgress, reset };
 }
 
-/** Label for the disabled primary button while `stage === 'installing'`. */
-export function installButtonLabel(progress: CreateContainerProgress | null): string {
-  if (progress?.phase === 'removing') return 'Removing old container…';
-  return progress?.percent != null ? `Installing… ${progress.percent}%` : 'Installing…';
+/** Label for the disabled primary button while `stage === 'installing'`. Called from both the
+ *  Docker and Apps install dialogs, each bound to their own namespace's `t` - the `common:` prefix
+ *  resolves this against the shared `common` namespace regardless of which namespace `t` defaults to. */
+export function installButtonLabel(t: TFunction, progress: CreateContainerProgress | null): string {
+  if (progress?.phase === 'removing') return t('common:installButtonLabel.removing');
+  return progress?.percent != null ? t('common:installButtonLabel.installingPercent', { percent: progress.percent }) : t('common:installButtonLabel.installing');
 }

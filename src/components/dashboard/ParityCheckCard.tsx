@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { deriveParityViewModel } from '../../selectors/parity';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { Card } from '../shared/Card';
@@ -5,6 +6,7 @@ import { ProgressBar } from '../shared/ProgressBar';
 import { ReloadDriverPrompt } from '../shared/ReloadDriverPrompt';
 
 export function ParityCheckCard() {
+  const { t } = useTranslation('dashboard');
   const { status, parityPending, parityAction, refresh } = useArrayStatus();
   if (!status) return null;
 
@@ -23,7 +25,7 @@ export function ParityCheckCard() {
   return (
     <Card className="parity-card">
       <div className="parity-card__head">
-        <div className="eyebrow">{parity.isClearing ? 'New Disk' : 'Parity Check'}</div>
+        <div className="eyebrow">{parity.isClearing ? t('ParityCheckCard.newDisk') : t('ParityCheckCard.parityCheck')}</div>
         <div className="parity-card__actions">
           {parity.isRunning && (
             <>
@@ -31,13 +33,13 @@ export function ParityCheckCard() {
                 {parity.pauseLabel}
               </button>
               <button type="button" className="btn btn--danger" disabled={parityPending} onClick={parity.cancelHandler}>
-                Cancel
+                {t('ParityCheckCard.cancel')}
               </button>
             </>
           )}
           {parity.canStart && (
             <button type="button" className="btn--primary-sm" disabled={parityPending} onClick={parity.startHandler}>
-              {parity.isClearing ? 'Start Clearing' : 'Start Parity Check'}
+              {parity.isClearing ? t('ParityCheckCard.startClearing') : t('ParityCheckCard.startParityCheck')}
             </button>
           )}
         </div>
@@ -47,13 +49,13 @@ export function ParityCheckCard() {
 
       <div className="parity-card__meta">
         <span>{parity.progressLabel}</span>
-        <span>Speed: {parity.speedText}</span>
+        <span>{t('ParityCheckCard.speed', { speed: parity.speedText })}</span>
         <span>{parity.etaText}</span>
       </div>
 
       {parity.needsDriverReload && (
         <ReloadDriverPrompt
-          description="Stuck pending from an unassigned disk with nothing behind it - Start would fail. Reload resets it without changing array disks."
+          description={t('ParityCheckCard.reloadDriverDesc')}
           onReloaded={refresh}
         />
       )}

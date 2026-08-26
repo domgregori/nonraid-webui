@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { lxcApi } from '../../api/lxcApi';
 
 interface EditLxcConfigDialogProps {
@@ -15,6 +16,7 @@ interface EditLxcConfigDialogProps {
  * start). See backend/src/lxc/configFile.ts for the file this reads/writes.
  */
 export function EditLxcConfigDialog({ name, onClose, onDone }: EditLxcConfigDialogProps) {
+  const { t } = useTranslation('lxc');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [content, setContent] = useState('');
@@ -59,20 +61,18 @@ export function EditLxcConfigDialog({ name, onClose, onDone }: EditLxcConfigDial
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog lxc-create-dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Edit {name} config</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('EditLxcConfigDialog.title', { name })}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('EditLxcConfigDialog.close')}>
             &#10005;
           </button>
         </div>
 
-        {loading && <div className="status-note">Loading…</div>}
+        {loading && <div className="status-note">{t('EditLxcConfigDialog.loading')}</div>}
         {loadError && <div className="status-note status-note--error">{loadError}</div>}
 
         {!loading && !loadError && (
           <div className="dialog__body">
-            <div className="status-note">
-              Editing the container's real LXC config file. Most changes only take effect after a restart.
-            </div>
+            <div className="status-note">{t('EditLxcConfigDialog.editingNote')}</div>
 
             <textarea
               className="history-input settings-textarea"
@@ -87,10 +87,10 @@ export function EditLxcConfigDialog({ name, onClose, onDone }: EditLxcConfigDial
 
             <div className="dialog__actions">
               <button type="button" className="btn" onClick={onClose}>
-                Cancel
+                {t('EditLxcConfigDialog.cancel')}
               </button>
               <button type="button" className="btn--primary" disabled={saving} onClick={handleSave}>
-                {saving ? 'Saving…' : 'Save'}
+                {saving ? t('EditLxcConfigDialog.saving') : t('EditLxcConfigDialog.save')}
               </button>
             </div>
           </div>

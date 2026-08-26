@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { servicesApi } from '../../api/servicesApi';
 import { sshApi } from '../../api/sshApi';
 import { deriveServiceStatusView } from '../../selectors/services';
@@ -10,26 +11,27 @@ import { ToggleSwitch } from '../shared/ToggleSwitch';
 
 type Action = 'start' | 'stop' | 'restart';
 
-const WARNINGS: Record<string, string> = {
-  docker: 'Stopping or restarting this will interrupt any running containers.',
-  lxc: 'Stopping or restarting this will interrupt any running containers.',
-  smb: 'Stopping or restarting this will drop active SMB client connections.',
-  nfs: 'Stopping or restarting this will drop active NFS client connections.',
-  ssh: 'Stopping or restarting this may drop your current SSH session and any other active SSH connections.',
-  avahi: 'Stopping or restarting this may drop network discovery',
-  tailscale: 'Stopping or restarting this will drop the Tailscale connection.',
-  'rclone-rcd': 'Stopping or restarting this will interrupt any Remote Backup sync currently in progress.',
+const WARNING_KEYS: Record<string, string> = {
+  docker: 'ServicesSection.warningContainers',
+  lxc: 'ServicesSection.warningContainers',
+  smb: 'ServicesSection.warningSmb',
+  nfs: 'ServicesSection.warningNfs',
+  ssh: 'ServicesSection.warningSsh',
+  avahi: 'ServicesSection.warningAvahi',
+  tailscale: 'ServicesSection.warningTailscale',
+  'rclone-rcd': 'ServicesSection.warningRclone',
 };
 
 const HEALTH_POLL_INTERVAL_MS = 2000;
 const HEALTH_POLL_TIMEOUT_MS = 30_000;
 
 export function ServicesSection() {
+  const { t } = useTranslation('settings');
   const { status: arrayStatus, loadState: arrayLoadState, refresh: refreshArrayStatus } = useArrayStatus();
   // The driver has no systemd unit of its own to poll (see the row below) - a successful array
   // status fetch is itself proof the kernel module is loaded and responding, since nmdctl can't
   // report anything at all otherwise (not even "no array configured yet").
-  const driverLabel = arrayStatus ? 'Running' : arrayLoadState === 'error' ? 'Unreachable' : 'Checking…';
+  const driverLabel = arrayStatus ? t('ServicesSection.running') : arrayLoadState === 'error' ? t('ServicesSection.unreachable') : t('ServicesSection.checking');
   const driverColor = arrayStatus ? COLORS.green : arrayLoadState === 'error' ? COLORS.red : COLORS.textDim;
   const [services, setServices] = useState<ServiceStatus[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -117,15 +119,13 @@ export function ServicesSection() {
   };
 
   if (loadError) return <div className="status-note status-note--error">{loadError}</div>;
-  if (!services) return <div className="status-note">Loading services…</div>;
+  if (!services) return <div className="status-note">{t('ServicesSection.loadingServices')}</div>;
 
   return (
     <div>
       {actionError && <div className="status-note status-note--error">{actionError}</div>}
-      {webuiReconnecting && <div className="status-note">Restarting - reconnecting…</div>}
-      {webuiReconnectFailed && (
-        <div className="status-note status-note--error">Still not back after 30s - check the backend on the host, or reload this page.</div>
-      )}
+      {webuiReconnecting && <div className="status-note">{t('ServicesSection.restartingReconnecting')}</div>}
+      {webuiReconnectFailed && <div className="status-note status-note--error">{t('ServicesSection.stillNotBack')}</div>}
       {services.map((service) => {
         const view = deriveServiceStatusView(service.state);
         const busy = busyId === service.id;
@@ -149,7 +149,7 @@ export function ServicesSection() {
                       disabled={busy || service.state === 'active'}
                       onClick={() => runAction(service.id, 'start')}
                     >
-                      Start
+                      {t('ServicesSection.start')}
                     </button>
                     <button
                       type="button"
@@ -157,25 +157,28 @@ export function ServicesSection() {
                       disabled={busy || service.state === 'inactive'}
                       onClick={() => runAction(service.id, 'stop')}
                     >
-                      Stop
+                      {t('ServicesSection.stop')}
                     </button>
                   </>
                 )}
                 <button type="button" className="btn" disabled={busy || webuiReconnecting} onClick={() => runAction(service.id, 'restart')}>
-                  {busy || (isWebui && webuiReconnecting) ? 'Working…' : 'Restart'}
+                  {busy || (isWebui && webuiReconnecting) ? t('ServicesSection.working') : t('ServicesSection.restart')}
                 </button>
               </div>
             </div>
-            {WARNINGS[service.id] && <div className="status-note">{WARNINGS[service.id]}</div>}
+            {WARNING_KEYS[service.id] && <div className="status-note">{t(WARNING_KEYS[service.id])}</div>}
             {service.id === 'ssh' && (
               <div className="toggle-row">
                 <div>
-                  <div className="toggle-row__title">Start on boot</div>
-                  <div className="toggle-row__desc">
-                    Disabling only stops sshd from starting next boot - it won't drop this or any other currently-open SSH session. Use Stop above for that.
-                  </div>
+                  <div className="toggle-row__title">{t('ServicesSection.startOnBoot')}</div>
+                  <div className="toggle-row__desc">{t('ServicesSection.startOnBootDesc')}</div>
                 </div>
-                <ToggleSwitch on={sshBootEnabled ?? false} onToggle={toggleSshBoot} label="SSH start on boot" disabled={sshBootEnabled === null || sshBootSaving} />
+                <ToggleSwitch
+                  on={sshBootEnabled ?? false}
+                  onToggle={toggleSshBoot}
+                  label={t('ServicesSection.sshStartOnBoot')}
+                  disabled={sshBootEnabled === null || sshBootSaving}
+                />
               </div>
             )}
           </div>
@@ -188,17 +191,14 @@ export function ServicesSection() {
       <div>
         <div className="toggle-row toggle-row--bordered">
           <div>
-            <div className="toggle-row__title">NonRAID Kernel Driver</div>
+            <div className="toggle-row__title">{t('ServicesSection.nonraidKernelDriver')}</div>
             <div className="toggle-row__desc" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span className="docker-card__status-dot" style={{ background: driverColor }} />
               {driverLabel}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <ReloadDriverPrompt
-              description="Resets stale internal counters - doesn't change array disks. May leave the array briefly down; let it finish."
-              onReloaded={refreshArrayStatus}
-            />
+            <ReloadDriverPrompt description={t('ServicesSection.reloadDriverDesc')} onReloaded={refreshArrayStatus} />
           </div>
         </div>
       </div>

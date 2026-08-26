@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 interface StepUpFieldsProps {
   password: string;
   onPasswordChange: (value: string) => void;
@@ -14,15 +16,16 @@ interface StepUpFieldsProps {
  *  one-time totpEnabled fetch. Purely presentational so any sensitive-action form can drop it in
  *  without re-building the same two inputs. */
 export function StepUpFields({ password, onPasswordChange, totpEnabled, totpCode, onTotpCodeChange, description }: StepUpFieldsProps) {
+  const { t } = useTranslation('shared');
   return (
     <>
-      <div className="toggle-row__desc">{description ?? "Confirm it's you."}</div>
+      <div className="toggle-row__desc">{description ?? t('StepUpFields.defaultDescription')}</div>
       <input
         type="password"
         className="history-input"
         value={password}
         onChange={(e) => onPasswordChange(e.target.value)}
-        placeholder="Current password"
+        placeholder={t('StepUpFields.passwordPlaceholder')}
         autoComplete="current-password"
       />
       {totpEnabled && (
@@ -30,7 +33,7 @@ export function StepUpFields({ password, onPasswordChange, totpEnabled, totpCode
           className="history-input"
           value={totpCode}
           onChange={(e) => onTotpCodeChange(e.target.value)}
-          placeholder="2FA code"
+          placeholder={t('StepUpFields.totpPlaceholder')}
           inputMode="numeric"
           autoComplete="one-time-code"
         />

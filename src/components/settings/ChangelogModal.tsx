@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { updateApi } from '../../api/updateApi';
 import type { UpdateComponent } from '../../types/updateApi';
 import { renderSimpleMarkdown } from '../../utils/simpleMarkdown';
@@ -14,6 +15,7 @@ interface ChangelogModalProps {
  *  utils/simpleMarkdown.tsx) rather than pulling in a full Markdown library - this project's own
  *  release notes only ever use headers, bullet lists, and paragraphs. */
 export function ChangelogModal({ component, label, tag, onClose }: ChangelogModalProps) {
+  const { t } = useTranslation('settings');
   const [body, setBody] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,16 +38,16 @@ export function ChangelogModal({ component, label, tag, onClose }: ChangelogModa
           <div className="dialog__title">
             {label} {tag}
           </div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('ChangelogModal.close')}>
             &#10005;
           </button>
         </div>
         <div className="dialog__body">
-          {loading && <div className="status-note">Loading…</div>}
+          {loading && <div className="status-note">{t('ChangelogModal.loading')}</div>}
           {error && <div className="status-note status-note--error">{error}</div>}
           {!loading && !error && (
             <div className="changelog-body" style={{ maxHeight: '60vh', overflow: 'auto' }}>
-              {body ? renderSimpleMarkdown(body) : 'No release notes published for this version.'}
+              {body ? renderSimpleMarkdown(body) : t('ChangelogModal.noReleaseNotes')}
             </div>
           )}
         </div>

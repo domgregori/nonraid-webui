@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { nmdApi } from '../../api/nmdApi';
 import { useAvailableDevices } from '../../hooks/useAvailableDevices';
 import { useArrayStatus } from '../../state/useArrayStatus';
@@ -34,6 +35,7 @@ interface ArrayBuilderProps {
  * Nothing is sent to nmdctl until "Build Array" - the two picks are local state until then.
  */
 export function ArrayBuilder({ onBuilt }: ArrayBuilderProps) {
+  const { t } = useTranslation('onboarding');
   const { devices, status: devicesStatus, error: devicesError, refresh } = useAvailableDevices();
   const { status } = useArrayStatus();
   const [parityDevice, setParityDevice] = useState('');
@@ -63,23 +65,23 @@ export function ArrayBuilder({ onBuilt }: ArrayBuilderProps) {
     setBuildLog([]);
     try {
       if (parity && !existingParity) {
-        appendLog(`Adding ${parity.model ?? parity.device} as the parity disk…`);
+        appendLog(t('ArrayBuilder.logAddingParity', { name: parity.model ?? parity.device }));
         const res = await nmdApi.addDisk(PARITY_SLOT, parity.device, false);
         appendLog(res.output);
       }
 
-      appendLog(`Adding ${data.model ?? data.device} as the data disk…`);
+      appendLog(t('ArrayBuilder.logAddingData', { name: data.model ?? data.device }));
       const res = await nmdApi.addDisk(FIRST_DATA_SLOT, data.device, false);
       appendLog(res.output);
 
-      appendLog('Starting the array…');
+      appendLog(t('ArrayBuilder.logStartingArray'));
       await nmdApi.startArray();
       // start alone only marks the initial parity build pending (resync.pending) - it doesn't run
       // it. parityCheck('CORRECT') is the same action the dashboard's own Parity Check card sends;
       // RealNmdClient.parityCheck() already substitutes in the pending build's own action word for
       // this exact case (confirmed live: without this, parity sits at 0% indefinitely and nmdctl
       // later refuses to add another disk at all).
-      appendLog('Starting the initial parity build - this continues in the background…');
+      appendLog(t('ArrayBuilder.logStartingParityBuild'));
       await nmdApi.parityCheck('CORRECT');
 
       refresh();
@@ -93,21 +95,21 @@ export function ArrayBuilder({ onBuilt }: ArrayBuilderProps) {
 
   return (
     <Card>
-      {devicesStatus === 'loading' && <div className="status-note">Scanning for devices…</div>}
+      {devicesStatus === 'loading' && <div className="status-note">{t('ArrayBuilder.scanningDevices')}</div>}
       {devicesError && <div className="status-note status-note--error">{devicesError}</div>}
-      {devicesStatus === 'ready' && devices.length === 0 && <div className="status-note">No unassigned devices found.</div>}
+      {devicesStatus === 'ready' && devices.length === 0 && <div className="status-note">{t('ArrayBuilder.noDevicesFound')}</div>}
 
       {devices.length > 0 && (
         <>
           {existingParity ? (
             <div className="settings-field">
-              <div className="toggle-row__title">Parity disk</div>
-              <div className="status-note">Already assigned - {existingParity.disk_id}.</div>
+              <div className="toggle-row__title">{t('ArrayBuilder.parityDiskLabel')}</div>
+              <div className="status-note">{t('ArrayBuilder.parityAlreadyAssigned', { diskId: existingParity.disk_id })}</div>
             </div>
           ) : (
             <div className="settings-field">
-              <div className="toggle-row__title">Parity disk</div>
-              <div className="toggle-row__desc">Has to be at least as large as the data disk below.</div>
+              <div className="toggle-row__title">{t('ArrayBuilder.parityDiskLabel')}</div>
+              <div className="toggle-row__desc">{t('ArrayBuilder.parityDesc')}</div>
               <select
                 className="history-input"
                 style={{ width: '100%' }}
@@ -115,22 +117,22 @@ export function ArrayBuilder({ onBuilt }: ArrayBuilderProps) {
                 disabled={building}
                 onChange={(e) => setParityDevice(e.target.value)}
               >
-                <option value="">Select a disk…</option>
+                <option value="">{t('ArrayBuilder.selectDisk')}</option>
                 {devices
                   .filter((d) => d.device !== dataDevice)
                   .map((d) => (
                     <option key={d.device} value={d.device}>
-                      {d.model ?? d.device} · {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : 'unknown size'}
+                      {d.model ?? d.device} · {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : t('ArrayBuilder.unknownSize')}
                     </option>
                   ))}
               </select>
-              {parity?.locked && <div className="status-note status-note--error">This disk appears to be locked/in use - this may fail.</div>}
+              {parity?.locked && <div className="status-note status-note--error">{t('ArrayBuilder.diskLockedWarning')}</div>}
             </div>
           )}
 
           <div className="settings-field" style={{ marginTop: 10 }}>
-            <div className="toggle-row__title">Data disk</div>
-            <div className="toggle-row__desc">Any existing data on it is cleared when the array starts.</div>
+            <div className="toggle-row__title">{t('ArrayBuilder.dataDiskLabel')}</div>
+            <div className="toggle-row__desc">{t('ArrayBuilder.dataDiskDesc')}</div>
             <select
               className="history-input"
               style={{ width: '100%' }}
@@ -138,28 +140,27 @@ export function ArrayBuilder({ onBuilt }: ArrayBuilderProps) {
               disabled={building}
               onChange={(e) => setDataDevice(e.target.value)}
             >
-              <option value="">Select a disk…</option>
+              <option value="">{t('ArrayBuilder.selectDisk')}</option>
               {devices
                 .filter((d) => d.device !== parityDevice)
                 .map((d) => (
                   <option key={d.device} value={d.device}>
-                    {d.model ?? d.device} · {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : 'unknown size'}
+                    {d.model ?? d.device} · {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : t('ArrayBuilder.unknownSize')}
                   </option>
                 ))}
             </select>
-            {data?.locked && <div className="status-note status-note--error">This disk appears to be locked/in use - this may fail.</div>}
+            {data?.locked && <div className="status-note status-note--error">{t('ArrayBuilder.diskLockedWarning')}</div>}
           </div>
         </>
       )}
 
       {parityTooSmall && (
         <div className="status-note status-note--error">
-          The parity disk is smaller than the data disk ({data ? formatBytesHuman(data.sizeKb! * 1024) : ''}) - pick a bigger parity disk, or
-          a smaller data disk.
+          {t('ArrayBuilder.paritySmallWarning', { size: data ? formatBytesHuman(data.sizeKb! * 1024) : '' })}
         </div>
       )}
       {status?.array.state === 'STARTED' && (dataDevice || parityDevice) && (
-        <div className="status-note">The array is currently running - building this will stop and restart it.</div>
+        <div className="status-note">{t('ArrayBuilder.arrayRunningWarning')}</div>
       )}
       {buildError && <div className="status-note status-note--error">{buildError}</div>}
 
@@ -168,7 +169,7 @@ export function ArrayBuilder({ onBuilt }: ArrayBuilderProps) {
       <div className="onboarding__actions" style={{ marginTop: 'var(--space-lg)' }}>
         <div className="onboarding__actions-right">
           <button type="button" className="btn btn--primary" disabled={!canBuild} onClick={handleBuild}>
-            {building ? 'Building array…' : 'Build Array'}
+            {building ? t('ArrayBuilder.buildingButton') : t('ArrayBuilder.buildButton')}
           </button>
         </div>
       </div>

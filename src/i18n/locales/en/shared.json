@@ -1,0 +1,38 @@
+{
+  "ArrayActionErrorBanner": {
+    "stopBlockedMessage": "A disk is in use by Docker or LXC. Stop containers?",
+    "stopping": "Stopping…",
+    "stopAndRetry": "Stop Docker/LXC and retry"
+  },
+  "ArrayStopBlockedModal": {
+    "title": "Stop Array",
+    "close": "Close",
+    "stopBlockedMessage": "A disk is in use by Docker or LXC. Stop containers?",
+    "cancel": "Cancel",
+    "stopping": "Stopping…",
+    "stopAndRetry": "Stop Docker/LXC and retry"
+  },
+  "ReloadDriverPrompt": {
+    "reloadDriver": "Reload Driver",
+    "title": "Reload Storage Driver",
+    "close": "Close",
+    "stopContainersLabel": "Stop Docker/LXC if blocking the reload - restarted automatically after.",
+    "cancel": "Cancel",
+    "reloading": "Reloading…",
+    "confirmReload": "Confirm Reload"
+  },
+  "StepUpFields": {
+    "defaultDescription": "Confirm it's you.",
+    "passwordPlaceholder": "Current password",
+    "totpPlaceholder": "2FA code"
+  },
+  "StepUpModal": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "confirming": "Confirming…",
+    "confirm": "Confirm"
+  },
+  "TimeSeriesChart": {
+    "noData": "No data for this range yet."
+  }
+}

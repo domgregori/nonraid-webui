@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { sshApi } from '../../api/sshApi';
 import type { SshKeyEntry } from '../../types/sshApi';
 import { StepUpModal } from '../shared/StepUpModal';
@@ -21,6 +22,7 @@ function swatchClass(id: string): string {
  *  button uses, on top of the step-up modal - two distinct guards for a mis-click vs. someone
  *  else at an unlocked, already-logged-in session. */
 export function SshKeysSection() {
+  const { t } = useTranslation('settings');
   const [keys, setKeys] = useState<SshKeyEntry[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -46,8 +48,8 @@ export function SshKeysSection() {
 
   return (
     <div className="settings-field">
-      <div className="toggle-row__title">SSH keys</div>
-      <div className="toggle-row__desc">Public keys trusted for root SSH login, in addition to (or instead of) a password.</div>
+      <div className="toggle-row__title">{t('SshKeysSection.title')}</div>
+      <div className="toggle-row__desc">{t('SshKeysSection.desc')}</div>
 
       {loadError && <div className="status-note status-note--error">{loadError}</div>}
 
@@ -64,14 +66,14 @@ export function SshKeysSection() {
               </div>
               <div className="remote-row__actions">
                 <button type="button" className="btn btn--danger" onClick={() => handleRemoveClick(k.fingerprint)}>
-                  {armedFingerprint === k.fingerprint ? 'Confirm?' : 'Remove'}
+                  {armedFingerprint === k.fingerprint ? t('SshKeysSection.confirm') : t('SshKeysSection.remove')}
                 </button>
               </div>
             </div>
           ))}
         </div>
       )}
-      {keys && keys.length === 0 && <div className="status-note">No keys added yet - password login is still available.</div>}
+      {keys && keys.length === 0 && <div className="status-note">{t('SshKeysSection.noKeys')}</div>}
 
       <textarea
         className="history-input settings-textarea"
@@ -82,15 +84,15 @@ export function SshKeysSection() {
       />
       <div className="settings-field__row">
         <button type="button" className="btn" disabled={!draft.trim()} onClick={() => setConfirmingAdd(true)}>
-          Add key
+          {t('SshKeysSection.addKey')}
         </button>
       </div>
 
       {confirmingAdd && (
         <StepUpModal
-          title="Confirm it's you"
-          description="Adding this key grants full root shell access."
-          confirmLabel="Add key"
+          title={t('SshKeysSection.confirmItsYou')}
+          description={t('SshKeysSection.addKeyDesc')}
+          confirmLabel={t('SshKeysSection.addKey')}
           onClose={() => setConfirmingAdd(false)}
           onConfirm={async (password, totpCode) => {
             const result = await sshApi.addKey(draft, password, totpCode);
@@ -102,9 +104,9 @@ export function SshKeysSection() {
 
       {confirmingRemoveFingerprint && (
         <StepUpModal
-          title="Confirm it's you"
-          description="Removing this key can lock out SSH access if it's the only one trusted."
-          confirmLabel="Remove key"
+          title={t('SshKeysSection.confirmItsYou')}
+          description={t('SshKeysSection.removeKeyDesc')}
+          confirmLabel={t('SshKeysSection.removeKey')}
           onClose={() => setConfirmingRemoveFingerprint(null)}
           onConfirm={async (password, totpCode) => {
             const result = await sshApi.removeKey(confirmingRemoveFingerprint, password, totpCode);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useChartHover } from '../../state/ChartHoverContext';
 
 export interface TimeSeriesChartSeries {
@@ -68,6 +69,7 @@ function nearestPoint(points: { ts: number; value: number }[], ts: number): { ts
  * the viewBox to the real pixel size keeps the scale 1:1 in both directions.
  */
 export function TimeSeriesChart({ series, height = 180, formatValue = defaultFormatValue, formatTs = defaultFormatTs }: TimeSeriesChartProps) {
+  const { t } = useTranslation('shared');
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(FALLBACK_WIDTH);
@@ -133,7 +135,7 @@ export function TimeSeriesChart({ series, height = 180, formatValue = defaultFor
   return (
     <div className="ts-chart" ref={containerRef}>
       {!hasData ? (
-        <div className="status-note">No data for this range yet.</div>
+        <div className="status-note">{t('TimeSeriesChart.noData')}</div>
       ) : (
         <>
           <svg

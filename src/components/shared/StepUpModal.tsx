@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStepUp } from '../../hooks/useStepUp';
 import { StepUpFields } from './StepUpFields';
 
@@ -19,7 +20,8 @@ interface StepUpModalProps {
  * changing the account password (SettingsPage.tsx's Security section); any future sensitive
  * action can reuse this the same way rather than building its own confirm dialog.
  */
-export function StepUpModal({ title, description, confirmLabel = 'Confirm', onConfirm, onClose }: StepUpModalProps) {
+export function StepUpModal({ title, description, confirmLabel, onConfirm, onClose }: StepUpModalProps) {
+  const { t } = useTranslation('shared');
   const stepUp = useStepUp();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export function StepUpModal({ title, description, confirmLabel = 'Confirm', onCo
       <div className="dialog">
         <div className="dialog__head">
           <div className="dialog__title">{title}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} disabled={submitting} aria-label="Close">
+          <button type="button" className="detail-panel__close" onClick={onClose} disabled={submitting} aria-label={t('StepUpModal.close')}>
             &#10005;
           </button>
         </div>
@@ -59,10 +61,10 @@ export function StepUpModal({ title, description, confirmLabel = 'Confirm', onCo
           {error && <div className="status-note status-note--error">{error}</div>}
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onClose} disabled={submitting}>
-              Cancel
+              {t('StepUpModal.cancel')}
             </button>
             <button type="button" className="btn btn--primary" disabled={submitting || !stepUp.password} onClick={submit}>
-              {submitting ? 'Confirming…' : confirmLabel}
+              {submitting ? t('StepUpModal.confirming') : (confirmLabel ?? t('StepUpModal.confirm'))}
             </button>
           </div>
         </div>

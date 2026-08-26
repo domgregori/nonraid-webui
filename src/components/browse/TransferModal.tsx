@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PathAutocomplete } from '../shared/PathAutocomplete';
 import type { BrowseEntry } from '../../types/browseApi';
 
@@ -13,12 +14,13 @@ interface TransferModalProps {
   onStart: (destPath: string) => void;
 }
 
-const VERB: Record<'copy' | 'move', string> = { copy: 'Copy', move: 'Move' };
+const VERB_KEY: Record<'copy' | 'move', string> = { copy: 'TransferModal.verbCopy', move: 'TransferModal.verbMove' };
 
 export function TransferModal({ op, entries, currentPath, onCancel, onStart }: TransferModalProps) {
+  const { t } = useTranslation('browse');
   const [destPath, setDestPath] = useState(currentPath);
-  const verb = VERB[op];
-  const label = entries.length === 1 ? entries[0]!.name : `${entries.length} items`;
+  const verb = t(VERB_KEY[op]);
+  const label = entries.length === 1 ? entries[0]!.name : t('TransferModal.itemsCount', { count: entries.length });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,29 +32,27 @@ export function TransferModal({ op, entries, currentPath, onCancel, onStart }: T
       <div className="detail-overlay" onClick={onCancel} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">
-            {verb} {label}
-          </div>
-          <button type="button" className="detail-panel__close" onClick={onCancel} aria-label="Close">
+          <div className="dialog__title">{t('TransferModal.dialogTitle', { verb, label })}</div>
+          <button type="button" className="detail-panel__close" onClick={onCancel} aria-label={t('TransferModal.close')}>
             &#10005;
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="dialog__body">
           <label className="form-field">
-            <span className="form-field__label">Destination folder (absolute path under /mnt)</span>
+            <span className="form-field__label">{t('TransferModal.destinationLabel')}</span>
             <PathAutocomplete
               scope="browse"
               value={destPath}
               onChange={setDestPath}
-              placeholder="e.g. /mnt/user/photos/2024"
+              placeholder={t('TransferModal.destinationPlaceholder')}
               autoFocus
             />
           </label>
 
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onCancel}>
-              Cancel
+              {t('TransferModal.cancel')}
             </button>
             <button type="submit" className="btn--primary">
               {verb}

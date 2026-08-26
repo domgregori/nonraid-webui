@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface BulkActionBarProps {
   count: number;
@@ -11,6 +12,7 @@ interface BulkActionBarProps {
 /** Replaces the normal New Folder/Upload toolbar row whenever there's an active selection -
  *  reads as "you're in selection mode" rather than just another static toolbar. */
 export function BulkActionBar({ count, onClear, onCopy, onMove, onDelete }: BulkActionBarProps) {
+  const { t } = useTranslation('browse');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const handleDeleteClick = () => {
@@ -24,18 +26,18 @@ export function BulkActionBar({ count, onClear, onCopy, onMove, onDelete }: Bulk
 
   return (
     <div className="browse-bulk-bar">
-      <span className="browse-bulk-bar__count">{count} selected</span>
+      <span className="browse-bulk-bar__count">{t('BulkActionBar.selectedCount', { count })}</span>
       <button type="button" className="btn" onClick={onCopy}>
-        Copy
+        {t('BulkActionBar.copy')}
       </button>
       <button type="button" className="btn" onClick={onMove}>
-        Move
+        {t('BulkActionBar.move')}
       </button>
       <button type="button" className="btn btn--danger" onClick={handleDeleteClick}>
-        {confirmingDelete ? 'Confirm?' : 'Delete'}
+        {confirmingDelete ? t('BulkActionBar.confirm') : t('BulkActionBar.delete')}
       </button>
       <button type="button" className="btn" onClick={onClear}>
-        Clear
+        {t('BulkActionBar.clear')}
       </button>
     </div>
   );

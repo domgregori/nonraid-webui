@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Share, ShareInput } from '../../types/sharesApi';
 
 interface ShareExportModalProps {
@@ -11,6 +12,7 @@ interface ShareExportModalProps {
  *  ShareFormModal, which no longer edits this. Submits the full ShareInput (name/disks/
  *  allocationMethod/description unchanged) since the update route replaces, not patches. */
 export function ShareExportModal({ share, onCancel, onSubmit }: ShareExportModalProps) {
+  const { t } = useTranslation('shares');
   const [smbEnabled, setSmbEnabled] = useState(share.protocols.includes('smb'));
   const [smbPublic, setSmbPublic] = useState(share.smb?.public ?? false);
   const [nfsEnabled, setNfsEnabled] = useState(share.protocols.includes('nfs'));
@@ -39,7 +41,7 @@ export function ShareExportModal({ share, onCancel, onSubmit }: ShareExportModal
     setSubmitting(true);
     const ok = await onSubmit(input);
     setSubmitting(false);
-    if (!ok) setError('Request failed - see the page error banner for details.');
+    if (!ok) setError(t('ShareExportModal.requestFailed'));
   };
 
   return (
@@ -47,37 +49,36 @@ export function ShareExportModal({ share, onCancel, onSubmit }: ShareExportModal
       <div className="detail-overlay" onClick={onCancel} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Share &quot;{share.name}&quot;</div>
-          <button type="button" className="detail-panel__close" onClick={onCancel} aria-label="Close">
+          <div className="dialog__title">{t('ShareExportModal.dialogTitle', { name: share.name })}</div>
+          <button type="button" className="detail-panel__close" onClick={onCancel} aria-label={t('ShareExportModal.close')}>
             &#10005;
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="dialog__body">
           <div className="toggle-row__desc">
-            Choose how the &quot;{share.name}&quot; pool is reachable over the network. Per-user SMB permissions are
-            set on each user's own page below.
+            {t('ShareExportModal.desc', { name: share.name })}
           </div>
 
           <div className="form-field">
             <label className="disk-checkbox">
-              <input type="checkbox" checked={smbEnabled} onChange={(e) => setSmbEnabled(e.target.checked)} /> SMB
+              <input type="checkbox" checked={smbEnabled} onChange={(e) => setSmbEnabled(e.target.checked)} /> {t('ShareExportModal.smb')}
             </label>
             {smbEnabled && (
               <label className="disk-checkbox" style={{ marginLeft: 20 }}>
-                <input type="checkbox" checked={smbPublic} onChange={(e) => setSmbPublic(e.target.checked)} /> Public (guest access)
+                <input type="checkbox" checked={smbPublic} onChange={(e) => setSmbPublic(e.target.checked)} /> {t('ShareExportModal.smbPublic')}
               </label>
             )}
             <label className="disk-checkbox">
-              <input type="checkbox" checked={nfsEnabled} onChange={(e) => setNfsEnabled(e.target.checked)} /> NFS
+              <input type="checkbox" checked={nfsEnabled} onChange={(e) => setNfsEnabled(e.target.checked)} /> {t('ShareExportModal.nfs')}
             </label>
             {nfsEnabled && (
               <div style={{ marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <label className="disk-checkbox">
-                  <input type="checkbox" checked={nfsReadOnly} onChange={(e) => setNfsReadOnly(e.target.checked)} /> Read-only
+                  <input type="checkbox" checked={nfsReadOnly} onChange={(e) => setNfsReadOnly(e.target.checked)} /> {t('ShareExportModal.nfsReadOnly')}
                 </label>
                 <label className="form-field">
-                  <span className="form-field__label">Allowed hosts (comma-separated, * for any)</span>
+                  <span className="form-field__label">{t('ShareExportModal.allowedHostsLabel')}</span>
                   <input className="history-input" style={{ width: '100%' }} value={nfsHosts} onChange={(e) => setNfsHosts(e.target.value)} />
                 </label>
               </div>
@@ -85,12 +86,11 @@ export function ShareExportModal({ share, onCancel, onSubmit }: ShareExportModal
           </div>
 
           {!smbEnabled && !nfsEnabled && (
-            <div className="status-note">Not shared - this pool won't be reachable over the network until SMB or NFS is turned on.</div>
+            <div className="status-note">{t('ShareExportModal.notSharedNote')}</div>
           )}
           {smbEnabled && !smbPublic && (
             <div className="status-note">
-              Not public - no one can connect over SMB until you grant specific users or groups access from the
-              Sharing tab.
+              {t('ShareExportModal.notPublicNote')}
             </div>
           )}
 
@@ -98,10 +98,10 @@ export function ShareExportModal({ share, onCancel, onSubmit }: ShareExportModal
 
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onCancel}>
-              Cancel
+              {t('ShareExportModal.cancel')}
             </button>
             <button type="submit" className="btn--primary" disabled={submitting}>
-              {submitting ? 'Saving…' : 'Save'}
+              {submitting ? t('ShareExportModal.saving') : t('ShareExportModal.save')}
             </button>
           </div>
         </form>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { isArrayError } from '../../selectors/status';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { COLORS } from '../../styles/colors';
@@ -22,6 +23,7 @@ import { Card } from '../shared/Card';
  * clear/recon instead).
  */
 export function ArrayErrorCard() {
+  const { t } = useTranslation('dashboard');
   const { status } = useArrayStatus();
 
   if (!status || !isArrayError(status)) return null;
@@ -30,13 +32,13 @@ export function ArrayErrorCard() {
     <Card className="parity-card">
       <div className="parity-card__head">
         <div className="eyebrow" style={{ color: COLORS.red }}>
-          Array Error
+          {t('ArrayErrorCard.arrayError')}
         </div>
       </div>
       <div className="status-note status-note--error">
-        <strong>{status.array.state}</strong> - {status.array.health.details || 'the array needs attention before it can start normally.'}
+        <strong>{status.array.state}</strong> - {status.array.health.details || t('ArrayErrorCard.needsAttention')}
       </div>
-      <ReloadDriverPrompt description="Resets stale internal counters - doesn't change array disks. May leave the array briefly down; let it finish." />
+      <ReloadDriverPrompt description={t('ArrayErrorCard.reloadDriverDesc')} />
     </Card>
   );
 }

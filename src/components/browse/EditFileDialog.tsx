@@ -3,6 +3,7 @@ import { LanguageDescription } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
 import CodeMirror, { EditorView, type Extension } from '@uiw/react-codemirror';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { browseApi } from '../../api/browseApi';
 
 interface EditFileDialogProps {
@@ -27,6 +28,7 @@ function resolveAppMode(): EditorMode {
 }
 
 export function EditFileDialog({ path, fileName, onClose }: EditFileDialogProps) {
+  const { t } = useTranslation('browse');
   const [content, setContent] = useState<string | null>(null);
   const [original, setOriginal] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,26 +102,26 @@ export function EditFileDialog({ path, fileName, onClose }: EditFileDialogProps)
       <div className="dialog browse-editor-dialog">
         <div className="dialog__head">
           <div className="dialog__title">
-            Edit: {fileName}
-            {dirty && <span className="browse-editor-dirty-dot" title="Unsaved changes" />}
+            {t('EditFileDialog.editTitle', { fileName })}
+            {dirty && <span className="browse-editor-dirty-dot" title={t('EditFileDialog.unsavedChanges')} />}
           </div>
           <div className="browse-editor-head-actions">
             <button
               type="button"
               className="btn browse-editor-mode-toggle"
               onClick={() => setEditorMode((m) => (m === 'dark' ? 'light' : 'dark'))}
-              title="Toggle editor light/dark theme"
+              title={t('EditFileDialog.toggleThemeTitle')}
             >
-              {editorMode === 'dark' ? 'Dark' : 'Light'}
+              {editorMode === 'dark' ? t('EditFileDialog.dark') : t('EditFileDialog.light')}
             </button>
-            <button type="button" className="detail-panel__close" onClick={handleClose} aria-label="Close">
+            <button type="button" className="detail-panel__close" onClick={handleClose} aria-label={t('EditFileDialog.close')}>
               &#10005;
             </button>
           </div>
         </div>
 
         <div className="dialog__body browse-editor-body">
-          {loading && <div className="status-note">Loading…</div>}
+          {loading && <div className="status-note">{t('EditFileDialog.loading')}</div>}
           {loadError && <div className="status-note status-note--error">{loadError}</div>}
 
           {content !== null && (
@@ -139,10 +141,10 @@ export function EditFileDialog({ path, fileName, onClose }: EditFileDialogProps)
 
           <div className="dialog__actions">
             <button type="button" className="btn" disabled={saving} onClick={handleClose}>
-              {confirmingClose ? 'Discard changes?' : 'Close'}
+              {confirmingClose ? t('EditFileDialog.discardChanges') : t('EditFileDialog.close')}
             </button>
             <button type="button" className="btn btn--primary" disabled={saving || content === null || !dirty} onClick={handleSave}>
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? t('EditFileDialog.saving') : t('EditFileDialog.save')}
             </button>
           </div>
         </div>

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { diskQueueApi } from '../../api/diskQueueApi';
 import { useDiskQueueStatus } from '../../hooks/useDiskQueueStatus';
 import { useArrayStatus } from '../../state/useArrayStatus';
@@ -14,47 +16,48 @@ import { ProgressBar } from '../shared/ProgressBar';
 // block can show live progress instead of leaving the reader to guess where to look.
 const EXTERNAL_RESYNC_ERROR = 'A parity check or resync is already active outside the queue - wait for it to finish, then retry.';
 
-function typeLabel(type: DiskQueueItemType): string {
+function typeLabel(t: TFunction<'dashboard'>, type: DiskQueueItemType): string {
   switch (type) {
     case 'add-parity':
-      return 'Add parity disk';
+      return t('DiskQueueCard.addParityDisk');
     case 'add-data':
-      return 'Add data disk';
+      return t('DiskQueueCard.addDataDisk');
     case 'add-cache-mirror':
-      return 'Add cache mirror';
+      return t('DiskQueueCard.addCacheMirror');
   }
 }
 
-function phaseText(phase: DiskQueueItemPhase): string {
+function phaseText(t: TFunction<'dashboard'>, phase: DiskQueueItemPhase): string {
   switch (phase) {
     case 'committing':
-      return 'Committing…';
+      return t('DiskQueueCard.committing');
     case 'awaiting-resync':
-      return 'Resyncing…';
+      return t('DiskQueueCard.resyncing');
     case 'formatting':
-      return 'Formatting…';
+      return t('DiskQueueCard.formatting');
     default:
-      return 'Starting…';
+      return t('DiskQueueCard.startingPhase');
   }
 }
 
-function formatEta(seconds: number): string {
+function formatEta(t: TFunction<'dashboard'>, seconds: number): string {
   if (!seconds || seconds <= 0) return '-';
   const mins = Math.round(seconds / 60);
-  if (mins < 60) return `${mins} min remaining`;
-  return `${Math.floor(mins / 60)}h ${mins % 60}m remaining`;
+  if (mins < 60) return t('DiskQueueCard.minRemaining', { mins });
+  return t('DiskQueueCard.hourMinRemaining', { hours: Math.floor(mins / 60), mins: mins % 60 });
 }
 
 /** Shared live percent/speed/ETA readout for an active resync - used by both the running item's
  *  'awaiting-resync' phase and the failed item's "blocked by an external resync" case below. */
 function ResyncProgress({ resync }: { resync: NmdResyncStatus }) {
+  const { t } = useTranslation('dashboard');
   return (
     <>
       <ProgressBar pct={Math.round(resync.progress_percent)} color={COLORS.blue} height={8} />
       <div className="parity-card__meta">
         <span>{Math.round(resync.progress_percent)}%</span>
-        <span>Speed: {Math.round(resync.rate_mb_s)} MB/s</span>
-        <span>{formatEta(resync.eta_seconds)}</span>
+        <span>{t('DiskQueueCard.speed', { rate: Math.round(resync.rate_mb_s) })}</span>
+        <span>{formatEta(t, resync.eta_seconds)}</span>
       </div>
     </>
   );
@@ -72,6 +75,7 @@ function ResyncProgress({ resync }: { resync: NmdResyncStatus }) {
  * percentage available yet, so those just show an indeterminate bar.
  */
 export function DiskQueueCard() {
+  const { t } = useTranslation('dashboard');
   const state = useDiskQueueStatus();
   const { status: arrayStatus } = useArrayStatus();
   const [busy, setBusy] = useState(false);
@@ -99,10 +103,10 @@ export function DiskQueueCard() {
   return (
     <Card className="parity-card">
       <div className="parity-card__head">
-        <div className="eyebrow">Disk Queue</div>
+        <div className="eyebrow">{t('DiskQueueCard.diskQueue')}</div>
         {state.paused && (
           <button type="button" className="btn btn--danger" disabled={busy} onClick={() => withBusy(() => diskQueueApi.clear())}>
-            Clear Queue
+            {t('DiskQueueCard.clearQueue')}
           </button>
         )}
       </div>
@@ -110,7 +114,7 @@ export function DiskQueueCard() {
       {running && (
         <>
           <div className="status-note">
-            {typeLabel(running.type)} - {running.label}: {phaseText(running.phase)}
+            {typeLabel(t, running.type)} - {running.label}: {phaseText(t, running.phase)}
           </div>
           {running.phase === 'awaiting-resync' && resync ? (
             <ResyncProgress resync={resync} />
@@ -123,20 +127,20 @@ export function DiskQueueCard() {
       {failed && (
         <div style={{ marginTop: running ? 'var(--space-md)' : 0 }}>
           <div className="status-note status-note--error">
-            {typeLabel(failed.type)} - {failed.label} failed: {failed.error ?? 'unknown error'}
+            {t('DiskQueueCard.itemFailed', { type: typeLabel(t, failed.type), label: failed.label, error: failed.error ?? t('DiskQueueCard.unknownError') })}
           </div>
           {failed.error === EXTERNAL_RESYNC_ERROR && resync?.active && (
             <div style={{ marginTop: 'var(--space-sm)' }}>
-              <div className="status-note">Waiting on an external parity operation to finish - it'll resolve on its own.</div>
+              <div className="status-note">{t('DiskQueueCard.waitingOnExternal')}</div>
               <ResyncProgress resync={resync} />
             </div>
           )}
           <div className="dialog__actions">
             <button type="button" className="btn" disabled={busy} onClick={() => withBusy(() => diskQueueApi.remove(failed.id))}>
-              Remove
+              {t('DiskQueueCard.remove')}
             </button>
             <button type="button" className="btn--primary" disabled={busy} onClick={() => withBusy(() => diskQueueApi.retry(failed.id))}>
-              Retry
+              {t('DiskQueueCard.retry')}
             </button>
           </div>
         </div>
@@ -147,11 +151,11 @@ export function DiskQueueCard() {
           {queued.map((item) => (
             <div key={item.id} className="unassigned-device-row" style={{ cursor: 'default' }}>
               <div className="unassigned-device-row__info">
-                <div className="unassigned-device-row__name">{typeLabel(item.type)}</div>
-                <div className="unassigned-device-row__meta">{item.label} &middot; queued</div>
+                <div className="unassigned-device-row__name">{typeLabel(t, item.type)}</div>
+                <div className="unassigned-device-row__meta">{item.label} &middot; {t('DiskQueueCard.queued')}</div>
               </div>
               <button type="button" className="btn" disabled={busy} onClick={() => withBusy(() => diskQueueApi.remove(item.id))}>
-                Remove
+                {t('DiskQueueCard.remove')}
               </button>
             </div>
           ))}
@@ -160,12 +164,12 @@ export function DiskQueueCard() {
 
       {history.length > 0 && (
         <div style={{ marginTop: 'var(--space-md)' }}>
-          <div className="eyebrow disk-section-label">Recently completed</div>
+          <div className="eyebrow disk-section-label">{t('DiskQueueCard.recentlyCompleted')}</div>
           <div className="unassigned-devices" style={{ marginTop: 6 }}>
             {history.map((item) => (
               <div key={item.id} className="unassigned-device-row" style={{ cursor: 'default', opacity: 0.6 }}>
                 <div className="unassigned-device-row__info">
-                  <div className="unassigned-device-row__name">{typeLabel(item.type)}</div>
+                  <div className="unassigned-device-row__name">{typeLabel(t, item.type)}</div>
                   <div className="unassigned-device-row__meta">{item.note ?? item.label}</div>
                 </div>
               </div>

@@ -1,0 +1,5 @@
+{
+  "AuthGate": {
+    "backendUnreachable": "Can't reach the backend: {{error}}"
+  }
+}

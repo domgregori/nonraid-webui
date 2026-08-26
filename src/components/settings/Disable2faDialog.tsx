@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { authApi } from '../../api/authApi';
 
 interface Disable2faDialogProps {
@@ -13,6 +14,7 @@ interface Disable2faDialogProps {
  * requirement.
  */
 export function Disable2faDialog({ onClose, onDone }: Disable2faDialogProps) {
+  const { t } = useTranslation('settings');
   const [confirming, setConfirming] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [running, setRunning] = useState(false);
@@ -38,28 +40,25 @@ export function Disable2faDialog({ onClose, onDone }: Disable2faDialogProps) {
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Disable two-factor authentication</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('Disable2faDialog.title')}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('Disable2faDialog.close')}>
             &#10005;
           </button>
         </div>
 
         <div className="dialog__body">
           {done ? (
-            <div className="status-note">Two-factor authentication disabled. Your account is now protected by password alone.</div>
+            <div className="status-note">{t('Disable2faDialog.disabledMessage')}</div>
           ) : (
             <>
-              <div className="status-note status-note--error">
-                Signing in will no longer require a code from your authenticator app - just your password. Your
-                existing backup codes will also stop working.
-              </div>
+              <div className="status-note status-note--error">{t('Disable2faDialog.warning')}</div>
               {!confirming ? (
                 <div className="dialog__actions">
                   <button type="button" className="btn" onClick={onClose}>
-                    Cancel
+                    {t('Disable2faDialog.cancel')}
                   </button>
                   <button type="button" className="btn btn--danger" onClick={() => setConfirming(true)}>
-                    I understand, continue
+                    {t('Disable2faDialog.understandContinue')}
                   </button>
                 </div>
               ) : (
@@ -70,17 +69,17 @@ export function Disable2faDialog({ onClose, onDone }: Disable2faDialogProps) {
                     style={{ width: '100%' }}
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Current password"
+                    placeholder={t('Disable2faDialog.currentPasswordPlaceholder')}
                     autoComplete="current-password"
                     autoFocus
                   />
                   {error && <div className="status-note status-note--error">{error}</div>}
                   <div className="dialog__actions">
                     <button type="button" className="btn" disabled={running} onClick={onClose}>
-                      Cancel
+                      {t('Disable2faDialog.cancel')}
                     </button>
                     <button type="button" className="btn btn--danger" disabled={running || !currentPassword} onClick={handleConfirm}>
-                      {running ? 'Disabling…' : 'Disable Two-Factor'}
+                      {running ? t('Disable2faDialog.disabling') : t('Disable2faDialog.disableTwoFactor')}
                     </button>
                   </div>
                 </>
@@ -90,7 +89,7 @@ export function Disable2faDialog({ onClose, onDone }: Disable2faDialogProps) {
           {done && (
             <div className="dialog__actions">
               <button type="button" className="btn" onClick={onClose}>
-                Close
+                {t('Disable2faDialog.closeButton')}
               </button>
             </div>
           )}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { GroupInput } from '../../types/usersApi';
 
 interface AddGroupModalProps {
@@ -10,15 +11,16 @@ interface AddGroupModalProps {
 const GROUP_NAME_RE = /^[a-z_][a-z0-9_-]{0,31}$/;
 
 export function AddGroupModal({ existingGroupNames, onCancel, onSubmit }: AddGroupModalProps) {
+  const { t } = useTranslation('users');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const validate = (): string | null => {
     if (!GROUP_NAME_RE.test(name)) {
-      return 'Group name must be lowercase letters, numbers, dash, underscore - starting with a letter or underscore.';
+      return t('AddGroupModal.invalidName');
     }
-    if (existingGroupNames.includes(name)) return `Group "${name}" already exists.`;
+    if (existingGroupNames.includes(name)) return t('AddGroupModal.alreadyExists', { name });
     return null;
   };
 
@@ -34,7 +36,7 @@ export function AddGroupModal({ existingGroupNames, onCancel, onSubmit }: AddGro
     setError(null);
     const ok = await onSubmit({ name });
     setSubmitting(false);
-    if (!ok) setError('Request failed - see the page error banner for details.');
+    if (!ok) setError(t('AddGroupModal.requestFailed'));
   };
 
   return (
@@ -42,35 +44,35 @@ export function AddGroupModal({ existingGroupNames, onCancel, onSubmit }: AddGro
       <div className="detail-overlay" onClick={onCancel} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Add Group</div>
-          <button type="button" className="detail-panel__close" onClick={onCancel} aria-label="Close">
+          <div className="dialog__title">{t('AddGroupModal.title')}</div>
+          <button type="button" className="detail-panel__close" onClick={onCancel} aria-label={t('AddGroupModal.close')}>
             &#10005;
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="dialog__body">
           <label className="form-field">
-            <span className="form-field__label">Group name</span>
+            <span className="form-field__label">{t('AddGroupModal.groupNameLabel')}</span>
             <input
               className="history-input"
               style={{ width: '100%' }}
               value={name}
               onChange={(e) => setName(e.target.value.toLowerCase())}
-              placeholder="media-users"
+              placeholder={t('AddGroupModal.groupNamePlaceholder')}
               autoFocus
             />
           </label>
 
-          <div className="status-note">Share access and members can be set from the group's page after it's created.</div>
+          <div className="status-note">{t('AddGroupModal.helpNote')}</div>
 
           {error && <div className="status-note status-note--error">{error}</div>}
 
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onCancel}>
-              Cancel
+              {t('AddGroupModal.cancel')}
             </button>
             <button type="submit" className="btn--primary" disabled={submitting}>
-              {submitting ? 'Creating…' : 'Create Group'}
+              {submitting ? t('AddGroupModal.creating') : t('AddGroupModal.createGroup')}
             </button>
           </div>
         </form>

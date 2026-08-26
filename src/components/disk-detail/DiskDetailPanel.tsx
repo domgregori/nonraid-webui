@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { nmdApi } from '../../api/nmdApi';
 import { useDiskSmart } from '../../hooks/useDiskSmart';
 import { deriveDisks } from '../../selectors/disks';
@@ -13,15 +14,16 @@ import { ShrinkArrayDialog } from './ShrinkArrayDialog';
 import { SmartOverviewRows } from './SmartOverviewRows';
 import type { SelfTestType } from '../../types/smart';
 
-const SELF_TEST_LABELS: Record<SelfTestType, string> = { short: 'Short Test', long: 'Long Test', conveyance: 'Conveyance Test' };
-
 type SmartTab = 'overview' | 'attributes' | 'capabilities';
 
-function boolLabel(v: boolean | null): string {
-  return v === null ? '-' : v ? 'Yes' : 'No';
-}
-
 export function DiskDetailPanel() {
+  const { t } = useTranslation('diskDetail');
+  const boolLabel = (v: boolean | null): string => (v === null ? '-' : v ? t('DiskDetailPanel.yes') : t('DiskDetailPanel.no'));
+  const SELF_TEST_LABELS: Record<SelfTestType, string> = {
+    short: t('DiskDetailPanel.shortTest'),
+    long: t('DiskDetailPanel.longTest'),
+    conveyance: t('DiskDetailPanel.conveyanceTest'),
+  };
   const {
     status,
     temps,
@@ -98,7 +100,7 @@ export function DiskDetailPanel() {
       if (/already has a filesystem/i.test(message)) {
         try {
           await nmdApi.formatDisk(disk.slot, true);
-          setFormatWarning(`Detected an existing ${disk.fsType} filesystem on this disk - formatted over it anyway.`);
+          setFormatWarning(t('DiskDetailPanel.formatWarning', { fsType: disk.fsType }));
         } catch (err2) {
           setFormatError((err2 as Error).message);
         }
@@ -152,7 +154,7 @@ export function DiskDetailPanel() {
       <div className="detail-panel">
         <div className="detail-panel__head">
           <div className="detail-panel__title">{disk.label}</div>
-          <button type="button" className="detail-panel__close" onClick={closeDetail} aria-label="Close">
+          <button type="button" className="detail-panel__close" onClick={closeDetail} aria-label={t('DiskDetailPanel.close')}>
             &#10005;
           </button>
         </div>
@@ -166,34 +168,34 @@ export function DiskDetailPanel() {
 
         <div className="detail-panel__body">
           <div className="detail-card">
-            <div className="eyebrow">Info</div>
+            <div className="eyebrow">{t('DiskDetailPanel.info')}</div>
             <div className="detail-rows">
               <div className="detail-row">
-                <span className="detail-row__label">Slot</span>
+                <span className="detail-row__label">{t('DiskDetailPanel.slot')}</span>
                 <span className="detail-row__value">{disk.slot}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Device</span>
+                <span className="detail-row__label">{t('DiskDetailPanel.device')}</span>
                 <span className="detail-row__value">{disk.device}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Size</span>
+                <span className="detail-row__label">{t('DiskDetailPanel.size')}</span>
                 <span className="detail-row__value">{disk.sizeLabel}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Used</span>
+                <span className="detail-row__label">{t('DiskDetailPanel.used')}</span>
                 <span className="detail-row__value">{disk.usedLabel}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Filesystem</span>
+                <span className="detail-row__label">{t('DiskDetailPanel.filesystem')}</span>
                 <span className="detail-row__value">{disk.fsType}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Mountpoint</span>
+                <span className="detail-row__label">{t('DiskDetailPanel.mountpoint')}</span>
                 <span className="detail-row__value">{disk.mountpoint}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Temperature</span>
+                <span className="detail-row__label">{t('DiskDetailPanel.temperature')}</span>
                 <span className="detail-row__value" style={{ color: disk.tempColor }}>
                   {disk.tempLabel}
                 </span>
@@ -203,11 +205,11 @@ export function DiskDetailPanel() {
 
           {smartSlot !== null && (
             <div className="detail-card">
-              <div className="eyebrow">SMART</div>
+              <div className="eyebrow">{t('DiskDetailPanel.smart')}</div>
 
-              {smartStatus === 'loading' && <div className="status-note">Loading SMART data…</div>}
+              {smartStatus === 'loading' && <div className="status-note">{t('DiskDetailPanel.loadingSmart')}</div>}
               {smartError && <div className="status-note status-note--error">{smartError}</div>}
-              {smartStatus === 'ready' && !attributes && <div className="status-note">No SMART data available for this disk.</div>}
+              {smartStatus === 'ready' && !attributes && <div className="status-note">{t('DiskDetailPanel.noSmartData')}</div>}
 
               {attributes && (
                 <>
@@ -219,7 +221,7 @@ export function DiskDetailPanel() {
                       className={`smart-tabs__btn${smartTab === tab ? ' smart-tabs__btn--active' : ''}`}
                       onClick={() => setSmartTab(tab)}
                     >
-                      {tab === 'overview' ? 'Overview' : tab === 'attributes' ? 'Attributes' : 'Capabilities'}
+                      {tab === 'overview' ? t('DiskDetailPanel.overview') : tab === 'attributes' ? t('DiskDetailPanel.attributes') : t('DiskDetailPanel.capabilities')}
                     </button>
                   ))}
                 </div>
@@ -230,11 +232,11 @@ export function DiskDetailPanel() {
 
                     <div className="smart-selftest">
                       <div className="smart-selftest__head">
-                        <span className="detail-row__label">Self-Test</span>
+                        <span className="detail-row__label">{t('DiskDetailPanel.selfTest')}</span>
                         <span className="detail-row__value">
                           {attributes.selfTest.state === 'running'
-                            ? `${attributes.selfTest.type ?? 'test'} · ${attributes.selfTest.progressPct ?? 0}%`
-                            : (attributes.selfTest.statusText ?? 'Idle')}
+                            ? `${attributes.selfTest.type ?? t('DiskDetailPanel.testFallback')} · ${attributes.selfTest.progressPct ?? 0}%`
+                            : (attributes.selfTest.statusText ?? t('DiskDetailPanel.idle'))}
                         </span>
                       </div>
                       {attributes.selfTest.state === 'running' && (
@@ -259,7 +261,7 @@ export function DiskDetailPanel() {
 
                     {attributes.selfTestHistory.length > 0 && (
                       <div className="smart-history">
-                        <div className="detail-row__label">Recent Self-Tests</div>
+                        <div className="detail-row__label">{t('DiskDetailPanel.recentSelfTests')}</div>
                         {attributes.selfTestHistory.map((entry, i) => (
                           <div className="smart-history__row" key={i}>
                             <span>{entry.type}</span>
@@ -274,19 +276,19 @@ export function DiskDetailPanel() {
 
                 {smartTab === 'attributes' && (
                   <div className="smart-attr-table">
-                    {attributes.rawAttributes.length === 0 && <div className="status-note">No raw attribute table for this disk.</div>}
+                    {attributes.rawAttributes.length === 0 && <div className="status-note">{t('DiskDetailPanel.noRawAttributes')}</div>}
                     {attributes.rawAttributes.length > 0 && (
                       <div className="smart-attr-table__scroll">
                         <table>
                           <thead>
                             <tr>
-                              <th>#</th>
-                              <th>Attribute</th>
-                              <th>Value</th>
-                              <th>Worst</th>
-                              <th>Thresh</th>
-                              <th>Type</th>
-                              <th>Raw</th>
+                              <th>{t('DiskDetailPanel.colId')}</th>
+                              <th>{t('DiskDetailPanel.colAttribute')}</th>
+                              <th>{t('DiskDetailPanel.colValue')}</th>
+                              <th>{t('DiskDetailPanel.colWorst')}</th>
+                              <th>{t('DiskDetailPanel.colThresh')}</th>
+                              <th>{t('DiskDetailPanel.colType')}</th>
+                              <th>{t('DiskDetailPanel.colRaw')}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -311,11 +313,11 @@ export function DiskDetailPanel() {
                 {smartTab === 'capabilities' && (
                   <div className="detail-rows">
                     <div className="detail-row">
-                      <span className="detail-row__label">Offline Data Collection</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.offlineDataCollection')}</span>
                       <span className="detail-row__value">{attributes.capabilitiesInfo.offlineDataCollectionStatus ?? '-'}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">Offline Collection Time</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.offlineCollectionTime')}</span>
                       <span className="detail-row__value">
                         {attributes.capabilitiesInfo.offlineDataCollectionSeconds != null
                           ? `${attributes.capabilitiesInfo.offlineDataCollectionSeconds}s`
@@ -323,11 +325,11 @@ export function DiskDetailPanel() {
                       </span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">Last Self-Test Result</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.lastSelfTestResult')}</span>
                       <span className="detail-row__value">{attributes.capabilitiesInfo.selfTestExecutionStatus ?? '-'}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">Short Test Polling</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.shortTestPolling')}</span>
                       <span className="detail-row__value">
                         {attributes.capabilitiesInfo.shortSelfTestPollingMinutes != null
                           ? `${attributes.capabilitiesInfo.shortSelfTestPollingMinutes} min`
@@ -335,7 +337,7 @@ export function DiskDetailPanel() {
                       </span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">Extended Test Polling</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.extendedTestPolling')}</span>
                       <span className="detail-row__value">
                         {attributes.capabilitiesInfo.extendedSelfTestPollingMinutes != null
                           ? `${attributes.capabilitiesInfo.extendedSelfTestPollingMinutes} min`
@@ -343,35 +345,35 @@ export function DiskDetailPanel() {
                       </span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">Self-Test Supported</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.selfTestSupported')}</span>
                       <span className="detail-row__value">{boolLabel(attributes.capabilitiesInfo.selfTestSupported)}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">Conveyance Supported</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.conveyanceSupported')}</span>
                       <span className="detail-row__value">{boolLabel(attributes.capabilitiesInfo.conveyanceSelfTestSupported)}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">Selective Self-Test</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.selectiveSelfTest')}</span>
                       <span className="detail-row__value">{boolLabel(attributes.capabilitiesInfo.selectiveSelfTestSupported)}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">Offline Surface Scan</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.offlineSurfaceScan')}</span>
                       <span className="detail-row__value">{boolLabel(attributes.capabilitiesInfo.offlineSurfaceScanSupported)}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">Attribute Autosave</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.attributeAutosave')}</span>
                       <span className="detail-row__value">{boolLabel(attributes.capabilitiesInfo.attributeAutosaveEnabled)}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">Error Logging</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.errorLogging')}</span>
                       <span className="detail-row__value">{boolLabel(attributes.capabilitiesInfo.errorLoggingSupported)}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">General Purpose Logging</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.generalPurposeLogging')}</span>
                       <span className="detail-row__value">{boolLabel(attributes.capabilitiesInfo.generalPurposeLoggingSupported)}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">SCT Status</span>
+                      <span className="detail-row__label">{t('DiskDetailPanel.sctStatus')}</span>
                       <span className="detail-row__value">{boolLabel(attributes.capabilitiesInfo.sctStatusSupported)}</span>
                     </div>
                   </div>
@@ -391,17 +393,16 @@ export function DiskDetailPanel() {
 
         {isRestorable && (
           <div className="status-note status-note--error">
-            This disk was unassigned but the array hasn't been started since - the change isn't committed yet and
-            this disk's identity is still intact.
+            {t('DiskDetailPanel.restorableNotice')}
             <div className="detail-actions">
               <button
                 type="button"
                 className="btn btn--block"
                 disabled={restorePending}
                 onClick={() => restoreDisk(disk.slot)}
-                title="Cancels the pending unassign and puts this disk back exactly as it was - the array hasn't started since, so nothing was actually committed yet."
+                title={t('DiskDetailPanel.restoreTitle')}
               >
-                {restorePending ? 'Restoring…' : 'Restore This Disk'}
+                {restorePending ? t('DiskDetailPanel.restoring') : t('DiskDetailPanel.restoreThisDisk')}
               </button>
             </div>
           </div>
@@ -409,17 +410,15 @@ export function DiskDetailPanel() {
 
         {isDroppable && (
           <div className="status-note status-note--error">
-            This disk is permanently disabled and no longer part of the array - it still shows up here and counts
-            toward DEGRADED because this driver keeps removed slots as placeholders rather than shrinking the array
-            automatically. Reconfiguring drops it from the topology for good, at the cost of a full parity rebuild.
+            {t('DiskDetailPanel.droppableNotice')}
             <div className="detail-actions">
               <button
                 type="button"
                 className="btn btn--block btn--danger"
                 onClick={() => setShowShrinkDialog(true)}
-                title="Permanently drops this slot from the array topology and rebuilds parity to match - there's no undo."
+                title={t('DiskDetailPanel.reconfigureTitle')}
               >
-                Reconfigure Array Without This Disk
+                {t('DiskDetailPanel.reconfigureButton')}
               </button>
             </div>
           </div>
@@ -433,9 +432,9 @@ export function DiskDetailPanel() {
                 className="btn btn--block"
                 disabled={formatPending}
                 onClick={handleFormat}
-                title="Creates a fresh XFS filesystem on this disk so it can join the array."
+                title={t('DiskDetailPanel.formatDiskTitle')}
               >
-                {formatPending ? 'Formatting…' : 'Format Disk (XFS)'}
+                {formatPending ? t('DiskDetailPanel.formatting') : t('DiskDetailPanel.formatDiskXfs')}
               </button>
             </>
           )}
@@ -446,9 +445,9 @@ export function DiskDetailPanel() {
                 className="btn btn--block"
                 disabled={mountPending}
                 onClick={handleMount}
-                title={`Makes this disk's existing filesystem accessible at /mnt/disk${disk.slot}.`}
+                title={t('DiskDetailPanel.mountDiskTitle', { slot: disk.slot })}
               >
-                {mountPending ? 'Mounting…' : 'Mount Disk'}
+                {mountPending ? t('DiskDetailPanel.mounting') : t('DiskDetailPanel.mountDisk')}
               </button>
               {mountError && <div className="status-note status-note--error">{mountError}</div>}
             </>
@@ -459,9 +458,9 @@ export function DiskDetailPanel() {
               className="btn btn--block btn--danger"
               disabled={formatPending}
               onClick={handleFormat}
-              title="Wipes this disk's existing (non-array) filesystem and formats it as XFS - destroys everything on it, with no undo."
+              title={t('DiskDetailPanel.forceFormatTitle')}
             >
-              {formatPending ? 'Formatting…' : 'Force Format'}
+              {formatPending ? t('DiskDetailPanel.formatting') : t('DiskDetailPanel.forceFormat')}
             </button>
           )}
           {(formatError || formatWarning) && (
@@ -472,9 +471,9 @@ export function DiskDetailPanel() {
               type="button"
               className="btn btn--block"
               onClick={() => setShowEmptyDialog(true)}
-              title="Moves this disk's share files onto other array disks, then offers to remove it from the array once it's empty."
+              title={t('DiskDetailPanel.emptyDiskTitle')}
             >
-              Empty Disk
+              {t('DiskDetailPanel.emptyDisk')}
             </button>
           )}
           {disk.isSSD === false && disk.status === 'active' && (
@@ -485,9 +484,9 @@ export function DiskDetailPanel() {
                   className="btn btn--block"
                   disabled={spinPending}
                   onClick={handleSpinUp}
-                  title="Wakes this disk from standby."
+                  title={t('DiskDetailPanel.spinUpTitle')}
                 >
-                  {spinPending ? 'Spinning up…' : 'Spin Up'}
+                  {spinPending ? t('DiskDetailPanel.spinningUp') : t('DiskDetailPanel.spinUp')}
                 </button>
               ) : (
                 <button
@@ -495,9 +494,9 @@ export function DiskDetailPanel() {
                   className="btn btn--block"
                   disabled={spinPending || status.resync.active}
                   onClick={handleSpinDown}
-                  title="Spins this disk down to save power while it's idle."
+                  title={t('DiskDetailPanel.spinDownTitle')}
                 >
-                  {spinPending ? 'Spinning down…' : 'Spin Down'}
+                  {spinPending ? t('DiskDetailPanel.spinningDown') : t('DiskDetailPanel.spinDown')}
                 </button>
               )}
               {spinError && <div className="status-note status-note--error">{spinError}</div>}
@@ -507,18 +506,18 @@ export function DiskDetailPanel() {
             type="button"
             className="btn btn--block"
             onClick={() => setShowReplaceDialog(true)}
-            title="Swaps in a genuinely different physical disk for this slot - the array rebuilds this disk's data from parity onto the new one."
+            title={t('DiskDetailPanel.replaceDiskTitle')}
           >
-            Replace Disk
+            {t('DiskDetailPanel.replaceDisk')}
           </button>
           <button
             type="button"
             className="btn btn--block btn--danger"
             disabled={unassignPending || isRestorable}
             onClick={() => unassignDisk(disk.slot)}
-            title="Removes this disk from the array. Its data is emulated from parity until you add a replacement, which then rebuilds it back."
+            title={t('DiskDetailPanel.unassignDiskTitle')}
           >
-            {unassignPending ? 'Unassigning…' : 'Unassign Disk'}
+            {unassignPending ? t('DiskDetailPanel.unassigning') : t('DiskDetailPanel.unassignDisk')}
           </button>
         </div>
 

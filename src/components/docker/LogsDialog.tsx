@@ -1,5 +1,6 @@
 import { AnsiUp } from 'ansi_up';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { dockerApi } from '../../api/dockerApi';
 
 interface LogsDialogProps {
@@ -24,6 +25,7 @@ function isNearBottom(el: HTMLElement): boolean {
 }
 
 export function LogsDialog({ containerId, containerName, onClose }: LogsDialogProps) {
+  const { t } = useTranslation('docker');
   const [logs, setLogs] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -103,8 +105,8 @@ export function LogsDialog({ containerId, containerName, onClose }: LogsDialogPr
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog docker-logs-dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Logs: {containerName}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('LogsDialog.titlePrefix', { name: containerName })}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('LogsDialog.close')}>
             &#10005;
           </button>
         </div>
@@ -114,17 +116,17 @@ export function LogsDialog({ containerId, containerName, onClose }: LogsDialogPr
             <select className="history-input" value={tail} disabled={live} onChange={(e) => setTail(Number(e.target.value))}>
               {TAIL_OPTIONS.map((n) => (
                 <option key={n} value={n}>
-                  Last {n} lines
+                  {t('LogsDialog.lastLines', { count: n })}
                 </option>
               ))}
             </select>
             <button type="button" className="btn" disabled={loading} onClick={load}>
-              {loading ? 'Loading…' : 'Refresh'}
+              {loading ? t('LogsDialog.loading') : t('LogsDialog.refresh')}
             </button>
             <label className="docker-logs-live-toggle">
               <input type="checkbox" checked={live} disabled={logs === null} onChange={(e) => setLive(e.target.checked)} />
               {live && <span className="status-dot" style={{ background: 'var(--color-green)', width: 6, height: 6 }} />}
-              Live
+              {t('LogsDialog.live')}
             </label>
           </div>
 
@@ -134,7 +136,7 @@ export function LogsDialog({ containerId, containerName, onClose }: LogsDialogPr
             <pre
               className="docker-logs-output"
               ref={logRef}
-              dangerouslySetInnerHTML={{ __html: logs ? ansiUp.ansi_to_html(logs) : 'No log output.' }}
+              dangerouslySetInnerHTML={{ __html: logs ? ansiUp.ansi_to_html(logs) : t('LogsDialog.noLogOutput') }}
             />
           )}
         </div>

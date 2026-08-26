@@ -1,4 +1,5 @@
 import type { RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { PullLogLine } from '../../hooks/useInstallProgress';
 import type { CreateContainerProgress } from '../../types/dockerApi';
 
@@ -9,9 +10,10 @@ interface InstallProgressProps {
 }
 
 export function InstallProgress({ progress, log, logRef }: InstallProgressProps) {
+  const { t } = useTranslation('docker');
   return (
     <div className="apps-install-progress">
-      <div className="apps-install-progress__status">{progress?.message ?? 'Starting…'}</div>
+      <div className="apps-install-progress__status">{progress?.message ?? t('InstallProgress.starting')}</div>
       <div className="apps-install-progress__bar">
         <div
           className={`apps-install-progress__bar-fill${progress?.percent == null ? ' apps-install-progress__bar-fill--indeterminate' : ''}`}

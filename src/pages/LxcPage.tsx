@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CreateLxcDialog } from '../components/lxc/CreateLxcDialog';
 import { DistroIcon } from '../components/lxc/DistroIcon';
 import { EditLxcConfigDialog } from '../components/lxc/EditLxcConfigDialog';
@@ -9,6 +10,7 @@ import { deriveLxcContainerViewModel } from '../selectors/lxcContainers';
 type DialogState = { mode: 'add' } | { mode: 'edit'; name: string } | { mode: 'snapshots'; name: string } | null;
 
 export function LxcPage() {
+  const { t } = useTranslation('pages');
   const { containers, status, error, pendingNames, start, stop, restart, destroy, setAutostart, refresh } = useLxcContainers();
   const [dialog, setDialog] = useState<DialogState>(null);
   const [confirmingDestroy, setConfirmingDestroy] = useState<string | null>(null);
@@ -37,13 +39,13 @@ export function LxcPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <div className="page-title">LXC Containers</div>
+        <div className="page-title">{t('LxcPage.title')}</div>
         <button type="button" className="btn--primary" onClick={() => setDialog({ mode: 'add' })}>
-          Add Container
+          {t('LxcPage.addContainer')}
         </button>
       </div>
 
-      {status === 'loading' && <div className="status-note">Loading containers…</div>}
+      {status === 'loading' && <div className="status-note">{t('LxcPage.loadingContainers')}</div>}
       {error && <div className="status-note status-note--error">{error}</div>}
 
       <div className="docker-grid">
@@ -63,19 +65,19 @@ export function LxcPage() {
             <div className="docker-card__autostart-row">
               <label className="docker-card__autostart">
                 <input type="checkbox" checked={c.autostart} disabled={c.isPending} onChange={c.onToggleAutostart} />
-                Autostart
+                {t('LxcPage.autostart')}
               </label>
             </div>
             {c.webUiUrl && (
               <div className="docker-card__badges">
                 <a className="docker-card__weburl" href={c.webUiUrl.replace('[IP]', window.location.hostname)} target="_blank" rel="noreferrer">
-                  Web UI &#8599;
+                  {t('LxcPage.webUi')} &#8599;
                 </a>
               </div>
             )}
             <div className="docker-card__stats">
-              <span>CPU {c.cpuLabel}</span>
-              <span>Mem {c.memLabel}</span>
+              <span>{t('LxcPage.cpuLabel')} {c.cpuLabel}</span>
+              <span>{t('LxcPage.memLabel')} {c.memLabel}</span>
               <span>{c.ips}</span>
             </div>
             <div className="docker-card__actions">
@@ -89,23 +91,23 @@ export function LxcPage() {
                 {c.toggleLabel}
               </button>
               <button type="button" className="btn" disabled={c.isPending} onClick={c.onRestart}>
-                Restart
+                {t('LxcPage.restart')}
               </button>
             </div>
             <div className="docker-card__actions">
               <button type="button" className="btn" disabled={c.isPending} onClick={c.onEdit}>
-                Edit
+                {t('LxcPage.edit')}
               </button>
               <button type="button" className="btn" disabled={c.isPending} onClick={c.onSnapshots}>
-                Snapshots
+                {t('LxcPage.snapshots')}
               </button>
               <button type="button" className="btn btn--danger" disabled={c.isPending} onClick={c.onDestroy}>
-                {confirmingDestroy === c.name ? 'Confirm?' : 'Destroy'}
+                {confirmingDestroy === c.name ? t('LxcPage.confirmQuestion') : t('LxcPage.destroy')}
               </button>
             </div>
           </div>
         ))}
-        {status === 'ready' && views.length === 0 && <div className="status-note">No LXC containers yet.</div>}
+        {status === 'ready' && views.length === 0 && <div className="status-note">{t('LxcPage.noContainers')}</div>}
       </div>
 
       {dialog?.mode === 'add' && <CreateLxcDialog onClose={() => setDialog(null)} onDone={refresh} />}

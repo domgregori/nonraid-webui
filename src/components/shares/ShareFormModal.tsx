@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useCacheStatus } from '../../hooks/useCacheStatus';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import type { AllocationMethod, Share, ShareInput } from '../../types/sharesApi';
@@ -11,36 +12,36 @@ interface ShareFormModalProps {
   onSubmit: (input: ShareInput) => Promise<boolean>;
 }
 
-const ALLOCATION_OPTIONS: { value: AllocationMethod; label: string; description: string }[] = [
+const ALLOCATION_OPTIONS: { value: AllocationMethod; labelKey: string; descriptionKey: string }[] = [
   {
     value: 'most-free',
-    label: 'Most-free',
-    description: 'Writes new files to whichever disk currently has the most free space - keeps usage balanced across all disks over time.',
+    labelKey: 'ShareFormModal.allocation.mostFreeLabel',
+    descriptionKey: 'ShareFormModal.allocation.mostFreeDesc',
   },
   {
     value: 'fill-up',
-    label: 'Fill-up',
-    description: 'Fills disks in order - writes go to the first disk (in disk order) with room until it’s full, then moves on to the next.',
+    labelKey: 'ShareFormModal.allocation.fillUpLabel',
+    descriptionKey: 'ShareFormModal.allocation.fillUpDesc',
   },
   {
     value: 'high-water',
-    label: 'High-water',
-    description:
-      'Keeps files under the same path together on one disk when possible, otherwise picks the disk with the most free space. An approximation of the classic High-Water allocation policy, not an exact match.',
+    labelKey: 'ShareFormModal.allocation.highWaterLabel',
+    descriptionKey: 'ShareFormModal.allocation.highWaterDesc',
   },
   {
     value: 'single-disk',
-    label: 'Single disk',
-    description: 'Pins this pool to exactly one disk - no spreading files across drives.',
+    labelKey: 'ShareFormModal.allocation.singleDiskLabel',
+    descriptionKey: 'ShareFormModal.allocation.singleDiskDesc',
   },
   {
     value: 'cache-only',
-    label: 'Cache only',
-    description: 'Lives entirely on the cache disks - no array disk is used, and the mover never touches it.',
+    labelKey: 'ShareFormModal.allocation.cacheOnlyLabel',
+    descriptionKey: 'ShareFormModal.allocation.cacheOnlyDesc',
   },
 ];
 
 export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: ShareFormModalProps) {
+  const { t } = useTranslation('shares');
   const { status } = useArrayStatus();
   // A cache pool must actually be set up (fsUuid persisted, even if currently degraded) before
   // "Cache only" can be picked at all - configuring a share that can never mount is worse than
@@ -100,13 +101,13 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
   };
 
   const validate = (): string | null => {
-    if (!/^[a-zA-Z0-9_-]{1,32}$/.test(name)) return 'Name must be 1-32 characters: letters, numbers, dash, underscore.';
-    if (!isEdit && existingNames.includes(name)) return `Pool "${name}" already exists.`;
+    if (!/^[a-zA-Z0-9_-]{1,32}$/.test(name)) return t('ShareFormModal.errors.invalidName');
+    if (!isEdit && existingNames.includes(name)) return t('ShareFormModal.errors.nameExists', { name });
     if (allocationMethod === 'cache-only') {
-      if (!cacheConfigured) return 'Set up a cache pool on the Disks page before creating a cache-only pool.';
+      if (!cacheConfigured) return t('ShareFormModal.errors.cacheNotConfigured');
     } else {
-      if (disks.length === 0) return 'Select at least one disk.';
-      if (allocationMethod === 'single-disk' && disks.length !== 1) return 'Single-disk allocation requires exactly one disk.';
+      if (disks.length === 0) return t('ShareFormModal.errors.selectDisk');
+      if (allocationMethod === 'single-disk' && disks.length !== 1) return t('ShareFormModal.errors.singleDiskOnly');
     }
     return null;
   };
@@ -136,7 +137,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
     setError(null);
     const ok = await onSubmit(input);
     setSubmitting(false);
-    if (!ok) setError('Request failed - see the page error banner for details.');
+    if (!ok) setError(t('ShareFormModal.requestFailed'));
   };
 
   return (
@@ -144,47 +145,47 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
       <div className="detail-overlay" onClick={onCancel} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">{isEdit ? `Edit ${initial.name}` : 'Add Pool'}</div>
-          <button type="button" className="detail-panel__close" onClick={onCancel} aria-label="Close">
+          <div className="dialog__title">{isEdit ? t('ShareFormModal.editTitle', { name: initial.name }) : t('ShareFormModal.addTitle')}</div>
+          <button type="button" className="detail-panel__close" onClick={onCancel} aria-label={t('ShareFormModal.close')}>
             &#10005;
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="dialog__body">
           <label className="form-field">
-            <span className="form-field__label">Name</span>
-            <input className="history-input" style={{ width: '100%' }} value={name} onChange={(e) => setName(e.target.value)} placeholder="media" />
+            <span className="form-field__label">{t('ShareFormModal.nameLabel')}</span>
+            <input className="history-input" style={{ width: '100%' }} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('ShareFormModal.namePlaceholder')} />
           </label>
 
           <label className="form-field">
-            <span className="form-field__label">Description (optional)</span>
+            <span className="form-field__label">{t('ShareFormModal.descriptionLabel')}</span>
             <input
               className="history-input"
               style={{ width: '100%' }}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What's this pool for?"
+              placeholder={t('ShareFormModal.descriptionPlaceholder')}
               maxLength={200}
             />
           </label>
 
           {allocationMethod === 'cache-only' ? (
-            <div className="status-note">This pool lives entirely on the cache disks - no array disk is used, and the mover never touches it.</div>
+            <div className="status-note">{t('ShareFormModal.cacheOnlyNote')}</div>
           ) : (
             <div className="form-field">
               <div className="toggle-row" style={{ padding: 0 }}>
                 <div>
-                  <div className="toggle-row__title">Use all drives</div>
+                  <div className="toggle-row__title">{t('ShareFormModal.useAllDrivesTitle')}</div>
                   <div className="toggle-row__desc">
                     {useAllDisks
-                      ? `Using all ${allDiskSlots.length} data disk(s) - new disks are added automatically`
-                      : 'Choose specific disks below'}
+                      ? t('ShareFormModal.useAllDrivesDescOn', { count: allDiskSlots.length })
+                      : t('ShareFormModal.useAllDrivesDescOff')}
                   </div>
                 </div>
                 <ToggleSwitch
                   on={useAllDisks}
                   onToggle={() => setUseAllDisks((prev) => !prev)}
-                  label="Use all drives"
+                  label={t('ShareFormModal.useAllDrivesTitle')}
                   disabled={allocationMethod === 'single-disk'}
                 />
               </div>
@@ -198,27 +199,27 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
                         checked={disks.includes(d.slot)}
                         onChange={() => toggleDisk(d.slot)}
                       />
-                      Disk {d.slot}
+                      {t('ShareFormModal.diskLabel', { slot: d.slot })}
                     </label>
                   ))}
-                  {dataDisks.length === 0 && <span className="status-note">No data disks reported by the array right now.</span>}
+                  {dataDisks.length === 0 && <span className="status-note">{t('ShareFormModal.noDataDisks')}</span>}
                 </div>
               )}
             </div>
           )}
 
           <label className="form-field">
-            <span className="form-field__label">Allocation method</span>
+            <span className="form-field__label">{t('ShareFormModal.allocationMethodLabel')}</span>
             <select
               className="history-input"
               style={{ width: '100%' }}
               value={allocationMethod}
               onChange={(e) => handleAllocationChange(e.target.value as AllocationMethod)}
-              title={ALLOCATION_OPTIONS.find((opt) => opt.value === allocationMethod)?.description}
+              title={ALLOCATION_OPTIONS.find((opt) => opt.value === allocationMethod) && t(ALLOCATION_OPTIONS.find((opt) => opt.value === allocationMethod)!.descriptionKey)}
             >
               {ALLOCATION_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value} disabled={opt.value === 'cache-only' && !cacheConfigured} title={opt.description}>
-                  {opt.value === 'cache-only' && !cacheConfigured ? `${opt.label} (set up a cache pool first)` : opt.label}
+                <option key={opt.value} value={opt.value} disabled={opt.value === 'cache-only' && !cacheConfigured} title={t(opt.descriptionKey)}>
+                  {opt.value === 'cache-only' && !cacheConfigured ? t('ShareFormModal.allocation.cacheOnlyLabelDisabled', { label: t(opt.labelKey) }) : t(opt.labelKey)}
                 </option>
               ))}
             </select>
@@ -226,8 +227,7 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
 
           {!isEdit && (
             <div className="status-note">
-              Not shared anywhere yet - turn on SMB or NFS access for this pool from the Sharing tab once it's
-              created.
+              {t('ShareFormModal.notSharedYetNote')}
             </div>
           )}
 
@@ -235,10 +235,10 @@ export function ShareFormModal({ initial, existingNames, onCancel, onSubmit }: S
 
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onCancel}>
-              Cancel
+              {t('ShareFormModal.cancel')}
             </button>
             <button type="submit" className="btn--primary" disabled={submitting}>
-              {submitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Pool'}
+              {submitting ? t('ShareFormModal.saving') : isEdit ? t('ShareFormModal.saveChanges') : t('ShareFormModal.createPool')}
             </button>
           </div>
         </form>

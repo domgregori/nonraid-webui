@@ -1,0 +1,10 @@
+{
+  "ActivityHistoryDialog": {
+    "title": "Activity History",
+    "close": "Close",
+    "lastNEvents": "Last {{count}} events",
+    "loading": "Loading…",
+    "refresh": "Refresh",
+    "nothingYet": "Nothing yet."
+  }
+}

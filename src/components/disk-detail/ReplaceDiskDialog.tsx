@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { nmdApi } from '../../api/nmdApi';
 import { useAvailableDevices } from '../../hooks/useAvailableDevices';
 import type { AddDiskResult } from '../../types/nmdApi';
@@ -23,6 +24,7 @@ type Step = 'confirm' | 'select' | 'result';
  * committing (see the "restore" banner on the detail panel for that case).
  */
 export function ReplaceDiskDialog({ slot, label, onClose, onDone }: ReplaceDiskDialogProps) {
+  const { t } = useTranslation('diskDetail');
   const [step, setStep] = useState<Step>('confirm');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,8 +51,8 @@ export function ReplaceDiskDialog({ slot, label, onClose, onDone }: ReplaceDiskD
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Replace {label} (slot {slot})</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('ReplaceDiskDialog.title', { label, slot })}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('ReplaceDiskDialog.close')}>
             &#10005;
           </button>
         </div>
@@ -59,17 +61,14 @@ export function ReplaceDiskDialog({ slot, label, onClose, onDone }: ReplaceDiskD
           {step === 'confirm' && (
             <>
               <div className="status-note status-note--error">
-                This is for swapping in a genuinely different physical disk - not for temporarily detaching this one.
-                Once you pick a replacement disk on the next step, this slot's current identity is cleared and the
-                array runs degraded until the new disk finishes rebuilding from parity. There's no undo past that
-                point. If you just clicked here by accident, close this dialog - nothing has happened yet.
+                {t('ReplaceDiskDialog.confirmWarning')}
               </div>
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
-                  Cancel
+                  {t('ReplaceDiskDialog.cancel')}
                 </button>
                 <button type="button" className="btn--primary" onClick={() => setStep('select')}>
-                  Continue
+                  {t('ReplaceDiskDialog.continue')}
                 </button>
               </div>
             </>
@@ -79,18 +78,17 @@ export function ReplaceDiskDialog({ slot, label, onClose, onDone }: ReplaceDiskD
             <>
               <div className="disk-section-head">
                 <div className="toggle-row__desc">
-                  Physically install the replacement disk, then pick it below. Not seeing it? It may not be connected
-                  yet, or another slot still claims its identity.
+                  {t('ReplaceDiskDialog.selectDesc')}
                 </div>
                 <button type="button" className="disk-section-link disk-section-link--btn" onClick={refresh}>
-                  Refresh &#8635;
+                  {t('ReplaceDiskDialog.refresh')} &#8635;
                 </button>
               </div>
 
-              {devicesStatus === 'loading' && <div className="status-note">Scanning for devices…</div>}
+              {devicesStatus === 'loading' && <div className="status-note">{t('ReplaceDiskDialog.scanning')}</div>}
               {devicesError && <div className="status-note status-note--error">{devicesError}</div>}
               {devicesStatus === 'ready' && devices.length === 0 && (
-                <div className="status-note">No unclaimed devices found yet.</div>
+                <div className="status-note">{t('ReplaceDiskDialog.noDevices')}</div>
               )}
 
               {devices.length > 0 && (
@@ -98,15 +96,15 @@ export function ReplaceDiskDialog({ slot, label, onClose, onDone }: ReplaceDiskD
                   {devices.map((d) => (
                     <div key={d.device} className="unassigned-device-row">
                       <div>
-                        <div className="unassigned-device-row__name">{d.model ?? 'Unknown drive'}</div>
+                        <div className="unassigned-device-row__name">{d.model ?? t('ReplaceDiskDialog.unknownDrive')}</div>
                         <div className="unassigned-device-row__meta">
-                          {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : 'unknown size'}
-                          {d.uuid ? ` · ${d.uuid}` : ' · no filesystem'}
-                          {d.locked ? ' · locked' : ''}
+                          {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : t('ReplaceDiskDialog.unknownSize')}
+                          {d.uuid ? ` · ${d.uuid}` : ` · ${t('ReplaceDiskDialog.noFilesystem')}`}
+                          {d.locked ? ` · ${t('ReplaceDiskDialog.locked')}` : ''}
                         </div>
                       </div>
                       <button type="button" className="btn btn--danger" disabled={submitting} onClick={() => handleReplace(d.device)}>
-                        {submitting ? 'Replacing…' : `Replace with ${d.model ?? 'this drive'}`}
+                        {submitting ? t('ReplaceDiskDialog.replacing') : t('ReplaceDiskDialog.replaceWith', { model: d.model ?? t('ReplaceDiskDialog.thisDrive') })}
                       </button>
                     </div>
                   ))}
@@ -117,7 +115,7 @@ export function ReplaceDiskDialog({ slot, label, onClose, onDone }: ReplaceDiskD
 
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
-                  Cancel
+                  {t('ReplaceDiskDialog.cancel')}
                 </button>
               </div>
             </>
@@ -125,11 +123,11 @@ export function ReplaceDiskDialog({ slot, label, onClose, onDone }: ReplaceDiskD
 
           {step === 'result' && result && (
             <div className="import-result">
-              <div className="status-note">{result.message} Watch progress on the Parity Check card.</div>
+              <div className="status-note">{result.message} {t('ReplaceDiskDialog.watchProgress')}</div>
               <pre className="import-raw-output">{result.output}</pre>
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
-                  Close
+                  {t('ReplaceDiskDialog.close')}
                 </button>
               </div>
             </div>

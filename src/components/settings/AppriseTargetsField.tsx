@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { settingsApi } from '../../api/settingsApi';
 import { APPRISE_SERVICES, describeAppriseUrl, maskAppriseUrl } from '../../selectors/appriseServices';
 
@@ -28,6 +29,7 @@ function parseTargets(value: string): string[] {
  * this only changes how that string gets built.
  */
 export function AppriseTargetsField({ value, onChange }: AppriseTargetsFieldProps) {
+  const { t } = useTranslation('settings');
   const targets = parseTargets(value);
   const [serviceId, setServiceId] = useState(APPRISE_SERVICES[0].id);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -53,7 +55,7 @@ export function AppriseTargetsField({ value, onChange }: AppriseTargetsFieldProp
   const addTarget = () => {
     const missing = service.fields.filter((f) => f.required && !fields[f.key]?.trim());
     if (missing.length > 0) {
-      setFormError(`${missing.map((f) => f.label).join(', ')} required.`);
+      setFormError(t('AppriseTargetsField.fieldsRequired', { fields: missing.map((f) => f.label).join(', ') }));
       return;
     }
     onChange([...targets, preview].join('\n'));
@@ -65,7 +67,7 @@ export function AppriseTargetsField({ value, onChange }: AppriseTargetsFieldProp
     setRowTest({ index, pending: true, result: null });
     try {
       const result = await settingsApi.testNotification(targets[index]);
-      setRowTest({ index, pending: false, result: result.message ?? 'Sent.' });
+      setRowTest({ index, pending: false, result: result.message ?? t('AppriseTargetsField.sent') });
     } catch (err) {
       setRowTest({ index, pending: false, result: (err as Error).message });
     }
@@ -85,10 +87,10 @@ export function AppriseTargetsField({ value, onChange }: AppriseTargetsFieldProp
               </div>
               <div className="remote-row__actions">
                 <button type="button" className="btn" disabled={rowTest?.index === i && rowTest.pending} onClick={() => testTarget(i)}>
-                  {rowTest?.index === i && rowTest.pending ? 'Sending…' : 'Test'}
+                  {rowTest?.index === i && rowTest.pending ? t('AppriseTargetsField.sending') : t('AppriseTargetsField.test')}
                 </button>
                 <button type="button" className="btn btn--danger" onClick={() => removeTarget(i)}>
-                  Remove
+                  {t('AppriseTargetsField.remove')}
                 </button>
               </div>
             </div>
@@ -97,10 +99,10 @@ export function AppriseTargetsField({ value, onChange }: AppriseTargetsFieldProp
       )}
 
       <div className="add-remote-panel">
-        <div className="add-remote-panel__title">Add a notification target</div>
+        <div className="add-remote-panel__title">{t('AppriseTargetsField.addTargetTitle')}</div>
         <div className="field-grid">
           <label className="field">
-            <span>Service</span>
+            <span>{t('AppriseTargetsField.service')}</span>
             <select className="history-input" value={serviceId} onChange={(e) => selectService(e.target.value)}>
               {APPRISE_SERVICES.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -111,10 +113,12 @@ export function AppriseTargetsField({ value, onChange }: AppriseTargetsFieldProp
           </label>
           {service.secure && (
             <div className="field">
-              <span>Connection</span>
+              <span>{t('AppriseTargetsField.connection')}</span>
               <label className="apprise-secure-toggle">
                 <input type="checkbox" className="round-checkbox" checked={secure} onChange={(e) => setSecure(e.target.checked)} />
-                {secure ? `Secure (${service.secure.secureScheme}://)` : `Not secure (${service.secure.insecureScheme}://)`}
+                {secure
+                  ? t('AppriseTargetsField.secureScheme', { scheme: service.secure.secureScheme })
+                  : t('AppriseTargetsField.insecureScheme', { scheme: service.secure.insecureScheme })}
               </label>
             </div>
           )}
@@ -138,12 +142,12 @@ export function AppriseTargetsField({ value, onChange }: AppriseTargetsFieldProp
         </div>
 
         <div className="apprise-preview">
-          <span>URL:</span> <code>{preview || '…'}</code>
+          <span>{t('AppriseTargetsField.urlLabel')}</span> <code>{preview || '…'}</code>
         </div>
 
         <div className="settings-field__row">
           <button type="button" className="btn btn--primary-sm" onClick={addTarget}>
-            Add target
+            {t('AppriseTargetsField.addTarget')}
           </button>
         </div>
         {formError && <div className="status-note status-note--error">{formError}</div>}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useCacheStatus } from '../../hooks/useCacheStatus';
 import { COLORS } from '../../styles/colors';
 import type { StorageLocation, StoragePathProgress } from '../../types/storagePath';
@@ -20,17 +21,18 @@ interface StorageLocationFieldProps {
 
 type Phase = 'idle' | 'moving';
 
-function currentLabel(current: CurrentLocation | null): string {
+function currentLabel(current: CurrentLocation | null, t: (key: string, opts?: Record<string, unknown>) => string): string {
   if (!current) return '…';
-  if (current.mode === 'boot') return 'Boot Disk';
-  if (current.mode === 'cache') return 'Cache';
-  if (current.mode === 'array') return `Disk ${current.diskSlot}`;
+  if (current.mode === 'boot') return t('StorageLocationField.bootDisk');
+  if (current.mode === 'cache') return t('StorageLocationField.cache');
+  if (current.mode === 'array') return t('StorageLocationField.diskSlot', { slot: current.diskSlot });
   return current.path; // 'custom' - a data-root this app didn't set
 }
 
 /** Shared by the Docker and LXC storage-location settings fields - same subsystem-picker + streamed
  *  migration-progress shape for both, just pointed at different API modules. */
 export function StorageLocationField({ title, desc, dataDisks, getStorage, moveStorage }: StorageLocationFieldProps) {
+  const { t } = useTranslation('settings');
   const [current, setCurrent] = useState<CurrentLocation | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [targetMode, setTargetMode] = useState<'boot' | 'array' | 'cache'>('boot');
@@ -84,7 +86,7 @@ export function StorageLocationField({ title, desc, dataDisks, getStorage, moveS
     <div className="settings-field toggle-row--bordered">
       <div className="toggle-row__title">{title}</div>
       <div className="toggle-row__desc">
-        {desc} Currently: <strong>{currentLabel(current)}</strong>
+        {desc} {t('StorageLocationField.currently')} <strong>{currentLabel(current, t)}</strong>
       </div>
       <div className="settings-field__row">
         <select
@@ -101,9 +103,9 @@ export function StorageLocationField({ title, desc, dataDisks, getStorage, moveS
             }
           }}
         >
-          <option value="boot">Boot Disk</option>
+          <option value="boot">{t('StorageLocationField.bootDisk')}</option>
           <option value="cache" disabled={!cacheConfigured}>
-            {cacheConfigured ? 'Cache' : 'Cache (set up a cache pool first)'}
+            {cacheConfigured ? t('StorageLocationField.cache') : t('StorageLocationField.cacheNotSetUp')}
           </option>
           {dataDisks.map((d) => (
             <option key={d.slot} value={`disk-${d.slot}`}>
@@ -117,7 +119,7 @@ export function StorageLocationField({ title, desc, dataDisks, getStorage, moveS
           disabled={phase === 'moving' || targetUnchanged || (targetMode === 'array' && targetSlot === null)}
           onClick={handleMove}
         >
-          {phase === 'moving' ? 'Moving…' : 'Move Storage'}
+          {phase === 'moving' ? t('StorageLocationField.moving') : t('StorageLocationField.moveStorage')}
         </button>
       </div>
       {phase === 'moving' && <ProgressBar indeterminate color={COLORS.blue} height={6} />}

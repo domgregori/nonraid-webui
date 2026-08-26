@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { appsApi } from '../../api/appsApi';
 import type { CaApp, InstalledInfo } from '../../types/appsApi';
@@ -42,6 +43,7 @@ function asText(value: unknown): string | null {
 }
 
 export function AppDetailPanel({ name, repository, installed, onClose, onInstall, onViewNamespace }: AppDetailPanelProps) {
+  const { t } = useTranslation('apps');
   const [app, setApp] = useState<CaApp | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,12 +77,12 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
       <div className="detail-panel">
         <div className="detail-panel__head">
           <div className="detail-panel__title">{name}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('AppDetailPanel.close')}>
             &#10005;
           </button>
         </div>
 
-        {!app && !error && <div className="status-note">Loading…</div>}
+        {!app && !error && <div className="status-note">{t('AppDetailPanel.loading')}</div>}
         {error && <div className="status-note status-note--error">{error}</div>}
 
         {app && (
@@ -93,21 +95,21 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
             <div className="apps-detail__actions">
               {installed ? (
                 <Link to="/docker" className="btn--primary" onClick={onClose}>
-                  Manage in Docker
+                  {t('AppDetailPanel.manageInDocker')}
                 </Link>
               ) : (
                 <button type="button" className="btn--primary" onClick={onInstall}>
-                  Install
+                  {t('AppDetailPanel.install')}
                 </button>
               )}
               {support && (
                 <a className="btn" href={support} target="_blank" rel="noreferrer">
-                  Support
+                  {t('AppDetailPanel.support')}
                 </a>
               )}
               {project && (
                 <a className="btn" href={project} target="_blank" rel="noreferrer">
-                  Source
+                  {t('AppDetailPanel.source')}
                 </a>
               )}
             </div>
@@ -117,37 +119,35 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
             <div className="detail-panel__body">
               {installed && (
                 <div className="detail-card">
-                  <div className="eyebrow">Installed</div>
+                  <div className="eyebrow">{t('AppDetailPanel.installedEyebrow')}</div>
                   <div className="detail-rows">
                     <div className="detail-row">
-                      <span className="detail-row__label">Container</span>
+                      <span className="detail-row__label">{t('AppDetailPanel.containerLabel')}</span>
                       <span className="detail-row__value">{installed.containerName}</span>
                     </div>
                     <div className="detail-row">
-                      <span className="detail-row__label">Status</span>
-                      <span className="detail-row__value">{installed.state === 'running' ? 'Running' : 'Stopped'}</span>
+                      <span className="detail-row__label">{t('AppDetailPanel.statusLabel')}</span>
+                      <span className="detail-row__value">{installed.state === 'running' ? t('AppDetailPanel.running') : t('AppDetailPanel.stopped')}</span>
                     </div>
                   </div>
                   {installed.updateAvailable && (
                     <div className="apps-update-note">
-                      A different image is now in the template: {repositoryText ?? repository} (currently running{' '}
-                      {installed.installedRepository}). Remove the existing container from the Docker page, then
-                      reinstall this template to update.
+                      {t('AppDetailPanel.updateNote', { repo: repositoryText ?? repository, installedRepo: installed.installedRepository })}
                     </div>
                   )}
                 </div>
               )}
 
               <div className="detail-card">
-                <div className="eyebrow">Details</div>
+                <div className="eyebrow">{t('AppDetailPanel.detailsEyebrow')}</div>
                 <div className="detail-rows">
                   <div className="detail-row">
-                    <span className="detail-row__label">Application type</span>
+                    <span className="detail-row__label">{t('AppDetailPanel.appTypeLabel')}</span>
                     <span className="detail-row__value">Docker</span>
                   </div>
                   {app.CategoryList && app.CategoryList.filter((c) => typeof c === 'string').length > 0 && (
                     <div className="detail-row">
-                      <span className="detail-row__label">Categories</span>
+                      <span className="detail-row__label">{t('AppDetailPanel.categoriesLabel')}</span>
                       <span className="detail-row__value">
                         {app.CategoryList.filter((c) => typeof c === 'string')
                           .map((c) => c.replace(/-/g, ' '))
@@ -156,44 +156,44 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
                     </div>
                   )}
                   <div className="detail-row">
-                    <span className="detail-row__label">Repository</span>
+                    <span className="detail-row__label">{t('AppDetailPanel.repositoryLabel')}</span>
                     <span className="detail-row__value">{repositoryText ?? repository}</span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-row__label">Network</span>
+                    <span className="detail-row__label">{t('AppDetailPanel.networkLabel')}</span>
                     <span className="detail-row__value">{network || 'bridge'}</span>
                   </div>
                   <div className="detail-row">
-                    <span className="detail-row__label">Privileged</span>
-                    <span className="detail-row__value">{app.Privileged === 'true' ? 'Yes' : 'No'}</span>
+                    <span className="detail-row__label">{t('AppDetailPanel.privilegedLabel')}</span>
+                    <span className="detail-row__value">{app.Privileged === 'true' ? t('AppDetailPanel.yes') : t('AppDetailPanel.no')}</span>
                   </div>
                   {typeof app.stars === 'number' && (
                     <div className="detail-row">
-                      <span className="detail-row__label">Docker Hub stars</span>
+                      <span className="detail-row__label">{t('AppDetailPanel.dockerHubStarsLabel')}</span>
                       <span className="detail-row__value">{app.stars.toLocaleString()}</span>
                     </div>
                   )}
                   {typeof app.downloads === 'number' && (
                     <div className="detail-row">
-                      <span className="detail-row__label">Downloads</span>
+                      <span className="detail-row__label">{t('AppDetailPanel.downloadsLabel')}</span>
                       <span className="detail-row__value">{app.downloads.toLocaleString()}</span>
                     </div>
                   )}
                   {added && (
                     <div className="detail-row">
-                      <span className="detail-row__label">Added</span>
+                      <span className="detail-row__label">{t('AppDetailPanel.addedLabel')}</span>
                       <span className="detail-row__value">{added}</span>
                     </div>
                   )}
                   {updated && (
                     <div className="detail-row">
-                      <span className="detail-row__label">Last update</span>
+                      <span className="detail-row__label">{t('AppDetailPanel.lastUpdateLabel')}</span>
                       <span className="detail-row__value">{updated}</span>
                     </div>
                   )}
                   {license && (
                     <div className="detail-row">
-                      <span className="detail-row__label">License</span>
+                      <span className="detail-row__label">{t('AppDetailPanel.licenseLabel')}</span>
                       <span className="detail-row__value">{license}</span>
                     </div>
                   )}
@@ -201,20 +201,17 @@ export function AppDetailPanel({ name, repository, installed, onClose, onInstall
               </div>
 
               <div className="detail-card">
-                <div className="eyebrow">Maintainer</div>
+                <div className="eyebrow">{t('AppDetailPanel.maintainerEyebrow')}</div>
                 <div className="apps-detail__maintainer">
                   <span>{maintainer || namespace}</span>
                   <button type="button" className="btn" onClick={() => onViewNamespace(namespace)}>
-                    All apps
+                    {t('AppDetailPanel.allApps')}
                   </button>
                 </div>
               </div>
             </div>
 
-            <div className="apps-detail__note">
-              Catalog data from Community Applications - not vetted by this project. Review ports, volumes, and the
-              image before installing.
-            </div>
+            <div className="apps-detail__note">{t('AppDetailPanel.catalogNote')}</div>
           </>
         )}
       </div>

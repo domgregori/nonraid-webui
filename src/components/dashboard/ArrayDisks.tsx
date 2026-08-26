@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { deriveDisks } from '../../selectors/disks';
 import { deriveParityViewModel } from '../../selectors/parity';
 import { useArrayStatus } from '../../state/useArrayStatus';
@@ -9,6 +10,7 @@ interface ArrayDisksProps {
 }
 
 export function ArrayDisks({ showManageLink }: ArrayDisksProps = {}) {
+  const { t } = useTranslation('dashboard');
   const { status, temps, diskHealths, diskTypes, selectDisk, parityPending, parityAction } = useArrayStatus();
   if (!status) return null;
 
@@ -28,10 +30,10 @@ export function ArrayDisks({ showManageLink }: ArrayDisksProps = {}) {
   return (
     <div>
       <div className="disk-section-head">
-        <div className="eyebrow disk-section-label">Array Disks</div>
+        <div className="eyebrow disk-section-label">{t('ArrayDisks.arrayDisks')}</div>
         {showManageLink && (
           <Link to="/disks" className="disk-section-link">
-            Manage disks &rarr;
+            {t('ArrayDisks.manageDisks')} &rarr;
           </Link>
         )}
       </div>

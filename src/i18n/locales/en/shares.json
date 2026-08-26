@@ -1,0 +1,60 @@
+{
+  "ShareExportModal": {
+    "dialogTitle": "Share \"{{name}}\"",
+    "close": "Close",
+    "desc": "Choose how the \"{{name}}\" pool is reachable over the network. Per-user SMB permissions are set on each user's own page below.",
+    "smb": "SMB",
+    "smbPublic": "Public (guest access)",
+    "nfs": "NFS",
+    "nfsReadOnly": "Read-only",
+    "allowedHostsLabel": "Allowed hosts (comma-separated, * for any)",
+    "notSharedNote": "Not shared - this pool won't be reachable over the network until SMB or NFS is turned on.",
+    "notPublicNote": "Not public - no one can connect over SMB until you grant specific users or groups access from the Sharing tab.",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "requestFailed": "Request failed - see the page error banner for details."
+  },
+  "ShareFormModal": {
+    "allocation": {
+      "mostFreeLabel": "Most-free",
+      "mostFreeDesc": "Writes new files to whichever disk currently has the most free space - keeps usage balanced across all disks over time.",
+      "fillUpLabel": "Fill-up",
+      "fillUpDesc": "Fills disks in order - writes go to the first disk (in disk order) with room until it’s full, then moves on to the next.",
+      "highWaterLabel": "High-water",
+      "highWaterDesc": "Keeps files under the same path together on one disk when possible, otherwise picks the disk with the most free space. An approximation of the classic High-Water allocation policy, not an exact match.",
+      "singleDiskLabel": "Single disk",
+      "singleDiskDesc": "Pins this pool to exactly one disk - no spreading files across drives.",
+      "cacheOnlyLabel": "Cache only",
+      "cacheOnlyDesc": "Lives entirely on the cache disks - no array disk is used, and the mover never touches it.",
+      "cacheOnlyLabelDisabled": "{{label}} (set up a cache pool first)"
+    },
+    "editTitle": "Edit {{name}}",
+    "addTitle": "Add Pool",
+    "close": "Close",
+    "nameLabel": "Name",
+    "namePlaceholder": "media",
+    "descriptionLabel": "Description (optional)",
+    "descriptionPlaceholder": "What's this pool for?",
+    "cacheOnlyNote": "This pool lives entirely on the cache disks - no array disk is used, and the mover never touches it.",
+    "useAllDrivesTitle": "Use all drives",
+    "useAllDrivesDescOn": "Using all {{count}} data disk(s) - new disks are added automatically",
+    "useAllDrivesDescOff": "Choose specific disks below",
+    "diskLabel": "Disk {{slot}}",
+    "noDataDisks": "No data disks reported by the array right now.",
+    "allocationMethodLabel": "Allocation method",
+    "notSharedYetNote": "Not shared anywhere yet - turn on SMB or NFS access for this pool from the Sharing tab once it's created.",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "saveChanges": "Save Changes",
+    "createPool": "Create Pool",
+    "requestFailed": "Request failed - see the page error banner for details.",
+    "errors": {
+      "invalidName": "Name must be 1-32 characters: letters, numbers, dash, underscore.",
+      "nameExists": "Pool \"{{name}}\" already exists.",
+      "cacheNotConfigured": "Set up a cache pool on the Disks page before creating a cache-only pool.",
+      "selectDisk": "Select at least one disk.",
+      "singleDiskOnly": "Single-disk allocation requires exactly one disk."
+    }
+  }
+}

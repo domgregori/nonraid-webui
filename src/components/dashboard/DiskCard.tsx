@@ -1,4 +1,5 @@
 import type { MouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../../styles/colors';
 import type { ParityViewModel } from '../../types/parity';
 import type { DiskViewModel } from '../../types';
@@ -47,6 +48,7 @@ export function ParityDiskCard({ disk, onClick }: DiskCardProps) {
 }
 
 export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
+  const { t } = useTranslation('dashboard');
   if (clearing) {
     return (
       <div className="disk-card disk-card--data" style={{ borderColor: disk.borderColor }} onClick={onClick}>
@@ -58,7 +60,7 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
             {clearing.pauseLabel}
           </button>
           <button type="button" className="btn btn--danger" onClick={stopPropagation(clearing.cancelHandler)}>
-            Cancel
+            {t('DiskCard.cancel')}
           </button>
         </div>
         <div className="disk-card__device">{disk.device}</div>
@@ -66,7 +68,7 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
           <div className="progress-track__fill" style={{ width: `${clearing.progressPct}%`, background: clearing.barColor }} />
         </div>
         <div className="disk-card__row--sub">
-          <span>Clearing: {clearing.progressPct}%</span>
+          <span>{t('DiskCard.clearing', { pct: clearing.progressPct })}</span>
           <span>{clearing.speedText}</span>
         </div>
         <div className="disk-card__row--sub">
@@ -88,7 +90,7 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
       <div className="disk-card__device">{disk.device}</div>
       {disk.needsFormat && (
         <div className="disk-card__row--sub" style={{ color: COLORS.amber }}>
-          Needs formatting - no filesystem yet
+          {t('DiskCard.needsFormatting')}
         </div>
       )}
       <div className="progress-track">
