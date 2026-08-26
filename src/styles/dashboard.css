@@ -265,6 +265,12 @@
   flex-shrink: 0;
 }
 
+/* Spun-up/standby arrow - sits on the right of whichever .disk-card__row--sub it's placed in. */
+.disk-card__spin {
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
 .disk-card__device {
   margin-top: 6px;
   font-size: 11px;

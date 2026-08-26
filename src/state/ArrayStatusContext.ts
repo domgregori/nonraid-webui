@@ -1,5 +1,6 @@
 import { createContext } from 'react';
 import type { NmdStatusResponse, ParityCheckAction } from '../types/nmdApi';
+import type { SmartSpinState } from '../types/smart';
 
 /** 'not-configured' means a genuinely fresh install - nmdctl reports no array has ever been
  *  created yet. Distinct from 'error' (a real failure) so OnboardingGate can route into setup
@@ -23,6 +24,8 @@ export interface ArrayStatusContextValue {
   stopBlockedByContainers: boolean;
   temps: Record<string, number | null>;
   diskHealths: Record<string, 'passed' | 'failed' | null>;
+  /** Spun up vs standby - polled at the same cadence as temps/diskHealths below. */
+  spinStates: Record<string, SmartSpinState>;
   /** SSD/HDD per array disk device - fetched once (not polled), since a disk's rotational type
    *  never changes at runtime. */
   diskTypes: Record<string, boolean | null>;

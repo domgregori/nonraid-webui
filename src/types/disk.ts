@@ -1,3 +1,5 @@
+import type { SmartSpinState } from './smart';
+
 export type DiskRole = 'parity' | 'data';
 export type DiskStatus = 'standby' | 'missing' | 'active';
 
@@ -10,6 +12,9 @@ export interface DiskBase {
   device: string;
   usedPct: number;
   temp: number;
+  /** Stable udev-style Model_Serial identity (NmdDisk.disk_id) - survives device-letter churn and
+   *  reboots, unlike `device`/`slot`. Used to key the per-disk nickname setting. */
+  diskId: string;
 }
 
 export interface DiskViewModel extends DiskBase {
@@ -20,6 +25,7 @@ export interface DiskViewModel extends DiskBase {
   statusColor: string;
   sizeLabel: string;
   usedLabel: string;
+  freeLabel: string;
   fsType: string;
   mountpoint: string;
   tempLabel: string;
@@ -34,6 +40,11 @@ export interface DiskViewModel extends DiskBase {
   healthLabel: string;
   isSSD: boolean | null;
   typeLabel: string;
+  /** null only before the first /smart/spin-states poll resolves - 'unknown' is a real value from
+   *  that endpoint (e.g. smartctl unreachable for this device), distinct from "not fetched yet". */
+  spinState: SmartSpinState | null;
+  /** User-chosen nickname (Settings-persisted, keyed by disk_id) - null if none set. */
+  customLabel: string | null;
   /** True for a data disk that's DISK_OK (present, correctly identified, no redundancy problem)
    *  but has never been formatted - nmdctl's own "unknown" filesystem sentinel. Not a parity/
    *  redundancy issue (isDegraded() correctly leaves this alone), but not a disk you can actually

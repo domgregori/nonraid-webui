@@ -1,6 +1,7 @@
 import { COLORS } from '../styles/colors';
 import type { DiskViewModel } from '../types';
 import type { NmdDisk, NmdStatusResponse } from '../types/nmdApi';
+import type { SmartSpinState } from '../types/smart';
 
 const STATUS_LABELS: Record<string, string> = {
   DISK_NP_MISSING: 'Missing · Emulated',
@@ -42,6 +43,8 @@ export function deriveDisk(
   tempC: number | null | undefined,
   health: 'passed' | 'failed' | null | undefined,
   isSSD: boolean | null | undefined,
+  spinState: SmartSpinState | null | undefined,
+  diskLabels: Record<string, string>,
 ): DiskViewModel {
   const role: 'parity' | 'data' = disk.type === 'P' || disk.type === 'Q' ? 'parity' : 'data';
   const label = disk.type === 'P' ? 'Parity 1' : disk.type === 'Q' ? 'Parity 2' : `Disk ${disk.slot}`;
@@ -78,6 +81,7 @@ export function deriveDisk(
     role,
     size: sizeTB,
     device: disk.device,
+    diskId: disk.disk_id,
     usedPct,
     temp: tempC ?? 0,
     status,
@@ -86,6 +90,7 @@ export function deriveDisk(
     statusColor,
     sizeLabel: formatSize(disk.size_gb),
     usedLabel: role === 'parity' ? '-' : `${usedPct}%`,
+    freeLabel: role === 'parity' ? '-' : formatSize(disk.size_gb * (1 - usedPct / 100)),
     fsType: role === 'parity' ? '-' : (disk.filesystem?.type ?? '-').toUpperCase(),
     mountpoint: role === 'parity' ? '-' : normalize(disk.filesystem?.mountpoint),
     tempLabel: typeof tempC === 'number' ? `${Math.round(tempC)}°C` : '-',
@@ -102,6 +107,8 @@ export function deriveDisk(
     healthLabel: health === 'failed' ? 'SMART Failing' : health === 'passed' ? 'SMART OK' : 'SMART -',
     isSSD: isSSD ?? null,
     typeLabel: isSSD === true ? 'SSD' : isSSD === false ? 'HDD' : '-',
+    spinState: spinState ?? null,
+    customLabel: diskLabels[disk.disk_id]?.trim() || null,
     needsFormat,
   };
 }
@@ -111,10 +118,12 @@ export function deriveDisks(
   temps: Record<string, number | null>,
   diskHealths: Record<string, 'passed' | 'failed' | null> = {},
   diskTypes: Record<string, boolean | null> = {},
+  spinStates: Record<string, SmartSpinState> = {},
+  diskLabels: Record<string, string> = {},
 ): { parity: DiskViewModel[]; data: DiskViewModel[]; all: DiskViewModel[] } {
   const arrayStarted = status.array.state === 'STARTED';
   const sorted = [...status.disks].sort((a, b) => a.slot - b.slot);
-  const all = sorted.map((d) => deriveDisk(d, arrayStarted, temps[d.device], diskHealths[d.device], diskTypes[d.device]));
+  const all = sorted.map((d) => deriveDisk(d, arrayStarted, temps[d.device], diskHealths[d.device], diskTypes[d.device], spinStates[d.device], diskLabels));
   return {
     parity: all.filter((d) => d.role === 'parity'),
     data: all.filter((d) => d.role === 'data'),

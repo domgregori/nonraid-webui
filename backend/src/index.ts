@@ -56,6 +56,7 @@ import { SettingsStore } from './settings/index.js';
 import { createShareApplier, ShareAccessStore, ShareService, ShareStore } from './shares/index.js';
 import { createSmartClient, SmartService } from './smart/index.js';
 import { BackupScheduler } from './system/backupScheduler.js';
+import { applySpinDownTimeout } from './system/hdparm.js';
 import { SystemStatsService } from './system/service.js';
 import { createTailscaleClient } from './tailscale/index.js';
 import { TlsStore } from './tls/index.js';
@@ -122,6 +123,11 @@ async function main() {
   const persistedSettings = await settingsStore.get();
   if (persistedSettings.turboWrite) {
     await nmd.setWriteMethod(true).catch(() => {});
+  }
+  // hdparm -S works directly on the block device regardless of array state, unlike setWriteMethod
+  // - reapply unconditionally (applySpinDownTimeout already skips disks with no real device).
+  if (persistedSettings.spinDownTimeoutMinutes > 0) {
+    await applySpinDownTimeout(nmd, persistedSettings.spinDownTimeoutMinutes).catch(() => {});
   }
 
   // Either source enables it - lets a deployment force this on via the TRUST_PROXY env var

@@ -4,6 +4,23 @@ import { COLORS } from '../../styles/colors';
 import type { ParityViewModel } from '../../types/parity';
 import type { DiskViewModel } from '../../types';
 
+/** Arrow indicator for spun-up vs standby - HDD only (SSDs don't spin, showing this would be
+ *  misleading) and only once the bulk /smart/spin-states poll has resolved a real value. */
+function SpinIndicator({ disk }: { disk: DiskViewModel }) {
+  const { t } = useTranslation('dashboard');
+  if (disk.typeLabel !== 'HDD' || !disk.spinState || disk.spinState === 'unknown') return null;
+  const active = disk.spinState === 'active';
+  return (
+    <span className="disk-card__spin" style={{ color: active ? COLORS.textSecondary : COLORS.textDim }}>
+      {active ? '▲' : '▼'} {active ? t('DiskCard.spinActive') : t('DiskCard.spinStandby')}
+    </span>
+  );
+}
+
+function DeviceLine({ disk }: { disk: DiskViewModel }) {
+  return <div className="disk-card__device">{disk.customLabel ? `${disk.customLabel} · ${disk.device}` : disk.device}</div>;
+}
+
 interface DiskCardProps {
   disk: DiskViewModel;
   onClick: () => void;
@@ -32,7 +49,7 @@ export function ParityDiskCard({ disk, onClick }: DiskCardProps) {
           {disk.statusLabel}
         </span>
       </div>
-      <div className="disk-card__device">{disk.device}</div>
+      <DeviceLine disk={disk} />
       <div className="disk-card__row">
         <span>{disk.sizeLabel}</span>
         <span>{disk.tempLabel}</span>
@@ -42,6 +59,7 @@ export function ParityDiskCard({ disk, onClick }: DiskCardProps) {
           <span className="disk-card__health-dot" style={{ background: disk.healthColor }} />
           {disk.healthLabel}
         </span>
+        <SpinIndicator disk={disk} />
       </div>
     </div>
   );
@@ -87,7 +105,7 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
           {disk.statusLabel}
         </span>
       </div>
-      <div className="disk-card__device">{disk.device}</div>
+      <DeviceLine disk={disk} />
       {disk.needsFormat && (
         <div className="disk-card__row--sub" style={{ color: COLORS.amber }}>
           {t('DiskCard.needsFormatting')}
@@ -101,8 +119,12 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
         <span>{disk.usedLabel}</span>
       </div>
       <div className="disk-card__row--sub">
-        <span>{disk.typeLabel}</span>
+        <span>{t('DiskCard.free', { free: disk.freeLabel })}</span>
         <span style={{ color: disk.tempColor }}>{disk.tempLabel}</span>
+      </div>
+      <div className="disk-card__row--sub">
+        <span>{disk.typeLabel}</span>
+        <SpinIndicator disk={disk} />
       </div>
       <div className="disk-card__row--sub">
         <span className="disk-card__health" style={{ color: disk.healthColor }}>

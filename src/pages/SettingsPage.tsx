@@ -787,6 +787,31 @@ export function SettingsPage() {
             {saveError && <div className="status-note status-note--error">{saveError}</div>}
 
             <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">{t('SettingsPage.array.spinDownTitle')}</div>
+              <div className="toggle-row__desc">{t('SettingsPage.array.spinDownDesc')}</div>
+              <div className="settings-field__row">
+                <select
+                  className="history-input"
+                  value={settings?.spinDownTimeoutMinutes ?? 0}
+                  onChange={(e) => update({ spinDownTimeoutMinutes: Number(e.target.value) })}
+                  disabled={!settings || saving}
+                >
+                  <option value={0}>{t('SettingsPage.array.spinDownNever')}</option>
+                  <option value={5}>{t('SettingsPage.array.spinDownMinutes', { count: 5 })}</option>
+                  <option value={10}>{t('SettingsPage.array.spinDownMinutes', { count: 10 })}</option>
+                  <option value={15}>{t('SettingsPage.array.spinDownMinutes', { count: 15 })}</option>
+                  <option value={20}>{t('SettingsPage.array.spinDownMinutes', { count: 20 })}</option>
+                  <option value={30}>{t('SettingsPage.array.spinDownMinutes', { count: 30 })}</option>
+                  <option value={60}>{t('SettingsPage.array.spinDownHours', { count: 1 })}</option>
+                  <option value={120}>{t('SettingsPage.array.spinDownHours', { count: 2 })}</option>
+                  <option value={180}>{t('SettingsPage.array.spinDownHours', { count: 3 })}</option>
+                  <option value={240}>{t('SettingsPage.array.spinDownHours', { count: 4 })}</option>
+                  <option value={300}>{t('SettingsPage.array.spinDownHours', { count: 5 })}</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="settings-field toggle-row--bordered">
               <div className="toggle-row__title">{t('SettingsPage.array.arrayLabelFieldTitle')}</div>
               <div className="settings-field__row">
                 <input className="history-input" style={{ width: '100%' }} value={labelDraft} onChange={(e) => setLabelDraft(e.target.value)} placeholder={t('SettingsPage.array.arrayLabelPlaceholder')} disabled={!status} />

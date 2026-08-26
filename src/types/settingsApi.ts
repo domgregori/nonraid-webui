@@ -116,6 +116,8 @@ export interface AppSettings {
   trustProxyAddress: string;
   notifications: NotificationSettings;
   minFreeSpaceGb: number;
+  spinDownTimeoutMinutes: number;
+  diskLabels: Record<string, string>;
   paritySchedule: ParitySchedule;
   backupSchedule: BackupSchedule;
   tempAlerts: TempAlertSettings;
@@ -134,6 +136,9 @@ export type AppSettingsUpdate = Partial<{
     eventTypes?: Partial<Record<NotificationEventType, Partial<NotificationChannelToggle>>>;
   };
   minFreeSpaceGb: number;
+  spinDownTimeoutMinutes: number;
+  // A key mapped to '' removes that disk's label.
+  diskLabels: Partial<Record<string, string>>;
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<Omit<BackupSchedule, 'encryption'>> & { encryption?: BackupEncryptionInput };
   tempAlerts: Partial<TempAlertSettings>;

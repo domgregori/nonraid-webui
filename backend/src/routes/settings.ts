@@ -8,6 +8,7 @@ import { redactEncryption, resolveEncryptionPatch } from '../settings/backupEncr
 import { validateCronExpression } from '../settings/cronMatch.js';
 import { NOTIFICATION_EVENTS, sendAppriseNotification, type AppSettings, type SettingsStore } from '../settings/index.js';
 import type { ShareService } from '../shares/index.js';
+import { applySpinDownTimeout } from '../system/hdparm.js';
 
 const KNOWN_EVENT_TYPES = new Set<string>(NOTIFICATION_EVENTS.map((e) => e.id));
 
@@ -115,6 +116,21 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
           throw new Error('minFreeSpaceGb must be a non-negative integer (GB).');
         }
       }
+      if ('spinDownTimeoutMinutes' in patch) {
+        if (typeof patch.spinDownTimeoutMinutes !== 'number' || !Number.isInteger(patch.spinDownTimeoutMinutes) || patch.spinDownTimeoutMinutes < 0) {
+          throw new Error('spinDownTimeoutMinutes must be a non-negative integer.');
+        }
+      }
+      if (patch.diskLabels) {
+        if (typeof patch.diskLabels !== 'object') {
+          throw new Error('diskLabels must be an object mapping disk_id to a label.');
+        }
+        for (const [key, value] of Object.entries(patch.diskLabels)) {
+          if (typeof value !== 'string' || value.length > 40) {
+            throw new Error(`diskLabels.${key} must be a string of 40 characters or fewer.`);
+          }
+        }
+      }
       if (patch.paritySchedule) {
         validateSchedulePatch('paritySchedule', patch.paritySchedule);
       }
@@ -175,6 +191,12 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
         // than leaving them on the old value until the next backend restart.
         await shares.remountAll();
         activity.log(`Minimum free space set to ${patch.minFreeSpaceGb} GB`, 'blue').catch(() => {});
+      }
+      if ('spinDownTimeoutMinutes' in patch) {
+        // Best-effort, same as array-start/boot-time reapplication (see routes/array.ts,
+        // index.ts) - a disk not responding to hdparm shouldn't fail the whole settings save.
+        await applySpinDownTimeout(nmd, patch.spinDownTimeoutMinutes).catch(() => {});
+        activity.log(patch.spinDownTimeoutMinutes > 0 ? `Idle spin-down set to ${patch.spinDownTimeoutMinutes} min` : 'Idle spin-down disabled', 'blue').catch(() => {});
       }
       res.json(redactSettings(updated));
     } catch (err) {

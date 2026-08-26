@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { nmdApi } from '../../api/nmdApi';
 import { useDiskSmart } from '../../hooks/useDiskSmart';
+import { useSettings } from '../../hooks/useSettings';
 import { deriveDisks } from '../../selectors/disks';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { COLORS } from '../../styles/colors';
@@ -29,6 +30,7 @@ export function DiskDetailPanel() {
     temps,
     diskHealths,
     diskTypes,
+    spinStates,
     selectedDiskId,
     actionNote,
     actionError,
@@ -39,7 +41,8 @@ export function DiskDetailPanel() {
     unassignDisk,
     restoreDisk,
   } = useArrayStatus();
-  const { all } = status ? deriveDisks(status, temps, diskHealths, diskTypes) : { all: [] };
+  const { settings, update: updateSettings } = useSettings();
+  const { all } = status ? deriveDisks(status, temps, diskHealths, diskTypes, spinStates, settings?.diskLabels ?? {}) : { all: [] };
   const disk = selectedDiskId ? all.find((d) => d.id === selectedDiskId) : undefined;
 
   const smartSlot = disk && disk.device && disk.device !== 'none' ? disk.slot : null;
@@ -55,8 +58,32 @@ export function DiskDetailPanel() {
   const [showReplaceDialog, setShowReplaceDialog] = useState(false);
   const [showEmptyDialog, setShowEmptyDialog] = useState(false);
   const [showShrinkDialog, setShowShrinkDialog] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState('');
+  const [nicknameSaving, setNicknameSaving] = useState(false);
+  const [nicknameError, setNicknameError] = useState<string | null>(null);
+
+  // Re-seeds when the selected disk changes, or when its persisted label value itself changes
+  // (e.g. this exact save resolving, or another session's edit) - but deliberately not on every
+  // settings/status poll tick, since `disk` is a freshly-derived object every render and depending
+  // on it directly would reset the draft out from under whatever the user is mid-typing.
+  useEffect(() => {
+    setNicknameDraft(disk?.customLabel ?? '');
+    setNicknameError(null);
+  }, [selectedDiskId, disk?.customLabel]);
 
   if (!selectedDiskId || !status || !disk) return null;
+
+  const saveNickname = async () => {
+    setNicknameSaving(true);
+    setNicknameError(null);
+    try {
+      await updateSettings({ diskLabels: { [disk.diskId]: nicknameDraft.trim() } });
+    } catch (err) {
+      setNicknameError((err as Error).message);
+    } finally {
+      setNicknameSaving(false);
+    }
+  };
 
   const arrayStarted = status.array.state === 'STARTED';
   // nmdctl only reports a disk's real filesystem type once the array is started and the disk is
@@ -168,6 +195,24 @@ export function DiskDetailPanel() {
 
         <div className="detail-panel__body">
           <div className="detail-card">
+            <div className="settings-field">
+              <div className="toggle-row__title">{t('DiskDetailPanel.nickname')}</div>
+              <div className="settings-field__row">
+                <input
+                  className="history-input"
+                  style={{ width: '100%' }}
+                  value={nicknameDraft}
+                  onChange={(e) => setNicknameDraft(e.target.value)}
+                  placeholder={t('DiskDetailPanel.nicknamePlaceholder')}
+                  maxLength={40}
+                />
+                <button type="button" className="btn" disabled={nicknameSaving || nicknameDraft.trim() === (disk.customLabel ?? '')} onClick={saveNickname}>
+                  {nicknameSaving ? t('DiskDetailPanel.saving') : t('DiskDetailPanel.save')}
+                </button>
+              </div>
+              {nicknameError && <div className="status-note status-note--error">{nicknameError}</div>}
+            </div>
+
             <div className="eyebrow">{t('DiskDetailPanel.info')}</div>
             <div className="detail-rows">
               <div className="detail-row">
@@ -184,7 +229,7 @@ export function DiskDetailPanel() {
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">{t('DiskDetailPanel.used')}</span>
-                <span className="detail-row__value">{disk.usedLabel}</span>
+                <span className="detail-row__value">{disk.role === 'parity' ? disk.usedLabel : t('DiskDetailPanel.usedWithFree', { used: disk.usedLabel, free: disk.freeLabel })}</span>
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">{t('DiskDetailPanel.filesystem')}</span>

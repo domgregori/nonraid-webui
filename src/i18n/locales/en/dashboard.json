@@ -43,7 +43,10 @@
   "DiskCard": {
     "cancel": "Cancel",
     "clearing": "Clearing: {{pct}}%",
-    "needsFormatting": "Needs formatting - no filesystem yet"
+    "needsFormatting": "Needs formatting - no filesystem yet",
+    "free": "{{free}} free",
+    "spinActive": "Spinning",
+    "spinStandby": "Standby"
   },
   "DiskQueueCard": {
     "addParityDisk": "Add parity disk",
