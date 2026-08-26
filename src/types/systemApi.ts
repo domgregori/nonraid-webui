@@ -43,7 +43,7 @@ export interface RestoreArchiveEntry {
 }
 
 // Mirrors backend/src/system/backupCatalog.ts's BackupCategoryId.
-export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory' | 'appdata' | 'remoteBackup';
+export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory' | 'appdata' | 'remoteBackup' | 'lxc' | 'users';
 
 export interface RestoreCategoryPreview {
   id: BackupCategoryId;
@@ -74,6 +74,19 @@ export interface RestoreCommitResult {
   // restored - passed back into restartServices() below so it only bounces Docker (which stops
   // every running container) when a restore actually touched it.
   dockerConfigRestored: boolean;
+  // Set only when the 'users' category's export snapshot was part of what was just restored -
+  // null when it wasn't in the selection (or the archive had no such member) rather than an
+  // all-zeros result, so the UI can tell "nothing to restore" apart from "restored, nothing new".
+  usersRestoreResult: UsersRestoreResult | null;
+  usersRestoreError: string | null;
+}
+
+// Mirrors backend/src/users/types.ts's UsersRestoreResult.
+export interface UsersRestoreResult {
+  usersCreated: string[];
+  usersSkipped: string[];
+  groupsCreated: string[];
+  groupsSkipped: string[];
 }
 
 export interface RestartServicesStepResult {

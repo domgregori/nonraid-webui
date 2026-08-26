@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { UsersClient } from './client.js';
-import type { Group, GroupInput, User, UserCommandResult, UserInput, UserUpdateInput } from './types.js';
+import type { Group, GroupInput, User, UserCommandResult, UserInput, UsersRestoreResult, UsersSnapshot, UserUpdateInput } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -47,6 +47,28 @@ async function setUnixPassword(username: string, password: string): Promise<void
 async function setSambaPassword(username: string, password: string): Promise<void> {
   // -s reads the new password twice from stdin instead of prompting interactively.
   await runWithStdin('smbpasswd', ['-a', '-s', username], `${password}\n${password}\n`);
+}
+
+/** The raw /etc/shadow hash field for `username` (crypt(3) format) - null for a locked/disabled
+ *  account (a leading "!") or one with no password set at all ("*" or empty), same "nothing
+ *  meaningful to restore" reasoning either way. Read via getent rather than parsing /etc/shadow
+ *  directly, same NSS-aware convention every other lookup in this file already uses. */
+async function getShadowHash(username: string): Promise<string | null> {
+  try {
+    const { stdout } = await run('getent', ['shadow', username]);
+    const hash = stdout.trim().split(':')[1];
+    return hash && hash !== '!' && hash !== '*' ? hash : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Sets a user's /etc/shadow entry directly from an already-hashed value (chpasswd's own -e flag)
+ *  - restoreSnapshot()'s way of putting a captured shadow hash back without ever needing the
+ *  original plaintext password, same "never touches argv, always stdin" discipline as
+ *  setUnixPassword()/setSambaPassword() above. */
+async function setShadowHash(username: string, hash: string): Promise<void> {
+  await runWithStdin('chpasswd', ['-e'], `${username}:${hash}\n`);
 }
 
 function parseGetentPasswd(
@@ -203,5 +225,49 @@ export class RealUsersClient implements UsersClient {
     }
     await run('groupdel', [name]);
     return { ok: true, message: `Group "${name}" deleted` };
+  }
+
+  async exportSnapshot(): Promise<UsersSnapshot> {
+    const [users, groups] = await Promise.all([this.listUsers(), this.listGroups()]);
+    const withHashes = await Promise.all(users.map(async (u) => ({ ...u, shadowHash: await getShadowHash(u.username) })));
+    return { version: 1, users: withHashes, groups };
+  }
+
+  async restoreSnapshot(snapshot: UsersSnapshot): Promise<UsersRestoreResult> {
+    const groupsCreated: string[] = [];
+    const groupsSkipped: string[] = [];
+    for (const g of snapshot.groups) {
+      try {
+        await run('groupadd', ['-g', String(g.gid), g.name]);
+        groupsCreated.push(g.name);
+      } catch {
+        // already exists, or the gid is taken by something else - either way nothing to recreate
+        groupsSkipped.push(g.name);
+      }
+    }
+
+    const usersCreated: string[] = [];
+    const usersSkipped: string[] = [];
+    for (const u of snapshot.users) {
+      try {
+        // Same useradd shape as createUser() above, minus setUnixPassword()/setSambaPassword() -
+        // this implants the captured shadow hash directly instead (below), and leaves the samba
+        // side to the 'users' category's other member, passdb.tdb, restored wholesale alongside
+        // this snapshot (see config.ts's sambaPasswdPath doc comment).
+        await run('useradd', ['-u', String(u.uid), '-N', '-M', '-s', config.usersShellPath, u.username]);
+        if (u.groups.length > 0) {
+          await run('usermod', ['-aG', u.groups.join(','), u.username]).catch(() => {});
+        }
+        if (u.shadowHash) {
+          await setShadowHash(u.username, u.shadowHash).catch(() => {});
+        }
+        usersCreated.push(u.username);
+      } catch {
+        // already exists, or the uid is taken by something else - either way nothing to recreate
+        usersSkipped.push(u.username);
+      }
+    }
+
+    return { usersCreated, usersSkipped, groupsCreated, groupsSkipped };
   }
 }

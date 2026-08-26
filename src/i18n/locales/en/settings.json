@@ -359,6 +359,8 @@
     "dockerRestartWarning": "Restarting Docker stops every currently-running container until it comes back up.",
     "superblockReloadFailed": "The restored array superblock is on disk, but reloading the driver to pick it up failed:",
     "retryBelow": "Restart services below to retry it.",
+    "usersRestoredNote": "Recreated {{users}} user(s) and {{groups}} group(s) - accounts that already existed on this host were left untouched.",
+    "usersRestoreFailed": "Recreating users/groups from the backup failed:",
     "restartServicesAgain": "Restart Services Again",
     "restartServices": "Restart Services",
     "restartingServicesDesc": "Restarting SMB, NFS, the driver, and Remote Backup, then nonraid-webui itself - this page will reconnect automatically once it's back.",

@@ -8,6 +8,8 @@ import type { RcloneClient } from '../rclone/client.js';
 import type { SettingsStore } from '../settings/index.js';
 import { notifyEvent } from '../settings/notify.js';
 import { scheduleFireKey, scheduleMatches } from '../settings/scheduleMatch.js';
+import type { UsersClient } from '../users/client.js';
+import { writeUsersExport } from '../users/backupExport.js';
 import type { BackupCategoryId } from './backupCatalog.js';
 import { ARCHIVE_EXT, isOwnArchiveName, resolveConfigBackupPaths, resolveExistingCategoryIds } from './backupCatalog.js';
 import { resolveBackupDestDir } from './backupDestination.js';
@@ -52,6 +54,9 @@ export class BackupScheduler {
     // run needs the real plaintext for openssl - see BackupEncryption's own doc comment
     // (settings/types.ts). Not used for anything else Local Backups does.
     private rclone: RcloneClient,
+    // Only ever used to snapshot managed users/groups right before a run - see the 'users'
+    // backup category (backupCatalog.ts) and users/backupExport.ts's writeUsersExport().
+    private users: UsersClient,
     intervalMs: number = config.schedulerTickIntervalMs,
   ) {
     this.timer = setInterval(() => this.tick(), intervalMs);
@@ -132,8 +137,9 @@ export class BackupScheduler {
       }
 
       this.metrics.checkpointForBackup();
+      await writeUsersExport(this.users, config.usersExportPath);
       const includeAppdata = schedule.scope === 'configAppdata';
-      const paths = await resolveConfigBackupPaths(this.nmd, includeAppdata);
+      const paths = await resolveConfigBackupPaths(this.nmd, this.settings, includeAppdata);
       if (paths.length === 0) {
         const msg = `${label} skipped - no config files found to back up`;
         this.activity.log(msg, 'amber').catch(() => {});
@@ -141,7 +147,7 @@ export class BackupScheduler {
       }
       const destPath = path.join(destDir, `${BACKUP_PREFIX}${Date.now()}${ARCHIVE_EXT}`);
       const bytes = await writeConfigBackupToFile(paths, destPath, password);
-      const categories = await resolveExistingCategoryIds(this.nmd, includeAppdata);
+      const categories = await resolveExistingCategoryIds(this.nmd, this.settings, includeAppdata);
       await writeMetaSidecar(destPath, buildMeta(schedule.scope, categories, !!password));
       const sizeLabel = bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
       const completedText = `${label} completed (${sizeLabel}${password ? ', encrypted' : ''})`;

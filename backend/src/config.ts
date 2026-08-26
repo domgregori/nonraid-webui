@@ -138,6 +138,21 @@ export const config = {
   usersUidRangeEnd: num('USERS_UID_RANGE_END', 59_999),
   usersTimeoutMs: num('USERS_TIMEOUT_MS', 15_000),
   usersShellPath: str('USERS_SHELL_PATH', '/usr/sbin/nologin'),
+  // A JSON snapshot of this host's managed users/groups (+ each user's own /etc/shadow hash),
+  // regenerated fresh right before every config backup run (see users/backupExport.ts) - never
+  // read by anything else this app does live, purely a backup/restore staging file. Restoring it
+  // (backupCatalog.ts's 'users' category) recreates whatever's missing via the same useradd/
+  // groupadd primitives users/realClient.ts's own createUser()/createGroup() use, implanting the
+  // shadow hash directly (chpasswd -e) rather than needing the original plaintext password back.
+  usersExportPath: str('USERS_EXPORT_PATH', path.join(process.cwd(), 'data', 'users-export.json')),
+  // Samba's own private password database (NTLM hashes for every smbpasswd-added account) - a
+  // self-contained file only this app's own setSambaPassword()/deleteUser() ever write into, so
+  // it's safe to restore wholesale (unlike /etc/passwd or /etc/shadow themselves, which a plain
+  // whole-file restore would overwrite system accounts with, restoring this just replaces the SMB
+  // credentials for exactly the accounts already in it). Samba still needs the matching Unix
+  // account to exist to authenticate against an entry here, which is what the 'users' category's
+  // exported snapshot above (recreated via UsersClient.restoreSnapshot()) is for.
+  sambaPasswdPath: str('SAMBA_PASSWD_PATH', '/var/lib/samba/private/passdb.tdb'),
   // Community Applications template feed - see backend/src/apps/. Primary is
   // the feed's own CDN; backup is the GitHub-hosted mirror the CA plugin itself
   // falls back to.

@@ -88,13 +88,17 @@ async function main() {
   // subprocess needs, same "reuse rclone's own obscure mechanism" reasoning RcloneService's own
   // password handling uses.
   const rclone = createRcloneClient();
-  const backupScheduler = new BackupScheduler(nmd, settingsStore, activity, metrics, rclone);
+  // Also moved up from its former call site (see UsersService below), same reasoning as rclone
+  // above - BackupScheduler/RcloneService only ever call exportSnapshot()/restoreSnapshot() on the
+  // raw client directly, with no need for UsersService's own share-access side effects.
+  const usersClient = createUsersClient();
+  const backupScheduler = new BackupScheduler(nmd, settingsStore, activity, metrics, rclone, usersClient);
   const authStore = new AuthStore();
   const authService = new AuthService(authStore);
   await authStore.get(); // fail fast at boot on a corrupt auth.json
   const tlsStore = new TlsStore();
   const tailscale = createTailscaleClient();
-  const rcloneService = new RcloneService(rclone, nmd, activity, settingsStore);
+  const rcloneService = new RcloneService(rclone, nmd, activity, settingsStore, usersClient);
   new RcloneSyncScheduler(rcloneService, settingsStore);
   new UpdateScheduler(activity, settingsStore);
   new DockerUpdateScheduler(docker, activity, settingsStore);
@@ -107,7 +111,6 @@ async function main() {
   const cacheMover = new CacheMoverService(nmd, shareStore, settingsStore);
   new CacheMoverScheduler(cacheMover, nmd, settingsStore, activity);
   const system = new SystemStatsService(smart);
-  const usersClient = createUsersClient();
   const users = new UsersService(usersClient, shareAccessStore, shareStore, shares, activity);
   const caFeedStore = new CaFeedStore();
   await caFeedStore.start();
@@ -231,7 +234,7 @@ async function main() {
   app.use('/api', smartRouter(nmd, smart, system));
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
-  app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics, settingsStore, rclone));
+  app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics, settingsStore, rclone, usersClient));
   app.use('/api', updateRouter(activity));
   app.use('/api', servicesRouter(activity));
   app.use('/api', sshRouter(activity, authService));

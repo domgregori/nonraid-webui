@@ -8,9 +8,12 @@ import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
 import { notifyEvent } from '../settings/notify.js';
 import { ARCHIVE_EXT, isOwnArchiveName, resolveConfigBackupPaths, resolveExistingCategoryIds } from '../system/backupCatalog.js';
+import { looksLikeGzip } from '../system/backupCrypto.js';
 import { buildMeta, META_SUFFIX, metaNameFor, readMetaSidecar, writeMetaSidecar } from '../system/backupMeta.js';
 import { writeConfigBackupToFile } from '../system/backupStream.js';
 import { buildRestorePreview, decryptIfNeeded, stageRestoreFile, type RestorePreviewData } from '../system/configRestore.js';
+import type { UsersClient } from '../users/client.js';
+import { writeUsersExport } from '../users/backupExport.js';
 import type { RcloneClient } from './client.js';
 import { getRcloneRcCredentials } from './rcCredentials.js';
 import { SyncJobStore, type NewSyncJob, type SyncJobPatch } from './syncJobStore.js';
@@ -57,6 +60,10 @@ export class RcloneService {
     private nmd: NmdClient,
     private activity: ActivityStore,
     private settings: SettingsStore,
+    // Only ever used to snapshot managed users/groups right before a 'config'/'configAppdata'
+    // scope job runs - see the 'users' backup category (backupCatalog.ts) and
+    // users/backupExport.ts's writeUsersExport().
+    private users: UsersClient,
     store?: SyncJobStore,
   ) {
     this.store = store ?? new SyncJobStore();
@@ -184,12 +191,18 @@ export class RcloneService {
       await this.client.downloadFile(dst, name, stagingDir, name);
       const filePath = path.join(stagingDir, name);
       const metaName = metaNameFor(name);
-      await this.client.downloadFile(dst, metaName, stagingDir, metaName).catch(() => {}); // best-effort - no sidecar reads as unencrypted
+      await this.client.downloadFile(dst, metaName, stagingDir, metaName).catch(() => {}); // best-effort - a missing remote sidecar is expected, not an error
       const meta = await readMetaSidecar(filePath); // reads stagingDir/<metaName>, same naming as the just-downloaded file above
 
-      const { path: decryptedPath, cleanup } = await decryptIfNeeded(filePath, meta?.encrypted ?? false, password);
+      // No sidecar (never uploaded, or lost) falls back to gzip-magic-byte sniffing rather than
+      // assuming unencrypted - same reasoning as the local-restore route's own fallback
+      // (routes/system.ts) and the upload route's looksLikeGzip() use, applied here too so a
+      // genuinely-encrypted archive with no sidecar still prompts for a password instead of
+      // failing deep inside buildRestorePreview() with a confusing "not a valid config backup".
+      const encrypted = meta ? meta.encrypted : !(await looksLikeGzip(filePath));
+      const { path: decryptedPath, cleanup } = await decryptIfNeeded(filePath, encrypted, password);
       cleanupDecrypted = cleanup;
-      const preview = await buildRestorePreview(this.nmd, decryptedPath);
+      const preview = await buildRestorePreview(this.nmd, this.settings, decryptedPath);
       const token = randomUUID();
       stageRestoreFile(token, decryptedPath);
       // Once decryption actually happened, the staged plaintext copy above lives outside
@@ -258,8 +271,9 @@ export class RcloneService {
 
         stagingDir = path.join(os.tmpdir(), `nonraid-rclone-${job.id}-${Date.now()}`);
         await mkdir(stagingDir, { recursive: true });
+        await writeUsersExport(this.users, config.usersExportPath);
         const includeAppdata = job.scope === 'configAppdata';
-        const paths = await resolveConfigBackupPaths(this.nmd, includeAppdata);
+        const paths = await resolveConfigBackupPaths(this.nmd, this.settings, includeAppdata);
         if (paths.length === 0) throw new Error('No config files found to back up.');
         const archivePath = path.join(stagingDir, `${ARCHIVE_PREFIX}${Date.now()}${ARCHIVE_EXT}`);
         await writeConfigBackupToFile(paths, archivePath, password);
@@ -267,7 +281,7 @@ export class RcloneService {
         // same rclone copy below - no separate upload call needed (see backupMeta.ts's own doc
         // comment on this module's split between "build the sidecar" and "get it to the
         // destination", which for this scope is just "put it next to the archive before syncing").
-        const categories = await resolveExistingCategoryIds(this.nmd, includeAppdata);
+        const categories = await resolveExistingCategoryIds(this.nmd, this.settings, includeAppdata);
         await writeMetaSidecar(archivePath, buildMeta(job.scope, categories, !!password));
         srcFs = stagingDir;
         mode = 'copy';

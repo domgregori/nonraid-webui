@@ -1,6 +1,7 @@
 import { unlink } from 'node:fs/promises';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
+import type { SettingsStore } from '../settings/index.js';
 import { categoryForMember, resolveBackupCategories, type BackupCategoryId } from './backupCatalog.js';
 import { decryptFileToTemp, PasswordRequiredError } from './backupCrypto.js';
 import { runSudoMaybe } from './procUtil.js';
@@ -129,7 +130,7 @@ export interface RestorePreviewData {
  * "config backups + appdata" Local/Remote Backup run) or it silently falls into no category at
  * all and can never be selected or restored, even though it's sitting right there in the archive.
  */
-export async function buildRestorePreview(nmd: NmdClient, filePath: string): Promise<RestorePreviewData> {
+export async function buildRestorePreview(nmd: NmdClient, settingsStore: SettingsStore, filePath: string): Promise<RestorePreviewData> {
   const members = await listArchiveMembers(filePath);
   if (members.length === 0) throw new HttpError(400, 'Archive is empty or not a valid config backup.');
 
@@ -139,7 +140,7 @@ export async function buildRestorePreview(nmd: NmdClient, filePath: string): Pro
   const status = await nmd.getStatus().catch(() => null);
   const arrayStopped = status ? status.array.state !== 'STARTED' : true;
 
-  const categories = await resolveBackupCategories(nmd, true);
+  const categories = await resolveBackupCategories(nmd, settingsStore, true);
   // Directory members (e.g. "etc/nonraid/") are counted in their category's totals below but
   // dropped from the flat `entries` shown per-member - same reasoning restoreArchiveMembers()
   // itself already has for not extracting them: a bare directory carries nothing the file

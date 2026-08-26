@@ -393,6 +393,20 @@ export function ConfigRestoreWizard({ onClose, onRestored, title, initialPreview
                 </div>
               )}
 
+              {commitResult.usersRestoreResult && (
+                <div className="status-note">
+                  {t('ConfigRestoreWizard.usersRestoredNote', {
+                    users: commitResult.usersRestoreResult.usersCreated.length,
+                    groups: commitResult.usersRestoreResult.groupsCreated.length,
+                  })}
+                </div>
+              )}
+              {commitResult.usersRestoreError && (
+                <div className="status-note status-note--error">
+                  {t('ConfigRestoreWizard.usersRestoreFailed')} {commitResult.usersRestoreError}
+                </div>
+              )}
+
               <div className="toggle-row--bordered" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
                 {!restarting ? (
                   <div className="dialog__actions" style={{ justifyContent: 'flex-start' }}>
