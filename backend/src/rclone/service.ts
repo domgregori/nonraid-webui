@@ -7,7 +7,7 @@ import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
 import { notifyEvent } from '../settings/notify.js';
-import { resolveConfigBackupPaths, resolveExistingCategoryIds } from '../system/backupCatalog.js';
+import { ARCHIVE_EXT, isOwnArchiveName, resolveConfigBackupPaths, resolveExistingCategoryIds } from '../system/backupCatalog.js';
 import { buildMeta, META_SUFFIX, metaNameFor, readMetaSidecar, writeMetaSidecar } from '../system/backupMeta.js';
 import { writeConfigBackupToFile } from '../system/backupStream.js';
 import { buildRestorePreview, decryptIfNeeded, stageRestoreFile, type RestorePreviewData } from '../system/configRestore.js';
@@ -17,7 +17,6 @@ import { SyncJobStore, type NewSyncJob, type SyncJobPatch } from './syncJobStore
 import type { RemoteBackupEntry, SyncJob, SyncJobProgress, SyncJobWithRuntime } from './types.js';
 
 const ARCHIVE_PREFIX = 'nonraid-remote-backup-';
-const ARCHIVE_SUFFIX = '.tar.gz';
 const VERSIONS_SUBDIR = '.nonraid-versions'; // rclone --backup-dir target under a 'custom'-scope job's own remote path
 
 function dstFs(remoteName: string, remotePath: string): string {
@@ -33,7 +32,7 @@ function dstFs(remoteName: string, remotePath: string): string {
  * comment (rclone/types.ts) and RemoteBackupSection.tsx for the scope/retention split this
  * implements:
  *
- * - 'config' / 'configAppdata': not a live mirror - each run builds one fresh tar.gz (same
+ * - 'config' / 'configAppdata': not a live mirror - each run builds one fresh archive (same
  *   category-path builder Local Backups itself uses, `configAppdata` just also includes
  *   config.appsBindRoots - see backupCatalog.ts's resolveBackupCategories) and uploads that one
  *   uniquely-timestamped file.
@@ -128,7 +127,7 @@ export class RcloneService {
   async listBackupsAt(remoteName: string, remotePath: string): Promise<RemoteBackupEntry[]> {
     const dst = dstFs(remoteName, remotePath);
     const entries = await this.client.listDir(dst).catch(() => []);
-    const archiveEntries = entries.filter((e) => e.name.startsWith(ARCHIVE_PREFIX) && e.name.endsWith(ARCHIVE_SUFFIX));
+    const archiveEntries = entries.filter((e) => isOwnArchiveName(e.name, ARCHIVE_PREFIX));
     const metaNames = new Set(entries.filter((e) => e.name.endsWith(META_SUFFIX)).map((e) => e.name));
 
     const results = await Promise.all(
@@ -174,7 +173,7 @@ export class RcloneService {
    * bearing on where the archive itself is read from.
    */
   async previewBackupAt(remoteName: string, remotePath: string, name: string, password: string | null | undefined, stagingKey: string): Promise<{ token: string } & RestorePreviewData> {
-    if (!name.startsWith(ARCHIVE_PREFIX) || !name.endsWith(ARCHIVE_SUFFIX) || name.includes('/') || name.includes('\\')) {
+    if (!isOwnArchiveName(name, ARCHIVE_PREFIX) || name.includes('/') || name.includes('\\')) {
       throw new Error('Invalid archive name.');
     }
     const stagingDir = path.join(os.tmpdir(), `nonraid-rclone-restore-${stagingKey}-${Date.now()}`);
@@ -262,7 +261,7 @@ export class RcloneService {
         const includeAppdata = job.scope === 'configAppdata';
         const paths = await resolveConfigBackupPaths(this.nmd, includeAppdata);
         if (paths.length === 0) throw new Error('No config files found to back up.');
-        const archivePath = path.join(stagingDir, `${ARCHIVE_PREFIX}${Date.now()}${ARCHIVE_SUFFIX}`);
+        const archivePath = path.join(stagingDir, `${ARCHIVE_PREFIX}${Date.now()}${ARCHIVE_EXT}`);
         await writeConfigBackupToFile(paths, archivePath, password);
         // Written into the same stagingDir as the archive itself, so it rides along on the exact
         // same rclone copy below - no separate upload call needed (see backupMeta.ts's own doc
@@ -339,7 +338,7 @@ export class RcloneService {
     }
     const remoteFs = dstFs(job.remoteName, job.remotePath);
     const entries = await this.listRemoteFiles(remoteFs);
-    const archives = entries.filter((e) => e.Name.startsWith(ARCHIVE_PREFIX) && e.Name.endsWith(ARCHIVE_SUFFIX));
+    const archives = entries.filter((e) => isOwnArchiveName(e.Name, ARCHIVE_PREFIX));
     for (const entry of archives) {
       if (new Date(entry.ModTime).getTime() < cutoff) {
         await this.deleteRemoteFile(remoteFs, entry.Path);

@@ -220,7 +220,7 @@ export function ConfigRestoreWizard({ onClose, onRestored, title, initialPreview
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".gz,.tar.gz,.enc"
+                accept=".nrb,.gz,.tar.gz,.enc"
                 className="file-input"
                 onChange={(e) => {
                   const file = e.target.files?.[0];

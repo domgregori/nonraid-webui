@@ -10,6 +10,7 @@ import { settingsApi } from '../api/settingsApi';
 import { systemApi } from '../api/systemApi';
 import { AppriseTargetsField } from '../components/settings/AppriseTargetsField';
 import { ConfigRestoreWizard } from '../components/settings/ConfigRestoreWizard';
+import { EncryptBackupModal } from '../components/settings/EncryptBackupModal';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
 import { LogsSection } from '../components/settings/LogsSection';
 import { NotificationEventToggles } from '../components/settings/NotificationEventToggles';
@@ -208,12 +209,13 @@ export function SettingsPage() {
   const [backupRetainDraft, setBackupRetainDraft] = useState('7');
   const [backupRetainForever, setBackupRetainForever] = useState(false);
   // `backupHadPassword` isn't itself editable - it's what was already saved (settings.backupSchedule.
-  // encryption.hasPassword), driving the "leave blank to keep the current password" placeholder vs.
-  // "required" validation. `backupEncryptPassword` is always blank to start, even when a password's
-  // already saved - never round-tripped from the server (see BackupEncryption's own doc comment).
+  // encryption.hasPassword), driving EncryptBackupModal's "change password" vs "encrypt backups"
+  // framing. The real password is never round-tripped from the server (see BackupEncryption's own
+  // doc comment) - the modal always starts blank, entered twice, only sent on a real change.
   const [backupEncryptEnabled, setBackupEncryptEnabled] = useState(false);
-  const [backupEncryptPassword, setBackupEncryptPassword] = useState('');
   const [backupHadPassword, setBackupHadPassword] = useState(false);
+  const [showEncryptModal, setShowEncryptModal] = useState(false);
+  const [encryptDisabling, setEncryptDisabling] = useState(false);
   const [backupSchedSaving, setBackupSchedSaving] = useState(false);
   const [backupSchedError, setBackupSchedError] = useState<string | null>(null);
   const [backupRunning, setBackupRunning] = useState(false);
@@ -542,10 +544,6 @@ export function SettingsPage() {
       setBackupSchedError(t('SettingsPage.backups.cronExpressionError'));
       return;
     }
-    if (backupEncryptEnabled && !backupEncryptPassword.trim() && !backupHadPassword) {
-      setBackupSchedError(t('SettingsPage.backups.encryptPasswordError'));
-      return;
-    }
     setBackupSchedSaving(true);
     setBackupSchedError(null);
     await update({
@@ -564,15 +562,32 @@ export function SettingsPage() {
         },
         retain: backupRetainForever ? 1 : retain,
         retainForever: backupRetainForever,
-        encryption: { enabled: backupEncryptEnabled, password: backupEncryptPassword.trim() || undefined },
+        // Encryption is its own standalone save (see EncryptBackupModal/handleEncryptConfirm/
+        // handleDisableEncryption below) - omitted here entirely rather than sent as unchanged,
+        // since AppSettingsUpdate's backupSchedule.encryption is optional precisely so a patch
+        // that doesn't touch it can leave it alone.
       },
     });
-    // Never keeps a just-typed password sitting in this draft field past a successful save - the
-    // next save (e.g. just changing the schedule) should mean "keep the current password" by
-    // default, same as reopening this card fresh would.
-    if (backupEncryptPassword.trim()) setBackupHadPassword(true);
-    setBackupEncryptPassword('');
     setBackupSchedSaving(false);
+  };
+
+  // The "Encrypt backups…"/"Change password…" modal's confirm handler - a standalone save (not
+  // tied to the rest of the schedule's own Save button) since encryption is now its own guided
+  // step, entered via EncryptBackupModal's double-password-entry rather than an inline field.
+  const handleEncryptConfirm = async (password: string) => {
+    await update({ backupSchedule: { encryption: { enabled: true, password } } });
+    setBackupEncryptEnabled(true);
+    setBackupHadPassword(true);
+  };
+
+  const handleDisableEncryption = async () => {
+    setEncryptDisabling(true);
+    try {
+      await update({ backupSchedule: { encryption: { enabled: false } } });
+      setBackupEncryptEnabled(false);
+    } finally {
+      setEncryptDisabling(false);
+    }
   };
 
   const runBackupNow = async () => {
@@ -973,6 +988,27 @@ export function SettingsPage() {
               </div>
               <ToggleSwitch on={backupSchedEnabled} onToggle={() => setBackupSchedEnabled((v) => !v)} label={t('SettingsPage.backups.autoBackupTitle')} disabled={!settings} />
             </div>
+
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">{t('SettingsPage.backups.backUpNowTitle')}</div>
+              <div className="settings-field__row">
+                <button type="button" className="btn" disabled={backupRunning || !settings} onClick={runBackupNow} title={t('SettingsPage.backups.backUpNowTooltip')}>
+                  {backupRunning && <span className="spinner" aria-hidden="true" />}
+                  {backupRunning ? t('SettingsPage.backups.backingUpButton') : t('SettingsPage.backups.backUpNowButton')}
+                </button>
+                <a
+                  className="btn"
+                  href={backupEncryptEnabled ? systemApi.bootDiskConfigBackupEncryptedUrl() : systemApi.bootDiskConfigBackupUrl()}
+                  download
+                  title={backupEncryptEnabled ? t('SettingsPage.backups.downloadEncryptedCopyTooltip') : t('SettingsPage.backups.downloadCopyTooltip')}
+                >
+                  {t('SettingsPage.backups.downloadCopyButton')}
+                </a>
+              </div>
+              {backupRunResult && <div className="status-note">{backupRunResult}</div>}
+              {backupRunError && <div className="status-note status-note--error">{backupRunError}</div>}
+            </div>
+
             {backupSchedEnabled && (
               <>
                 <div className="settings-field toggle-row--bordered">
@@ -1036,28 +1072,23 @@ export function SettingsPage() {
                   <div className="toggle-row__title" style={{ marginTop: 10 }}>
                     {t('SettingsPage.backups.encryptionTitle')}
                   </div>
-                  <div className="keep-forever-row" style={{ marginTop: 0 }}>
-                    <input
-                      className="round-checkbox"
-                      type="checkbox"
-                      id="local-backup-encrypt"
-                      checked={backupEncryptEnabled}
-                      onChange={(e) => setBackupEncryptEnabled(e.target.checked)}
-                      disabled={!settings}
-                    />
-                    <label htmlFor="local-backup-encrypt">{t('SettingsPage.backups.encryptPasswordLabel')}</label>
+                  <div className="toggle-row__desc">{backupEncryptEnabled ? t('SettingsPage.backups.encryptionOnDesc') : t('SettingsPage.backups.encryptionOffDesc')}</div>
+                  <div className="settings-field__row" style={{ marginTop: 6 }}>
+                    <button type="button" className="btn" disabled={!settings} onClick={() => setShowEncryptModal(true)}>
+                      {backupEncryptEnabled ? t('SettingsPage.backups.changePasswordButton') : t('SettingsPage.backups.encryptBackupsButton')}
+                    </button>
+                    {backupEncryptEnabled && (
+                      <button type="button" className="btn btn--danger" disabled={!settings || encryptDisabling} onClick={handleDisableEncryption}>
+                        {encryptDisabling ? t('SettingsPage.saving') : t('SettingsPage.backups.disableEncryptionButton')}
+                      </button>
+                    )}
                   </div>
-                  {backupEncryptEnabled && (
-                    <div className="settings-field__row" style={{ marginTop: 8 }}>
-                      <input
-                        className="history-input"
-                        type="password"
-                        value={backupEncryptPassword}
-                        onChange={(e) => setBackupEncryptPassword(e.target.value)}
-                        placeholder={backupHadPassword ? t('SettingsPage.backups.passwordPlaceholderExisting') : t('SettingsPage.backups.passwordPlaceholder')}
-                        disabled={!settings}
-                      />
-                    </div>
+                  {showEncryptModal && (
+                    <EncryptBackupModal
+                      hadPassword={backupHadPassword}
+                      onConfirm={handleEncryptConfirm}
+                      onClose={() => setShowEncryptModal(false)}
+                    />
                   )}
 
                   <div className="schedule-row" style={{ marginTop: 10 }}>
@@ -1071,20 +1102,6 @@ export function SettingsPage() {
                     </button>
                   </div>
                   {backupSchedError && <div className="status-note status-note--error">{backupSchedError}</div>}
-                </div>
-
-                <div className="settings-field toggle-row--bordered">
-                  <div className="toggle-row__title">{t('SettingsPage.backups.backUpNowTitle')}</div>
-                  <div className="settings-field__row">
-                    <button type="button" className="btn" disabled={backupRunning || !settings} onClick={runBackupNow} title={t('SettingsPage.backups.backUpNowTooltip')}>
-                      {backupRunning ? t('SettingsPage.backups.backingUpButton') : t('SettingsPage.backups.backUpNowButton')}
-                    </button>
-                    <a className="btn" href={systemApi.bootDiskConfigBackupUrl()} download title={t('SettingsPage.backups.downloadCopyTooltip')}>
-                      {t('SettingsPage.backups.downloadCopyButton')}
-                    </a>
-                  </div>
-                  {backupRunResult && <div className="status-note">{backupRunResult}</div>}
-                  {backupRunError && <div className="status-note status-note--error">{backupRunError}</div>}
                 </div>
               </>
             )}
@@ -1112,6 +1129,9 @@ export function SettingsPage() {
                 <button type="button" className="btn" onClick={() => setRestoreDialog({ source: 'remote' })}>
                   {t('SettingsPage.recovery.fromRemote')}
                 </button>
+              </div>
+              <div className="toggle-row__desc" style={{ marginTop: 6 }}>
+                {t('SettingsPage.recovery.cliDecryptPrefix')} <code>tools/decrypt-backup.sh</code> {t('SettingsPage.recovery.cliDecryptSuffix')}
               </div>
             </div>
 

@@ -35,6 +35,19 @@
     "connected": "{{name}} is connected.",
     "done": "Done"
   },
+  "EncryptBackupModal": {
+    "title": "Encrypt backups",
+    "changeTitle": "Change encryption password",
+    "close": "Close",
+    "description": "This password protects your local config backups. Enter it twice to make sure it's typed correctly - losing it means losing access to every backup encrypted with it.",
+    "passwordLabel": "Password",
+    "confirmLabel": "Confirm password",
+    "passwordRequired": "Enter a password.",
+    "mismatch": "Passwords don't match.",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "confirm": "Encrypt backups"
+  },
   "AppriseTargetsField": {
     "fieldsRequired": "{{fields}} required.",
     "sent": "Sent.",
@@ -463,7 +476,8 @@
     "new": "New",
     "recoveryLink": "Recovery →",
     "syncBackupsTitle": "Sync backups to remote storage",
-    "syncBackupsDesc": "S3, Backblaze B2, Google Drive, SFTP, and 70+ others via rclone. Disabled by default.",
+    "syncBackupsDesc": "S3, Backblaze B2, Google Drive, SFTP, and 70+ others via rclone.",
+    "rcloneDocsLink": "rclone docs",
     "rcloneNotReachable1": "rclone-rcd isn't reachable - check",
     "rcloneNotReachable2": "on the host.",
     "remotes": "Remotes",

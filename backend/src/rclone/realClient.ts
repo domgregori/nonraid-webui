@@ -18,7 +18,7 @@ function isEnoent(err: unknown): boolean {
 // The subset of rclone's own `config/providers` response shape this client actually reads -
 // confirmed live against rclone v1.75.0 (see backend/src/rclone/realClient.ts's doc comment on
 // listProviders for how this was verified). Real responses have several more fields per option
-// (Hide, Exclusive, Sensitive, Examples, ...) nothing here uses.
+// (Exclusive, Sensitive, Examples, ...) nothing here uses.
 interface RcProviderOptionJson {
   Name: string;
   Help: string;
@@ -26,6 +26,12 @@ interface RcProviderOptionJson {
   Required: boolean;
   IsPassword: boolean;
   Advanced: boolean;
+  // rclone's own bitmask (OptionHideCommandLine = 1, OptionHideConfigurator = 2) - confirmed live
+  // that every field with bit 2 set is either genuinely deprecated ("Deprecated: No longer
+  // needed.", drive's alternate_export) or meant only for CLI flags, not an interactive config
+  // wizard (drive's team_drive/service_account_credentials) - the same category this app's
+  // dynamic Add-remote form belongs in. Bit 1 alone (CLI-only) is left visible here on purpose.
+  Hide: number;
   Type: string;
 }
 interface RcProviderJson {
@@ -180,7 +186,10 @@ export class RealRcloneClient implements RcloneClient {
       // the *raw* Options here, before the !Advanced filter below strips them out of what the
       // dynamic field form actually renders.
       oauth: p.Options.some((o) => o.Name === 'auth_url') && p.Options.some((o) => o.Name === 'token_url'),
-      options: p.Options.filter((o) => !o.Advanced).map(
+      // !Advanced already drops most deprecated/internal fields (they're almost always also
+      // marked Advanced) - the Hide check catches the rest, like drive's alternate_export, which
+      // rclone marks deprecated but NOT advanced (confirmed live).
+      options: p.Options.filter((o) => !o.Advanced && !(o.Hide & 2)).map(
         (o): RcloneProviderOption => ({
           name: o.Name,
           help: o.Help,

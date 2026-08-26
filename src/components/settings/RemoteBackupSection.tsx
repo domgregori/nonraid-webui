@@ -443,7 +443,10 @@ export function RemoteBackupSection() {
         <div>
           <div className="toggle-row__title">{t('RemoteBackupSection.syncBackupsTitle')}</div>
           <div className="toggle-row__desc" style={{ paddingBottom: 0 }}>
-            {t('RemoteBackupSection.syncBackupsDesc')}
+            {t('RemoteBackupSection.syncBackupsDesc')}{' '}
+            <a href="https://rclone.org/docs/" target="_blank" rel="noreferrer">
+              {t('RemoteBackupSection.rcloneDocsLink')}
+            </a>
           </div>
         </div>
         <ToggleSwitch on={status.featureEnabled} onToggle={toggleEnabled} label={t('RemoteBackupSection.title')} disabled={enabling} />

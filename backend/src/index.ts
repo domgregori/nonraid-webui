@@ -231,7 +231,7 @@ async function main() {
   app.use('/api', smartRouter(nmd, smart, system));
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
-  app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics, settingsStore));
+  app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics, settingsStore, rclone));
   app.use('/api', updateRouter(activity));
   app.use('/api', servicesRouter(activity));
   app.use('/api', sshRouter(activity, authService));

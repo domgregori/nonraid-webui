@@ -33,6 +33,7 @@ import { runSudoMaybe } from '../system/procUtil.js';
 import type { SystemStatsService } from '../system/service.js';
 import { restartService, SERVICE_DEFS } from '../system/services.js';
 import type { SettingsStore } from '../settings/store.js';
+import type { RcloneClient } from '../rclone/client.js';
 
 // Config backups are small text files plus the 4KB superblock, but a long-lived activity log or
 // many shares' worth of config could add up - generous but bounded, matching the same "don't
@@ -46,6 +47,7 @@ export function systemRouter(
   backupScheduler: BackupScheduler,
   metrics: MetricsService,
   settingsStore: SettingsStore,
+  rclone: RcloneClient,
 ): Router {
   const router = Router();
 
@@ -80,6 +82,33 @@ export function systemRouter(
         throw new HttpError(400, 'No NonRAID config files were found to back up.');
       }
       streamConfigBackup(existing, res, activity);
+    } catch (err) {
+      if (err instanceof HttpError) {
+        res.status(err.status).json({ error: err.message });
+      } else {
+        res.status(502).json({ error: (err as Error).message });
+      }
+    }
+  });
+
+  // Same one-off browser download as /system/boot-disk/backup/config above, but encrypted with
+  // whatever password is already saved for Local Backups (Settings -> Backups' own Encryption
+  // section) - there's no separate "pick a password for this one download" flow, it always reuses
+  // the saved one, same as a scheduled/manual "Back up now" run would.
+  router.get('/system/boot-disk/backup/config-encrypted', async (_req, res) => {
+    try {
+      const settings = await settingsStore.get();
+      const { passwordObscured } = settings.backupSchedule.encryption;
+      if (!passwordObscured) {
+        throw new HttpError(400, 'No encryption password is saved - set one in Settings → Local Backups first.');
+      }
+      metrics.checkpointForBackup();
+      const existing = await resolveConfigBackupPaths(nmd);
+      if (existing.length === 0) {
+        throw new HttpError(400, 'No NonRAID config files were found to back up.');
+      }
+      const password = await rclone.reveal(passwordObscured);
+      streamConfigBackup(existing, res, activity, password);
     } catch (err) {
       if (err instanceof HttpError) {
         res.status(err.status).json({ error: err.message });

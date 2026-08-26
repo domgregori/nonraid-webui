@@ -15,6 +15,27 @@ import type { NmdClient } from '../nmd/index.js';
 // to have kept the current login and restored everything else.
 export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory' | 'appdata' | 'remoteBackup';
 
+// The extension every config backup archive this app writes gets, encrypted or not - a branded
+// stand-in for the generic ".tar.gz" every archive actually still is under the hood (tar+gzip, or
+// that piped through openssl enc - see backupCrypto.ts), the same "the container format doesn't
+// change, only the label on it" reasoning backupMeta.ts's own doc comment already established for
+// why a `.meta.json` sidecar carries the encrypted flag instead of the extension. Shared by
+// backupStream.ts, backupScheduler.ts, and rclone/service.ts so every archive this app creates -
+// on-demand download, scheduled local, or remote sync - uses the same suffix.
+export const ARCHIVE_EXT = '.nrb';
+// Every archive this app wrote before ARCHIVE_EXT existed - recognized alongside ARCHIVE_EXT
+// wherever existing archives are matched (local/remote listing, retention pruning, restore lookup)
+// so upgrading this app doesn't orphan anything already on disk or already uploaded; never used for
+// naming a newly-created archive.
+export const LEGACY_ARCHIVE_EXT = '.tar.gz';
+
+/** True for a filename this app would recognize as one of its own config backup archives -
+ *  `prefix` is the caller's own archive-naming prefix (BackupScheduler's/RcloneService's each
+ *  differ), suffix is ARCHIVE_EXT or LEGACY_ARCHIVE_EXT. */
+export function isOwnArchiveName(name: string, prefix: string): boolean {
+  return name.startsWith(prefix) && (name.endsWith(ARCHIVE_EXT) || name.endsWith(LEGACY_ARCHIVE_EXT));
+}
+
 export interface BackupCategory {
   id: BackupCategoryId;
   label: string;

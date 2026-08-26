@@ -48,6 +48,7 @@ export const systemApi = {
 
   bootDiskImageBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/image`,
   bootDiskConfigBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/config`,
+  bootDiskConfigBackupEncryptedUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/config-encrypted`,
 
   getTimezones: () => request<string[]>('/api/system/timezones'),
   setHostname: (hostname: string) =>

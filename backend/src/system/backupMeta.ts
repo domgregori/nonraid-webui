@@ -22,16 +22,17 @@ export interface BackupMeta {
 
 export const META_SUFFIX = '.meta.json';
 
-/** Swaps an archive's trailing ".tar.gz" for ".meta.json" - both BackupScheduler's and
- *  RcloneService's own archive filenames end in ".tar.gz" today (encrypted or not - the extension
- *  deliberately never changes, see BackupMeta's own doc comment), so this one substitution covers
- *  every archive-naming convention in the app without either caller needing its own copy. */
+/** Swaps an archive's trailing ARCHIVE_EXT (or a pre-".nrb" archive's LEGACY_ARCHIVE_EXT) for
+ *  ".meta.json" - both BackupScheduler's and RcloneService's own archive filenames end in one of
+ *  those two today (encrypted or not - the extension deliberately never changes, see BackupMeta's
+ *  own doc comment), so this one substitution covers every archive-naming convention in the app
+ *  without either caller needing its own copy. */
 export function metaPathFor(archivePath: string): string {
-  return archivePath.replace(/\.tar\.gz$/, META_SUFFIX);
+  return archivePath.replace(/\.(nrb|tar\.gz)$/, META_SUFFIX);
 }
 
 export function metaNameFor(archiveName: string): string {
-  return archiveName.replace(/\.tar\.gz$/, META_SUFFIX);
+  return archiveName.replace(/\.(nrb|tar\.gz)$/, META_SUFFIX);
 }
 
 export function buildMeta(scope: BackupScope, categories: BackupCategoryId[], encrypted: boolean): BackupMeta {

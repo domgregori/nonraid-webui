@@ -9,13 +9,12 @@ import type { SettingsStore } from '../settings/index.js';
 import { notifyEvent } from '../settings/notify.js';
 import { scheduleFireKey, scheduleMatches } from '../settings/scheduleMatch.js';
 import type { BackupCategoryId } from './backupCatalog.js';
-import { resolveConfigBackupPaths, resolveExistingCategoryIds } from './backupCatalog.js';
+import { ARCHIVE_EXT, isOwnArchiveName, resolveConfigBackupPaths, resolveExistingCategoryIds } from './backupCatalog.js';
 import { resolveBackupDestDir } from './backupDestination.js';
 import { buildMeta, deleteMetaSidecar, readMetaSidecar, writeMetaSidecar } from './backupMeta.js';
 import { writeConfigBackupToFile } from './backupStream.js';
 
 const BACKUP_PREFIX = 'nonraid-config-backup-';
-const BACKUP_SUFFIX = '.tar.gz';
 
 // GET /system/backup/local/list - one archive at Settings -> Local Backups' own configured
 // destination, enriched with its own `.meta.json` sidecar (backupMeta.ts) when one exists next to
@@ -140,7 +139,7 @@ export class BackupScheduler {
         this.activity.log(msg, 'amber').catch(() => {});
         throw new Error('No config files found to back up.');
       }
-      const destPath = path.join(destDir, `${BACKUP_PREFIX}${Date.now()}${BACKUP_SUFFIX}`);
+      const destPath = path.join(destDir, `${BACKUP_PREFIX}${Date.now()}${ARCHIVE_EXT}`);
       const bytes = await writeConfigBackupToFile(paths, destPath, password);
       const categories = await resolveExistingCategoryIds(this.nmd, includeAppdata);
       await writeMetaSidecar(destPath, buildMeta(schedule.scope, categories, !!password));
@@ -169,7 +168,7 @@ export class BackupScheduler {
     } catch {
       return;
     }
-    const ours = entries.filter((f) => f.startsWith(BACKUP_PREFIX) && f.endsWith(BACKUP_SUFFIX));
+    const ours = entries.filter((f) => isOwnArchiveName(f, BACKUP_PREFIX));
     if (ours.length <= retain) return;
 
     const withMtimes = await Promise.all(
@@ -216,7 +215,7 @@ export class BackupScheduler {
     } catch {
       return { destDir, backups: [] };
     }
-    const ours = entries.filter((f) => f.startsWith(BACKUP_PREFIX) && f.endsWith(BACKUP_SUFFIX));
+    const ours = entries.filter((f) => isOwnArchiveName(f, BACKUP_PREFIX));
     const withStats = await Promise.all(
       ours.map(async (f) => {
         const full = path.join(destDir, f);
@@ -239,7 +238,7 @@ export class BackupScheduler {
    *  path-based import. Throws if the name doesn't look like one of this scheduler's own archives
    *  or the file no longer actually exists (e.g. pruned between listing and picking it). */
   async resolveBackupPath(name: string): Promise<string> {
-    if (!name.startsWith(BACKUP_PREFIX) || !name.endsWith(BACKUP_SUFFIX) || name.includes('/') || name.includes('\\')) {
+    if (!isOwnArchiveName(name, BACKUP_PREFIX) || name.includes('/') || name.includes('\\')) {
       throw new Error('Invalid backup file name.');
     }
     const settings = await this.settings.get();

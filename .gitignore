@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+*.tsbuildinfo
 backend/src/buildInfo.generated.ts
 
 # Personal/local-only tooling, never shipped or synced to either remote
