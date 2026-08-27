@@ -21,7 +21,8 @@ export type NotificationEventType =
   | 'updateAvailable'
   | 'dockerUpdateAvailable'
   | 'backupSkipped'
-  | 'remoteBackupRetentionFailed';
+  | 'remoteBackupRetentionFailed'
+  | 'dockerLxcStorageUnavailable';
 
 export type NotificationSeverity = 'high' | 'medium' | 'low';
 
@@ -58,6 +59,7 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { id: 'parityErrors', label: 'Parity check finished with errors', severity: 'high', defaultEnabled: true },
   { id: 'backupFailed', label: 'Scheduled backup failed', severity: 'high', defaultEnabled: true },
   { id: 'backupSkipped', label: 'Backup skipped (misconfigured)', severity: 'high', defaultEnabled: true },
+  { id: 'dockerLxcStorageUnavailable', label: "Docker/LXC storage on the array isn't available", severity: 'high', defaultEnabled: true },
   { id: 'cacheMirrorDegraded', label: 'Cache mirror degraded', severity: 'high', defaultEnabled: true },
   { id: 'cacheMoverFailed', label: 'Cache mover failed', severity: 'high', defaultEnabled: true },
   { id: 'tempAlertCpu', label: 'CPU temperature alert', severity: 'medium', defaultEnabled: true, group: 'Temperature' },

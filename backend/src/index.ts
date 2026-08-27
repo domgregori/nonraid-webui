@@ -15,6 +15,7 @@ import { CacheService } from './cache/service.js';
 import { config } from './config.js';
 import { DiskQueueService } from './diskQueue/service.js';
 import { createDockerClient } from './docker/index.js';
+import { getConfiguredDockerStorage } from './docker/storagePath.js';
 import { DockerUpdateScheduler } from './docker/updateScheduler.js';
 import { EmptyDiskService } from './emptyDisk/index.js';
 import { createLxcClient } from './lxc/index.js';
@@ -54,6 +55,7 @@ import { createRcloneClient } from './rclone/index.js';
 import { RcloneService } from './rclone/service.js';
 import { RcloneSyncScheduler } from './rclone/syncScheduler.js';
 import { SettingsStore } from './settings/index.js';
+import { notifyEvent } from './settings/notify.js';
 import { createShareApplier, ShareAccessStore, ShareService, ShareStore } from './shares/index.js';
 import { createSmartClient, SmartService } from './smart/index.js';
 import { BackupScheduler } from './system/backupScheduler.js';
@@ -162,6 +164,33 @@ async function main() {
   // empty leftover directory. Best-effort (see ShareService.remountAll):
   // never block startup on one share's mount failing.
   await shares.remountAll();
+
+  // docker.service/lxc.service are ordered (via a systemd drop-in install-webui.sh installs) to
+  // start only after nonraid.service - which assembles/mounts the array at boot on its own,
+  // independent of this app - so they no longer race an unmounted array disk. That's ordering
+  // only, not a guarantee the array actually came up: nonraid.service's own ExecStart lines are
+  // all best-effort and never fail the unit even if nmdctl did. This backend is ordered the same
+  // way (After=nonraid.service), so by the time this runs, the array has already had its one shot
+  // at starting - if either service's storage is configured on it and it still isn't up, surface
+  // that now rather than leaving an admin to notice missing containers on their own. One-time
+  // check, not a recurring watcher - covers the boot-time gap this exists for, not "is storage
+  // reachable right now" as an ongoing health check.
+  try {
+    const [dockerStorage, arrayStatus] = await Promise.all([getConfiguredDockerStorage().catch(() => null), nmd.getStatus().catch(() => null)]);
+    const arrayStarted = arrayStatus?.array.state === 'STARTED';
+    if (!arrayStarted) {
+      const affected = [dockerStorage?.mode === 'array' ? 'Docker' : null, persistedSettings.lxcStorage.mode === 'array' ? 'LXC' : null].filter(
+        (s): s is string => s !== null,
+      );
+      if (affected.length > 0) {
+        const msg = `${affected.join(' and ')} storage is on the array, but the array isn't started - start it to bring ${affected.join('/')} back.`;
+        activity.log(msg, 'amber', 'dockerLxcStorageUnavailable').catch(() => {});
+        notifyEvent(settingsStore, 'dockerLxcStorageUnavailable', 'NonRAID: Docker/LXC storage unavailable', msg);
+      }
+    }
+  } catch {
+    // best-effort - never block startup over this check itself
+  }
 
   const app = express();
   // Only set when config.trustProxy is explicitly opted into (see its doc comment in config.ts) -

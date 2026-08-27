@@ -24,7 +24,8 @@ export type NotificationEventType =
   | 'updateAvailable'
   | 'dockerUpdateAvailable'
   | 'backupSkipped'
-  | 'remoteBackupRetentionFailed';
+  | 'remoteBackupRetentionFailed'
+  | 'dockerLxcStorageUnavailable';
 
 export type NotificationSeverity = 'high' | 'medium' | 'low';
 

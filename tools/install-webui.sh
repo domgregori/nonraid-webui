@@ -627,6 +627,18 @@ install_rclone_systemd_unit() {
   systemctl disable --now rclone-rcd >/dev/null 2>&1 || true
 }
 
+# Orders docker.service/lxc.service to start only after nonraid.service (which assembles/mounts
+# the array at boot on its own, independent of this app) - see the two drop-in files themselves
+# for why this is ordering only, not a hard dependency. Installed unconditionally, regardless of
+# whether Docker/LXC storage is actually configured on the array right now, so relocating it there
+# later (Settings -> Docker & LXC Storage) doesn't need a separate step to pick this up.
+install_docker_lxc_array_ordering() {
+  log "Ordering docker.service/lxc.service to start after the array"
+  install -D -m 644 "$REPO_ROOT/tools/systemd/docker.service.d/order-after-nonraid.conf" /etc/systemd/system/docker.service.d/order-after-nonraid.conf
+  install -D -m 644 "$REPO_ROOT/tools/systemd/lxc.service.d/order-after-nonraid.conf" /etc/systemd/system/lxc.service.d/order-after-nonraid.conf
+  systemctl daemon-reload
+}
+
 start_system_services() {
   log "Starting system services"
   # samba/nfs-kernel-server/docker.io/avahi-daemon's own postinst scripts already enable+start their
@@ -754,6 +766,7 @@ STEPS=(
   stage_install
   install_webui_systemd_unit
   install_rclone_systemd_unit
+  install_docker_lxc_array_ordering
   start_services
   print_summary
 )
