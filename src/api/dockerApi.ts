@@ -56,7 +56,6 @@ export const dockerApi = {
   getUpdateStatus: () => request<Record<string, ContainerUpdateStatus>>('/api/docker/update-status'),
   // The only call that actually pulls every container's image - "Check for updates" button.
   checkUpdates: () => request<Record<string, ContainerUpdateStatus>>('/api/docker/update-status/check', { method: 'POST' }),
-  checkContainerUpdate: (id: string) => request<ContainerUpdateStatus>(`/api/docker/containers/${id}/check-update`, { method: 'POST' }),
   updateContainerNow: (id: string) => request<DockerCommandResult>(`/api/docker/containers/${id}/update-now`, { method: 'POST' }),
   listDevices: () => request<HostDevice[]>('/api/docker/devices'),
   listNetworks: () => request<string[]>('/api/docker/networks'),

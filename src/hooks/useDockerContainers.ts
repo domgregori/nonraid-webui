@@ -18,7 +18,6 @@ export interface UseDockerContainers {
   restart: (id: string) => Promise<void>;
   destroy: (id: string) => Promise<void>;
   setAutostart: (id: string, autostart: boolean) => Promise<void>;
-  checkContainerUpdate: (id: string) => Promise<void>;
   checkAllUpdates: () => Promise<void>;
   updateNow: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -57,8 +56,8 @@ export function useDockerContainers(): UseDockerContainers {
     refresh();
     // Cheap/cached - whatever the last check (scheduler or a previous page visit) already found,
     // just once on mount rather than polled - a live check is always an explicit user action
-    // (checkAllUpdates/checkContainerUpdate below), never something to hammer the registry for
-    // silently in the background.
+    // (checkAllUpdates below), never something to hammer the registry for silently in the
+    // background.
     dockerApi
       .getUpdateStatus()
       .then((s) => mounted.current && setUpdateStatus(s))
@@ -89,22 +88,6 @@ export function useDockerContainers(): UseDockerContainers {
     [refresh],
   );
 
-  const checkContainerUpdate = useCallback(async (id: string) => {
-    setPendingIds((prev) => new Set(prev).add(id));
-    try {
-      const result = await dockerApi.checkContainerUpdate(id);
-      setUpdateStatus((prev) => ({ ...prev, [id]: result }));
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setPendingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
-  }, []);
-
   const checkAllUpdates = useCallback(async () => {
     setCheckingUpdates(true);
     try {
@@ -128,7 +111,6 @@ export function useDockerContainers(): UseDockerContainers {
     restart: (id) => runAction(id, dockerApi.restartContainer),
     destroy: (id) => runAction(id, dockerApi.removeContainer),
     setAutostart: (id, autostart) => runAction(id, (i) => dockerApi.setAutostart(i, autostart)),
-    checkContainerUpdate,
     checkAllUpdates,
     // Recreates the container under a brand-new id (see the backend route's own comment) - the
     // stale updateStatus entry for the old id is harmless, it's simply never looked up again once

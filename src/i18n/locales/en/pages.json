@@ -72,7 +72,6 @@
     "logs": "Logs",
     "edit": "Edit",
     "updateNow": "Update Now",
-    "checkUpdate": "Check update",
     "confirmQuestion": "Confirm?",
     "destroy": "Destroy",
     "updateDialogTitle": "Update {{name}}",

@@ -26,7 +26,6 @@ export function DockerPage() {
     restart,
     destroy,
     setAutostart,
-    checkContainerUpdate,
     checkAllUpdates,
     updateNow,
     refresh,
@@ -60,7 +59,6 @@ export function DockerPage() {
       onViewLogs: () => setDialog({ mode: 'logs', containerId: c.id, containerName: c.name }),
       onDestroy: () => handleDestroyClick(c.id),
       onToggleAutostart: () => setAutostart(c.id, !c.autostart),
-      onCheckUpdate: () => checkContainerUpdate(c.id),
       onUpdateNow: () => setConfirmingUpdate({ id: c.id, name: c.name }),
     }),
   );
@@ -142,17 +140,13 @@ export function DockerPage() {
                 {t('DockerPage.edit')}
               </button>
             </div>
-            <div className="docker-card__actions">
-              {c.updateAvailable ? (
+            {c.updateAvailable && (
+              <div className="docker-card__actions">
                 <button type="button" className="btn" disabled={c.isPending} onClick={c.onUpdateNow}>
                   {t('DockerPage.updateNow')}
                 </button>
-              ) : (
-                <button type="button" className="btn" disabled={c.isPending} onClick={c.onCheckUpdate}>
-                  {t('DockerPage.checkUpdate')}
-                </button>
-              )}
-            </div>
+              </div>
+            )}
             <div className="docker-card__actions">
               <button type="button" className="btn btn--danger" disabled={c.isPending} onClick={c.onDestroy}>
                 {confirmingDestroy === c.id ? t('DockerPage.confirmQuestion') : t('DockerPage.destroy')}

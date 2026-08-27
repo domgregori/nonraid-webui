@@ -7,7 +7,7 @@ import type { DockerClient, DockerContainerSummary } from '../docker/index.js';
 import { listAvailableDevices } from '../docker/devices.js';
 import { buildManualPlan } from '../docker/manualPlan.js';
 import { getCurrentDockerStorage, migrateDockerStorage } from '../docker/storagePath.js';
-import { checkAllContainers, checkContainerUpdate, lastKnownStatus, type ContainerUpdateStatus } from '../docker/updateCheck.js';
+import { checkAllContainers, lastKnownStatus, type ContainerUpdateStatus } from '../docker/updateCheck.js';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { StorageLocation } from '../settings/types.js';
@@ -331,16 +331,6 @@ export function dockerRouter(
       const statuses: Record<string, ContainerUpdateStatus> = {};
       for (const s of results) statuses[s.containerId] = s;
       res.json(statuses);
-    } catch (err) {
-      res.status(502).json({ error: (err as Error).message });
-    }
-  });
-
-  // Re-checks just this one container (e.g. a per-card "recheck" action) without re-pulling
-  // every other container's image too.
-  router.post('/docker/containers/:id/check-update', async (req, res) => {
-    try {
-      res.json(await checkContainerUpdate(docker, req.params.id));
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

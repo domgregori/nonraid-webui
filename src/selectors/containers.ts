@@ -12,7 +12,6 @@ export interface ContainerActions {
   onViewLogs: () => void;
   onDestroy: () => void;
   onToggleAutostart: () => void;
-  onCheckUpdate: () => void;
   onUpdateNow: () => void;
 }
 
@@ -93,7 +92,6 @@ export function deriveContainerViewModel(container: DockerContainerSummary, acti
     onViewLogs: actions.onViewLogs,
     onDestroy: actions.onDestroy,
     onToggleAutostart: actions.onToggleAutostart,
-    onCheckUpdate: actions.onCheckUpdate,
     onUpdateNow: actions.onUpdateNow,
   };
 }

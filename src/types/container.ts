@@ -24,6 +24,5 @@ export interface ContainerViewModel {
   onViewLogs: () => void;
   onDestroy: () => void;
   onToggleAutostart: () => void;
-  onCheckUpdate: () => void;
   onUpdateNow: () => void;
 }

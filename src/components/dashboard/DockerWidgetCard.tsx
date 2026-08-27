@@ -15,7 +15,6 @@ const NOOP_ACTIONS = {
   onViewLogs: () => {},
   onDestroy: () => {},
   onToggleAutostart: () => {},
-  onCheckUpdate: () => {},
   onUpdateNow: () => {},
 };
 
