@@ -89,7 +89,7 @@ describe('diskNeedsFormat', () => {
 
 describe('deriveDisk', () => {
   it('reports standby when the array is stopped, regardless of disk state or filesystem', () => {
-    const vm = deriveDisk(makeDisk({ status: 'DISK_OK', filesystem: undefined }), false, undefined, null, null);
+    const vm = deriveDisk(makeDisk({ status: 'DISK_OK', filesystem: undefined }), false, undefined, null, null, null, {});
     expect(vm.status).toBe('standby');
     expect(vm.statusLabel).toBe('Standby');
     expect(vm.statusColor).toBe(COLORS.textDim);
@@ -107,7 +107,7 @@ describe('deriveDisk', () => {
       true,
       38,
       'passed',
-      false,
+      false, null, {}
     );
     expect(vm.status).toBe('active');
     expect(vm.statusLabel).toBe('Active');
@@ -121,7 +121,7 @@ describe('deriveDisk', () => {
   });
 
   it('marks a started, unformatted DISK_OK data disk as needsFormat', () => {
-    const vm = deriveDisk(makeDisk({ status: 'DISK_OK', filesystem: undefined }), true, undefined, null, null);
+    const vm = deriveDisk(makeDisk({ status: 'DISK_OK', filesystem: undefined }), true, undefined, null, null, null, {});
     expect(vm.status).toBe('active');
     expect(vm.needsFormat).toBe(true);
     expect(vm.borderColor).toBe(COLORS.amber); // amber border signals "needs attention"
@@ -135,7 +135,7 @@ describe('deriveDisk', () => {
       true,
       undefined,
       null,
-      null,
+      null, null, {}
     );
     expect(vm.needsFormat).toBe(true);
   });
@@ -149,7 +149,7 @@ describe('deriveDisk', () => {
     ['DISK_NEW', 'New'],
     ['DISK_DSBL_NEW', 'New (Disabled)'],
   ] as const)('maps raw status %s to label %s', (rawStatus, expectedLabel) => {
-    const vm = deriveDisk(makeDisk({ status: rawStatus }), true, undefined, null, null);
+    const vm = deriveDisk(makeDisk({ status: rawStatus }), true, undefined, null, null, null, {});
     expect(vm.status).toBe('missing');
     expect(vm.statusLabel).toBe(expectedLabel);
     expect(vm.statusColor).toBe(COLORS.red);
@@ -158,12 +158,12 @@ describe('deriveDisk', () => {
   });
 
   it('falls back to the raw status string for unknown statuses', () => {
-    const vm = deriveDisk(makeDisk({ status: 'DISK_FOO' }), true, undefined, null, null);
+    const vm = deriveDisk(makeDisk({ status: 'DISK_FOO' }), true, undefined, null, null, null, {});
     expect(vm.statusLabel).toBe('DISK_FOO');
   });
 
   it('derives parity disks with fixed labels and no usage', () => {
-    const p = deriveDisk(makeDisk({ slot: 1, type: 'P', status: 'DISK_OK' }), true, undefined, null, null);
+    const p = deriveDisk(makeDisk({ slot: 1, type: 'P', status: 'DISK_OK' }), true, undefined, null, null, null, {});
     expect(p.role).toBe('parity');
     expect(p.label).toBe('Parity 1');
     expect(p.usedPct).toBe(0);
@@ -172,7 +172,7 @@ describe('deriveDisk', () => {
     expect(p.mountpoint).toBe('-');
     expect(p.barWidth).toBe('0%');
 
-    const q = deriveDisk(makeDisk({ slot: 1, type: 'Q', status: 'DISK_OK' }), true, undefined, null, null);
+    const q = deriveDisk(makeDisk({ slot: 1, type: 'Q', status: 'DISK_OK' }), true, undefined, null, null, null, {});
     expect(q.label).toBe('Parity 2');
   });
 
@@ -182,7 +182,7 @@ describe('deriveDisk', () => {
       true,
       undefined,
       null,
-      null,
+      null, null, {}
     );
     expect(vm.id).toBe('7');
     expect(vm.slot).toBe(7);
@@ -200,7 +200,7 @@ describe('deriveDisk', () => {
     [1536, '1.5 TB'],
     [2048, '2 TB'],
   ] as const)('formats sizeLabel for size_gb=%d as %s', (sizeGb, expected) => {
-    const vm = deriveDisk(makeDisk({ status: 'DISK_OK', size_gb: sizeGb, filesystem: undefined }), true, undefined, null, null);
+    const vm = deriveDisk(makeDisk({ status: 'DISK_OK', size_gb: sizeGb, filesystem: undefined }), true, undefined, null, null, null, {});
     expect(vm.sizeLabel).toBe(expected);
   });
 
@@ -210,7 +210,7 @@ describe('deriveDisk', () => {
       true,
       undefined,
       null,
-      null,
+      null, null, {}
     );
     expect(vm.usedPct).toBe(87);
     expect(vm.barWidth).toBe('87%');
@@ -222,7 +222,7 @@ describe('deriveDisk', () => {
       true,
       undefined,
       null,
-      null,
+      null, null, {}
     );
     expect(vm.usedPct).toBe(0);
     expect(vm.usedLabel).toBe('0%');
@@ -241,7 +241,7 @@ describe('deriveDisk', () => {
       true,
       undefined,
       null,
-      null,
+      null, null, {}
     );
     expect(vm.barColor).toBe(expected);
   });
@@ -252,7 +252,7 @@ describe('deriveDisk', () => {
     [40, 40, '40°C', COLORS.amber], // 40 is the amber threshold
     [51.6, 51.6, '52°C', COLORS.amber], // label rounds 51.6 up to 52
   ] as const)('derives temp with tempC=%s', (tempC, expectedTemp, expectedLabel, expectedColor) => {
-    const vm = deriveDisk(makeDisk({ status: 'DISK_OK', filesystem: undefined }), true, tempC, null, null);
+    const vm = deriveDisk(makeDisk({ status: 'DISK_OK', filesystem: undefined }), true, tempC, null, null, null, {});
     expect(vm.temp).toBe(expectedTemp);
     expect(vm.tempLabel).toBe(expectedLabel);
     expect(vm.tempColor).toBe(expectedColor);
@@ -264,7 +264,7 @@ describe('deriveDisk', () => {
     ['passed', 'passed', 'SMART OK', COLORS.green],
     ['failed', 'failed', 'SMART Failing', COLORS.red],
   ] as const)('derives SMART health from health=%s', (health, expectedHealth, expectedLabel, expectedColor) => {
-    const vm = deriveDisk(makeDisk({ status: 'DISK_OK', filesystem: undefined }), true, undefined, health, null);
+    const vm = deriveDisk(makeDisk({ status: 'DISK_OK', filesystem: undefined }), true, undefined, health, null, null, {});
     expect(vm.health).toBe(expectedHealth);
     expect(vm.healthLabel).toBe(expectedLabel);
     expect(vm.healthColor).toBe(expectedColor);
@@ -276,7 +276,7 @@ describe('deriveDisk', () => {
     [true, true, 'SSD'],
     [false, false, 'HDD'],
   ] as const)('derives drive type from isSSD=%s', (isSSD, expectedIsSSD, expectedLabel) => {
-    const vm = deriveDisk(makeDisk({ status: 'DISK_OK', filesystem: undefined }), true, undefined, null, isSSD);
+    const vm = deriveDisk(makeDisk({ status: 'DISK_OK', filesystem: undefined }), true, undefined, null, isSSD, null, {});
     expect(vm.isSSD).toBe(expectedIsSSD);
     expect(vm.typeLabel).toBe(expectedLabel);
   });
@@ -287,7 +287,7 @@ describe('deriveDisk', () => {
       true,
       undefined,
       null,
-      null,
+      null, null, {}
     );
     expect(vm.mountpoint).toBe('-');
   });
@@ -355,7 +355,7 @@ describe('deriveCapacity', () => {
   });
 
   it('derives pct and TB labels from a single disk', () => {
-    const disks: DiskViewModel[] = [deriveDisk(makeDisk({ status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk1', usage: '50%' } }), true, undefined, null, null)];
+    const disks: DiskViewModel[] = [deriveDisk(makeDisk({ status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk1', usage: '50%' } }), true, undefined, null, null, null, {})];
     const result = deriveCapacity(disks, true);
     expect(result.pct).toBe(50);
     expect(result.totalLabel).toBe('1 TB');
@@ -364,14 +364,14 @@ describe('deriveCapacity', () => {
   });
 
   it('returns pct 0 when the array is not started', () => {
-    const disks: DiskViewModel[] = [deriveDisk(makeDisk({ status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk1', usage: '50%' } }), true, undefined, null, null)];
+    const disks: DiskViewModel[] = [deriveDisk(makeDisk({ status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk1', usage: '50%' } }), true, undefined, null, null, null, {})];
     expect(deriveCapacity(disks, false).pct).toBe(0);
   });
 
   it('weights usage across multiple disks', () => {
     const disks: DiskViewModel[] = [
-      deriveDisk(makeDisk({ slot: 1, status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk1', usage: '100%' } }), true, undefined, null, null),
-      deriveDisk(makeDisk({ slot: 2, status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk2', usage: '0%' } }), true, undefined, null, null),
+      deriveDisk(makeDisk({ slot: 1, status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk1', usage: '100%' } }), true, undefined, null, null, null, {}),
+      deriveDisk(makeDisk({ slot: 2, status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk2', usage: '0%' } }), true, undefined, null, null, null, {}),
     ];
     const result = deriveCapacity(disks, true);
     expect(result.totalLabel).toBe('2 TB');
@@ -381,7 +381,7 @@ describe('deriveCapacity', () => {
   });
 
   it('handles small test disks without rounding to 0', () => {
-    const disks: DiskViewModel[] = [deriveDisk(makeDisk({ status: 'DISK_OK', size_gb: 5, filesystem: { type: 'ext4', mountpoint: '/mnt/disk1', usage: '50%' } }), true, undefined, null, null)];
+    const disks: DiskViewModel[] = [deriveDisk(makeDisk({ status: 'DISK_OK', size_gb: 5, filesystem: { type: 'ext4', mountpoint: '/mnt/disk1', usage: '50%' } }), true, undefined, null, null, null, {})];
     const result = deriveCapacity(disks, true);
     expect(result.totalLabel).toBe('5.0 GB'); // sub-10 GB keeps a decimal in formatSize
     expect(result.usedLabel).toBe('2.5 GB');
@@ -391,9 +391,9 @@ describe('deriveCapacity', () => {
 
   it('rounds fractional pct to the nearest integer', () => {
     const disks: DiskViewModel[] = [
-      deriveDisk(makeDisk({ slot: 1, status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk1', usage: '33%' } }), true, undefined, null, null),
-      deriveDisk(makeDisk({ slot: 2, status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk2', usage: '33%' } }), true, undefined, null, null),
-      deriveDisk(makeDisk({ slot: 3, status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk3', usage: '33%' } }), true, undefined, null, null),
+      deriveDisk(makeDisk({ slot: 1, status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk1', usage: '33%' } }), true, undefined, null, null, null, {}),
+      deriveDisk(makeDisk({ slot: 2, status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk2', usage: '33%' } }), true, undefined, null, null, null, {}),
+      deriveDisk(makeDisk({ slot: 3, status: 'DISK_OK', size_gb: 1024, filesystem: { type: 'ext4', mountpoint: '/mnt/disk3', usage: '33%' } }), true, undefined, null, null, null, {}),
     ];
     expect(deriveCapacity(disks, true).pct).toBe(33);
   });
@@ -402,15 +402,15 @@ describe('deriveCapacity', () => {
 describe('deriveDisksOnline', () => {
   it('counts only active disks', () => {
     const disks: DiskViewModel[] = [
-      deriveDisk(makeDisk({ slot: 1, status: 'DISK_OK', filesystem: { type: 'ext4', mountpoint: '/mnt/disk1', usage: '10%' } }), true, undefined, null, null),
-      deriveDisk(makeDisk({ slot: 2, status: 'DISK_NP_MISSING' }), true, undefined, null, null),
-      deriveDisk(makeDisk({ slot: 3, status: 'DISK_OK', filesystem: { type: 'ext4', mountpoint: '/mnt/disk3', usage: '10%' } }), true, undefined, null, null),
+      deriveDisk(makeDisk({ slot: 1, status: 'DISK_OK', filesystem: { type: 'ext4', mountpoint: '/mnt/disk1', usage: '10%' } }), true, undefined, null, null, null, {}),
+      deriveDisk(makeDisk({ slot: 2, status: 'DISK_NP_MISSING' }), true, undefined, null, null, null, {}),
+      deriveDisk(makeDisk({ slot: 3, status: 'DISK_OK', filesystem: { type: 'ext4', mountpoint: '/mnt/disk3', usage: '10%' } }), true, undefined, null, null, null, {}),
     ];
     expect(deriveDisksOnline(disks)).toBe(2);
   });
 
   it('counts standby disks as offline', () => {
-    const disks: DiskViewModel[] = [deriveDisk(makeDisk(), false, undefined, null, null)];
+    const disks: DiskViewModel[] = [deriveDisk(makeDisk(), false, undefined, null, null, null, {})];
     expect(deriveDisksOnline(disks)).toBe(0);
   });
 
