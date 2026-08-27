@@ -5,6 +5,8 @@ export interface DockerContainerSummary {
   id: string;
   name: string;
   image: string;
+  // The resolved sha256 digest this container is actually running - see docker/updateCheck.ts.
+  imageId: string;
   state: ContainerRuntimeStatus;
   status: string;
   cpuPercent: number | null;
@@ -75,6 +77,7 @@ export interface ContainerDetail {
   id: string;
   name: string;
   image: string;
+  imageId: string;
   network: string;
   privileged: boolean;
   env: ContainerEnvVar[];
@@ -119,6 +122,15 @@ export interface ManualContainerPlan {
   requiresPrivilegedAck: boolean;
   elevatedAccessReasons: string[];
   autostart: boolean;
+}
+
+// Mirrors backend/src/docker/updateCheck.ts's ContainerUpdateStatus.
+export interface ContainerUpdateStatus {
+  containerId: string;
+  updateAvailable: boolean | null;
+  latestImageId: string | null;
+  checkError: string | null;
+  checkedAt: number | null;
 }
 
 // Labels stamped by the Apps (Community Applications) feature at install

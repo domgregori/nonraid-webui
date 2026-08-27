@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { systemApi } from '../../api/systemApi';
 import type { BackupCategoryId, LocalBackupEntry, RestorePreview } from '../../types/systemApi';
 import { formatFileSize, formatRelativeTime } from '../../utils/format';
@@ -25,6 +26,7 @@ interface RestoreFromLocalWizardProps {
  * ConfigRestoreWizard as a confusing "not a valid config backup" error.
  */
 export function RestoreFromLocalWizard({ onClose, onRestored, focusCategory }: RestoreFromLocalWizardProps) {
+  const { t } = useTranslation('settings');
   const [loading, setLoading] = useState(true);
   const [destDir, setDestDir] = useState<string | null>(null);
   const [backups, setBackups] = useState<LocalBackupEntry[]>([]);
@@ -86,12 +88,14 @@ export function RestoreFromLocalWizard({ onClose, onRestored, focusCategory }: R
     void previewFor(entry.name);
   };
 
+  const title = focusCategory === 'array' ? t('RestoreFromLocalWizard.recoverArrayTitle') : t('RestoreFromLocalWizard.restoreTitle');
+
   if (preview && pickedName) {
     return (
       <ConfigRestoreWizard
         onClose={onClose}
         onRestored={onRestored}
-        title={focusCategory === 'array' ? 'Recover the array from a local backup' : 'Restore from a local backup'}
+        title={title}
         initialPreview={preview}
         sourceLabel={pickedName}
         focusCategory={focusCategory}
@@ -103,15 +107,13 @@ export function RestoreFromLocalWizard({ onClose, onRestored, focusCategory }: R
     );
   }
 
-  const title = focusCategory === 'array' ? 'Recover the array from a local backup' : 'Restore from a local backup';
-
   return (
     <>
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog import-array-wizard">
         <div className="dialog__head">
           <div className="dialog__title">{title}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('RestoreFromLocalWizard.close')}>
             &#10005;
           </button>
         </div>
@@ -120,7 +122,7 @@ export function RestoreFromLocalWizard({ onClose, onRestored, focusCategory }: R
           {passwordEntry ? (
             <>
               <div className="toggle-row__desc">
-                <strong>{passwordEntry.name}</strong> is password-encrypted. Enter its password to read what's inside.
+                <strong>{passwordEntry.name}</strong> {t('RestoreFromLocalWizard.passwordEncrypted')}
               </div>
               <input
                 className="history-input"
@@ -131,33 +133,46 @@ export function RestoreFromLocalWizard({ onClose, onRestored, focusCategory }: R
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && passwordDraft) void previewFor(passwordEntry.name, passwordDraft);
                 }}
-                placeholder="Password"
+                placeholder={t('RestoreFromLocalWizard.passwordPlaceholder')}
               />
-              {previewingName && <div className="status-note">Reading {previewingName}…</div>}
+              {previewingName && <div className="status-note">{t('RestoreFromLocalWizard.reading', { name: previewingName })}</div>}
               {passwordError && <div className="status-note status-note--error">{passwordError}</div>}
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={() => setPasswordEntry(null)} disabled={previewingName !== null}>
-                  Back
+                  {t('RestoreFromLocalWizard.back')}
                 </button>
-                <button type="button" className="btn btn--primary-sm" disabled={!passwordDraft || previewingName !== null} onClick={() => previewFor(passwordEntry.name, passwordDraft)}>
-                  Continue
+                <button
+                  type="button"
+                  className="btn btn--primary-sm"
+                  disabled={!passwordDraft || previewingName !== null}
+                  onClick={() => previewFor(passwordEntry.name, passwordDraft)}
+                >
+                  {t('RestoreFromLocalWizard.continue')}
                 </button>
               </div>
             </>
           ) : (
             <>
               <div className="toggle-row__desc">
-                Pick a config backup already sitting at Settings → Local Backups' own configured destination{destDir ? <> (<code>{destDir}</code>)</> : null}. This
-                only reads the archive to show what's in it; nothing on this host changes until you confirm on a later step.
+                {t('RestoreFromLocalWizard.pickBackupDesc1')}
+                {destDir ? (
+                  <>
+                    {' '}
+                    (<code>{destDir}</code>)
+                  </>
+                ) : null}
+                . {t('RestoreFromLocalWizard.pickBackupDesc2')}
               </div>
 
-              {loading && <div className="status-note">Loading…</div>}
+              {loading && <div className="status-note">{t('RestoreFromLocalWizard.loading')}</div>}
               {listError && <div className="status-note status-note--error">{listError}</div>}
 
               {!loading && !listError && destDir === null && (
-                <div className="status-note status-note--error">No Local Backups destination is configured yet - set one in Settings → Local Backups first.</div>
+                <div className="status-note status-note--error">{t('RestoreFromLocalWizard.noDestinationConfigured')}</div>
               )}
-              {!loading && !listError && destDir !== null && backups.length === 0 && <div className="status-note">No backups found at this destination yet.</div>}
+              {!loading && !listError && destDir !== null && backups.length === 0 && (
+                <div className="status-note">{t('RestoreFromLocalWizard.noBackupsFound')}</div>
+              )}
 
               {!loading && backups.length > 0 && (
                 <div className="import-browser__list">
@@ -166,7 +181,7 @@ export function RestoreFromLocalWizard({ onClose, onRestored, focusCategory }: R
                       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
                       {b.encrypted && (
                         <span className="job-badge job-badge--encrypted" style={{ flexShrink: 0 }}>
-                          Encrypted
+                          {t('RestoreFromLocalWizard.encrypted')}
                         </span>
                       )}
                       <span style={{ flexShrink: 0, color: 'var(--color-text-dim)' }}>
@@ -177,12 +192,12 @@ export function RestoreFromLocalWizard({ onClose, onRestored, focusCategory }: R
                 </div>
               )}
 
-              {previewingName && <div className="status-note">Reading {previewingName}…</div>}
+              {previewingName && <div className="status-note">{t('RestoreFromLocalWizard.reading', { name: previewingName })}</div>}
               {previewError && <div className="status-note status-note--error">{previewError}</div>}
 
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
-                  Cancel
+                  {t('RestoreFromLocalWizard.cancel')}
                 </button>
               </div>
             </>

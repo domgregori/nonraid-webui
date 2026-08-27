@@ -89,6 +89,8 @@ export interface SmartClient {
   getTemperature(device: string): Promise<number | null>;
   /** Overall SMART health self-assessment, or null if unavailable (device asleep, no SMART support, etc). */
   getHealth(device: string): Promise<SmartHealth | null>;
+  /** Spun up vs standby, without spinning up a sleeping disk to check. */
+  getSpinState(device: string): Promise<SmartSpinState>;
   /** Curated attribute/self-test snapshot, or null if the device has no SMART data available. */
   getAttributes(device: string): Promise<SmartAttributes | null>;
   /** Fire-and-forget: starts the test on the drive's own controller and returns once the trigger command completes. */

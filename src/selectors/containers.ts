@@ -5,12 +5,14 @@ import { formatBytesAsMB } from '../utils/format';
 
 export interface ContainerActions {
   isPending: boolean;
+  updateAvailable: boolean | null;
   onToggle: () => void;
   onRestart: () => void;
   onEdit: () => void;
   onViewLogs: () => void;
   onDestroy: () => void;
   onToggleAutostart: () => void;
+  onUpdateNow: () => void;
 }
 
 /**
@@ -83,11 +85,13 @@ export function deriveContainerViewModel(container: DockerContainerSummary, acti
     caAppName: container.labels[CA_APP_NAME_LABEL] ?? null,
     webUiUrl: running ? resolveContainerWebUi(container) : null,
     autostart: container.autostart,
+    updateAvailable: actions.updateAvailable,
     onToggle: actions.onToggle,
     onRestart: actions.onRestart,
     onEdit: actions.onEdit,
     onViewLogs: actions.onViewLogs,
     onDestroy: actions.onDestroy,
     onToggleAutostart: actions.onToggleAutostart,
+    onUpdateNow: actions.onUpdateNow,
   };
 }

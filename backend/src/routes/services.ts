@@ -1,23 +1,14 @@
 import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
-import type { SettingsStore } from '../settings/store.js';
 import { getServiceState, restartService, SERVICE_DEFS, startService, stopService, type ServiceState } from '../system/services.js';
 
-export function servicesRouter(activity: ActivityStore, settingsStore: SettingsStore): Router {
+export function servicesRouter(activity: ActivityStore): Router {
   const router = Router();
 
   router.get('/services', async (_req, res) => {
     try {
-      // Tailscale's and rclone-rcd's rows only make sense once their own feature's been switched
-      // on in its own Settings section (see settings/types.ts's TailscaleSettings/
-      // RemoteBackupSettings doc comments) - showing them unconditionally would put a
-      // permanently-relevant-looking row in front of installs that never turn either on.
-      const settings = await settingsStore.get();
-      const defs = SERVICE_DEFS.filter(
-        (def) => (def.id !== 'tailscale' || settings.tailscale.enabled) && (def.id !== 'rclone-rcd' || settings.remoteBackup.enabled),
-      );
       const rows: Array<{ id: string; label: string; state: ServiceState }> = await Promise.all(
-        defs.map(async (def) => ({ id: def.id, label: def.label, state: await getServiceState(def) })),
+        SERVICE_DEFS.map(async (def) => ({ id: def.id, label: def.label, state: await getServiceState(def) })),
       );
       // Synthesized row: if this endpoint answered, the backend serving it is up.
       rows.push({ id: 'webui', label: 'NonRAID WebUI', state: 'active' });

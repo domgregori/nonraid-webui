@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../state/useAuth';
 
 export function SetupPage() {
+  const { t } = useTranslation('pages');
   const { setup } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -12,7 +14,7 @@ export function SetupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('SetupPage.passwordMismatch'));
       return;
     }
     setPending(true);
@@ -31,13 +33,13 @@ export function SetupPage() {
       <div className="auth-card card">
         <div className="auth-card__brand">
           <img src="/logo.png" alt="" className="auth-card__logo" />
-          <div className="auth-card__title">NonRAID</div>
+          <div className="auth-card__title">{t('SetupPage.brandTitle')}</div>
         </div>
-        <div className="auth-card__subtitle">Create the admin account to finish setup. This is the only account for this dashboard.</div>
+        <div className="auth-card__subtitle">{t('SetupPage.subtitle')}</div>
 
         <form onSubmit={handleSubmit} className="auth-card__form">
           <label className="form-field">
-            <span className="form-field__label">Username</span>
+            <span className="form-field__label">{t('SetupPage.usernameLabel')}</span>
             <input
               className="history-input"
               value={username}
@@ -47,7 +49,7 @@ export function SetupPage() {
             />
           </label>
           <label className="form-field">
-            <span className="form-field__label">Password</span>
+            <span className="form-field__label">{t('SetupPage.passwordLabel')}</span>
             <input
               type="password"
               className="history-input"
@@ -57,7 +59,7 @@ export function SetupPage() {
             />
           </label>
           <label className="form-field">
-            <span className="form-field__label">Confirm password</span>
+            <span className="form-field__label">{t('SetupPage.confirmPasswordLabel')}</span>
             <input
               type="password"
               className="history-input"
@@ -70,7 +72,7 @@ export function SetupPage() {
           {error && <div className="status-note status-note--error">{error}</div>}
 
           <button type="submit" className="btn btn--primary btn--block" disabled={pending}>
-            {pending ? 'Creating account…' : 'Create admin account'}
+            {pending ? t('SetupPage.creatingAccount') : t('SetupPage.createAccount')}
           </button>
         </form>
       </div>

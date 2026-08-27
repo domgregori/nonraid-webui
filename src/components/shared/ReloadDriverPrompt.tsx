@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { nmdApi } from '../../api/nmdApi';
 
 interface ReloadDriverPromptProps {
@@ -19,6 +20,7 @@ interface ReloadDriverPromptProps {
  * looked fine in a full-width Card body but read badly crammed into a narrow row (see
  * ServicesSection's driver row, confirmed live). A modal doesn't care what it's triggered from. */
 export function ReloadDriverPrompt({ description, onReloaded }: ReloadDriverPromptProps) {
+  const { t } = useTranslation('shared');
   const [confirming, setConfirming] = useState(false);
   const [stopContainers, setStopContainers] = useState(false);
   const [running, setRunning] = useState(false);
@@ -47,15 +49,15 @@ export function ReloadDriverPrompt({ description, onReloaded }: ReloadDriverProm
   return (
     <>
       <button type="button" className="btn btn--danger" onClick={() => setConfirming(true)}>
-        Reload Driver
+        {t('ReloadDriverPrompt.reloadDriver')}
       </button>
       {confirming && (
         <>
           <div className="detail-overlay" onClick={close} />
           <div className="dialog">
             <div className="dialog__head">
-              <div className="dialog__title">Reload Storage Driver</div>
-              <button type="button" className="detail-panel__close" onClick={close} aria-label="Close">
+              <div className="dialog__title">{t('ReloadDriverPrompt.title')}</div>
+              <button type="button" className="detail-panel__close" onClick={close} aria-label={t('ReloadDriverPrompt.close')}>
                 &#10005;
               </button>
             </div>
@@ -65,15 +67,15 @@ export function ReloadDriverPrompt({ description, onReloaded }: ReloadDriverProm
               </p>
               <label className="status-note" style={{ display: 'block', marginBottom: 8 }}>
                 <input type="checkbox" checked={stopContainers} onChange={(e) => setStopContainers(e.target.checked)} disabled={running} />{' '}
-                Stop Docker/LXC if blocking the reload - restarted automatically after.
+                {t('ReloadDriverPrompt.stopContainersLabel')}
               </label>
               {error && <div className="status-note status-note--error">{error}</div>}
               <div className="dialog__actions">
                 <button type="button" className="btn" disabled={running} onClick={close}>
-                  Cancel
+                  {t('ReloadDriverPrompt.cancel')}
                 </button>
                 <button type="button" className="btn btn--danger" disabled={running} onClick={handleReload}>
-                  {running ? 'Reloading…' : 'Confirm Reload'}
+                  {running ? t('ReloadDriverPrompt.reloading') : t('ReloadDriverPrompt.confirmReload')}
                 </button>
               </div>
             </div>

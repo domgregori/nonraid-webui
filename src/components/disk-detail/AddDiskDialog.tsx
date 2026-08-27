@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { diskQueueApi } from '../../api/diskQueueApi';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import type { AvailableDevice } from '../../types/nmdApi';
@@ -20,6 +21,7 @@ const PARITY_SLOT = 0;
 const PARITY2_SLOT = 29;
 
 export function AddDiskDialog({ device, onClose, onDone }: AddDiskDialogProps) {
+  const { t } = useTranslation('diskDetail');
   const { status } = useArrayStatus();
   // nmdctl always reports a placeholder slot-0 (parity) row with an empty disk_id even on a
   // totally blank array (see OnboardingWizard's disk summary, which filters the same way) - only
@@ -45,8 +47,8 @@ export function AddDiskDialog({ device, onClose, onDone }: AddDiskDialogProps) {
       const item = role === 'data' ? await diskQueueApi.enqueueData(device.device) : await diskQueueApi.enqueueParity(device.device);
       setResult(
         item.status === 'running'
-          ? 'Added to the queue - starting now.'
-          : 'Added to the queue - will start once the current operation finishes.',
+          ? t('AddDiskDialog.addedRunning')
+          : t('AddDiskDialog.addedQueued'),
       );
       onDone();
     } catch (err) {
@@ -61,8 +63,8 @@ export function AddDiskDialog({ device, onClose, onDone }: AddDiskDialogProps) {
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Add {device.model ?? 'drive'} to array</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('AddDiskDialog.title', { model: device.model ?? t('AddDiskDialog.driveFallback') })}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('AddDiskDialog.close')}>
             &#10005;
           </button>
         </div>
@@ -70,52 +72,51 @@ export function AddDiskDialog({ device, onClose, onDone }: AddDiskDialogProps) {
         <div className="dialog__body">
           <div className="detail-rows">
             <div className="detail-row">
-              <span className="detail-row__label">Drive</span>
-              <span className="detail-row__value">{device.model ?? 'Unknown drive'}</span>
+              <span className="detail-row__label">{t('AddDiskDialog.drive')}</span>
+              <span className="detail-row__value">{device.model ?? t('AddDiskDialog.unknownDrive')}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-row__label">Size</span>
+              <span className="detail-row__label">{t('AddDiskDialog.size')}</span>
               <span className="detail-row__value">{device.sizeKb != null ? formatBytesHuman(device.sizeKb * 1024) : '-'}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-row__label">UUID</span>
-              <span className="detail-row__value">{device.uuid ?? '(no filesystem)'}</span>
+              <span className="detail-row__label">{t('AddDiskDialog.uuid')}</span>
+              <span className="detail-row__value">{device.uuid ?? t('AddDiskDialog.noFilesystem')}</span>
             </div>
           </div>
 
           {device.locked && (
             <div className="status-note status-note--error">
-              This device appears to be locked/in use by another process - adding it may fail.
+              {t('AddDiskDialog.lockedWarning')}
             </div>
           )}
-          {!device.partition && <div className="status-note">No partition detected - it'll be assigned and cleared as a raw disk.</div>}
+          {!device.partition && <div className="status-note">{t('AddDiskDialog.noPartitionWarning')}</div>}
           {arrayStarted && (
-            <div className="status-note">The array is currently running - it'll be stopped automatically when this item's turn comes up.</div>
+            <div className="status-note">{t('AddDiskDialog.arrayRunningWarning')}</div>
           )}
 
           {!result && (
             <div className="settings-field">
-              <div className="toggle-row__title">Assign as</div>
+              <div className="toggle-row__title">{t('AddDiskDialog.assignAs')}</div>
               <div className="toggle-row__desc">
-                Parity has to be at least as large as your biggest data disk. A second parity disk is optional - it
-                protects against two disk failures at once instead of one.
+                {t('AddDiskDialog.assignDesc')}
               </div>
               <select className="history-input" value={role} onChange={(e) => setRole(e.target.value as Role)} disabled={submitting}>
-                <option value="data">Data disk</option>
+                <option value="data">{t('AddDiskDialog.dataDisk')}</option>
                 <option value="parity" disabled={parityTaken}>
-                  Parity 1{parityTaken ? ' (already assigned)' : ''}
+                  {t('AddDiskDialog.parity1')}{parityTaken ? t('AddDiskDialog.alreadyAssigned') : ''}
                 </option>
                 <option value="parity2" disabled={parity2Taken}>
-                  Parity 2{parity2Taken ? ' (already assigned)' : ''}
+                  {t('AddDiskDialog.parity2')}{parity2Taken ? t('AddDiskDialog.alreadyAssigned') : ''}
                 </option>
               </select>
               {role === 'data' && (
                 <div className="toggle-row__desc" style={{ marginTop: 10 }}>
-                  The first free data slot (1-28) is used automatically.
+                  {t('AddDiskDialog.dataSlotNote')}
                 </div>
               )}
 
-              {roleAlreadyTaken && <div className="status-note status-note--error">That slot already has a disk assigned.</div>}
+              {roleAlreadyTaken && <div className="status-note status-note--error">{t('AddDiskDialog.slotTaken')}</div>}
             </div>
           )}
 
@@ -123,17 +124,17 @@ export function AddDiskDialog({ device, onClose, onDone }: AddDiskDialogProps) {
 
           {result && (
             <div className="status-note">
-              {result} Watch progress on the Disk Queue card.
+              {result} {t('AddDiskDialog.watchProgress')}
             </div>
           )}
 
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onClose}>
-              {result ? 'Close' : 'Cancel'}
+              {result ? t('AddDiskDialog.close') : t('AddDiskDialog.cancel')}
             </button>
             {!result && (
               <button type="button" className="btn--primary" disabled={submitting || roleAlreadyTaken} onClick={handleAdd}>
-                {submitting ? 'Adding…' : 'Add Disk'}
+                {submitting ? t('AddDiskDialog.adding') : t('AddDiskDialog.addDisk')}
               </button>
             )}
           </div>

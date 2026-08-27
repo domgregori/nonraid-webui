@@ -1,10 +1,11 @@
 import { request } from './request';
 import type { NmdCommandResult } from '../types/nmdApi';
-import type { SelfTestType, SmartAttributes } from '../types/smart';
+import type { SelfTestType, SmartAttributes, SmartSpinState } from '../types/smart';
 
 export const smartApi = {
   getTemperatures: () => request<Record<string, number | null>>('/api/smart/temperatures'),
   getHealthStatuses: () => request<Record<string, 'passed' | 'failed' | null>>('/api/smart/health'),
+  getSpinStates: () => request<Record<string, SmartSpinState>>('/api/smart/spin-states'),
   getDiskTypes: () => request<Record<string, boolean | null>>('/api/smart/disk-types'),
   getAttributes: (slot: number) => request<SmartAttributes | null>(`/api/disks/${slot}/smart`),
   getAttributesByDevice: (device: string) => request<SmartAttributes | null>(`/api/smart/by-device?device=${encodeURIComponent(device)}`),

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TimeSeriesChart, type TimeSeriesChartSeries } from '../components/shared/TimeSeriesChart';
 import { useLiveMetrics } from '../hooks/useLiveMetrics';
 import { useMetrics } from '../hooks/useMetrics';
@@ -10,12 +11,12 @@ import { formatBytesHuman } from '../utils/format';
 
 type ViewMode = MetricRange | 'live';
 
-const RANGES: { value: ViewMode; label: string }[] = [
-  { value: '1h', label: '1H' },
-  { value: '24h', label: '24H' },
-  { value: '7d', label: '7D' },
-  { value: '30d', label: '30D' },
-  { value: 'live', label: 'LIVE' },
+const RANGES: { value: ViewMode; labelKey: string }[] = [
+  { value: '1h', labelKey: 'HistoryPage.range1h' },
+  { value: '24h', labelKey: 'HistoryPage.range24h' },
+  { value: '7d', labelKey: 'HistoryPage.range7d' },
+  { value: '30d', labelKey: 'HistoryPage.range30d' },
+  { value: 'live', labelKey: 'HistoryPage.rangeLive' },
 ];
 
 const ALL_METRICS: MetricName[] = [
@@ -52,6 +53,7 @@ function formatKbs(v: number): string {
 }
 
 export function HistoryPage() {
+  const { t } = useTranslation('pages');
   const [view, setView] = useState<ViewMode>('24h');
   const isLive = view === 'live';
   const dbMetrics = useMetrics(ALL_METRICS, isLive ? '1h' : view, !isLive);
@@ -61,8 +63,8 @@ export function HistoryPage() {
 
   const diskLabel = (slot: string): string => {
     const disk = arrayStatus?.disks.find((d) => String(d.slot) === slot);
-    if (!disk) return `Disk ${slot}`;
-    return disk.type === 'P' ? 'Parity 1' : disk.type === 'Q' ? 'Parity 2' : `Disk ${disk.slot}`;
+    if (!disk) return t('HistoryPage.diskLabel', { slot });
+    return disk.type === 'P' ? t('HistoryPage.parity1') : disk.type === 'Q' ? t('HistoryPage.parity2') : t('HistoryPage.diskLabel', { slot: disk.slot });
   };
 
   const perDiskSeries = (metric: MetricName): TimeSeriesChartSeries[] =>
@@ -79,11 +81,11 @@ export function HistoryPage() {
     <div className="page">
       <div className="history-header">
         <div>
-          <div className="page-title">History</div>
+          <div className="page-title">{t('HistoryPage.title')}</div>
           <div className="history-header__desc">
             {isLive
-              ? 'Live - updating as new data arrives, last 10 minutes'
-              : 'CPU, memory, network, and per-disk temperature/read-write/usage over time'}
+              ? t('HistoryPage.liveDesc')
+              : t('HistoryPage.rangeDesc')}
           </div>
         </div>
         <div className="history-header__controls">
@@ -95,55 +97,55 @@ export function HistoryPage() {
               onClick={() => setView(r.value)}
             >
               {r.value === 'live' && view === 'live' && <span className="status-dot" style={{ background: COLORS.green }} />}
-              {r.label}
+              {t(r.labelKey)}
             </button>
           ))}
         </div>
       </div>
 
-      {status === 'loading' && <div className="status-note">{isLive ? 'Waiting for the first live sample…' : 'Loading history…'}</div>}
+      {status === 'loading' && <div className="status-note">{isLive ? t('HistoryPage.waitingForLive') : t('HistoryPage.loadingHistory')}</div>}
       {error && <div className="status-note status-note--error">{error}</div>}
 
       <ChartHoverProvider>
         <div className="metrics-grid">
           <div className="card metric-card">
-            <div className="eyebrow">CPU</div>
-            <TimeSeriesChart series={totalSeries('cpu_percent', 'CPU', COLORS.blue)} formatValue={formatPercent} />
+            <div className="eyebrow">{t('HistoryPage.cpuEyebrow')}</div>
+            <TimeSeriesChart series={totalSeries('cpu_percent', t('HistoryPage.cpuSeriesLabel'), COLORS.blue)} formatValue={formatPercent} />
           </div>
 
           <div className="card metric-card">
-            <div className="eyebrow">Memory</div>
-            <TimeSeriesChart series={totalSeries('mem_used_bytes', 'Memory used', COLORS.blue)} formatValue={formatBytesHuman} />
+            <div className="eyebrow">{t('HistoryPage.memoryEyebrow')}</div>
+            <TimeSeriesChart series={totalSeries('mem_used_bytes', t('HistoryPage.memoryUsedSeriesLabel'), COLORS.blue)} formatValue={formatBytesHuman} />
           </div>
 
           <div className="card metric-card">
-            <div className="eyebrow">Network</div>
+            <div className="eyebrow">{t('HistoryPage.networkEyebrow')}</div>
             <TimeSeriesChart
               series={[
-                { key: 'rx', label: 'Download', color: COLORS.blue, points: (seriesByMetric.net_rx_kb_s ?? [])[0]?.points ?? [] },
-                { key: 'tx', label: 'Upload', color: COLORS.green, points: (seriesByMetric.net_tx_kb_s ?? [])[0]?.points ?? [] },
+                { key: 'rx', label: t('HistoryPage.downloadSeriesLabel'), color: COLORS.blue, points: (seriesByMetric.net_rx_kb_s ?? [])[0]?.points ?? [] },
+                { key: 'tx', label: t('HistoryPage.uploadSeriesLabel'), color: COLORS.green, points: (seriesByMetric.net_tx_kb_s ?? [])[0]?.points ?? [] },
               ]}
               formatValue={formatKbs}
             />
           </div>
 
           <div className="card metric-card">
-            <div className="eyebrow">Disk Temperature</div>
+            <div className="eyebrow">{t('HistoryPage.diskTempEyebrow')}</div>
             <TimeSeriesChart series={perDiskSeries('disk_temp_c')} formatValue={(v) => `${Math.round(v)}°C`} />
           </div>
 
           <div className="card metric-card">
-            <div className="eyebrow">Disk Read</div>
+            <div className="eyebrow">{t('HistoryPage.diskReadEyebrow')}</div>
             <TimeSeriesChart series={perDiskSeries('disk_read_kb_s')} formatValue={formatKbs} />
           </div>
 
           <div className="card metric-card">
-            <div className="eyebrow">Disk Write</div>
+            <div className="eyebrow">{t('HistoryPage.diskWriteEyebrow')}</div>
             <TimeSeriesChart series={perDiskSeries('disk_write_kb_s')} formatValue={formatKbs} />
           </div>
 
           <div className="card metric-card metric-card--wide">
-            <div className="eyebrow">Disk Usage</div>
+            <div className="eyebrow">{t('HistoryPage.diskUsageEyebrow')}</div>
             <TimeSeriesChart series={perDiskSeries('disk_usage_pct')} formatValue={formatPercent} />
           </div>
         </div>

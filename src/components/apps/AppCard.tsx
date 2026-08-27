@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { AppSummary } from '../../types/appsApi';
 import { AppIcon } from './AppIcon';
 
@@ -12,6 +13,7 @@ const MAX_VISIBLE_CATEGORIES = 2;
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact' });
 
 export function AppCard({ app, onInstall, onViewDetail }: AppCardProps) {
+  const { t } = useTranslation('apps');
   const shownCategories = app.categories.slice(0, MAX_VISIBLE_CATEGORIES);
   const extraCount = app.categories.length - shownCategories.length;
   const updateAvailable = app.installed?.updateAvailable ?? false;
@@ -37,13 +39,13 @@ export function AppCard({ app, onInstall, onViewDetail }: AppCardProps) {
           <div className="app-card__repo">{app.repository}</div>
         </div>
         {app.privileged && (
-          <span className="app-card__privileged" title="This template requests a privileged container">
-            Privileged
+          <span className="app-card__privileged" title={t('AppCard.privilegedTooltip')}>
+            {t('AppCard.privilegedBadge')}
           </span>
         )}
         {app.installed && (
           <span className={`app-card__installed${updateAvailable ? ' app-card__installed--update' : ''}`}>
-            {updateAvailable ? 'Update available' : 'Installed'}
+            {updateAvailable ? t('AppCard.updateAvailable') : t('AppCard.installed')}
           </span>
         )}
       </div>
@@ -53,13 +55,13 @@ export function AppCard({ app, onInstall, onViewDetail }: AppCardProps) {
       {hasStats && (
         <div className="app-card__stats">
           {app.downloads !== null && (
-            <span title={`${app.downloads.toLocaleString()} downloads`}>
-              {compactNumber.format(app.downloads)} download{app.downloads === 1 ? '' : 's'}
+            <span title={t('AppCard.downloadsTooltip', { count: app.downloads.toLocaleString() })}>
+              {t('AppCard.downloads', { count: app.downloads, formatted: compactNumber.format(app.downloads) })}
             </span>
           )}
           {app.stars !== null && (
-            <span title={`${app.stars.toLocaleString()} stars`}>
-              {compactNumber.format(app.stars)} star{app.stars === 1 ? '' : 's'}
+            <span title={t('AppCard.starsTooltip', { count: app.stars.toLocaleString() })}>
+              {t('AppCard.stars', { count: app.stars, formatted: compactNumber.format(app.stars) })}
             </span>
           )}
         </div>
@@ -83,7 +85,7 @@ export function AppCard({ app, onInstall, onViewDetail }: AppCardProps) {
             else onInstall();
           }}
         >
-          {app.installed ? (updateAvailable ? 'Update' : 'Edit') : 'Install'}
+          {app.installed ? (updateAvailable ? t('AppCard.update') : t('AppCard.edit')) : t('AppCard.install')}
         </button>
       </div>
     </div>

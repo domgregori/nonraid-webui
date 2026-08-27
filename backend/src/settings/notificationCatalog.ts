@@ -17,7 +17,12 @@ export type NotificationEventType =
   | 'cacheMoverFailed'
   | 'cacheMoverCompleted'
   | 'arrayError'
-  | 'diskNeedsFormat';
+  | 'diskNeedsFormat'
+  | 'updateAvailable'
+  | 'dockerUpdateAvailable'
+  | 'backupSkipped'
+  | 'remoteBackupRetentionFailed'
+  | 'dockerLxcStorageUnavailable';
 
 export type NotificationSeverity = 'high' | 'medium' | 'low';
 
@@ -53,6 +58,8 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { id: 'smartFailed', label: 'SMART health check failed', severity: 'high', defaultEnabled: true },
   { id: 'parityErrors', label: 'Parity check finished with errors', severity: 'high', defaultEnabled: true },
   { id: 'backupFailed', label: 'Scheduled backup failed', severity: 'high', defaultEnabled: true },
+  { id: 'backupSkipped', label: 'Backup skipped (misconfigured)', severity: 'high', defaultEnabled: true },
+  { id: 'dockerLxcStorageUnavailable', label: "Docker/LXC storage on the array isn't available", severity: 'high', defaultEnabled: true },
   { id: 'cacheMirrorDegraded', label: 'Cache mirror degraded', severity: 'high', defaultEnabled: true },
   { id: 'cacheMoverFailed', label: 'Cache mover failed', severity: 'high', defaultEnabled: true },
   { id: 'tempAlertCpu', label: 'CPU temperature alert', severity: 'medium', defaultEnabled: true, group: 'Temperature' },
@@ -60,6 +67,9 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { id: 'diskAdded', label: 'Disk added or replaced', severity: 'medium', defaultEnabled: true },
   { id: 'arrayReconfigured', label: 'Array reconfigured (disk dropped)', severity: 'medium', defaultEnabled: true },
   { id: 'diskNeedsFormat', label: 'Disk needs formatting', severity: 'medium', defaultEnabled: true },
+  { id: 'updateAvailable', label: 'Software update available', severity: 'medium', defaultEnabled: true },
+  { id: 'dockerUpdateAvailable', label: 'Docker container update available', severity: 'medium', defaultEnabled: true },
+  { id: 'remoteBackupRetentionFailed', label: 'Remote Backup retention cleanup failed', severity: 'medium', defaultEnabled: true },
   { id: 'parityStarted', label: 'Parity check started', severity: 'low', defaultEnabled: false },
   { id: 'parityCompleted', label: 'Parity check finished with no errors', severity: 'low', defaultEnabled: false },
   { id: 'backupCompleted', label: 'Scheduled backup completed', severity: 'low', defaultEnabled: false },

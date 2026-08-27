@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { OnboardingGate } from './components/onboarding/OnboardingGate';
 import { LoginPage } from './pages/LoginPage';
 import { SetupPage } from './pages/SetupPage';
@@ -16,6 +17,7 @@ import { useAuth } from './state/useAuth';
  * setup wizard before the real dashboard - see its own doc comment.
  */
 export function AuthGate() {
+  const { t } = useTranslation('app');
   const { loadState, configured, authenticated, error } = useAuth();
 
   if (loadState === 'loading') {
@@ -25,7 +27,7 @@ export function AuthGate() {
     return (
       <div className="auth-screen">
         <div className="auth-card card">
-          <div className="status-note status-note--error">Can't reach the backend: {error}</div>
+          <div className="status-note status-note--error">{t('AuthGate.backendUnreachable', { error })}</div>
         </div>
       </div>
     );

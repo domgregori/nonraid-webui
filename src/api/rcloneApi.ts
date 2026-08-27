@@ -29,11 +29,13 @@ export const rcloneApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name, type, parameters }),
     }),
-  continueRemoteSetup: (name: string, type: string, state: string) =>
+  // `result` answers whatever step `state` is currently paused on - the pasted `rclone authorize`
+  // output once RcloneRemoteSetupResult.needsToken is true.
+  continueRemoteSetup: (name: string, type: string, state: string, result: string) =>
     request<RcloneRemoteSetupResult>(`/api/rclone/remotes/${encodeURIComponent(name)}/continue`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type, state }),
+      body: JSON.stringify({ type, state, result }),
     }),
   getRemoteConfig: (name: string) => request<RcloneRemoteConfig>(`/api/rclone/remotes/${encodeURIComponent(name)}`),
   updateRemote: (name: string, parameters: Record<string, string>) =>

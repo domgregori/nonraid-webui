@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { rcloneApi } from '../../api/rcloneApi';
 import { useSettings } from '../../hooks/useSettings';
@@ -27,15 +28,15 @@ function providerAbbrev(type: string): string {
   return type.slice(0, 2).toUpperCase();
 }
 
-function formatRelativeTime(ms: number): string {
+function formatRelativeTime(ms: number, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const diff = Date.now() - ms;
   const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  if (minutes < 1) return t('RemoteBackupSection.justNow');
+  if (minutes < 60) return t('RemoteBackupSection.minutesAgo', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  if (hours < 24) return t('RemoteBackupSection.hoursAgo', { count: hours });
   const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
+  return t('RemoteBackupSection.daysAgo', { count: days });
 }
 function formatBytes(bytes: number): string {
   if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -57,25 +58,30 @@ function formatEta(seconds: number | null): string {
  * two jobs pointed at the same path, or "meant to turn encryption on/off"), or it's a genuine mix
  * of both (report the real split, not a collapsed single state).
  */
-function describeExistingBackups(count: number, encryptedCount: number, jobEncryptionEnabled: boolean): string {
+function describeExistingBackups(
+  count: number,
+  encryptedCount: number,
+  jobEncryptionEnabled: boolean,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string {
   const unencryptedCount = count - encryptedCount;
   if (encryptedCount === 0 && unencryptedCount === 0) return '';
   if (encryptedCount > 0 && unencryptedCount > 0) {
-    return `(${encryptedCount} encrypted, ${unencryptedCount} unencrypted)`;
+    return t('RemoteBackupSection.mixEncryptedAndUnencrypted', { encryptedCount, unencryptedCount });
   }
   if (jobEncryptionEnabled && unencryptedCount > 0) {
-    return `(${unencryptedCount} unencrypted) - this job will add encrypted backups alongside them`;
+    return t('RemoteBackupSection.willAddEncryptedAlongside', { unencryptedCount });
   }
   if (!jobEncryptionEnabled && encryptedCount > 0) {
-    return `(${encryptedCount} encrypted) - this job won't encrypt its own backups, so they'll sit alongside these`;
+    return t('RemoteBackupSection.wontEncryptAlongsideExisting', { encryptedCount });
   }
   return '';
 }
 
-const SCOPE_LABELS: Record<SyncScope, string> = {
-  config: 'Config backups',
-  configAppdata: 'Config backups + appdata',
-  custom: 'Custom',
+const SCOPE_LABEL_KEYS: Record<SyncScope, string> = {
+  config: 'RemoteBackupSection.scopeConfig',
+  configAppdata: 'RemoteBackupSection.scopeConfigAppdata',
+  custom: 'RemoteBackupSection.scopeCustom',
 };
 
 interface JobDraft {
@@ -140,6 +146,7 @@ const NEW_JOB_DRAFT: JobDraft = {
 };
 
 export function RemoteBackupSection() {
+  const { t } = useTranslation('settings');
   const { settings } = useSettings();
   const hour12 = settings?.timeFormat !== '24h';
 
@@ -280,24 +287,24 @@ export function RemoteBackupSection() {
 
   const saveJob = async () => {
     if (!jobDraft.name.trim()) {
-      setJobError('Name is required.');
+      setJobError(t('RemoteBackupSection.nameRequired'));
       return;
     }
     if (!jobDraft.remoteName) {
-      setJobError('Pick a destination remote.');
+      setJobError(t('RemoteBackupSection.pickDestinationRemote'));
       return;
     }
     if (jobDraft.scope === 'custom' && !jobDraft.customPath.trim()) {
-      setJobError('Enter a path to sync.');
+      setJobError(t('RemoteBackupSection.enterPathToSync'));
       return;
     }
     const keepDays = Number(jobDraft.keepDays);
     if (!jobDraft.forever && (!Number.isInteger(keepDays) || keepDays < 1)) {
-      setJobError('Enter a positive whole number of days.');
+      setJobError(t('RemoteBackupSection.enterPositiveWholeNumber'));
       return;
     }
     if (jobDraft.frequency === 'cron' && !jobDraft.cronExpression.trim()) {
-      setJobError('Enter a cron expression.');
+      setJobError(t('RemoteBackupSection.enterCronExpression'));
       return;
     }
     // Custom-scope jobs mirror a folder file-by-file, never a single archive - encryption isn't
@@ -305,7 +312,7 @@ export function RemoteBackupSection() {
     // of whatever the toggle happened to show before the scope was switched.
     const encryptionEnabled = jobDraft.scope !== 'custom' && jobDraft.encryptEnabled;
     if (encryptionEnabled && !jobDraft.encryptPassword.trim() && !jobDraft.hadPassword) {
-      setJobError('Enter a password to enable encryption.');
+      setJobError(t('RemoteBackupSection.enterPasswordToEnableEncryption'));
       return;
     }
     setJobSaving(true);
@@ -405,18 +412,17 @@ export function RemoteBackupSection() {
   };
 
   if (loadError) return <div className="status-note status-note--error">{loadError}</div>;
-  if (!status) return <div className="status-note">Loading…</div>;
+  if (!status) return <div className="status-note">{t('RemoteBackupSection.loading')}</div>;
 
   if (!status.installed) {
     return (
       <div className="settings-card">
         <div className="settings-card__title">
-          <span className="settings-card__title-text">
-            Remote Backup
-          </span>
+          <span className="settings-card__title-text">{t('RemoteBackupSection.title')}</span>
         </div>
         <div className="toggle-row__desc">
-          The <code>rclone</code> package isn't installed on this host. Re-run <code>tools/install-webui.sh</code> to enable this section.
+          {t('RemoteBackupSection.notInstalled1')} <code>rclone</code> {t('RemoteBackupSection.notInstalled2')} <code>tools/install-webui.sh</code>{' '}
+          {t('RemoteBackupSection.notInstalled3')}
         </div>
       </div>
     );
@@ -426,21 +432,24 @@ export function RemoteBackupSection() {
     <div className="settings-card">
       <div className="settings-card__title settings-card__title--with-link">
         <span className="settings-card__title-text">
-          Remote Backup <span className="badge-new">New</span>
+          {t('RemoteBackupSection.title')} <span className="badge-new">{t('RemoteBackupSection.new')}</span>
         </span>
         <Link to="/settings#recovery" className="settings-card__title-link">
-          Recovery →
+          {t('RemoteBackupSection.recoveryLink')}
         </Link>
       </div>
 
       <div className="toggle-row" style={{ paddingTop: 0 }}>
         <div>
-          <div className="toggle-row__title">Sync backups to remote storage</div>
+          <div className="toggle-row__title">{t('RemoteBackupSection.syncBackupsTitle')}</div>
           <div className="toggle-row__desc" style={{ paddingBottom: 0 }}>
-            S3, Backblaze B2, Google Drive, SFTP, and 70+ others via rclone. Disabled by default.
+            {t('RemoteBackupSection.syncBackupsDesc')}{' '}
+            <a href="https://rclone.org/docs/" target="_blank" rel="noreferrer">
+              {t('RemoteBackupSection.rcloneDocsLink')}
+            </a>
           </div>
         </div>
-        <ToggleSwitch on={status.featureEnabled} onToggle={toggleEnabled} label="Remote Backup" disabled={enabling} />
+        <ToggleSwitch on={status.featureEnabled} onToggle={toggleEnabled} label={t('RemoteBackupSection.title')} disabled={enabling} />
       </div>
       {enableError && <div className="status-note status-note--error">{enableError}</div>}
 
@@ -448,14 +457,14 @@ export function RemoteBackupSection() {
         <>
           {!status.running && (
             <div className="status-note status-note--error">
-              rclone-rcd isn't reachable - check <code>systemctl status rclone-rcd</code> on the host.
+              {t('RemoteBackupSection.rcloneNotReachable1')} <code>systemctl status rclone-rcd</code> {t('RemoteBackupSection.rcloneNotReachable2')}
             </div>
           )}
 
           <hr className="divider" />
 
           <div className="settings-field" style={{ paddingTop: 0 }}>
-            <div className="settings-field__label">Remotes</div>
+            <div className="settings-field__label">{t('RemoteBackupSection.remotes')}</div>
             <div className="remote-list">
               {(remotes ?? []).map((r) => (
                 <div className="remote-row" key={r.name}>
@@ -471,30 +480,36 @@ export function RemoteBackupSection() {
                         background: r.status === 'ok' ? 'var(--color-green)' : r.status === 'authExpired' ? 'var(--color-red)' : 'var(--color-text-dim)',
                       }}
                     />
-                    {r.status === 'ok' ? 'Connected' : r.status === 'authExpired' ? 'Auth expired' : r.status === 'error' ? 'Error' : 'Unknown'}
+                    {r.status === 'ok'
+                      ? t('RemoteBackupSection.connected')
+                      : r.status === 'authExpired'
+                        ? t('RemoteBackupSection.authExpired')
+                        : r.status === 'error'
+                          ? t('RemoteBackupSection.error')
+                          : t('RemoteBackupSection.unknown')}
                   </div>
                   <div className="remote-row__actions">
                     {r.status === 'authExpired' && (
                       <button type="button" className="btn" onClick={() => loadRemotes()}>
-                        Reconnect
+                        {t('RemoteBackupSection.reconnect')}
                       </button>
                     )}
                     <button type="button" className="btn" onClick={() => startEditRemote(r)}>
-                      Edit
+                      {t('RemoteBackupSection.edit')}
                     </button>
                     <button type="button" className="btn btn--danger" disabled={removingRemote === r.name} onClick={() => removeRemote(r.name)}>
-                      {removingRemote === r.name ? 'Removing…' : 'Remove'}
+                      {removingRemote === r.name ? t('RemoteBackupSection.removing') : t('RemoteBackupSection.remove')}
                     </button>
                   </div>
                 </div>
               ))}
-              {remotes?.length === 0 && <div className="status-note">No remotes configured yet.</div>}
+              {remotes?.length === 0 && <div className="status-note">{t('RemoteBackupSection.noRemotesConfigured')}</div>}
             </div>
             {removeRemoteError && <div className="status-note status-note--error">{removeRemoteError}</div>}
 
             {!showAddRemote && (
               <button type="button" className="add-sync-btn" style={{ marginTop: 8 }} onClick={startAddRemote}>
-                + Add remote
+                {t('RemoteBackupSection.addRemote')}
               </button>
             )}
 
@@ -504,13 +519,13 @@ export function RemoteBackupSection() {
           <hr className="divider" />
 
           <div className="settings-field" style={{ paddingTop: 0 }}>
-            <div className="settings-field__label">Syncs</div>
+            <div className="settings-field__label">{t('RemoteBackupSection.syncs')}</div>
             {existingBackupsFound && (
               <div className="status-note">
-                Found {existingBackupsFound.count} existing backup{existingBackupsFound.count === 1 ? '' : 's'}{' '}
-                {describeExistingBackups(existingBackupsFound.count, existingBackupsFound.encryptedCount, existingBackupsFound.jobEncryptionEnabled)} already at "
-                {existingBackupsFound.jobName}"'s destination - restorable from{' '}
-                <Link to="/settings#recovery">Settings → Recovery</Link>.{' '}
+                {t('RemoteBackupSection.foundExistingBackups', { count: existingBackupsFound.count })}{' '}
+                {describeExistingBackups(existingBackupsFound.count, existingBackupsFound.encryptedCount, existingBackupsFound.jobEncryptionEnabled, t)}{' '}
+                {t('RemoteBackupSection.alreadyAtDestination', { jobName: existingBackupsFound.jobName })}{' '}
+                <Link to="/settings#recovery">{t('RemoteBackupSection.settingsRecoveryLink')}</Link>.{' '}
                 <a
                   href="#"
                   onClick={(e) => {
@@ -518,7 +533,7 @@ export function RemoteBackupSection() {
                     setExistingBackupsFound(null);
                   }}
                 >
-                  Dismiss
+                  {t('RemoteBackupSection.dismiss')}
                 </a>
               </div>
             )}
@@ -529,10 +544,12 @@ export function RemoteBackupSection() {
             </div>
             {editingJobId === null && (
               <button type="button" className="add-sync-btn" style={{ marginTop: 12 }} onClick={startNewJob} disabled={(remotes ?? []).length === 0}>
-                + Add sync
+                {t('RemoteBackupSection.addSync')}
               </button>
             )}
-            {(remotes ?? []).length === 0 && editingJobId === null && <div className="settings-field__hint">Add a remote above before creating a sync.</div>}
+            {(remotes ?? []).length === 0 && editingJobId === null && (
+              <div className="settings-field__hint">{t('RemoteBackupSection.addRemoteBeforeSync')}</div>
+            )}
           </div>
         </>
       )}
@@ -562,10 +579,22 @@ function JobCard({
   onSyncNow: () => void;
   onCancelSync: () => void;
 }) {
-  const scheduleSummary = job.schedule.frequency === 'cron' ? `Cron · ${job.schedule.cronExpression}` : job.schedule.frequency === 'daily' ? `Daily · ${String(job.schedule.hour).padStart(2, '0')}:00` : job.schedule.frequency === 'weekly' ? `Weekly · ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][job.schedule.dayOfWeek]} · ${String(job.schedule.hour).padStart(2, '0')}:00` : `Monthly · Day ${job.schedule.dayOfMonth} · ${String(job.schedule.hour).padStart(2, '0')}:00`;
+  const { t } = useTranslation('settings');
+  const dayAbbrevKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const scheduleSummary =
+    job.schedule.frequency === 'cron'
+      ? t('RemoteBackupSection.scheduleCron', { expr: job.schedule.cronExpression })
+      : job.schedule.frequency === 'daily'
+        ? t('RemoteBackupSection.scheduleDaily', { hour: String(job.schedule.hour).padStart(2, '0') })
+        : job.schedule.frequency === 'weekly'
+          ? t('RemoteBackupSection.scheduleWeekly', {
+              day: t(`RemoteBackupSection.dayAbbrev_${dayAbbrevKeys[job.schedule.dayOfWeek]}`),
+              hour: String(job.schedule.hour).padStart(2, '0'),
+            })
+          : t('RemoteBackupSection.scheduleMonthly', { day: job.schedule.dayOfMonth, hour: String(job.schedule.hour).padStart(2, '0') });
 
   const modifierClass = job.state === 'syncing' ? 'sync-job--enabled sync-job--syncing' : remoteMissing ? 'sync-job--error' : job.state === 'disabled' ? 'sync-job--disabled' : 'sync-job--enabled';
-  const destLabel = job.scope === 'custom' ? `Custom (${job.customPath || '…'})` : SCOPE_LABELS[job.scope];
+  const destLabel = job.scope === 'custom' ? t('RemoteBackupSection.scopeCustomWithPath', { path: job.customPath || '…' }) : t(SCOPE_LABEL_KEYS[job.scope]);
 
   return (
     <div className={`sync-job ${modifierClass}`}>
@@ -575,21 +604,21 @@ function JobCard({
             {destLabel} → {job.remoteName || '…'}
           </span>
           {job.encryption.enabled && (
-            <span className="job-badge job-badge--encrypted" title="Archives from this job are password-encrypted">
-              Encrypted
+            <span className="job-badge job-badge--encrypted" title={t('RemoteBackupSection.encryptedTooltip')}>
+              {t('RemoteBackupSection.encrypted')}
             </span>
           )}
           {job.state === 'syncing' ? (
             <span className="job-badge job-badge--syncing">
               <span className="status-dot status-dot--pulse" style={{ background: 'var(--color-blue)' }} />
-              Syncing…
+              {t('RemoteBackupSection.syncingEllipsis')}
             </span>
           ) : remoteMissing ? (
-            <span className="job-badge job-badge--error">Remote missing</span>
+            <span className="job-badge job-badge--error">{t('RemoteBackupSection.remoteMissing')}</span>
           ) : job.state === 'disabled' ? (
-            <span className="job-badge job-badge--disabled">Disabled</span>
+            <span className="job-badge job-badge--disabled">{t('RemoteBackupSection.disabled')}</span>
           ) : (
-            <span className="job-badge job-badge--active">Active</span>
+            <span className="job-badge job-badge--active">{t('RemoteBackupSection.active')}</span>
           )}
         </div>
         {job.state !== 'syncing' && <span className="sync-job__schedule">{scheduleSummary}</span>}
@@ -598,12 +627,10 @@ function JobCard({
       {job.state === 'syncing' && job.progress ? (
         <div className="sync-progress">
           <div className="sync-progress__row">
+            <span>{t('RemoteBackupSection.transferringFiles', { done: job.progress.filesDone, total: job.progress.filesTotal || '?' })}</span>
             <span>
-              Transferring {job.progress.filesDone} of {job.progress.filesTotal || '?'} files
-            </span>
-            <span>
-              {formatBytes(job.progress.speedBytesPerSec)}/s
-              {job.progress.etaSeconds !== null ? ` · ETA ${formatEta(job.progress.etaSeconds)}` : ''}
+              {t('RemoteBackupSection.speedPerSec', { speed: formatBytes(job.progress.speedBytesPerSec) })}
+              {job.progress.etaSeconds !== null ? ` · ${t('RemoteBackupSection.eta', { eta: formatEta(job.progress.etaSeconds) })}` : ''}
             </span>
           </div>
           <div className="progress-track">
@@ -631,37 +658,39 @@ function JobCard({
           />
           {job.lastSyncedAt ? (
             <>
-              Last synced <strong>{formatRelativeTime(job.lastSyncedAt)}</strong>
+              {t('RemoteBackupSection.lastSynced')} <strong>{formatRelativeTime(job.lastSyncedAt, t)}</strong>
               {job.lastSizeBytes !== null && <> · {formatBytes(job.lastSizeBytes)}</>}
-              {job.lastFileCount !== null && <> · {job.lastFileCount} files</>}
-              {job.lastErrorCount !== null && <> · {job.lastErrorCount} errors</>}
+              {job.lastFileCount !== null && <> · {t('RemoteBackupSection.filesCount', { count: job.lastFileCount })}</>}
+              {job.lastErrorCount !== null && <> · {t('RemoteBackupSection.errorsCount', { count: job.lastErrorCount })}</>}
             </>
           ) : (
-            'Never synced yet'
+            t('RemoteBackupSection.neverSyncedYet')
           )}
         </div>
       )}
       {job.lastError && job.state !== 'syncing' && <div className="status-note status-note--error">{job.lastError}</div>}
-      {remoteMissing && job.state !== 'syncing' && <div className="status-note status-note--error">Remote "{job.remoteName}" no longer exists - re-add it, or point this sync at a different remote via Edit.</div>}
+      {remoteMissing && job.state !== 'syncing' && (
+        <div className="status-note status-note--error">{t('RemoteBackupSection.remoteNoLongerExists', { remoteName: job.remoteName })}</div>
+      )}
 
       <div className="sync-job__actions">
         {job.state === 'syncing' ? (
           <button type="button" className="btn btn--danger" onClick={onCancelSync}>
-            Cancel
+            {t('RemoteBackupSection.cancel')}
           </button>
         ) : (
           <button type="button" className="btn btn--primary-sm" disabled={job.state === 'disabled' || remoteMissing} onClick={onSyncNow}>
-            Sync now
+            {t('RemoteBackupSection.syncNow')}
           </button>
         )}
         <button type="button" className="btn" disabled={job.state === 'syncing'} onClick={onEdit}>
-          Edit
+          {t('RemoteBackupSection.edit')}
         </button>
         <button type="button" className="btn" disabled={job.state === 'syncing'} onClick={onToggleEnabled}>
-          {job.state === 'disabled' ? 'Enable' : 'Disable'}
+          {job.state === 'disabled' ? t('RemoteBackupSection.enable') : t('RemoteBackupSection.disable')}
         </button>
         <button type="button" className="btn btn--danger" disabled={job.state === 'syncing'} onClick={onDelete}>
-          Delete
+          {t('RemoteBackupSection.delete')}
         </button>
       </div>
     </div>
@@ -669,21 +698,27 @@ function JobCard({
 }
 
 function JobEditor({ draft, setDraft, remotes, hour12, saving, error, onSave, onCancel }: { draft: JobDraft; setDraft: (updater: (prev: JobDraft) => JobDraft) => void; remotes: RcloneRemote[]; hour12: boolean; saving: boolean; error: string | null; onSave: () => void; onCancel: () => void }) {
+  const { t } = useTranslation('settings');
   return (
     <div className="sync-job sync-job--editing">
       <div className="sync-job__head">
         <div className="sync-job__title">
-          <span className="sync-job__name">{draft.name || 'Editing sync'}</span>
-          <span className="job-badge job-badge--editing">Editing</span>
+          <span className="sync-job__name">{draft.name || t('RemoteBackupSection.editingSync')}</span>
+          <span className="job-badge job-badge--editing">{t('RemoteBackupSection.editing')}</span>
         </div>
       </div>
       <div className="field-grid">
         <label className="field">
-          <span>Name</span>
-          <input className="history-input" value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} placeholder="e.g. Offsite config backup" />
+          <span>{t('RemoteBackupSection.name')}</span>
+          <input
+            className="history-input"
+            value={draft.name}
+            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+            placeholder={t('RemoteBackupSection.namePlaceholder')}
+          />
         </label>
         <label className="field">
-          <span>What to sync</span>
+          <span>{t('RemoteBackupSection.whatToSync')}</span>
           <select
             className="history-input"
             value={draft.scope}
@@ -696,19 +731,19 @@ function JobEditor({ draft, setDraft, remotes, hour12, saving, error, onSave, on
               setDraft((d) => ({ ...d, scope, encryptEnabled: scope === 'custom' ? false : d.encryptEnabled }));
             }}
           >
-            <option value="config">Config backups</option>
-            <option value="configAppdata">Config backups + appdata</option>
-            <option value="custom">Custom…</option>
+            <option value="config">{t('RemoteBackupSection.scopeConfig')}</option>
+            <option value="configAppdata">{t('RemoteBackupSection.scopeConfigAppdata')}</option>
+            <option value="custom">{t('RemoteBackupSection.scopeCustomEllipsis')}</option>
           </select>
         </label>
         {draft.scope === 'custom' && (
           <label className="field field-grid--full">
-            <span>Path</span>
+            <span>{t('RemoteBackupSection.path')}</span>
             <PathAutocomplete scope="browse" value={draft.customPath} onChange={(v) => setDraft((d) => ({ ...d, customPath: v }))} placeholder="/mnt/user/..." />
           </label>
         )}
         <label className="field">
-          <span>Destination</span>
+          <span>{t('RemoteBackupSection.destination')}</span>
           <select className="history-input" value={draft.remoteName} onChange={(e) => setDraft((d) => ({ ...d, remoteName: e.target.value }))}>
             {remotes.map((r) => (
               <option key={r.name} value={r.name}>
@@ -718,8 +753,13 @@ function JobEditor({ draft, setDraft, remotes, hour12, saving, error, onSave, on
           </select>
         </label>
         <label className="field">
-          <span>Remote path (optional)</span>
-          <input className="history-input" value={draft.remotePath} onChange={(e) => setDraft((d) => ({ ...d, remotePath: e.target.value }))} placeholder="bucket/subfolder" />
+          <span>{t('RemoteBackupSection.remotePathOptional')}</span>
+          <input
+            className="history-input"
+            value={draft.remotePath}
+            onChange={(e) => setDraft((d) => ({ ...d, remotePath: e.target.value }))}
+            placeholder="bucket/subfolder"
+          />
         </label>
 
         {/* Day-based, uniformly across every scope - not a "keep last N" count. Same model rclone's
@@ -727,23 +767,23 @@ function JobEditor({ draft, setDraft, remotes, hour12, saving, error, onSave, on
             doc comment) whether this job syncs a live mirror ('custom') or uploads discrete dated
             archives ('config'/'configAppdata'). */}
         <label className="field field-grid--full">
-          <span>Keep changed/deleted versions for</span>
+          <span>{t('RemoteBackupSection.keepVersionsFor')}</span>
           <div className={`settings-field__row${draft.forever ? ' retention-input--disabled' : ''}`} style={{ flexWrap: 'nowrap' }}>
             <input className="history-input" type="number" min={1} step={1} style={{ width: 100 }} value={draft.keepDays} onChange={(e) => setDraft((d) => ({ ...d, keepDays: e.target.value }))} disabled={draft.forever} />
             <span className="settings-field__hint" style={{ alignSelf: 'center' }}>
-              days
+              {t('RemoteBackupSection.days')}
             </span>
           </div>
           <div className="keep-forever-row" style={{ marginTop: 0 }}>
             <input className="round-checkbox" type="checkbox" id={`forever-${draft.name || 'new'}`} checked={draft.forever} onChange={(e) => setDraft((d) => ({ ...d, forever: e.target.checked }))} />
-            <label htmlFor={`forever-${draft.name || 'new'}`}>Keep all versions forever</label>
+            <label htmlFor={`forever-${draft.name || 'new'}`}>{t('RemoteBackupSection.keepForever')}</label>
           </div>
         </label>
 
         {/* Not offered for 'custom' scope - see the scope <select>'s own onChange comment above. */}
         {draft.scope !== 'custom' && (
           <label className="field field-grid--full">
-            <span>Encryption</span>
+            <span>{t('RemoteBackupSection.encryption')}</span>
             <div className="keep-forever-row" style={{ marginTop: 0 }}>
               <input
                 className="round-checkbox"
@@ -752,7 +792,7 @@ function JobEditor({ draft, setDraft, remotes, hour12, saving, error, onSave, on
                 checked={draft.encryptEnabled}
                 onChange={(e) => setDraft((d) => ({ ...d, encryptEnabled: e.target.checked }))}
               />
-              <label htmlFor={`encrypt-${draft.name || 'new'}`}>Password-encrypt this job's backup archives</label>
+              <label htmlFor={`encrypt-${draft.name || 'new'}`}>{t('RemoteBackupSection.encryptionCheckboxLabel')}</label>
             </div>
             {draft.encryptEnabled && (
               <input
@@ -761,7 +801,7 @@ function JobEditor({ draft, setDraft, remotes, hour12, saving, error, onSave, on
                 style={{ marginTop: 8 }}
                 value={draft.encryptPassword}
                 onChange={(e) => setDraft((d) => ({ ...d, encryptPassword: e.target.value }))}
-                placeholder={draft.hadPassword ? 'Leave blank to keep the current password' : 'Password'}
+                placeholder={draft.hadPassword ? t('RemoteBackupSection.keepCurrentPassword') : t('RemoteBackupSection.password')}
               />
             )}
           </label>
@@ -769,17 +809,17 @@ function JobEditor({ draft, setDraft, remotes, hour12, saving, error, onSave, on
       </div>
 
       <div className="schedule-row">
-        <div className="schedule-row__label">Schedule</div>
+        <div className="schedule-row__label">{t('RemoteBackupSection.schedule')}</div>
         <ScheduleFields frequency={draft.frequency} onFrequencyChange={(f) => setDraft((d) => ({ ...d, frequency: f }))} dayOfWeek={draft.dayOfWeek} onDayOfWeekChange={(v) => setDraft((d) => ({ ...d, dayOfWeek: v }))} dayOfMonth={draft.dayOfMonth} onDayOfMonthChange={(v) => setDraft((d) => ({ ...d, dayOfMonth: v }))} hour={draft.hour} onHourChange={(v) => setDraft((d) => ({ ...d, hour: v }))} hour12={hour12} allowCron cronExpression={draft.cronExpression} onCronExpressionChange={(v) => setDraft((d) => ({ ...d, cronExpression: v }))} />
       </div>
 
       {error && <div className="status-note status-note--error">{error}</div>}
       <div className="sync-job__actions">
         <button type="button" className="btn btn--primary-sm" disabled={saving} onClick={onSave}>
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? t('RemoteBackupSection.saving') : t('RemoteBackupSection.save')}
         </button>
         <button type="button" className="btn" onClick={onCancel}>
-          Cancel
+          {t('RemoteBackupSection.cancel')}
         </button>
       </div>
     </div>

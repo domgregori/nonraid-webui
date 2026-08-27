@@ -1,0 +1,123 @@
+{
+  "ArrayBuilder": {
+    "scanningDevices": "Scanning for devices…",
+    "noDevicesFound": "No unassigned devices found.",
+    "parityDiskLabel": "Parity disk",
+    "parityAlreadyAssigned": "Already assigned - {{diskId}}.",
+    "parityDesc": "Has to be at least as large as the data disk below.",
+    "selectDisk": "Select a disk…",
+    "unknownSize": "unknown size",
+    "diskLockedWarning": "This disk appears to be locked/in use - this may fail.",
+    "dataDiskLabel": "Data disk",
+    "dataDiskDesc": "Any existing data on it is cleared when the array starts.",
+    "paritySmallWarning": "The parity disk is smaller than the data disk ({{size}}) - pick a bigger parity disk, or a smaller data disk.",
+    "arrayRunningWarning": "The array is currently running - building this will stop and restart it.",
+    "buildingButton": "Building array…",
+    "buildButton": "Build Array",
+    "logAddingParity": "Adding {{name}} as the parity disk…",
+    "logAddingData": "Adding {{name}} as the data disk…",
+    "logStartingArray": "Starting the array…",
+    "logStartingParityBuild": "Starting the initial parity build - this continues in the background…"
+  },
+  "OnboardingWizard": {
+    "brandTitle": "NonRAID setup",
+    "skipSetup": "Skip setup",
+    "stageLabels": {
+      "array": "Array",
+      "tour": "Tour",
+      "done": "Done"
+    },
+    "common": {
+      "back": "Back",
+      "firstTimeSetup": "First-time setup"
+    },
+    "welcome": {
+      "title": "Name this machine",
+      "desc": "A couple of quick basics before the array - both are already set to sensible defaults and can always be changed later from Settings → About.",
+      "hostnameLabel": "Hostname",
+      "timezoneLabel": "Timezone",
+      "continue": "Continue",
+      "saving": "Saving…"
+    },
+    "start": {
+      "title": "Let's build your array",
+      "desc": "Every disk that's part of the array - one or two parity disks plus your data disks - needs to be assigned before it can start. If this isn't a fresh install, you can bring an existing array's configuration in instead of assigning disks by hand.",
+      "buildChoiceTitle": "Build a new array",
+      "buildChoiceDesc": "Assign a parity disk and your data disks now. You can always add more later.",
+      "importChoiceTitle": "Import an existing array",
+      "importChoiceDesc": "From a previous NonRAID install, or another array using the same superblock format.",
+      "restoreChoiceTitle": "Restore a full config backup",
+      "restoreChoiceDesc": "Bring back everything from a previous nonraid-webui install at once - array, shares, users, and settings - from a config backup archive."
+    },
+    "restoreConfig": {
+      "title": "Restore a full config backup",
+      "desc": "Bring back everything from a previous nonraid-webui install at once - array, shares, users, and settings. Pick where the backup is coming from.",
+      "fromUpload": "From an uploaded file…",
+      "fromLocal": "From a local backup…",
+      "fromRemote": "From a remote backup…"
+    },
+    "disks": {
+      "eyebrow": "First-time setup · Array",
+      "title": "Build your array",
+      "desc": "Pick a parity disk and a data disk, then press Build Array. Initialization - clearing the data disk and building parity - happens in the background, so you don't need to wait here. Once it's running, add more disks, a second parity disk, or a cache mirror any time from the Disks page.",
+      "summaryRow": "Slot {{slot}} · {{type}}",
+      "parity1": "Parity 1",
+      "parity2": "Parity 2",
+      "dataType": "Data"
+    },
+    "infoSlides": {
+      "apps": {
+        "eyebrow": "Apps",
+        "title": "Install ready-made apps",
+        "body": "The Apps catalog has one-click installs for common self-hosted services - media servers, downloaders, home automation, and more. Find it any time from the sidebar."
+      },
+      "docker": {
+        "eyebrow": "Docker",
+        "title": "Or run your own containers",
+        "body": "Bringing your own image? The Docker page pulls it, sets ports/volumes/env vars, and shows a live log tail - no app catalog entry needed."
+      },
+      "lxc": {
+        "eyebrow": "LXC",
+        "title": "Or a full lightweight VM",
+        "body": "When a container isn't isolated enough, LXC gives you a more complete lightweight VM instead - with its own storage location, separate from Docker's."
+      },
+      "notifications": {
+        "eyebrow": "Notifications",
+        "title": "Stay in the loop",
+        "body": "Turn on notifications in Settings to hear about it - by email, Discord, or anything Apprise supports - when a disk fails, a parity check finishes, or something needs a look."
+      },
+      "backups": {
+        "eyebrow": "Backups & Recovery",
+        "title": "Don't lose this setup twice",
+        "body": "Back up this app's own config - array, shares, users, and settings - locally or to a remote via rclone. Settings → Backups sets it up; Settings → Recovery brings it back, from an upload, a local backup, or a remote one."
+      }
+    },
+    "next": "Next",
+    "gotIt": "Got it",
+    "done": {
+      "eyebrow": "Setup complete",
+      "title": "You're all set",
+      "desc": "Head to the Dashboard to check on the array, or Disks to keep adding storage. You can replay this tour any time from Settings → About.",
+      "goToDashboard": "Go to Dashboard"
+    }
+  },
+  "RemoteRestoreOnboarding": {
+    "rcloneNotInstalled": "The rclone package isn't installed on this host - re-run tools/install-webui.sh on it to enable remote backups.",
+    "titleRecoverArray": "Recover the array from a remote backup",
+    "titleRestore": "Restore from a remote backup",
+    "close": "Close",
+    "cancel": "Cancel",
+    "turningOn": "Turning on Remote Backup…",
+    "pickRemoteDesc": "Pick a remote to browse for backups already sitting on it, or connect a new one.",
+    "addDifferentRemote": "+ Add a different remote",
+    "connectRemoteTitle": "Connect a remote",
+    "pathStep": {
+      "descBefore": "Where on",
+      "descAfter": "did the old install's sync job point? Leave blank to browse the remote's own root.",
+      "remotePathLabel": "Remote path (optional)",
+      "remotePathPlaceholder": "bucket/subfolder",
+      "browseBackups": "Browse backups"
+    },
+    "back": "Back"
+  }
+}

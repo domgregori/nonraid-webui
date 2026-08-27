@@ -1,20 +1,22 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useShares } from '../../hooks/useShares';
 import { deriveShareViewModel } from '../../selectors/shares';
 import { Card } from '../shared/Card';
 
 export function SharesCard() {
+  const { t } = useTranslation('dashboard');
   const { shares } = useShares();
   const views = shares.map(deriveShareViewModel);
 
   return (
     <Card>
       <div className="eyebrow" style={{ marginBottom: 12 }}>
-        Pools
+        {t('SharesCard.pools')}
       </div>
 
       {views.length === 0 ? (
-        <div className="status-note">No pools yet.</div>
+        <div className="status-note">{t('SharesCard.noPools')}</div>
       ) : (
         views.map((share, i) => (
           <div key={share.name} className={`share-summary-row${i > 0 ? ' share-summary-row--bordered' : ''}`}>
@@ -31,7 +33,7 @@ export function SharesCard() {
       )}
 
       <Link to="/shares" className="share-summary-manage-link">
-        Manage pools &rarr;
+        {t('SharesCard.managePools')} &rarr;
       </Link>
     </Card>
   );

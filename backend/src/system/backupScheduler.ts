@@ -8,14 +8,15 @@ import type { RcloneClient } from '../rclone/client.js';
 import type { SettingsStore } from '../settings/index.js';
 import { notifyEvent } from '../settings/notify.js';
 import { scheduleFireKey, scheduleMatches } from '../settings/scheduleMatch.js';
+import type { UsersClient } from '../users/client.js';
+import { writeUsersExport } from '../users/backupExport.js';
 import type { BackupCategoryId } from './backupCatalog.js';
-import { resolveConfigBackupPaths, resolveExistingCategoryIds } from './backupCatalog.js';
+import { ARCHIVE_EXT, isOwnArchiveName, resolveConfigBackupPaths, resolveExistingCategoryIds } from './backupCatalog.js';
 import { resolveBackupDestDir } from './backupDestination.js';
 import { buildMeta, deleteMetaSidecar, readMetaSidecar, writeMetaSidecar } from './backupMeta.js';
 import { writeConfigBackupToFile } from './backupStream.js';
 
 const BACKUP_PREFIX = 'nonraid-config-backup-';
-const BACKUP_SUFFIX = '.tar.gz';
 
 // GET /system/backup/local/list - one archive at Settings -> Local Backups' own configured
 // destination, enriched with its own `.meta.json` sidecar (backupMeta.ts) when one exists next to
@@ -53,6 +54,9 @@ export class BackupScheduler {
     // run needs the real plaintext for openssl - see BackupEncryption's own doc comment
     // (settings/types.ts). Not used for anything else Local Backups does.
     private rclone: RcloneClient,
+    // Only ever used to snapshot managed users/groups right before a run - see the 'users'
+    // backup category (backupCatalog.ts) and users/backupExport.ts's writeUsersExport().
+    private users: UsersClient,
     intervalMs: number = config.schedulerTickIntervalMs,
   ) {
     this.timer = setInterval(() => this.tick(), intervalMs);
@@ -93,13 +97,15 @@ export class BackupScheduler {
       destDir = resolveBackupDestDir(schedule.destination);
     } catch (err) {
       const msg = `${label} skipped - ${(err as Error).message}`;
-      this.activity.log(msg, 'amber').catch(() => {});
+      this.activity.log(msg, 'amber', 'backupSkipped').catch(() => {});
+      notifyEvent(this.settings, 'backupSkipped', 'NonRAID: backup skipped', msg);
       throw err;
     }
 
     if (!destDir) {
       const msg = `${label} skipped - no destination directory configured`;
-      this.activity.log(msg, 'amber').catch(() => {});
+      this.activity.log(msg, 'amber', 'backupSkipped').catch(() => {});
+      notifyEvent(this.settings, 'backupSkipped', 'NonRAID: backup skipped', msg);
       throw new Error('No destination directory configured - set one below and save first.');
     }
     // The 'boot'/'array' picker options resolve to a fixed convention path (e.g.
@@ -115,7 +121,8 @@ export class BackupScheduler {
       await access(destDir, constants.W_OK);
     } catch {
       const msg = `${label} skipped - destination "${destDir}" doesn't exist or isn't writable`;
-      this.activity.log(msg, 'amber').catch(() => {});
+      this.activity.log(msg, 'amber', 'backupSkipped').catch(() => {});
+      notifyEvent(this.settings, 'backupSkipped', 'NonRAID: backup skipped', msg);
       throw new Error(`Destination "${destDir}" doesn't exist or isn't writable.`);
     }
 
@@ -126,23 +133,26 @@ export class BackupScheduler {
       if (schedule.encryption.enabled) {
         if (!schedule.encryption.passwordObscured) {
           const msg = `${label} skipped - encryption is on but no password is saved`;
-          this.activity.log(msg, 'amber').catch(() => {});
+          this.activity.log(msg, 'amber', 'backupSkipped').catch(() => {});
+          notifyEvent(this.settings, 'backupSkipped', 'NonRAID: backup skipped', msg);
           throw new Error('Encryption is on but no password is saved - set one in Settings → Local Backups.');
         }
         password = await this.rclone.reveal(schedule.encryption.passwordObscured);
       }
 
       this.metrics.checkpointForBackup();
+      await writeUsersExport(this.users, config.usersExportPath);
       const includeAppdata = schedule.scope === 'configAppdata';
-      const paths = await resolveConfigBackupPaths(this.nmd, includeAppdata);
+      const paths = await resolveConfigBackupPaths(this.nmd, this.settings, includeAppdata);
       if (paths.length === 0) {
         const msg = `${label} skipped - no config files found to back up`;
-        this.activity.log(msg, 'amber').catch(() => {});
+        this.activity.log(msg, 'amber', 'backupSkipped').catch(() => {});
+        notifyEvent(this.settings, 'backupSkipped', 'NonRAID: backup skipped', msg);
         throw new Error('No config files found to back up.');
       }
-      const destPath = path.join(destDir, `${BACKUP_PREFIX}${Date.now()}${BACKUP_SUFFIX}`);
+      const destPath = path.join(destDir, `${BACKUP_PREFIX}${Date.now()}${ARCHIVE_EXT}`);
       const bytes = await writeConfigBackupToFile(paths, destPath, password);
-      const categories = await resolveExistingCategoryIds(this.nmd, includeAppdata);
+      const categories = await resolveExistingCategoryIds(this.nmd, this.settings, includeAppdata);
       await writeMetaSidecar(destPath, buildMeta(schedule.scope, categories, !!password));
       const sizeLabel = bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
       const completedText = `${label} completed (${sizeLabel}${password ? ', encrypted' : ''})`;
@@ -169,7 +179,7 @@ export class BackupScheduler {
     } catch {
       return;
     }
-    const ours = entries.filter((f) => f.startsWith(BACKUP_PREFIX) && f.endsWith(BACKUP_SUFFIX));
+    const ours = entries.filter((f) => isOwnArchiveName(f, BACKUP_PREFIX));
     if (ours.length <= retain) return;
 
     const withMtimes = await Promise.all(
@@ -216,7 +226,7 @@ export class BackupScheduler {
     } catch {
       return { destDir, backups: [] };
     }
-    const ours = entries.filter((f) => f.startsWith(BACKUP_PREFIX) && f.endsWith(BACKUP_SUFFIX));
+    const ours = entries.filter((f) => isOwnArchiveName(f, BACKUP_PREFIX));
     const withStats = await Promise.all(
       ours.map(async (f) => {
         const full = path.join(destDir, f);
@@ -239,7 +249,7 @@ export class BackupScheduler {
    *  path-based import. Throws if the name doesn't look like one of this scheduler's own archives
    *  or the file no longer actually exists (e.g. pruned between listing and picking it). */
   async resolveBackupPath(name: string): Promise<string> {
-    if (!name.startsWith(BACKUP_PREFIX) || !name.endsWith(BACKUP_SUFFIX) || name.includes('/') || name.includes('\\')) {
+    if (!isOwnArchiveName(name, BACKUP_PREFIX) || name.includes('/') || name.includes('\\')) {
       throw new Error('Invalid backup file name.');
     }
     const settings = await this.settings.get();

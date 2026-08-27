@@ -19,6 +19,19 @@ function mergeEventTypes(
   return merged;
 }
 
+// Per-key merge for diskLabels, same reasoning as mergeEventTypes above - a patch touching one
+// disk's label must not blow away every other disk's already-persisted one. A patch value of ''
+// removes that disk's entry entirely, rather than persisting an empty-string label.
+function mergeDiskLabels(base: Record<string, string>, patch: Partial<Record<string, string>> | undefined): Record<string, string> {
+  if (!patch) return { ...base };
+  const merged = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (!value) delete merged[key];
+    else merged[key] = value;
+  }
+  return merged;
+}
+
 // Normalizes a possibly-legacy eventTypes record on load: a bare boolean (the pre-split shape)
 // becomes { apprise: <that boolean>, webui: true } - apprise carries over the old value exactly so
 // existing Apprise preferences survive the migration untouched; webui defaults to true because the
@@ -44,8 +57,11 @@ const DEFAULTS: AppSettings = {
   timeFormat: '12h',
   turboWrite: false,
   trustProxy: false,
+  trustProxyAddress: '',
   notifications: { enabled: false, appriseUrls: '', eventTypes: DEFAULT_EVENT_TYPES },
   minFreeSpaceGb: 4,
+  spinDownTimeoutMinutes: 0,
+  diskLabels: {},
   paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2, cronExpression: '' },
   backupSchedule: {
     enabled: false,
@@ -86,6 +102,7 @@ export class SettingsStore {
     return {
       ...settings,
       notifications: { ...settings.notifications, eventTypes: { ...settings.notifications.eventTypes } },
+      diskLabels: { ...settings.diskLabels },
       paritySchedule: { ...settings.paritySchedule },
       backupSchedule: { ...settings.backupSchedule },
       tempAlerts: { ...settings.tempAlerts },
@@ -109,6 +126,7 @@ export class SettingsStore {
           ...patch.notifications,
           eventTypes: mergeEventTypes(current.notifications.eventTypes, patch.notifications?.eventTypes),
         },
+        diskLabels: mergeDiskLabels(current.diskLabels, patch.diskLabels),
         paritySchedule: { ...current.paritySchedule, ...patch.paritySchedule },
         backupSchedule: {
           ...current.backupSchedule,

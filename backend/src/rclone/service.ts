@@ -7,17 +7,19 @@ import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
 import { notifyEvent } from '../settings/notify.js';
-import { resolveConfigBackupPaths, resolveExistingCategoryIds } from '../system/backupCatalog.js';
+import { ARCHIVE_EXT, isOwnArchiveName, resolveConfigBackupPaths, resolveExistingCategoryIds } from '../system/backupCatalog.js';
+import { looksLikeGzip } from '../system/backupCrypto.js';
 import { buildMeta, META_SUFFIX, metaNameFor, readMetaSidecar, writeMetaSidecar } from '../system/backupMeta.js';
 import { writeConfigBackupToFile } from '../system/backupStream.js';
 import { buildRestorePreview, decryptIfNeeded, stageRestoreFile, type RestorePreviewData } from '../system/configRestore.js';
+import type { UsersClient } from '../users/client.js';
+import { writeUsersExport } from '../users/backupExport.js';
 import type { RcloneClient } from './client.js';
 import { getRcloneRcCredentials } from './rcCredentials.js';
 import { SyncJobStore, type NewSyncJob, type SyncJobPatch } from './syncJobStore.js';
 import type { RemoteBackupEntry, SyncJob, SyncJobProgress, SyncJobWithRuntime } from './types.js';
 
 const ARCHIVE_PREFIX = 'nonraid-remote-backup-';
-const ARCHIVE_SUFFIX = '.tar.gz';
 const VERSIONS_SUBDIR = '.nonraid-versions'; // rclone --backup-dir target under a 'custom'-scope job's own remote path
 
 function dstFs(remoteName: string, remotePath: string): string {
@@ -33,7 +35,7 @@ function dstFs(remoteName: string, remotePath: string): string {
  * comment (rclone/types.ts) and RemoteBackupSection.tsx for the scope/retention split this
  * implements:
  *
- * - 'config' / 'configAppdata': not a live mirror - each run builds one fresh tar.gz (same
+ * - 'config' / 'configAppdata': not a live mirror - each run builds one fresh archive (same
  *   category-path builder Local Backups itself uses, `configAppdata` just also includes
  *   config.appsBindRoots - see backupCatalog.ts's resolveBackupCategories) and uploads that one
  *   uniquely-timestamped file.
@@ -58,6 +60,10 @@ export class RcloneService {
     private nmd: NmdClient,
     private activity: ActivityStore,
     private settings: SettingsStore,
+    // Only ever used to snapshot managed users/groups right before a 'config'/'configAppdata'
+    // scope job runs - see the 'users' backup category (backupCatalog.ts) and
+    // users/backupExport.ts's writeUsersExport().
+    private users: UsersClient,
     store?: SyncJobStore,
   ) {
     this.store = store ?? new SyncJobStore();
@@ -128,7 +134,7 @@ export class RcloneService {
   async listBackupsAt(remoteName: string, remotePath: string): Promise<RemoteBackupEntry[]> {
     const dst = dstFs(remoteName, remotePath);
     const entries = await this.client.listDir(dst).catch(() => []);
-    const archiveEntries = entries.filter((e) => e.name.startsWith(ARCHIVE_PREFIX) && e.name.endsWith(ARCHIVE_SUFFIX));
+    const archiveEntries = entries.filter((e) => isOwnArchiveName(e.name, ARCHIVE_PREFIX));
     const metaNames = new Set(entries.filter((e) => e.name.endsWith(META_SUFFIX)).map((e) => e.name));
 
     const results = await Promise.all(
@@ -174,7 +180,7 @@ export class RcloneService {
    * bearing on where the archive itself is read from.
    */
   async previewBackupAt(remoteName: string, remotePath: string, name: string, password: string | null | undefined, stagingKey: string): Promise<{ token: string } & RestorePreviewData> {
-    if (!name.startsWith(ARCHIVE_PREFIX) || !name.endsWith(ARCHIVE_SUFFIX) || name.includes('/') || name.includes('\\')) {
+    if (!isOwnArchiveName(name, ARCHIVE_PREFIX) || name.includes('/') || name.includes('\\')) {
       throw new Error('Invalid archive name.');
     }
     const stagingDir = path.join(os.tmpdir(), `nonraid-rclone-restore-${stagingKey}-${Date.now()}`);
@@ -185,12 +191,18 @@ export class RcloneService {
       await this.client.downloadFile(dst, name, stagingDir, name);
       const filePath = path.join(stagingDir, name);
       const metaName = metaNameFor(name);
-      await this.client.downloadFile(dst, metaName, stagingDir, metaName).catch(() => {}); // best-effort - no sidecar reads as unencrypted
+      await this.client.downloadFile(dst, metaName, stagingDir, metaName).catch(() => {}); // best-effort - a missing remote sidecar is expected, not an error
       const meta = await readMetaSidecar(filePath); // reads stagingDir/<metaName>, same naming as the just-downloaded file above
 
-      const { path: decryptedPath, cleanup } = await decryptIfNeeded(filePath, meta?.encrypted ?? false, password);
+      // No sidecar (never uploaded, or lost) falls back to gzip-magic-byte sniffing rather than
+      // assuming unencrypted - same reasoning as the local-restore route's own fallback
+      // (routes/system.ts) and the upload route's looksLikeGzip() use, applied here too so a
+      // genuinely-encrypted archive with no sidecar still prompts for a password instead of
+      // failing deep inside buildRestorePreview() with a confusing "not a valid config backup".
+      const encrypted = meta ? meta.encrypted : !(await looksLikeGzip(filePath));
+      const { path: decryptedPath, cleanup } = await decryptIfNeeded(filePath, encrypted, password);
       cleanupDecrypted = cleanup;
-      const preview = await buildRestorePreview(this.nmd, decryptedPath);
+      const preview = await buildRestorePreview(this.nmd, this.settings, decryptedPath);
       const token = randomUUID();
       stageRestoreFile(token, decryptedPath);
       // Once decryption actually happened, the staged plaintext copy above lives outside
@@ -259,16 +271,17 @@ export class RcloneService {
 
         stagingDir = path.join(os.tmpdir(), `nonraid-rclone-${job.id}-${Date.now()}`);
         await mkdir(stagingDir, { recursive: true });
+        await writeUsersExport(this.users, config.usersExportPath);
         const includeAppdata = job.scope === 'configAppdata';
-        const paths = await resolveConfigBackupPaths(this.nmd, includeAppdata);
+        const paths = await resolveConfigBackupPaths(this.nmd, this.settings, includeAppdata);
         if (paths.length === 0) throw new Error('No config files found to back up.');
-        const archivePath = path.join(stagingDir, `${ARCHIVE_PREFIX}${Date.now()}${ARCHIVE_SUFFIX}`);
+        const archivePath = path.join(stagingDir, `${ARCHIVE_PREFIX}${Date.now()}${ARCHIVE_EXT}`);
         await writeConfigBackupToFile(paths, archivePath, password);
         // Written into the same stagingDir as the archive itself, so it rides along on the exact
         // same rclone copy below - no separate upload call needed (see backupMeta.ts's own doc
         // comment on this module's split between "build the sidecar" and "get it to the
         // destination", which for this scope is just "put it next to the archive before syncing").
-        const categories = await resolveExistingCategoryIds(this.nmd, includeAppdata);
+        const categories = await resolveExistingCategoryIds(this.nmd, this.settings, includeAppdata);
         await writeMetaSidecar(archivePath, buildMeta(job.scope, categories, !!password));
         srcFs = stagingDir;
         mode = 'copy';
@@ -295,7 +308,9 @@ export class RcloneService {
 
       if (!job.retention.forever) {
         await this.enforceRetention(job).catch((err) => {
-          this.activity.log(`${job.name}: retention cleanup failed - ${(err as Error).message}`, 'amber').catch(() => {});
+          const msg = `${job.name}: retention cleanup failed - ${(err as Error).message}`;
+          this.activity.log(msg, 'amber', 'remoteBackupRetentionFailed').catch(() => {});
+          notifyEvent(this.settings, 'remoteBackupRetentionFailed', 'NonRAID: remote backup retention cleanup failed', msg);
         });
       }
 
@@ -339,7 +354,7 @@ export class RcloneService {
     }
     const remoteFs = dstFs(job.remoteName, job.remotePath);
     const entries = await this.listRemoteFiles(remoteFs);
-    const archives = entries.filter((e) => e.Name.startsWith(ARCHIVE_PREFIX) && e.Name.endsWith(ARCHIVE_SUFFIX));
+    const archives = entries.filter((e) => isOwnArchiveName(e.Name, ARCHIVE_PREFIX));
     for (const entry of archives) {
       if (new Date(entry.ModTime).getTime() < cutoff) {
         await this.deleteRemoteFile(remoteFs, entry.Path);

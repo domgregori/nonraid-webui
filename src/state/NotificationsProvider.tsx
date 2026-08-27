@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { activityApi } from '../api/activityApi';
 import { settingsApi } from '../api/settingsApi';
 import type { ActivityEntry } from '../types/activityApi';
-import type { NotificationChannelToggle, NotificationEventType } from '../types/settingsApi';
+import type { NotificationChannelToggle, NotificationEventType, NotificationSeverity } from '../types/settingsApi';
 import { NotificationsContext, type ToastItem } from './NotificationsContext';
 
 const POLL_MS = 8000;
@@ -25,6 +25,19 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   // which case isWebuiMuted() below treats everything as unmuted (safer than hiding entries based
   // on nothing).
   const eventTypes = useRef<Record<NotificationEventType, NotificationChannelToggle> | null>(null);
+  // Event catalog's own severity per event type ('high'|'medium'|'low', see
+  // settings/notificationCatalog.ts) - static data, fetched once rather than on every poll. Used
+  // to make the badge count only "high" severity unread entries instead of every unread entry.
+  const eventSeverity = useRef<Partial<Record<NotificationEventType, NotificationSeverity>> | null>(null);
+
+  useEffect(() => {
+    settingsApi
+      .getNotificationEvents()
+      .then((defs) => {
+        eventSeverity.current = Object.fromEntries(defs.map((d) => [d.id, d.severity]));
+      })
+      .catch(() => {});
+  }, []);
 
   const isWebuiMuted = useCallback((entry: ActivityEntry): boolean => {
     return entry.eventType !== undefined && eventTypes.current?.[entry.eventType]?.webui === false;
@@ -105,13 +118,25 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     if (newest) localStorage.setItem(LAST_SEEN_KEY, newest);
   }, [entries]);
 
+  // Badge count is "high"/"medium" severity unread only (diskFailed, smartFailed, backupFailed,
+  // tempAlertCpu, updateAvailable, ...) - "low" (parityStarted, arrayStarted, ...) is excluded so
+  // routine activity doesn't inflate it. The dropdown itself still lists every unread entry
+  // regardless of severity, this only changes what the number on the bell represents.
   const unreadCount = (() => {
     if (entries.length === 0) return 0;
-    if (lastSeenId === null) return entries.length;
-    const idx = entries.findIndex((e) => e.id === lastSeenId);
-    // Not found means everything currently loaded is newer than the last-seen entry (it aged out
-    // of this LIST_LIMIT-sized window) - treat the whole visible window as unread rather than 0.
-    return idx === -1 ? entries.length : idx;
+    const cutoff =
+      lastSeenId === null
+        ? entries.length
+        : (() => {
+            const idx = entries.findIndex((e) => e.id === lastSeenId);
+            // Not found means everything currently loaded is newer than the last-seen entry (it
+            // aged out of this LIST_LIMIT-sized window) - treat the whole window as unread.
+            return idx === -1 ? entries.length : idx;
+          })();
+    return entries.slice(0, cutoff).filter((e) => {
+      const severity = e.eventType !== undefined ? eventSeverity.current?.[e.eventType] : undefined;
+      return severity === 'high' || severity === 'medium';
+    }).length;
   })();
 
   return (

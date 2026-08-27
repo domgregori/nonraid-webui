@@ -20,6 +20,10 @@ export interface BrowseEntry {
    *  user share (config.shareMountRoot), where mergerfs can blend more than one disk together. */
   locations?: string[];
   locationType?: BrowseLocationType;
+  /** Set only for type: 'file' - whether the Browse page's text editor can open it (small enough,
+   *  and not binary by content sniff). Lets the UI decide clickability without guessing from the
+   *  extension. */
+  editable?: boolean;
 }
 
 export interface BrowseListing {
@@ -33,6 +37,10 @@ export interface BrowseListing {
 export interface BrowseCommandResult {
   ok: boolean;
   message: string;
+}
+
+export interface BrowseFileContent {
+  content: string;
 }
 
 export type BulkOp = 'copy' | 'move' | 'delete';

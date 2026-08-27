@@ -7,7 +7,7 @@ import https from 'node:https';
 import path from 'node:path';
 import { ActivityStore, ActivityWatcher } from './activity/index.js';
 import { AppsService, CaFeedStore } from './apps/index.js';
-import { AuthService, AuthStore, requireAuth } from './auth/index.js';
+import { AuthService, AuthStore, requireAuth, resolveTrustProxyValue } from './auth/index.js';
 import { BrowseService } from './browse/service.js';
 import { CacheMoverService } from './cache/mover.js';
 import { CacheMoverScheduler } from './cache/moverScheduler.js';
@@ -15,6 +15,8 @@ import { CacheService } from './cache/service.js';
 import { config } from './config.js';
 import { DiskQueueService } from './diskQueue/service.js';
 import { createDockerClient } from './docker/index.js';
+import { getConfiguredDockerStorage } from './docker/storagePath.js';
+import { DockerUpdateScheduler } from './docker/updateScheduler.js';
 import { EmptyDiskService } from './emptyDisk/index.js';
 import { createLxcClient } from './lxc/index.js';
 import { resolveLxcPath } from './lxc/storagePath.js';
@@ -40,18 +42,24 @@ import { servicesRouter } from './routes/services.js';
 import { settingsRouter } from './routes/settings.js';
 import { sharesRouter } from './routes/shares.js';
 import { smartRouter } from './routes/smart.js';
+import { sshRouter } from './routes/ssh.js';
 import { statusRouter } from './routes/status.js';
 import { systemRouter } from './routes/system.js';
+import { bootSnapshotsRouter } from './routes/bootSnapshots.js';
 import { tailscaleRouter } from './routes/tailscale.js';
 import { tlsRouter } from './routes/tls.js';
+import { updateRouter } from './routes/update.js';
+import { UpdateScheduler } from './update/scheduler.js';
 import { usersRouter } from './routes/users.js';
 import { createRcloneClient } from './rclone/index.js';
 import { RcloneService } from './rclone/service.js';
 import { RcloneSyncScheduler } from './rclone/syncScheduler.js';
 import { SettingsStore } from './settings/index.js';
+import { notifyEvent } from './settings/notify.js';
 import { createShareApplier, ShareAccessStore, ShareService, ShareStore } from './shares/index.js';
 import { createSmartClient, SmartService } from './smart/index.js';
 import { BackupScheduler } from './system/backupScheduler.js';
+import { applySpinDownTimeout } from './system/hdparm.js';
 import { SystemStatsService } from './system/service.js';
 import { createTailscaleClient } from './tailscale/index.js';
 import { TlsStore } from './tls/index.js';
@@ -83,14 +91,20 @@ async function main() {
   // subprocess needs, same "reuse rclone's own obscure mechanism" reasoning RcloneService's own
   // password handling uses.
   const rclone = createRcloneClient();
-  const backupScheduler = new BackupScheduler(nmd, settingsStore, activity, metrics, rclone);
+  // Also moved up from its former call site (see UsersService below), same reasoning as rclone
+  // above - BackupScheduler/RcloneService only ever call exportSnapshot()/restoreSnapshot() on the
+  // raw client directly, with no need for UsersService's own share-access side effects.
+  const usersClient = createUsersClient();
+  const backupScheduler = new BackupScheduler(nmd, settingsStore, activity, metrics, rclone, usersClient);
   const authStore = new AuthStore();
   const authService = new AuthService(authStore);
   await authStore.get(); // fail fast at boot on a corrupt auth.json
   const tlsStore = new TlsStore();
   const tailscale = createTailscaleClient();
-  const rcloneService = new RcloneService(rclone, nmd, activity, settingsStore);
+  const rcloneService = new RcloneService(rclone, nmd, activity, settingsStore, usersClient);
   new RcloneSyncScheduler(rcloneService, settingsStore);
+  new UpdateScheduler(activity, settingsStore);
+  new DockerUpdateScheduler(docker, activity, settingsStore);
   const tlsRecord = await tlsStore.get(); // fail fast at boot on a corrupt tls.json
   if (config.serveFrontend && !existsSync(path.join(config.frontendDistPath, 'index.html'))) {
     throw new Error(`serveFrontend is true but no index.html at ${config.frontendDistPath} - did the frontend build run?`);
@@ -100,7 +114,6 @@ async function main() {
   const cacheMover = new CacheMoverService(nmd, shareStore, settingsStore);
   new CacheMoverScheduler(cacheMover, nmd, settingsStore, activity);
   const system = new SystemStatsService(smart);
-  const usersClient = createUsersClient();
   const users = new UsersService(usersClient, shareAccessStore, shareStore, shares, activity);
   const caFeedStore = new CaFeedStore();
   await caFeedStore.start();
@@ -117,9 +130,14 @@ async function main() {
   if (persistedSettings.turboWrite) {
     await nmd.setWriteMethod(true).catch(() => {});
   }
+  // hdparm -S works directly on the block device regardless of array state, unlike setWriteMethod
+  // - reapply unconditionally (applySpinDownTimeout already skips disks with no real device).
+  if (persistedSettings.spinDownTimeoutMinutes > 0) {
+    await applySpinDownTimeout(nmd, persistedSettings.spinDownTimeoutMinutes).catch(() => {});
+  }
 
-  // Either source enables it - lets a deployment force this on via env var/config.toml without
-  // touching the UI, while still letting the UI toggle (routes/settings.ts) turn it on/off live.
+  // Either source enables it - lets a deployment force this on via the TRUST_PROXY env var
+  // without touching the UI, while still letting the UI toggle (routes/settings.ts) turn it on/off live.
   if (persistedSettings.trustProxy) {
     config.trustProxy = true;
   }
@@ -147,12 +165,49 @@ async function main() {
   // never block startup on one share's mount failing.
   await shares.remountAll();
 
+  // docker.service/lxc.service are ordered (via a systemd drop-in install-webui.sh installs) to
+  // start only after nonraid.service - which assembles/mounts the array at boot on its own,
+  // independent of this app - so they no longer race an unmounted array disk. That's ordering
+  // only, not a guarantee the array actually came up: nonraid.service's own ExecStart lines are
+  // all best-effort and never fail the unit even if nmdctl did. This backend is ordered the same
+  // way (After=nonraid.service), so by the time this runs, the array has already had its one shot
+  // at starting - if either service's storage is configured on it and it still isn't up, surface
+  // that now rather than leaving an admin to notice missing containers on their own. One-time
+  // check, not a recurring watcher - covers the boot-time gap this exists for, not "is storage
+  // reachable right now" as an ongoing health check.
+  try {
+    const [dockerStorage, arrayStatus] = await Promise.all([getConfiguredDockerStorage().catch(() => null), nmd.getStatus().catch(() => null)]);
+    const arrayStarted = arrayStatus?.array.state === 'STARTED';
+    if (!arrayStarted) {
+      const affected = [dockerStorage?.mode === 'array' ? 'Docker' : null, persistedSettings.lxcStorage.mode === 'array' ? 'LXC' : null].filter(
+        (s): s is string => s !== null,
+      );
+      if (affected.length > 0) {
+        const msg = `${affected.join(' and ')} storage is on the array, but the array isn't started - start it to bring ${affected.join('/')} back.`;
+        activity.log(msg, 'amber', 'dockerLxcStorageUnavailable').catch(() => {});
+        notifyEvent(settingsStore, 'dockerLxcStorageUnavailable', 'NonRAID: Docker/LXC storage unavailable', msg);
+      }
+    }
+  } catch {
+    // best-effort - never block startup over this check itself
+  }
+
   const app = express();
   // Only set when config.trustProxy is explicitly opted into (see its doc comment in config.ts) -
   // makes req.secure/req.hostname/req.ip trust X-Forwarded-Proto/Host/For, which cookies.ts and
-  // webauthn.ts rely on via requestOrigin.ts to auto-detect HTTPS behind a reverse proxy.
+  // webauthn.ts rely on via requestOrigin.ts to auto-detect HTTPS behind a reverse proxy. When a
+  // specific trusted proxy address is configured (Settings > Security), only requests actually
+  // arriving via that address get their forwarded headers honored - address left blank falls back
+  // to trusting every hop, same as before this existed. A resolution failure at boot (bad
+  // hostname, DNS unavailable) falls open to blanket trust rather than crashing - same
+  // "misconfiguration shouldn't brick the NAS" reasoning as the TLS cert-read fallback above.
   if (config.trustProxy) {
-    app.set('trust proxy', true);
+    try {
+      app.set('trust proxy', (await resolveTrustProxyValue(persistedSettings.trustProxyAddress)) ?? true);
+    } catch (err) {
+      console.error(`Trusted proxy address could not be resolved (${(err as Error).message}) - trusting any hop instead. Fix it in Settings > Security.`);
+      app.set('trust proxy', true);
+    }
   }
   app.use(cors({ origin: config.corsOrigin, credentials: true }));
   app.use(express.json());
@@ -209,8 +264,11 @@ async function main() {
   app.use('/api', smartRouter(nmd, smart, system));
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
-  app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics));
-  app.use('/api', servicesRouter(activity, settingsStore));
+  app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics, settingsStore, rclone, usersClient));
+  app.use('/api', bootSnapshotsRouter(activity));
+  app.use('/api', updateRouter(activity));
+  app.use('/api', servicesRouter(activity));
+  app.use('/api', sshRouter(activity, authService));
   app.use('/api', usersRouter(users));
   app.use('/api', appsRouter(apps));
   app.use('/api', activityRouter(activity));
@@ -220,20 +278,22 @@ async function main() {
 
   // Protocol is chosen once at boot from the persisted TLS config, same "config changes need a
   // restart" model as everything else in this app - see backend/src/tls/. Falls open to plain
-  // HTTP if the configured cert/key can't be read, rather than crashing: a bad cert combined with
-  // a crash-on-boot would brick the admin's only path back into Settings to fix it (systemd would
-  // just crash-loop into the same broken tls.json forever). cookieSecure/WebAuthn config is only
-  // flipped inside the success branch below - flipping it unconditionally on tlsRecord.enabled
-  // would force Secure cookies even on the HTTP fallback, silently breaking login (see
-  // config.ts's cookieSecure doc comment).
+  // HTTP (on httpPort, same as if TLS were off) if the configured cert/key can't be read, rather
+  // than crashing: a bad cert combined with a crash-on-boot would brick the admin's only path back
+  // into Settings to fix it (systemd would just crash-loop into the same broken tls.json forever).
+  // cookieSecure/WebAuthn config is only flipped inside the success branch below - flipping it
+  // unconditionally on tlsRecord.enabled would force Secure cookies even on the HTTP fallback,
+  // silently breaking login (see config.ts's cookieSecure doc comment).
   let server: http.Server | https.Server = http.createServer(app);
+  let listenPort = config.httpPort;
   if (tlsRecord?.enabled) {
     try {
       const [cert, key] = await Promise.all([readFile(tlsRecord.certPath, 'utf8'), readFile(tlsRecord.keyPath, 'utf8')]);
       server = https.createServer({ cert, key }, app);
+      listenPort = config.httpsPort;
       config.cookieSecure = true;
       if (!config.webauthnRpId) config.webauthnRpId = tlsRecord.commonName;
-      if (!config.webauthnOrigin) config.webauthnOrigin = `https://${tlsRecord.commonName}${config.port === 443 ? '' : `:${config.port}`}`;
+      if (!config.webauthnOrigin) config.webauthnOrigin = `https://${tlsRecord.commonName}${config.httpsPort === 443 ? '' : `:${config.httpsPort}`}`;
     } catch (err) {
       console.error(
         `TLS is enabled but the cert/key at ${tlsRecord.certPath}/${tlsRecord.keyPath} could not be read (${(err as Error).message}) - falling back to plain HTTP. Fix or regenerate the certificate in Settings.`,
@@ -242,9 +302,30 @@ async function main() {
     }
   }
 
-  server.listen(config.port, () => {
-    console.log(`nonraid-webui backend listening on ${server instanceof https.Server ? 'https' : 'http'}://localhost:${config.port}`);
+  server.listen(listenPort, () => {
+    console.log(`nonraid-webui backend listening on ${server instanceof https.Server ? 'https' : 'http'}://localhost:${listenPort}`);
   });
+
+  // Only once TLS actually came up (not the plain-HTTP fallback above) - httpPort's listener
+  // switches roles from "the app itself" (the plain-HTTP case above) to "redirect to httpsPort",
+  // a separate minimal listener whose only job is bouncing a plain http:// request over to the
+  // real https:// origin. Skipped entirely if it would collide with httpsPort (both set to the
+  // same custom value) - same port for both makes no sense, and would otherwise just fail to bind
+  // with a less clear error.
+  if (server instanceof https.Server && config.httpPort !== config.httpsPort) {
+    const portSuffix = config.httpsPort === 443 ? '' : `:${config.httpsPort}`;
+    const redirectServer = http.createServer((req, res) => {
+      const hostname = (req.headers.host ?? '').split(':')[0] || 'localhost';
+      res.writeHead(301, { Location: `https://${hostname}${portSuffix}${req.url ?? '/'}` });
+      res.end();
+    });
+    redirectServer.on('error', (err) => {
+      console.error(`HTTP->HTTPS redirect listener could not bind on port ${config.httpPort} (${err.message}) - continuing without it.`);
+    });
+    redirectServer.listen(config.httpPort, () => {
+      console.log(`HTTP->HTTPS redirect listening on http://localhost:${config.httpPort}`);
+    });
+  }
 }
 
 main().catch((err) => {

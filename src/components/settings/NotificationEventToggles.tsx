@@ -1,10 +1,15 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { settingsApi } from '../../api/settingsApi';
 import type { NotificationChannelToggle, NotificationEventDef, NotificationEventType, NotificationSeverity } from '../../types/settingsApi';
 import { RoundCheckbox } from '../shared/RoundCheckbox';
 
 const SEVERITY_ORDER: NotificationSeverity[] = ['high', 'medium', 'low'];
-const SEVERITY_LABELS: Record<NotificationSeverity, string> = { high: 'High', medium: 'Medium', low: 'Low' };
+const SEVERITY_LABEL_KEYS: Record<NotificationSeverity, string> = {
+  high: 'NotificationEventToggles.severityHigh',
+  medium: 'NotificationEventToggles.severityMedium',
+  low: 'NotificationEventToggles.severityLow',
+};
 
 interface NotificationEventTogglesProps {
   eventTypes: Record<NotificationEventType, NotificationChannelToggle>;
@@ -21,13 +26,14 @@ interface NotificationEventTogglesProps {
  *  (labels, severities, defaults) is fetched from the backend so this never hand-duplicates that
  *  list and can't drift from what the server actually understands. */
 export function NotificationEventToggles({ eventTypes, onChange, disabled, renderExtra }: NotificationEventTogglesProps) {
+  const { t } = useTranslation('settings');
   const [events, setEvents] = useState<NotificationEventDef[] | null>(null);
 
   useEffect(() => {
     settingsApi.getNotificationEvents().then(setEvents).catch(() => {});
   }, []);
 
-  if (!events) return <div className="status-note">Loading event types…</div>;
+  if (!events) return <div className="status-note">{t('NotificationEventToggles.loading')}</div>;
 
   const channelsFor = (eventId: NotificationEventType): NotificationChannelToggle => {
     const defaults = events.find((e) => e.id === eventId)?.defaultEnabled ?? true;
@@ -48,7 +54,7 @@ export function NotificationEventToggles({ eventTypes, onChange, disabled, rende
               <RoundCheckbox
                 on={channels.apprise}
                 onToggle={() => onChange(event.id, 'apprise', !channels.apprise)}
-                label={`${event.label} - Apprise`}
+                label={t('NotificationEventToggles.appriseChannelLabel', { label: event.label })}
                 disabled={disabled}
               />
             </div>
@@ -56,7 +62,7 @@ export function NotificationEventToggles({ eventTypes, onChange, disabled, rende
               <RoundCheckbox
                 on={channels.webui}
                 onToggle={() => onChange(event.id, 'webui', !channels.webui)}
-                label={`${event.label} - Webui`}
+                label={t('NotificationEventToggles.webuiChannelLabel', { label: event.label })}
                 disabled={disabled}
               />
             </div>
@@ -70,8 +76,8 @@ export function NotificationEventToggles({ eventTypes, onChange, disabled, rende
   return (
     <div>
       <div className="notification-channel-header">
-        <div className="notification-channel-header__col">Apprise</div>
-        <div className="notification-channel-header__col">Webui</div>
+        <div className="notification-channel-header__col">{t('NotificationEventToggles.apprise')}</div>
+        <div className="notification-channel-header__col">{t('NotificationEventToggles.webui')}</div>
       </div>
       {SEVERITY_ORDER.map((severity) => {
         const group = events.filter((e) => e.severity === severity);
@@ -79,7 +85,7 @@ export function NotificationEventToggles({ eventTypes, onChange, disabled, rende
         return (
           <div key={severity} style={{ marginBottom: 12 }}>
             <div className="settings-info-row__label" style={{ marginBottom: 4 }}>
-              {SEVERITY_LABELS[severity]}
+              {t(SEVERITY_LABEL_KEYS[severity])}
             </div>
             {segmentByGroup(group).map((segment, i) =>
               segment.group ? (

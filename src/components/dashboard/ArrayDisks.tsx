@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useSettings } from '../../hooks/useSettings';
 import { deriveDisks } from '../../selectors/disks';
 import { deriveParityViewModel } from '../../selectors/parity';
 import { useArrayStatus } from '../../state/useArrayStatus';
@@ -9,10 +11,12 @@ interface ArrayDisksProps {
 }
 
 export function ArrayDisks({ showManageLink }: ArrayDisksProps = {}) {
-  const { status, temps, diskHealths, diskTypes, selectDisk, parityPending, parityAction } = useArrayStatus();
+  const { t } = useTranslation('dashboard');
+  const { status, temps, diskHealths, diskTypes, spinStates, selectDisk, parityPending, parityAction } = useArrayStatus();
+  const { settings } = useSettings();
   if (!status) return null;
 
-  const { parity, data } = deriveDisks(status, temps, diskHealths, diskTypes);
+  const { parity, data } = deriveDisks(status, temps, diskHealths, diskTypes, spinStates, settings?.diskLabels ?? {});
   // A new-disk clear reuses the same resync status a parity check would - reuse the same view
   // model, just route it to the clearing disk's own card instead of the Parity Check card. Only
   // once the clear is actually running, though (see ParityCheckCard's own comment) - while it's
@@ -28,10 +32,10 @@ export function ArrayDisks({ showManageLink }: ArrayDisksProps = {}) {
   return (
     <div>
       <div className="disk-section-head">
-        <div className="eyebrow disk-section-label">Array Disks</div>
+        <div className="eyebrow disk-section-label">{t('ArrayDisks.arrayDisks')}</div>
         {showManageLink && (
           <Link to="/disks" className="disk-section-link">
-            Manage disks &rarr;
+            {t('ArrayDisks.manageDisks')} &rarr;
           </Link>
         )}
       </div>

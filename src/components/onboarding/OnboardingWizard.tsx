@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { systemApi } from '../../api/systemApi';
 import { useSystemStats } from '../../hooks/useSystemStats';
 import { useArrayStatus } from '../../state/useArrayStatus';
@@ -17,7 +18,7 @@ type Step = 'welcome' | 'start' | 'import' | 'restoreConfig' | 'disks' | 'info' 
 type RestoreSource = 'upload' | 'local' | 'remote';
 type Stage = 0 | 1 | 2;
 
-const STAGE_LABELS = ['Array', 'Tour', 'Done'];
+const STAGE_LABEL_KEYS = ['array', 'tour', 'done'] as const;
 
 function stageForStep(step: Step): Stage {
   if (step === 'info') return 1;
@@ -61,33 +62,7 @@ function deriveHasDisks(status: NmdStatusResponse | null): { hasAnyDisk: boolean
   };
 }
 
-const INFO_SLIDES = [
-  {
-    eyebrow: 'Apps',
-    title: 'Install ready-made apps',
-    body: 'The Apps catalog has one-click installs for common self-hosted services - media servers, downloaders, home automation, and more. Find it any time from the sidebar.',
-  },
-  {
-    eyebrow: 'Docker',
-    title: 'Or run your own containers',
-    body: "Bringing your own image? The Docker page pulls it, sets ports/volumes/env vars, and shows a live log tail - no app catalog entry needed.",
-  },
-  {
-    eyebrow: 'LXC',
-    title: 'Or a full lightweight VM',
-    body: "When a container isn't isolated enough, LXC gives you a more complete lightweight VM instead - with its own storage location, separate from Docker's.",
-  },
-  {
-    eyebrow: 'Notifications',
-    title: 'Stay in the loop',
-    body: 'Turn on notifications in Settings to hear about it - by email, Discord, or anything Apprise supports - when a disk fails, a parity check finishes, or something needs a look.',
-  },
-  {
-    eyebrow: 'Backups & Recovery',
-    title: "Don't lose this setup twice",
-    body: "Back up this app's own config - array, shares, users, and settings - locally or to a remote via rclone. Settings → Backups sets it up; Settings → Recovery brings it back, from an upload, a local backup, or a remote one.",
-  },
-] as const;
+const INFO_SLIDE_KEYS = ['apps', 'docker', 'lxc', 'notifications', 'backups'] as const;
 
 interface OnboardingWizardProps {
   /** Always marks the wizard dismissed/completed and unmounts it - fired from every exit point
@@ -98,6 +73,7 @@ interface OnboardingWizardProps {
 }
 
 export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
+  const { t } = useTranslation('onboarding');
   const { status, refresh } = useArrayStatus();
   const stats = useSystemStats();
   const { hasAnyDisk, hasDataDisk } = deriveHasDisks(status);
@@ -199,22 +175,22 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
       <div className="onboarding__chrome">
         <div className="onboarding__brand">
           <img src="/logo.png" alt="" className="onboarding__brand-logo" />
-          <span className="onboarding__brand-title">NonRAID setup</span>
+          <span className="onboarding__brand-title">{t('OnboardingWizard.brandTitle')}</span>
         </div>
         {step !== 'done' && (
           <button type="button" className="btn onboarding__skip" onClick={onFinish}>
-            Skip setup
+            {t('OnboardingWizard.skipSetup')}
           </button>
         )}
       </div>
 
       <div className="onboarding-track">
-        {STAGE_LABELS.map((label, i) => (
-          <div key={label} className="onboarding-track__item">
+        {STAGE_LABEL_KEYS.map((labelKey, i) => (
+          <div key={labelKey} className="onboarding-track__item">
             {i > 0 && <div className="onboarding-rail" />}
             <div className={`onboarding-bay${i === stage ? ' onboarding-bay--active' : i < stage ? ' onboarding-bay--done' : ''}`}>
               <div className="onboarding-bay__glyph" />
-              <div className="onboarding-bay__label">{label}</div>
+              <div className="onboarding-bay__label">{t(`OnboardingWizard.stageLabels.${labelKey}`)}</div>
             </div>
           </div>
         ))}
@@ -224,15 +200,12 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
         <div className="onboarding__panel">
           {step === 'welcome' && (
             <>
-              <div className="eyebrow onboarding-hero__eyebrow">First-time setup</div>
-              <div className="onboarding-hero__title">Name this machine</div>
-              <div className="onboarding-hero__desc">
-                A couple of quick basics before the array - both are already set to sensible defaults and can always
-                be changed later from Settings &rarr; About.
-              </div>
+              <div className="eyebrow onboarding-hero__eyebrow">{t('OnboardingWizard.common.firstTimeSetup')}</div>
+              <div className="onboarding-hero__title">{t('OnboardingWizard.welcome.title')}</div>
+              <div className="onboarding-hero__desc">{t('OnboardingWizard.welcome.desc')}</div>
 
               <label className="form-field">
-                <span className="form-field__label">Hostname</span>
+                <span className="form-field__label">{t('OnboardingWizard.welcome.hostnameLabel')}</span>
                 <input
                   className="history-input"
                   value={hostnameDraft}
@@ -242,7 +215,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
               </label>
 
               <label className="form-field">
-                <span className="form-field__label">Timezone</span>
+                <span className="form-field__label">{t('OnboardingWizard.welcome.timezoneLabel')}</span>
                 <select
                   className="history-input"
                   value={timezoneDraft}
@@ -263,7 +236,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
               <div className="onboarding__actions">
                 <div className="onboarding__actions-right">
                   <button type="button" className="btn btn--primary" disabled={savingWelcome} onClick={saveWelcome}>
-                    {savingWelcome ? 'Saving…' : 'Continue'}
+                    {savingWelcome ? t('OnboardingWizard.welcome.saving') : t('OnboardingWizard.welcome.continue')}
                   </button>
                 </div>
               </div>
@@ -272,17 +245,13 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
 
           {step === 'start' && (
             <>
-              <div className="eyebrow onboarding-hero__eyebrow">First-time setup</div>
-              <div className="onboarding-hero__title">Let's build your array</div>
-              <div className="onboarding-hero__desc">
-                Every disk that's part of the array - one or two parity disks plus your data disks - needs to be
-                assigned before it can start. If this isn't a fresh install, you can bring an existing array's
-                configuration in instead of assigning disks by hand.
-              </div>
+              <div className="eyebrow onboarding-hero__eyebrow">{t('OnboardingWizard.common.firstTimeSetup')}</div>
+              <div className="onboarding-hero__title">{t('OnboardingWizard.start.title')}</div>
+              <div className="onboarding-hero__desc">{t('OnboardingWizard.start.desc')}</div>
               <div className="onboarding-choices">
                 <button type="button" className="onboarding-choice onboarding-choice--primary" onClick={() => setStep('disks')}>
-                  <span className="onboarding-choice__title">Build a new array</span>
-                  <span className="onboarding-choice__desc">Assign a parity disk and your data disks now. You can always add more later.</span>
+                  <span className="onboarding-choice__title">{t('OnboardingWizard.start.buildChoiceTitle')}</span>
+                  <span className="onboarding-choice__desc">{t('OnboardingWizard.start.buildChoiceDesc')}</span>
                 </button>
                 <button
                   type="button"
@@ -292,10 +261,8 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
                     setStep('import');
                   }}
                 >
-                  <span className="onboarding-choice__title">Import an existing array</span>
-                  <span className="onboarding-choice__desc">
-                    From a previous NonRAID install, or another array using the same superblock format.
-                  </span>
+                  <span className="onboarding-choice__title">{t('OnboardingWizard.start.importChoiceTitle')}</span>
+                  <span className="onboarding-choice__desc">{t('OnboardingWizard.start.importChoiceDesc')}</span>
                 </button>
                 <button
                   type="button"
@@ -306,11 +273,8 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
                     setStep('restoreConfig');
                   }}
                 >
-                  <span className="onboarding-choice__title">Restore a full config backup</span>
-                  <span className="onboarding-choice__desc">
-                    Bring back everything from a previous nonraid-webui install at once - array, shares, users, and
-                    settings - from a config backup archive.
-                  </span>
+                  <span className="onboarding-choice__title">{t('OnboardingWizard.start.restoreChoiceTitle')}</span>
+                  <span className="onboarding-choice__desc">{t('OnboardingWizard.start.restoreChoiceDesc')}</span>
                 </button>
               </div>
             </>
@@ -320,26 +284,23 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
 
           {step === 'restoreConfig' && restoreSource === null && (
             <>
-              <div className="eyebrow onboarding-hero__eyebrow">First-time setup</div>
-              <div className="onboarding-hero__title">Restore a full config backup</div>
-              <div className="onboarding-hero__desc">
-                Bring back everything from a previous nonraid-webui install at once - array, shares, users, and
-                settings. Pick where the backup is coming from.
-              </div>
+              <div className="eyebrow onboarding-hero__eyebrow">{t('OnboardingWizard.common.firstTimeSetup')}</div>
+              <div className="onboarding-hero__title">{t('OnboardingWizard.restoreConfig.title')}</div>
+              <div className="onboarding-hero__desc">{t('OnboardingWizard.restoreConfig.desc')}</div>
               <div className="settings-field__row">
                 <button type="button" className="btn" onClick={() => setRestoreSource('upload')}>
-                  From an uploaded file…
+                  {t('OnboardingWizard.restoreConfig.fromUpload')}
                 </button>
                 <button type="button" className="btn" onClick={() => setRestoreSource('local')}>
-                  From a local backup…
+                  {t('OnboardingWizard.restoreConfig.fromLocal')}
                 </button>
                 <button type="button" className="btn" onClick={() => setRestoreSource('remote')}>
-                  From a remote backup…
+                  {t('OnboardingWizard.restoreConfig.fromRemote')}
                 </button>
               </div>
               <div className="onboarding__actions">
                 <button type="button" className="btn" onClick={() => setStep('start')}>
-                  Back
+                  {t('OnboardingWizard.common.back')}
                 </button>
               </div>
             </>
@@ -350,13 +311,9 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
 
           {step === 'disks' && (
             <>
-              <div className="eyebrow onboarding-hero__eyebrow">First-time setup &middot; Array</div>
-              <div className="onboarding-hero__title">Build your array</div>
-              <div className="onboarding-hero__desc">
-                Pick a parity disk and a data disk, then press Build Array. Initialization - clearing the data disk
-                and building parity - happens in the background, so you don't need to wait here. Once it's running,
-                add more disks, a second parity disk, or a cache mirror any time from the Disks page.
-              </div>
+              <div className="eyebrow onboarding-hero__eyebrow">{t('OnboardingWizard.disks.eyebrow')}</div>
+              <div className="onboarding-hero__title">{t('OnboardingWizard.disks.title')}</div>
+              <div className="onboarding-hero__desc">{t('OnboardingWizard.disks.desc')}</div>
 
               {status && status.disks.some((d) => d.disk_id) && (
                 <div className="onboarding-summary">
@@ -368,7 +325,15 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
                     .map((d) => (
                       <div key={d.slot} className="onboarding-summary__row">
                         <span>
-                          Slot {d.slot} &middot; {d.type === 'P' ? 'Parity 1' : d.type === 'Q' ? 'Parity 2' : 'Data'}
+                          {t('OnboardingWizard.disks.summaryRow', {
+                            slot: d.slot,
+                            type:
+                              d.type === 'P'
+                                ? t('OnboardingWizard.disks.parity1')
+                                : d.type === 'Q'
+                                  ? t('OnboardingWizard.disks.parity2')
+                                  : t('OnboardingWizard.disks.dataType'),
+                          })}
                         </span>
                         <span>{d.status}</span>
                       </div>
@@ -380,7 +345,7 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
 
               <div className="onboarding__actions">
                 <button type="button" className="btn" onClick={() => setStep('start')}>
-                  Back
+                  {t('OnboardingWizard.common.back')}
                 </button>
               </div>
             </>
@@ -388,28 +353,28 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
 
           {step === 'info' && (
             <>
-              <div className="eyebrow onboarding-hero__eyebrow">{INFO_SLIDES[infoIndex].eyebrow}</div>
-              <div className="onboarding-hero__title">{INFO_SLIDES[infoIndex].title}</div>
-              <div className="onboarding-hero__desc">{INFO_SLIDES[infoIndex].body}</div>
+              <div className="eyebrow onboarding-hero__eyebrow">{t(`OnboardingWizard.infoSlides.${INFO_SLIDE_KEYS[infoIndex]}.eyebrow`)}</div>
+              <div className="onboarding-hero__title">{t(`OnboardingWizard.infoSlides.${INFO_SLIDE_KEYS[infoIndex]}.title`)}</div>
+              <div className="onboarding-hero__desc">{t(`OnboardingWizard.infoSlides.${INFO_SLIDE_KEYS[infoIndex]}.body`)}</div>
 
               <div className="onboarding-slide__dots">
-                {INFO_SLIDES.map((slide, i) => (
-                  <span key={slide.eyebrow} className={`onboarding-slide__dot${i === infoIndex ? ' onboarding-slide__dot--active' : ''}`} />
+                {INFO_SLIDE_KEYS.map((slideKey, i) => (
+                  <span key={slideKey} className={`onboarding-slide__dot${i === infoIndex ? ' onboarding-slide__dot--active' : ''}`} />
                 ))}
               </div>
 
               <div className="onboarding__actions">
                 <button type="button" className="btn" onClick={() => setInfoIndex((i) => Math.max(0, i - 1))} disabled={infoIndex === 0}>
-                  Back
+                  {t('OnboardingWizard.common.back')}
                 </button>
                 <div className="onboarding__actions-right">
-                  {infoIndex < INFO_SLIDES.length - 1 ? (
+                  {infoIndex < INFO_SLIDE_KEYS.length - 1 ? (
                     <button type="button" className="btn btn--primary" onClick={() => setInfoIndex((i) => i + 1)}>
-                      Next
+                      {t('OnboardingWizard.next')}
                     </button>
                   ) : (
                     <button type="button" className="btn btn--primary" onClick={() => setStep('done')}>
-                      Got it
+                      {t('OnboardingWizard.gotIt')}
                     </button>
                   )}
                 </div>
@@ -419,16 +384,13 @@ export function OnboardingWizard({ onFinish }: OnboardingWizardProps) {
 
           {step === 'done' && (
             <>
-              <div className="eyebrow onboarding-hero__eyebrow">Setup complete</div>
-              <div className="onboarding-hero__title">You're all set</div>
-              <div className="onboarding-hero__desc">
-                Head to the Dashboard to check on the array, or Disks to keep adding storage. You can replay this
-                tour any time from Settings &rarr; About.
-              </div>
+              <div className="eyebrow onboarding-hero__eyebrow">{t('OnboardingWizard.done.eyebrow')}</div>
+              <div className="onboarding-hero__title">{t('OnboardingWizard.done.title')}</div>
+              <div className="onboarding-hero__desc">{t('OnboardingWizard.done.desc')}</div>
               <div className="onboarding__actions">
                 <div className="onboarding__actions-right">
                   <button type="button" className="btn btn--primary" onClick={onFinish}>
-                    Go to Dashboard
+                    {t('OnboardingWizard.done.goToDashboard')}
                   </button>
                 </div>
               </div>

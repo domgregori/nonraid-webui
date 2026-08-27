@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { BulkJobState } from '../../hooks/useBrowse';
 
 interface BulkProgressDialogProps {
@@ -6,9 +7,14 @@ interface BulkProgressDialogProps {
   onDismiss: () => void;
 }
 
-const VERB_ING: Record<BulkJobState['op'], string> = { copy: 'Copying', move: 'Moving', delete: 'Deleting' };
+const VERB_ING_KEY: Record<BulkJobState['op'], string> = {
+  copy: 'BulkProgressDialog.verbCopying',
+  move: 'BulkProgressDialog.verbMoving',
+  delete: 'BulkProgressDialog.verbDeleting',
+};
 
 export function BulkProgressDialog({ job, onCancel, onDismiss }: BulkProgressDialogProps) {
+  const { t } = useTranslation('browse');
   const running = job.result === null && !job.aborted && job.error === null;
   const pct = job.progress ? Math.round((job.progress.index / job.total) * 100) : 0;
 
@@ -17,9 +23,9 @@ export function BulkProgressDialog({ job, onCancel, onDismiss }: BulkProgressDia
       <div className="detail-overlay" onClick={running ? undefined : onDismiss} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">{VERB_ING[job.op]}…</div>
+          <div className="dialog__title">{t(VERB_ING_KEY[job.op])}…</div>
           {!running && (
-            <button type="button" className="detail-panel__close" onClick={onDismiss} aria-label="Close">
+            <button type="button" className="detail-panel__close" onClick={onDismiss} aria-label={t('BulkProgressDialog.close')}>
               &#10005;
             </button>
           )}
@@ -32,11 +38,13 @@ export function BulkProgressDialog({ job, onCancel, onDismiss }: BulkProgressDia
                 <div className="progress-track__fill" style={{ width: `${pct}%` }} />
               </div>
               <div className="toggle-row__desc">
-                {job.progress ? `${job.progress.index + 1} of ${job.total} - ${job.progress.name}` : `0 of ${job.total}`}
+                {job.progress
+                  ? t('BulkProgressDialog.progressWithName', { current: job.progress.index + 1, total: job.total, name: job.progress.name })
+                  : t('BulkProgressDialog.progressNoName', { total: job.total })}
               </div>
               <div className="dialog__actions">
                 <button type="button" className="btn btn--danger" onClick={onCancel}>
-                  Cancel
+                  {t('BulkProgressDialog.cancel')}
                 </button>
               </div>
             </>
@@ -44,14 +52,16 @@ export function BulkProgressDialog({ job, onCancel, onDismiss }: BulkProgressDia
 
           {job.error && <div className="status-note status-note--error">{job.error}</div>}
 
-          {job.aborted && <div className="status-note">Cancelled - some items may have completed before it stopped. The listing has been refreshed.</div>}
+          {job.aborted && <div className="status-note">{t('BulkProgressDialog.cancelledNote')}</div>}
 
           {job.result && (
             <>
               <div className="status-note">
                 {job.result.cancelled
-                  ? `Cancelled after ${job.result.succeeded.length} item(s).`
-                  : `${job.result.succeeded.length} succeeded${job.result.failed.length > 0 ? `, ${job.result.failed.length} failed` : ''}.`}
+                  ? t('BulkProgressDialog.cancelledAfter', { count: job.result.succeeded.length })
+                  : job.result.failed.length > 0
+                    ? t('BulkProgressDialog.succeededWithFailed', { succeededCount: job.result.succeeded.length, failedCount: job.result.failed.length })
+                    : t('BulkProgressDialog.succeededOnly', { count: job.result.succeeded.length })}
               </div>
               {job.result.failed.length > 0 && (
                 <ul className="browse-bulk-failures">
@@ -68,7 +78,7 @@ export function BulkProgressDialog({ job, onCancel, onDismiss }: BulkProgressDia
           {!running && (
             <div className="dialog__actions">
               <button type="button" className="btn" onClick={onDismiss}>
-                Close
+                {t('BulkProgressDialog.close')}
               </button>
             </div>
           )}

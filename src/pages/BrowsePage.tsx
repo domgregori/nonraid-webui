@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BulkActionBar } from '../components/browse/BulkActionBar';
 import { BulkProgressDialog } from '../components/browse/BulkProgressDialog';
 import { Breadcrumbs } from '../components/browse/Breadcrumbs';
@@ -10,12 +11,18 @@ import { LOCATION_TYPE_COLOR, LOCATION_TYPE_LABEL } from '../selectors/browse';
 import type { BrowseEntry, BrowseLocationType } from '../types/browseApi';
 import { formatFileSize } from '../utils/format';
 
+// Lazy - CodeMirror's core (not just its per-language chunks, which already code-split on their
+// own) is real weight, and this app has no other route-level code-splitting today. Loading it
+// only when someone actually opens a file keeps it out of every other page's shared bundle.
+const EditFileDialog = lazy(() => import('../components/browse/EditFileDialog').then((m) => ({ default: m.EditFileDialog })));
+
 function formatModified(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 export function BrowsePage() {
+  const { t } = useTranslation('pages');
   const browse = useBrowse();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -24,6 +31,7 @@ export function BrowsePage() {
   const [transfer, setTransfer] = useState<{ op: 'copy' | 'move'; entries: BrowseEntry[] } | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [calculating, setCalculating] = useState<Set<string>>(new Set());
+  const [editingEntry, setEditingEntry] = useState<{ path: string; name: string } | null>(null);
 
   const ready = browse.status === 'ready';
   const entries = browse.listing?.entries ?? [];
@@ -68,7 +76,7 @@ export function BrowsePage() {
   return (
     <div className="page">
       <div className="page-header">
-        <div className="page-title">Browse</div>
+        <div className="page-title">{t('BrowsePage.title')}</div>
         {browse.selected.size > 0 ? (
           <BulkActionBar
             count={browse.selected.size}
@@ -80,10 +88,10 @@ export function BrowsePage() {
         ) : (
           <div className="browse-toolbar">
             <button type="button" className="btn" disabled={!ready} onClick={() => setCreatingFolder(true)}>
-              New Folder
+              {t('BrowsePage.newFolder')}
             </button>
             <button type="button" className="btn--primary" disabled={!ready} onClick={() => fileInputRef.current?.click()}>
-              Upload
+              {t('BrowsePage.upload')}
             </button>
             <input
               ref={fileInputRef}
@@ -112,13 +120,13 @@ export function BrowsePage() {
           {hasFileConflicts && (
             <span className="browse-legend__item">
               <span className="browse-conflict-icon">!</span>
-              File exists on multiple disks - please fix
+              {t('BrowsePage.fileConflictLegend')}
             </span>
           )}
         </div>
       )}
 
-      {browse.status === 'loading' && <div className="status-note">Loading…</div>}
+      {browse.status === 'loading' && <div className="status-note">{t('BrowsePage.loading')}</div>}
       {browse.error && <div className="status-note status-note--error">{browse.error}</div>}
       {browse.actionError && <div className="status-note status-note--error">{browse.actionError}</div>}
 
@@ -137,12 +145,12 @@ export function BrowsePage() {
       >
         <div className="browse-table__head">
           <div className="browse-row__checkbox">
-            <input type="checkbox" checked={allSelected} onChange={() => (allSelected ? browse.clearSelection() : browse.selectAll())} aria-label="Select all" />
+            <input type="checkbox" checked={allSelected} onChange={() => (allSelected ? browse.clearSelection() : browse.selectAll())} aria-label={t('BrowsePage.selectAll')} />
           </div>
-          <div>Name</div>
-          <div>Size</div>
-          <div>Modified</div>
-          <div>Location</div>
+          <div>{t('BrowsePage.nameColumn')}</div>
+          <div>{t('BrowsePage.sizeColumn')}</div>
+          <div>{t('BrowsePage.modifiedColumn')}</div>
+          <div>{t('BrowsePage.locationColumn')}</div>
           <div />
         </div>
 
@@ -169,7 +177,7 @@ export function BrowsePage() {
               onClick={() => browse.open(entry)}
             >
               <div className="browse-row__checkbox" onClick={(e) => e.stopPropagation()}>
-                <input type="checkbox" checked={browse.selected.has(entry.name)} onChange={() => browse.toggleSelect(entry.name)} aria-label={`Select ${entry.name}`} />
+                <input type="checkbox" checked={browse.selected.has(entry.name)} onChange={() => browse.toggleSelect(entry.name)} aria-label={t('BrowsePage.selectEntry', { name: entry.name })} />
               </div>
               <div className="browse-row__name">
                 {entry.locationType && (
@@ -179,12 +187,25 @@ export function BrowsePage() {
                     title={LOCATION_TYPE_LABEL[entry.locationType]}
                   />
                 )}
-                <span className={`browse-row__name-text--${entry.type}`}>{entry.name}</span>
+                {entry.type === 'file' && entry.editable ? (
+                  <button
+                    type="button"
+                    className="browse-row__name-text--file browse-row__name-text--editable"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingEntry({ path: absPath, name: entry.name });
+                    }}
+                  >
+                    {entry.name}
+                  </button>
+                ) : (
+                  <span className={`browse-row__name-text--${entry.type}`}>{entry.name}</span>
+                )}
                 {isFileConflict(entry) && (
                   <span
                     className="browse-conflict-icon"
                     style={{ marginLeft: 6 }}
-                    title={`File exists on multiple disks (${entry.locations?.join(', ')}) - please fix`}
+                    title={t('BrowsePage.fileConflictTooltip', { locations: entry.locations?.join(', ') })}
                   >
                     !
                   </span>
@@ -196,7 +217,7 @@ export function BrowsePage() {
                     formatFileSize(knownSize)
                   ) : (
                     <button type="button" className="browse-calculate-btn" disabled={calculating.has(entry.name)} onClick={() => handleCalculate(entry)}>
-                      {calculating.has(entry.name) ? '…' : 'Calculate'}
+                      {calculating.has(entry.name) ? '…' : t('BrowsePage.calculate')}
                     </button>
                   )
                 ) : (
@@ -208,20 +229,20 @@ export function BrowsePage() {
               <div className="browse-row__actions" onClick={(e) => e.stopPropagation()}>
                 {entry.type === 'file' && (
                   <a className="btn" href={browse.downloadUrl(entry)} download={entry.name}>
-                    Download
+                    {t('BrowsePage.download')}
                   </a>
                 )}
                 <button type="button" className="btn" onClick={() => setRenamingEntry(entry)}>
-                  Rename
+                  {t('BrowsePage.rename')}
                 </button>
                 <button type="button" className="btn" onClick={() => setTransfer({ op: 'copy', entries: [entry] })}>
-                  Copy
+                  {t('BrowsePage.copy')}
                 </button>
                 <button type="button" className="btn" onClick={() => setTransfer({ op: 'move', entries: [entry] })}>
-                  Move
+                  {t('BrowsePage.move')}
                 </button>
                 <button type="button" className="btn btn--danger" onClick={() => handleDeleteClick(entry)}>
-                  {confirmingDelete === entry.name ? 'Confirm?' : 'Delete'}
+                  {confirmingDelete === entry.name ? t('BrowsePage.confirmQuestion') : t('BrowsePage.delete')}
                 </button>
               </div>
             </div>
@@ -229,7 +250,7 @@ export function BrowsePage() {
         })}
 
         {browse.status === 'ready' && entries.length === 0 && (
-          <div className="browse-dropzone-hint">This folder is empty - drag files here, or use Upload.</div>
+          <div className="browse-dropzone-hint">{t('BrowsePage.emptyFolder')}</div>
         )}
       </div>
 
@@ -270,6 +291,12 @@ export function BrowsePage() {
       )}
 
       {browse.bulkJob && <BulkProgressDialog job={browse.bulkJob} onCancel={browse.cancelBulk} onDismiss={browse.dismissBulk} />}
+
+      {editingEntry && (
+        <Suspense fallback={<div className="detail-overlay" />}>
+          <EditFileDialog path={editingEntry.path} fileName={editingEntry.name} onClose={() => setEditingEntry(null)} />
+        </Suspense>
+      )}
     </div>
   );
 }

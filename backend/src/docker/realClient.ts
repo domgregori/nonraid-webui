@@ -186,6 +186,7 @@ export class RealDockerClient implements DockerClient {
         let oomKilled = false;
         let restarting = false;
         let restartCount = 0;
+        let imageId = '';
         try {
           const info = await this.docker.getContainer(c.Id).inspect();
           autostart = !!info.HostConfig.RestartPolicy?.Name && info.HostConfig.RestartPolicy.Name !== 'no';
@@ -193,6 +194,7 @@ export class RealDockerClient implements DockerClient {
           oomKilled = info.State.OOMKilled;
           restarting = info.State.Restarting;
           restartCount = info.RestartCount;
+          imageId = info.Image;
         } catch {
           // container may have been removed between list and inspect calls - leave the above at their defaults
         }
@@ -201,6 +203,7 @@ export class RealDockerClient implements DockerClient {
           id: c.Id,
           name,
           image: c.Image,
+          imageId,
           state,
           status: c.Status,
           cpuPercent,
@@ -241,6 +244,7 @@ export class RealDockerClient implements DockerClient {
       id: info.Id,
       name: info.Name.replace(/^\//, ''),
       image: info.Config.Image, // the reference actually used to create it (e.g. "repo:tag") - Id/top-level Image is a resolved sha256 digest, not editable
+      imageId: info.Image,
       network: info.HostConfig.NetworkMode ?? 'bridge',
       privileged: info.HostConfig.Privileged ?? false,
       env,
@@ -363,7 +367,13 @@ export class RealDockerClient implements DockerClient {
     } catch {
       // not present locally - pull it below
     }
+    await this.runPull(image, onProgress);
+  }
 
+  // The actual pull+progress-streaming mechanics, shared by ensureImagePulled (skips the pull
+  // entirely when the image is already present - can't detect an update that way) and pullImage
+  // (always pulls, so it doubles as the update check itself - see that method's own comment).
+  private async runPull(image: string, onProgress?: CreateContainerProgressCallback): Promise<void> {
     onProgress?.({ phase: 'pulling', message: `Pulling ${image}`, percent: 0 });
 
     // Each image layer ("id") reports its own current/total bytes independently
@@ -403,6 +413,14 @@ export class RealDockerClient implements DockerClient {
           },
         );
       });
+    });
+  }
+
+  async pullImage(image: string): Promise<{ id: string }> {
+    return this.guard(async () => {
+      await this.runPull(image);
+      const info = await this.docker.getImage(image).inspect();
+      return { id: info.Id };
     });
   }
 

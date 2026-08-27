@@ -3,7 +3,7 @@ import type { AppsService } from '../apps/index.js';
 import type { AppSort } from '../apps/types.js';
 import { HttpError } from '../httpError.js';
 
-const SORTS: AppSort[] = ['trending', 'latest', 'new'];
+const SORTS: AppSort[] = ['trending', 'latest', 'new', 'popular'];
 
 function handleError(err: unknown, res: Response) {
   if (err instanceof HttpError) {

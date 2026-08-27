@@ -17,6 +17,16 @@ export function smartRouter(nmd: NmdClient, smart: SmartService, system: SystemS
     }
   });
 
+  router.get('/smart/spin-states', async (_req, res) => {
+    try {
+      const status = await nmd.getStatus();
+      const devices = status.disks.map((d) => d.device).filter((d) => d && d !== 'none');
+      res.json(await smart.getSpinStates(devices));
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   router.get('/smart/health', async (_req, res) => {
     try {
       const status = await nmd.getStatus();

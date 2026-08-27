@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../../styles/colors';
 import type { SmartAttributes } from '../../types/smart';
 import { formatBytesHuman } from '../../utils/format';
@@ -12,32 +13,33 @@ interface SmartOverviewRowsProps {
 /** The read-only info rows shared by the array-disk detail panel and the boot disk detail panel -
  *  kept as one component so the two don't drift into two different layouts for the same data. */
 export function SmartOverviewRows({ attributes, typeLabel }: SmartOverviewRowsProps) {
+  const { t } = useTranslation('diskDetail');
   return (
     <div className="detail-rows">
       <div className="detail-row">
-        <span className="detail-row__label">Model</span>
+        <span className="detail-row__label">{t('SmartOverviewRows.model')}</span>
         <span className="detail-row__value">{attributes.model ?? '-'}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-row__label">Serial</span>
+        <span className="detail-row__label">{t('SmartOverviewRows.serial')}</span>
         <span className="detail-row__value">{attributes.serial ?? '-'}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-row__label">Capacity</span>
+        <span className="detail-row__label">{t('SmartOverviewRows.capacity')}</span>
         <span className="detail-row__value">{attributes.capacityBytes != null ? formatBytesHuman(attributes.capacityBytes) : '-'}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-row__label">Health</span>
+        <span className="detail-row__label">{t('SmartOverviewRows.health')}</span>
         <span
           className="detail-row__value"
           style={{ color: attributes.health === 'failed' ? COLORS.red : attributes.health === 'passed' ? COLORS.green : undefined }}
         >
-          {attributes.health === 'failed' ? 'FAILED' : attributes.health === 'passed' ? 'Passed' : '-'}
+          {attributes.health === 'failed' ? t('SmartOverviewRows.failed') : attributes.health === 'passed' ? t('SmartOverviewRows.passed') : '-'}
         </span>
       </div>
       {(typeLabel || attributes.rotationRpm != null) && (
         <div className="detail-row">
-          <span className="detail-row__label">Type</span>
+          <span className="detail-row__label">{t('SmartOverviewRows.type')}</span>
           <span className="detail-row__value">
             {typeLabel ?? ''}
             {attributes.rotationRpm != null
@@ -47,37 +49,37 @@ export function SmartOverviewRows({ attributes, typeLabel }: SmartOverviewRowsPr
                 // text output, or hdparm's raw ATA IDENTIFY data. Says so explicitly rather than
                 // silently omitting RPM, which reads as broken rather than as the drive's own gap.
                 typeLabel === 'HDD'
-                ? ' (RPM not reported by this drive)'
+                ? ` (${t('SmartOverviewRows.rpmNotReported')})`
                 : ''}
           </span>
         </div>
       )}
       {typeLabel !== 'SSD' && (
         <div className="detail-row">
-          <span className="detail-row__label">Spin State</span>
+          <span className="detail-row__label">{t('SmartOverviewRows.spinState')}</span>
           <span className="detail-row__value">
-            {attributes.spinState === 'standby' ? 'Standby (spun down)' : attributes.spinState === 'active' ? 'Active (spun up)' : '-'}
+            {attributes.spinState === 'standby' ? t('SmartOverviewRows.standby') : attributes.spinState === 'active' ? t('SmartOverviewRows.active') : '-'}
           </span>
         </div>
       )}
       <div className="detail-row">
-        <span className="detail-row__label">Power-On Hours</span>
+        <span className="detail-row__label">{t('SmartOverviewRows.powerOnHours')}</span>
         <span className="detail-row__value">{attributes.powerOnHours ?? '-'}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-row__label">Power Cycles</span>
+        <span className="detail-row__label">{t('SmartOverviewRows.powerCycles')}</span>
         <span className="detail-row__value">{attributes.powerCycleCount ?? '-'}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-row__label">Reallocated Sectors</span>
+        <span className="detail-row__label">{t('SmartOverviewRows.reallocatedSectors')}</span>
         <span className="detail-row__value">{attributes.reallocatedSectors ?? '-'}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-row__label">Pending Sectors</span>
+        <span className="detail-row__label">{t('SmartOverviewRows.pendingSectors')}</span>
         <span className="detail-row__value">{attributes.pendingSectors ?? '-'}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-row__label">Uncorrectable</span>
+        <span className="detail-row__label">{t('SmartOverviewRows.uncorrectable')}</span>
         <span className="detail-row__value">{attributes.uncorrectableSectors ?? '-'}</span>
       </div>
     </div>

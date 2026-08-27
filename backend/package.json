@@ -21,8 +21,7 @@
     "express": "^4.21.2",
     "multer": "^2.2.0",
     "otplib": "^13.4.1",
-    "qrcode": "^1.5.4",
-    "smol-toml": "^1.7.1"
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",

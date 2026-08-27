@@ -1,5 +1,6 @@
 import { startAuthentication } from '@simplewebauthn/browser';
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { authApi } from '../../api/authApi';
 import { UnauthorizedError } from '../../api/request';
 import { useAuth } from '../../state/useAuth';
@@ -11,6 +12,7 @@ interface TwoFactorStepProps {
 }
 
 export function TwoFactorStep({ methods }: TwoFactorStepProps) {
+  const { t } = useTranslation('auth');
   const { completeTwoFactor } = useAuth();
   const canUsePasskey = methods.includes('passkey') && webauthnAvailable();
   // Defaults to the code form unless TOTP was never enrolled - a passkey is still offered
@@ -31,7 +33,7 @@ export function TwoFactorStep({ methods }: TwoFactorStepProps) {
       // request() throws a bare UnauthorizedError (no body) on any 401 - the backend's real
       // "Incorrect code." message never reaches here, so substitute a message that still makes
       // sense for this specific step.
-      setError(err instanceof UnauthorizedError ? 'Incorrect code.' : (err as Error).message);
+      setError(err instanceof UnauthorizedError ? t('TwoFactorStep.incorrectCode') : (err as Error).message);
     } finally {
       setPending(false);
     }
@@ -46,7 +48,7 @@ export function TwoFactorStep({ methods }: TwoFactorStepProps) {
       await authApi.passkeyAuthVerify(response);
       await completeTwoFactor();
     } catch (err) {
-      setError(err instanceof UnauthorizedError ? 'Passkey authentication failed.' : (err as Error).message);
+      setError(err instanceof UnauthorizedError ? t('TwoFactorStep.passkeyFailed') : (err as Error).message);
     } finally {
       setPending(false);
     }
@@ -55,14 +57,14 @@ export function TwoFactorStep({ methods }: TwoFactorStepProps) {
   if (usingPasskey) {
     return (
       <div className="auth-card__form">
-        <div className="auth-card__subtitle">Use your passkey to finish signing in.</div>
+        <div className="auth-card__subtitle">{t('TwoFactorStep.passkeySubtitle')}</div>
         {error && <div className="status-note status-note--error">{error}</div>}
         <button type="button" className="btn btn--primary btn--block" disabled={pending} onClick={handlePasskey}>
-          {pending ? 'Waiting for passkey…' : 'Use Passkey'}
+          {pending ? t('TwoFactorStep.waitingForPasskey') : t('TwoFactorStep.usePasskey')}
         </button>
         {methods.includes('totp') && (
           <button type="button" className="btn btn--block" disabled={pending} onClick={() => setUsingPasskey(false)}>
-            Use a code instead
+            {t('TwoFactorStep.useCodeInstead')}
           </button>
         )}
       </div>
@@ -71,9 +73,9 @@ export function TwoFactorStep({ methods }: TwoFactorStepProps) {
 
   return (
     <form onSubmit={handleSubmit} className="auth-card__form">
-      <div className="auth-card__subtitle">Enter the code from your authenticator app, or a backup code.</div>
+      <div className="auth-card__subtitle">{t('TwoFactorStep.codeSubtitle')}</div>
       <label className="form-field">
-        <span className="form-field__label">Code</span>
+        <span className="form-field__label">{t('TwoFactorStep.codeLabel')}</span>
         <input
           className="history-input"
           value={code}
@@ -84,11 +86,11 @@ export function TwoFactorStep({ methods }: TwoFactorStepProps) {
       </label>
       {error && <div className="status-note status-note--error">{error}</div>}
       <button type="submit" className="btn btn--primary btn--block" disabled={pending || !code}>
-        {pending ? 'Verifying…' : 'Verify'}
+        {pending ? t('TwoFactorStep.verifying') : t('TwoFactorStep.verify')}
       </button>
       {canUsePasskey && (
         <button type="button" className="btn btn--block" disabled={pending} onClick={() => setUsingPasskey(true)}>
-          Use a passkey instead
+          {t('TwoFactorStep.usePasskeyInstead')}
         </button>
       )}
     </form>

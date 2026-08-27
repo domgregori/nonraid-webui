@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { appsApi } from '../../api/appsApi';
 import { dockerApi } from '../../api/dockerApi';
 import { InstallProgress } from '../docker/InstallProgress';
@@ -41,17 +42,18 @@ function resolveWebUi(template: string | null): string | null {
  * of comparable severity, so they share one ack rather than only gating on
  * the Privileged flag.
  */
-function preReviewElevatedReasons(app: CaApp): string[] {
+function preReviewElevatedReasons(app: CaApp, t: (key: string) => string): string[] {
   const reasons: string[] = [];
-  if (app.Privileged === 'true') reasons.push('This template runs a privileged container (full host access).');
+  if (app.Privileged === 'true') reasons.push(t('InstallDialog.privilegedReason'));
   if ((app.Config ?? []).some((e) => e['@attributes'].Type === 'Device')) {
-    reasons.push('This template passes through a host device directly.');
+    reasons.push(t('InstallDialog.deviceReason'));
   }
-  if (app.Network === 'host') reasons.push('This template uses host networking (no network isolation from the host).');
+  if (app.Network === 'host') reasons.push(t('InstallDialog.hostNetworkReason'));
   return reasons;
 }
 
 export function InstallDialog({ appName, repository, onClose }: InstallDialogProps) {
+  const { t } = useTranslation('apps');
   const [stage, setStage] = useState<Stage>('loading');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [app, setApp] = useState<CaApp | null>(null);
@@ -131,7 +133,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
   const configEntries = (app?.Config ?? []).filter((e) => !isHidden(e['@attributes'].Display) && e['@attributes'].Type !== 'Label');
   const primaryEntries = configEntries.filter((e) => !isAdvanced(e['@attributes'].Display));
   const advancedEntries = configEntries.filter((e) => isAdvanced(e['@attributes'].Display));
-  const elevatedReasons = plan?.elevatedAccessReasons ?? (app ? preReviewElevatedReasons(app) : []);
+  const elevatedReasons = plan?.elevatedAccessReasons ?? (app ? preReviewElevatedReasons(app, t) : []);
   const needsElevatedAck = elevatedReasons.length > 0;
   // Nothing is editable once install has actually started - show the values
   // that are actually being installed as plain info instead of live inputs.
@@ -142,13 +144,13 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog apps-install-dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Install {appName}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('InstallDialog.title', { name: appName })}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('InstallDialog.close')}>
             &#10005;
           </button>
         </div>
 
-        {stage === 'loading' && !app && <div className="status-note">Loading template…</div>}
+        {stage === 'loading' && !app && <div className="status-note">{t('InstallDialog.loadingTemplate')}</div>}
         {stage === 'load-error' && <div className="status-note status-note--error">{loadError}</div>}
 
         {app && (
@@ -156,7 +158,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
             {app.Overview && <div className="apps-install-overview">{app.Overview.replace(/\r\n/g, '\n').split('\n')[0]}</div>}
 
             <label className="form-field">
-              <span className="form-field__label">Container name</span>
+              <span className="form-field__label">{t('InstallDialog.containerNameLabel')}</span>
               {locked ? (
                 <div className="form-field__value">{containerName}</div>
               ) : (
@@ -175,12 +177,12 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
 
             {needsElevatedAck && (
               <div className="apps-privileged-banner">
-                <div className="apps-privileged-banner__title">Requires extra host access</div>
+                <div className="apps-privileged-banner__title">{t('InstallDialog.elevatedAccessTitle')}</div>
                 <div className="apps-privileged-banner__body">
                   {elevatedReasons.map((reason) => (
                     <div key={reason}>{reason}</div>
                   ))}
-                  Only install it if you trust the image ({app.Repository}).
+                  {t('InstallDialog.onlyInstallIfTrusted', { repository: app.Repository })}
                 </div>
                 <label className="apps-privileged-banner__ack">
                   <input
@@ -192,7 +194,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
                       setStage('editing');
                     }}
                   />
-                  I understand and want to proceed
+                  {t('InstallDialog.elevatedAccessAck')}
                 </label>
               </div>
             )}
@@ -212,7 +214,10 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
             {advancedEntries.length > 0 && (
               <div className="apps-advanced">
                 <button type="button" className="apps-advanced__toggle" onClick={() => setShowAdvanced((v) => !v)}>
-                  {showAdvanced ? 'Hide' : 'Show'} advanced settings ({advancedEntries.length})
+                  {t('InstallDialog.advancedToggle', {
+                    action: showAdvanced ? t('InstallDialog.hide') : t('InstallDialog.show'),
+                    count: advancedEntries.length,
+                  })}
                 </button>
                 {showAdvanced &&
                   advancedEntries.map((entry) => (
@@ -233,7 +238,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
 
             {stage === 'reviewed' && plan && (
               <div className="apps-plan-review">
-                <div className="apps-plan-review__title">Review before installing</div>
+                <div className="apps-plan-review__title">{t('InstallDialog.reviewBeforeInstalling')}</div>
                 {plan.errors.length > 0 ? (
                   <div className="status-note status-note--error">
                     {plan.errors.map((e) => (
@@ -243,20 +248,20 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
                 ) : (
                   <>
                     <div className="apps-plan-review__section">
-                      <div className="apps-plan-review__section-title">Container</div>
+                      <div className="apps-plan-review__section-title">{t('InstallDialog.containerSection')}</div>
                       <div className="apps-plan-review__kv">
-                        <span className="apps-plan-review__kv-label">Image</span>
+                        <span className="apps-plan-review__kv-label">{t('InstallDialog.imageLabel')}</span>
                         <span className="apps-plan-review__kv-value">{plan.image}</span>
                       </div>
                       <div className="apps-plan-review__kv">
-                        <span className="apps-plan-review__kv-label">Network</span>
+                        <span className="apps-plan-review__kv-label">{t('InstallDialog.networkLabel')}</span>
                         <span className="apps-plan-review__kv-value">{plan.network}</span>
                       </div>
                     </div>
 
                     {plan.ports.length > 0 && (
                       <div className="apps-plan-review__section">
-                        <div className="apps-plan-review__section-title">Ports</div>
+                        <div className="apps-plan-review__section-title">{t('InstallDialog.portsSection')}</div>
                         {plan.ports.map((p) => (
                           <div className="apps-plan-review__kv" key={p.target}>
                             <span className="apps-plan-review__kv-label">{p.label}</span>
@@ -270,12 +275,12 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
 
                     {plan.binds.length > 0 && (
                       <div className="apps-plan-review__section">
-                        <div className="apps-plan-review__section-title">Volumes</div>
+                        <div className="apps-plan-review__section-title">{t('InstallDialog.volumesSection')}</div>
                         {plan.binds.map((b) => (
                           <div className="apps-plan-review__bind" key={b.target}>
                             <div className="apps-plan-review__bind-label">
                               {b.label}
-                              {b.readOnly && <span className="apps-plan-review__badge">RO</span>}
+                              {b.readOnly && <span className="apps-plan-review__badge">{t('InstallDialog.roLabel')}</span>}
                             </div>
                             <div className="apps-plan-review__bind-path">{b.hostPath}</div>
                             <div className="apps-plan-review__bind-arrow">→ {b.containerPath}</div>
@@ -286,7 +291,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
 
                     {plan.env.length > 0 && (
                       <div className="apps-plan-review__section">
-                        <div className="apps-plan-review__section-title">Environment</div>
+                        <div className="apps-plan-review__section-title">{t('InstallDialog.environmentSection')}</div>
                         {plan.env.map((e) => (
                           <div className="apps-plan-review__kv" key={e.target}>
                             <span className="apps-plan-review__kv-label">{e.label}</span>
@@ -298,7 +303,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
 
                     {plan.webUi && (
                       <div className="apps-plan-review__section">
-                        <div className="apps-plan-review__section-title">Web UI</div>
+                        <div className="apps-plan-review__section-title">{t('InstallDialog.webUiSection')}</div>
                         <div className="apps-plan-review__kv-value apps-plan-review__weburl">{resolveWebUi(plan.webUi)}</div>
                       </div>
                     )}
@@ -316,7 +321,7 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
                 <div className="status-note">{installMessage}</div>
                 {plan?.webUi && (
                   <a className="btn" href={resolveWebUi(plan.webUi) ?? undefined} target="_blank" rel="noreferrer">
-                    Open Web UI
+                    {t('InstallDialog.openWebUi')}
                   </a>
                 )}
               </div>
@@ -324,17 +329,17 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
 
             <div className="dialog__actions">
               <button type="button" className="btn" onClick={onClose}>
-                {stage === 'done' ? 'Close' : 'Cancel'}
+                {stage === 'done' ? t('InstallDialog.close') : t('InstallDialog.cancel')}
               </button>
               {stage !== 'done' && stage !== 'reviewed' && stage !== 'installing' && (
                 <button type="button" className="btn--primary" disabled={stage === 'loading'} onClick={handleReview}>
-                  {stage === 'loading' ? 'Reviewing…' : 'Review'}
+                  {stage === 'loading' ? t('InstallDialog.reviewing') : t('InstallDialog.review')}
                 </button>
               )}
               {stage === 'reviewed' && (
                 <>
                   <button type="button" className="btn" onClick={handleReview}>
-                    Re-check
+                    {t('InstallDialog.recheck')}
                   </button>
                   <button
                     type="button"
@@ -342,13 +347,13 @@ export function InstallDialog({ appName, repository, onClose }: InstallDialogPro
                     disabled={!plan || plan.errors.length > 0 || (plan.requiresPrivilegedAck && !privilegedAck)}
                     onClick={handleInstall}
                   >
-                    Confirm install
+                    {t('InstallDialog.confirmInstall')}
                   </button>
                 </>
               )}
               {stage === 'installing' && (
                 <button type="button" className="btn--primary" disabled>
-                  {installButtonLabel(installProgress)}
+                  {installButtonLabel(t, installProgress)}
                 </button>
               )}
             </div>
@@ -369,6 +374,7 @@ interface ConfigFieldProps {
 }
 
 function ConfigField({ entry, value, onChange, plan, locked, availableDevices }: ConfigFieldProps) {
+  const { t } = useTranslation('apps');
   const attrs = entry['@attributes'];
   const masked = attrs.Mask === 'true';
   const required = attrs.Required === 'true';
@@ -376,12 +382,12 @@ function ConfigField({ entry, value, onChange, plan, locked, availableDevices }:
   const bindIssue = plan?.binds.find((b) => b.target === attrs.Target && !b.allowed);
   const deviceIssue = plan?.devices.find((d) => d.target === attrs.Target && !d.allowed);
   const fieldError = bindIssue
-    ? `Outside the allowed host directories`
+    ? t('InstallDialog.outsideAllowedDirs')
     : deviceIssue
-      ? `Must be a /dev/ path`
+      ? t('InstallDialog.mustBeDevPath')
       : null;
 
-  const label = attrs.Type === 'Port' ? `${attrs.Name} (host port)` : attrs.Name;
+  const label = attrs.Type === 'Port' ? t('InstallDialog.hostPortSuffix', { name: attrs.Name }) : attrs.Name;
 
   // See ContainerFormDialog's identical device picker for why this isn't keyed on "value === ''" -
   // that would make picking "Custom path…" (which clears value) collapse back to looking unselected.
@@ -416,13 +422,13 @@ function ConfigField({ entry, value, onChange, plan, locked, availableDevices }:
                 {dev.label}
               </option>
             ))}
-            <option value={DEVICE_CUSTOM}>Custom path…</option>
+            <option value={DEVICE_CUSTOM}>{t('InstallDialog.customPathOption')}</option>
           </select>
           {deviceSelectValue === DEVICE_CUSTOM && (
             <input
               className={`history-input${fieldError ? ' apps-field--error' : ''}`}
               style={{ width: '100%', marginTop: 6 }}
-              placeholder="/dev/..."
+              placeholder={t('InstallDialog.hostDevicePlaceholder')}
               value={value}
               onChange={(e) => onChange(attrs.Target, e.target.value)}
             />

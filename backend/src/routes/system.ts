@@ -29,8 +29,14 @@ import {
   sweepStagedRestores,
 } from '../system/configRestore.js';
 import { listTimezones, rebootHost, setHostname, setTimezone } from '../system/hostConfig.js';
+import { runSudoMaybe } from '../system/procUtil.js';
 import type { SystemStatsService } from '../system/service.js';
 import { restartService, SERVICE_DEFS } from '../system/services.js';
+import type { SettingsStore } from '../settings/store.js';
+import type { RcloneClient } from '../rclone/client.js';
+import type { UsersClient } from '../users/client.js';
+import { restoreUsersExport, writeUsersExport } from '../users/backupExport.js';
+import type { UsersRestoreResult } from '../users/types.js';
 
 // Config backups are small text files plus the 4KB superblock, but a long-lived activity log or
 // many shares' worth of config could add up - generous but bounded, matching the same "don't
@@ -43,6 +49,9 @@ export function systemRouter(
   activity: ActivityStore,
   backupScheduler: BackupScheduler,
   metrics: MetricsService,
+  settingsStore: SettingsStore,
+  rclone: RcloneClient,
+  users: UsersClient,
 ): Router {
   const router = Router();
 
@@ -72,11 +81,40 @@ export function systemRouter(
   router.get('/system/boot-disk/backup/config', async (_req, res) => {
     try {
       metrics.checkpointForBackup();
-      const existing = await resolveConfigBackupPaths(nmd);
+      await writeUsersExport(users, config.usersExportPath);
+      const existing = await resolveConfigBackupPaths(nmd, settingsStore);
       if (existing.length === 0) {
         throw new HttpError(400, 'No NonRAID config files were found to back up.');
       }
       streamConfigBackup(existing, res, activity);
+    } catch (err) {
+      if (err instanceof HttpError) {
+        res.status(err.status).json({ error: err.message });
+      } else {
+        res.status(502).json({ error: (err as Error).message });
+      }
+    }
+  });
+
+  // Same one-off browser download as /system/boot-disk/backup/config above, but encrypted with
+  // whatever password is already saved for Local Backups (Settings -> Backups' own Encryption
+  // section) - there's no separate "pick a password for this one download" flow, it always reuses
+  // the saved one, same as a scheduled/manual "Back up now" run would.
+  router.get('/system/boot-disk/backup/config-encrypted', async (_req, res) => {
+    try {
+      const settings = await settingsStore.get();
+      const { passwordObscured } = settings.backupSchedule.encryption;
+      if (!passwordObscured) {
+        throw new HttpError(400, 'No encryption password is saved - set one in Settings → Local Backups first.');
+      }
+      metrics.checkpointForBackup();
+      await writeUsersExport(users, config.usersExportPath);
+      const existing = await resolveConfigBackupPaths(nmd, settingsStore);
+      if (existing.length === 0) {
+        throw new HttpError(400, 'No NonRAID config files were found to back up.');
+      }
+      const password = await rclone.reveal(passwordObscured);
+      streamConfigBackup(existing, res, activity, password);
     } catch (err) {
       if (err instanceof HttpError) {
         res.status(err.status).json({ error: err.message });
@@ -124,7 +162,7 @@ export function systemRouter(
       const encrypted = !(await looksLikeGzip(file.path));
       const { path: decryptedPath, cleanup } = await decryptIfNeeded(file.path, encrypted, password);
       cleanupDecrypted = cleanup;
-      const preview = await buildRestorePreview(nmd, decryptedPath);
+      const preview = await buildRestorePreview(nmd, settingsStore, decryptedPath);
       const token = randomUUID();
       stageRestoreFile(token, decryptedPath);
       // Once decrypted, the original upload at file.path is no longer needed (the plaintext copy
@@ -175,12 +213,17 @@ export function systemRouter(
     let cleanupDecrypted = async () => {};
     try {
       const sourcePath = await backupScheduler.resolveBackupPath(name);
-      const meta = await readMetaSidecar(sourcePath); // sourcePath's own sidecar - missing reads as unencrypted, see backupMeta.ts
+      const meta = await readMetaSidecar(sourcePath); // sourcePath's own sidecar
       tmpPath = path.join(os.tmpdir(), `nonraid-restore-${randomUUID()}.tar.gz`);
       await copyFile(sourcePath, tmpPath);
-      const { path: decryptedPath, cleanup } = await decryptIfNeeded(tmpPath, meta?.encrypted ?? false, password);
+      // A missing sidecar reads as "encrypted-ness unknown", not "unencrypted" - falls back to the
+      // same gzip-magic-byte sniff the upload route uses when it has no sidecar relationship at
+      // all, rather than assuming plain and letting an actually-encrypted archive fail confusingly
+      // deep inside buildRestorePreview() instead of prompting for a password here.
+      const encrypted = meta ? meta.encrypted : !(await looksLikeGzip(tmpPath));
+      const { path: decryptedPath, cleanup } = await decryptIfNeeded(tmpPath, encrypted, password);
       cleanupDecrypted = cleanup;
-      const preview = await buildRestorePreview(nmd, decryptedPath);
+      const preview = await buildRestorePreview(nmd, settingsStore, decryptedPath);
       const token = randomUUID();
       stageRestoreFile(token, decryptedPath);
       if (decryptedPath !== tmpPath) await unlink(tmpPath).catch(() => {}); // see the upload route's own comment on this
@@ -218,7 +261,7 @@ export function systemRouter(
       const arrayIsBlank = await isArrayBlank(nmd);
       // includeAppdata always on here, matching buildRestorePreview() - see its own doc comment
       // for why an appdata member with no matching category would otherwise never get restored.
-      const categories = await resolveBackupCategories(nmd, true);
+      const categories = await resolveBackupCategories(nmd, settingsStore, true);
 
       // Missing/malformed `categories` means "everything" (the field didn't exist before this
       // selection feature - old clients, or a plain re-POST of a preview response, still restore
@@ -283,13 +326,35 @@ export function systemRouter(
         }
       }
 
+      // restoreArchiveMembers() only wrote the snapshot file itself back to usersExportPath - this
+      // is the follow-up materialization step (same "file restore, then a real action" shape as
+      // the superblock reload above), recreating whatever managed users/groups are missing on this
+      // host. Best-effort per account (see UsersClient.restoreSnapshot()'s own doc comment) - a
+      // failure here doesn't undo anything else this restore already did.
+      const usersExportMember = config.usersExportPath.replace(/^\//, '');
+      let usersRestoreResult: UsersRestoreResult | null = null;
+      let usersRestoreError: string | null = null;
+      if (toRestore.includes(usersExportMember)) {
+        try {
+          usersRestoreResult = await restoreUsersExport(users, config.usersExportPath);
+        } catch (err) {
+          usersRestoreError = (err as Error).message;
+        }
+      }
+
       const text = `Config restored (${restoredCount} item${restoredCount === 1 ? '' : 's'}${skippedSuperblock ? ', array superblock skipped - array already has disks assigned' : ''})`;
       activity.log(text, 'blue').catch(() => {});
       if (superblockReloadError) {
         activity.log(`Config restore's superblock reload failed: ${superblockReloadError}`, 'red').catch(() => {});
       }
+      if (usersRestoreResult) {
+        activity.log(`Restored users/groups: ${usersRestoreResult.usersCreated.length} user(s), ${usersRestoreResult.groupsCreated.length} group(s) created`, 'blue').catch(() => {});
+      }
+      if (usersRestoreError) {
+        activity.log(`Config restore's users/groups recreation failed: ${usersRestoreError}`, 'red').catch(() => {});
+      }
 
-      res.json({ restoredCount, skippedSuperblock, superblockReloadError, dockerConfigRestored });
+      res.json({ restoredCount, skippedSuperblock, superblockReloadError, dockerConfigRestored, usersRestoreResult, usersRestoreError });
     } catch (err) {
       const message = err instanceof HttpError ? err.message : (err as Error).message;
       activity.log(`Config restore failed: ${message}`, 'red').catch(() => {});
@@ -318,12 +383,12 @@ export function systemRouter(
   });
 
   // The config-restore result screen's single "make everything take effect" action - SMB, NFS,
-  // driver reload, and nonraid-webui itself, instead of four separate buttons for what's really
-  // one "apply what was just restored" step. Order matters: SMB/NFS/driver run first so their own
-  // outcomes can still be reported in this response; the webui restart runs last (self-exit, same
-  // pattern as /services/webui/restart) since it drops this connection. Each step is independent
-  // and best-effort - one failing doesn't skip the rest, since e.g. a driver reload failure
-  // shouldn't leave Samba serving a stale smb.conf just because it ran second.
+  // driver reload, rclone-rcd, and nonraid-webui itself, instead of five separate buttons for
+  // what's really one "apply what was just restored" step. Order matters: SMB/NFS/driver/rclone-rcd
+  // run first so their own outcomes can still be reported in this response; the webui restart runs
+  // last (self-exit, same pattern as /services/webui/restart) since it drops this connection. Each
+  // step is independent and best-effort - one failing doesn't skip the rest, since e.g. a driver
+  // reload failure shouldn't leave Samba serving a stale smb.conf just because it ran second.
   router.post('/system/restart-services', async (req, res) => {
     const runStep = async (label: string, step: () => Promise<string>): Promise<{ ok: boolean; message: string }> => {
       try {
@@ -350,6 +415,18 @@ export function systemRouter(
     const driverReload = await runStep('Driver reload', async () => {
       const result = await nmd.reloadModuleAndImport();
       return `Driver reloaded, ${result.importedCount} disk(s) re-imported`;
+    });
+    // rclone-rcd only reads rclone.conf at startup, so a freshly-restored one (see backupCatalog.ts's
+    // 'remoteBackup' category) is inert until the daemon restarts - same category of problem as
+    // Docker's daemon.json above, but not destructive the way bouncing Docker is (at worst this
+    // interrupts one in-flight sync, always safely re-runnable), so it always runs here rather than
+    // needing its own opt-in flag. Re-runs the same enable/disable --now toggle PUT /rclone/enabled
+    // already uses rather than a plain restart, so it also correctly stops the daemon if the
+    // restored settings.json turned Remote Backup off, and correctly (re)starts it if turned on.
+    const rcloneRcd = await runStep('rclone-rcd resync', async () => {
+      const settings = await settingsStore.get();
+      await runSudoMaybe('systemctl', [settings.remoteBackup.enabled ? 'enable' : 'disable', '--now', 'rclone-rcd']);
+      return `rclone-rcd ${settings.remoteBackup.enabled ? 'started' : 'stopped'}`;
     });
     // Docker only reads daemon.json at startup, and restarting it stops every running container -
     // an explicit opt-in from the caller, not run by default, so a restore that never touched
@@ -382,6 +459,7 @@ export function systemRouter(
       smb,
       nfs,
       driverReload,
+      rcloneRcd,
       docker: dockerResult,
       message: 'Restarting nonraid-webui - this page will reconnect automatically in a few seconds.',
     });

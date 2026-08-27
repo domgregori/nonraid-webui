@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { lxcApi } from '../../api/lxcApi';
 import type { CreateLxcProgress, LxcDistroOption } from '../../types/lxcApi';
 import { DistroIcon } from './DistroIcon';
@@ -17,6 +18,7 @@ function distroKey(d: LxcDistroOption): string {
 }
 
 export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
+  const { t } = useTranslation('lxc');
   const [stage, setStage] = useState<Stage>('loading-options');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [distros, setDistros] = useState<LxcDistroOption[]>([]);
@@ -126,31 +128,31 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog lxc-create-dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Add LXC Container</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('CreateLxcDialog.title')}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('CreateLxcDialog.close')}>
             &#10005;
           </button>
         </div>
 
-        {stage === 'loading-options' && <div className="status-note">Loading distributions and bridges…</div>}
+        {stage === 'loading-options' && <div className="status-note">{t('CreateLxcDialog.loadingOptions')}</div>}
         {stage === 'load-error' && <div className="status-note status-note--error">{loadError}</div>}
 
         {stage !== 'loading-options' && stage !== 'load-error' && (
           <div className="dialog__body">
             <label className="form-field">
-              <span className="form-field__label">Container name</span>
+              <span className="form-field__label">{t('CreateLxcDialog.containerNameLabel')}</span>
               <input
                 className="history-input"
                 style={{ width: '100%' }}
                 disabled={locked}
-                placeholder="e.g. debian-build"
+                placeholder={t('CreateLxcDialog.containerNamePlaceholder')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </label>
 
             <label className="form-field">
-              <span className="form-field__label">Distribution</span>
+              <span className="form-field__label">{t('CreateLxcDialog.distributionLabel')}</span>
               <div className="container-form-row" style={{ alignItems: 'center' }}>
                 <DistroIcon distribution={distribution} size={28} />
                 <select
@@ -165,7 +167,7 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
                       {d.label}
                     </option>
                   ))}
-                  <option value={CUSTOM_VALUE}>Custom…</option>
+                  <option value={CUSTOM_VALUE}>{t('CreateLxcDialog.customOption')}</option>
                 </select>
               </div>
             </label>
@@ -174,14 +176,14 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
               <div className="container-form-row">
                 <input
                   className="history-input"
-                  placeholder="Distribution (e.g. debian)"
+                  placeholder={t('CreateLxcDialog.distributionPlaceholder')}
                   disabled={locked}
                   value={distribution}
                   onChange={(e) => setDistribution(e.target.value)}
                 />
                 <input
                   className="history-input"
-                  placeholder="Release (e.g. bookworm)"
+                  placeholder={t('CreateLxcDialog.releasePlaceholder')}
                   disabled={locked}
                   value={release}
                   onChange={(e) => setRelease(e.target.value)}
@@ -190,7 +192,7 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
             )}
 
             <label className="form-field">
-              <span className="form-field__label">Architecture</span>
+              <span className="form-field__label">{t('CreateLxcDialog.architectureLabel')}</span>
               <input
                 className="history-input"
                 style={{ width: '100%' }}
@@ -202,7 +204,7 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
             </label>
 
             <label className="form-field">
-              <span className="form-field__label">Network</span>
+              <span className="form-field__label">{t('CreateLxcDialog.networkLabel')}</span>
               <select
                 className="history-input"
                 style={{ width: '100%' }}
@@ -210,13 +212,13 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
                 value={networkType}
                 onChange={(e) => handleNetworkTypeChange(e.target.value as 'bridge' | 'macvlan')}
               >
-                <option value="bridge">Bridge - IP on the bridge's own subnet</option>
-                <option value="macvlan">Direct on a network interface - real IP from your LAN's DHCP</option>
+                <option value="bridge">{t('CreateLxcDialog.bridgeOption')}</option>
+                <option value="macvlan">{t('CreateLxcDialog.macvlanOption')}</option>
               </select>
             </label>
 
             <label className="form-field">
-              <span className="form-field__label">{networkType === 'macvlan' ? 'Interface' : 'Bridge'}</span>
+              <span className="form-field__label">{networkType === 'macvlan' ? t('CreateLxcDialog.interfaceLabel') : t('CreateLxcDialog.bridgeFieldLabel')}</span>
               {(networkType === 'macvlan' ? interfaces : bridges).length > 0 ? (
                 <select className="history-input" style={{ width: '100%' }} disabled={locked} value={bridge} onChange={(e) => setBridge(e.target.value)}>
                   {(networkType === 'macvlan' ? interfaces : bridges).map((b) => (
@@ -230,20 +232,18 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
                   className="history-input"
                   style={{ width: '100%' }}
                   disabled={locked}
-                  placeholder={networkType === 'macvlan' ? 'e.g. eno0' : 'e.g. br0'}
+                  placeholder={networkType === 'macvlan' ? t('CreateLxcDialog.interfacePlaceholder') : t('CreateLxcDialog.bridgePlaceholder')}
                   value={bridge}
                   onChange={(e) => setBridge(e.target.value)}
                 />
               )}
               <span className="apps-field__hint">
-                {networkType === 'macvlan'
-                  ? "The container's interface rides directly on this NIC and gets its own LAN IP via DHCP. The host itself can't reach the container over this interface - that's a macvlan limitation, not a bug."
-                  : "Host bridge the container's veth attaches to"}
+                {networkType === 'macvlan' ? t('CreateLxcDialog.macvlanHint') : t('CreateLxcDialog.bridgeHint')}
               </span>
             </label>
 
             <label className="form-field">
-              <span className="form-field__label">Description</span>
+              <span className="form-field__label">{t('CreateLxcDialog.descriptionLabel')}</span>
               <input
                 className="history-input"
                 style={{ width: '100%' }}
@@ -254,12 +254,12 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
             </label>
 
             <label className="form-field">
-              <span className="form-field__label">Web UI link</span>
+              <span className="form-field__label">{t('CreateLxcDialog.webUiLinkLabel')}</span>
               <input
                 className="history-input"
                 style={{ width: '100%' }}
                 disabled={locked}
-                placeholder="optional, e.g. http://[IP]:8080"
+                placeholder={t('CreateLxcDialog.webUiPlaceholder')}
                 value={webUiUrl}
                 onChange={(e) => setWebUiUrl(e.target.value)}
               />
@@ -267,12 +267,12 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
 
             <label className="apps-privileged-banner__ack">
               <input type="checkbox" disabled={locked} checked={autostart} onChange={(e) => setAutostart(e.target.checked)} />
-              Start automatically on boot
+              {t('CreateLxcDialog.autostartLabel')}
             </label>
 
             {stage === 'creating' && (
               <div className="apps-install-progress">
-                <div className="apps-install-progress__status">{progress?.message ?? 'Starting…'}</div>
+                <div className="apps-install-progress__status">{progress?.message ?? t('CreateLxcDialog.starting')}</div>
                 <div className="apps-install-progress__bar">
                   <div className="apps-install-progress__bar-fill apps-install-progress__bar-fill--indeterminate" />
                 </div>
@@ -293,16 +293,16 @@ export function CreateLxcDialog({ onClose, onDone }: CreateLxcDialogProps) {
 
             <div className="dialog__actions">
               <button type="button" className="btn" onClick={onClose}>
-                {stage === 'done' ? 'Close' : 'Cancel'}
+                {stage === 'done' ? t('CreateLxcDialog.close') : t('CreateLxcDialog.cancel')}
               </button>
               {!locked && (
                 <button type="button" className="btn--primary" disabled={!valid} onClick={handleSubmit}>
-                  Create
+                  {t('CreateLxcDialog.create')}
                 </button>
               )}
               {stage === 'creating' && (
                 <button type="button" className="btn--primary" disabled>
-                  Creating…
+                  {t('CreateLxcDialog.creating')}
                 </button>
               )}
             </div>

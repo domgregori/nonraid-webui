@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { dockerApi } from '../../api/dockerApi';
 import { installButtonLabel, useInstallProgress } from '../../hooks/useInstallProgress';
 import { PathAutocomplete } from '../shared/PathAutocomplete';
@@ -44,6 +45,7 @@ function removeAt<T>(list: T[], index: number): T[] {
 }
 
 export function ContainerFormDialog({ mode, containerId, onClose, onDone }: ContainerFormDialogProps) {
+  const { t } = useTranslation('docker');
   const [stage, setStage] = useState<Stage>(mode === 'edit' ? 'loading' : 'editing');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [caAppName, setCaAppName] = useState<string | null>(null);
@@ -160,26 +162,23 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog apps-install-dialog">
         <div className="dialog__head">
-          <div className="dialog__title">{mode === 'add' ? 'Add Container' : `Edit ${containerName || 'container'}`}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">
+            {mode === 'add' ? t('ContainerFormDialog.addTitle') : t('ContainerFormDialog.editTitle', { name: containerName || t('ContainerFormDialog.containerFallback') })}
+          </div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('ContainerFormDialog.close')}>
             &#10005;
           </button>
         </div>
 
-        {stage === 'loading' && !containerName && <div className="status-note">Loading container…</div>}
+        {stage === 'loading' && !containerName && <div className="status-note">{t('ContainerFormDialog.loadingContainer')}</div>}
         {stage === 'load-error' && <div className="status-note status-note--error">{loadError}</div>}
 
         {(stage !== 'loading' || containerName) && stage !== 'load-error' && (
           <div className="dialog__body">
-            {caAppName && (
-              <div className="status-note">
-                Installed via Community Applications as &quot;{caAppName}&quot;. Editing here changes the running container
-                directly.
-              </div>
-            )}
+            {caAppName && <div className="status-note">{t('ContainerFormDialog.installedViaCA', { name: caAppName })}</div>}
 
             <label className="form-field">
-              <span className="form-field__label">Container name</span>
+              <span className="form-field__label">{t('ContainerFormDialog.containerNameLabel')}</span>
               {locked ? (
                 <div className="form-field__value">{containerName}</div>
               ) : (
@@ -196,14 +195,14 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
             </label>
 
             <label className="form-field">
-              <span className="form-field__label">Image</span>
+              <span className="form-field__label">{t('ContainerFormDialog.imageLabel')}</span>
               {locked ? (
                 <div className="form-field__value">{image}</div>
               ) : (
                 <input
                   className="history-input"
                   style={{ width: '100%' }}
-                  placeholder="e.g. nginx:latest"
+                  placeholder={t('ContainerFormDialog.imagePlaceholder')}
                   value={image}
                   onChange={(e) => {
                     setImage(e.target.value);
@@ -214,7 +213,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
             </label>
 
             <label className="form-field">
-              <span className="form-field__label">Network</span>
+              <span className="form-field__label">{t('ContainerFormDialog.networkLabel')}</span>
               {locked ? (
                 <div className="form-field__value">{network}</div>
               ) : (
@@ -234,13 +233,13 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                         {n}
                       </option>
                     ))}
-                    <option value={NETWORK_CUSTOM}>Custom…</option>
+                    <option value={NETWORK_CUSTOM}>{t('ContainerFormDialog.customOption')}</option>
                   </select>
                   {!networkOptions.includes(network) && (
                     <input
                       className="history-input"
                       style={{ width: '100%', marginTop: 8 }}
-                      placeholder="Existing network's name"
+                      placeholder={t('ContainerFormDialog.existingNetworkPlaceholder')}
                       value={network}
                       onChange={(e) => {
                         setNetwork(e.target.value);
@@ -250,7 +249,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                   )}
                 </>
               )}
-              <span className="apps-field__hint">bridge, host, none, or an existing network's name</span>
+              <span className="apps-field__hint">{t('ContainerFormDialog.networkHint')}</span>
             </label>
 
             {!locked && (
@@ -263,7 +262,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                     invalidate();
                   }}
                 />
-                Privileged (full host access)
+                {t('ContainerFormDialog.privilegedLabel')}
               </label>
             )}
 
@@ -277,18 +276,18 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                     invalidate();
                   }}
                 />
-                Start automatically on boot
+                {t('ContainerFormDialog.autostartLabel')}
               </label>
             )}
 
             {needsElevatedAck && (plan ? plan.elevatedAccessReasons.length > 0 : true) && (
               <div className="apps-privileged-banner">
-                <div className="apps-privileged-banner__title">Requires extra host access</div>
+                <div className="apps-privileged-banner__title">{t('ContainerFormDialog.elevatedAccessTitle')}</div>
                 <div className="apps-privileged-banner__body">
                   {plan
                     ? plan.elevatedAccessReasons.map((reason) => <div key={reason}>{reason}</div>)
-                    : 'Privileged mode, host networking, and device passthrough all grant this container full or partial host access.'}
-                  Only proceed if you trust this configuration.
+                    : t('ContainerFormDialog.elevatedAccessFallback')}
+                  {t('ContainerFormDialog.elevatedAccessSuffix')}
                 </div>
                 {!locked && (
                   <label className="apps-privileged-banner__ack">
@@ -300,14 +299,14 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                         invalidate();
                       }}
                     />
-                    I understand and want to proceed
+                    {t('ContainerFormDialog.elevatedAccessAck')}
                   </label>
                 )}
               </div>
             )}
 
             <ListField
-              label="Ports"
+              label={t('ContainerFormDialog.portsLabel')}
               locked={locked}
               items={ports}
               onAdd={() => setPorts([...ports, { containerPort: 0, hostPort: 0, protocol: 'tcp' }])}
@@ -319,8 +318,8 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
               renderHeader={
                 ports.length > 0 ? (
                   <div className="container-form-row container-form-row--header">
-                    <span className="apps-field__hint">Container port - what the app listens on inside</span>
-                    <span className="apps-field__hint">Host port - what you'll actually browse to</span>
+                    <span className="apps-field__hint">{t('ContainerFormDialog.portsHintContainer')}</span>
+                    <span className="apps-field__hint">{t('ContainerFormDialog.portsHintHost')}</span>
                   </div>
                 ) : null
               }
@@ -329,7 +328,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                   <input
                     className="history-input"
                     type="number"
-                    placeholder="e.g. 80"
+                    placeholder={t('ContainerFormDialog.containerPortPlaceholder')}
                     value={p.containerPort || ''}
                     onChange={(e) => {
                       setPorts(updateAt(ports, i, { containerPort: Number(e.target.value) }));
@@ -339,7 +338,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                   <input
                     className="history-input"
                     type="number"
-                    placeholder="e.g. 8080"
+                    placeholder={t('ContainerFormDialog.hostPortPlaceholder')}
                     value={p.hostPort || ''}
                     onChange={(e) => {
                       setPorts(updateAt(ports, i, { hostPort: Number(e.target.value) }));
@@ -364,7 +363,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                       setPorts(removeAt(ports, i));
                       invalidate();
                     }}
-                    aria-label="Remove port"
+                    aria-label={t('ContainerFormDialog.removePort')}
                   >
                     &#10005;
                   </button>
@@ -373,7 +372,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
             />
 
             <ListField
-              label="Environment Variables"
+              label={t('ContainerFormDialog.envLabel')}
               locked={locked}
               items={env}
               onAdd={() => setEnv([...env, { name: '', value: '' }])}
@@ -386,7 +385,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                 <div className="container-form-row" key={i}>
                   <input
                     className="history-input"
-                    placeholder="Name"
+                    placeholder={t('ContainerFormDialog.namePlaceholder')}
                     value={e.name}
                     onChange={(ev) => {
                       setEnv(updateAt(env, i, { name: ev.target.value }));
@@ -395,7 +394,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                   />
                   <input
                     className="history-input"
-                    placeholder="Value"
+                    placeholder={t('ContainerFormDialog.valuePlaceholder')}
                     value={e.value}
                     onChange={(ev) => {
                       setEnv(updateAt(env, i, { value: ev.target.value }));
@@ -409,7 +408,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                       setEnv(removeAt(env, i));
                       invalidate();
                     }}
-                    aria-label="Remove variable"
+                    aria-label={t('ContainerFormDialog.removeVariable')}
                   >
                     &#10005;
                   </button>
@@ -418,14 +417,14 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
             />
 
             <ListField
-              label="Volumes"
+              label={t('ContainerFormDialog.volumesLabel')}
               locked={locked}
               items={binds}
               onAdd={() => setBinds([...binds, { hostPath: '', containerPath: '', readOnly: false }])}
               renderLocked={(b, i) => (
                 <div key={i}>
                   {b.hostPath} → {b.containerPath}
-                  {b.readOnly ? ' (read-only)' : ''}
+                  {b.readOnly ? t('ContainerFormDialog.readOnlySuffix') : ''}
                 </div>
               )}
               renderRow={(b, i) => {
@@ -435,7 +434,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                     <PathAutocomplete
                       scope="binds"
                       className={`history-input${issue ? ' apps-field--error' : ''}`}
-                      placeholder="Host path"
+                      placeholder={t('ContainerFormDialog.hostPathPlaceholder')}
                       value={b.hostPath}
                       onChange={(v) => {
                         setBinds(updateAt(binds, i, { hostPath: v }));
@@ -444,7 +443,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                     />
                     <input
                       className="history-input"
-                      placeholder="Container path"
+                      placeholder={t('ContainerFormDialog.containerPathPlaceholder')}
                       value={b.containerPath}
                       onChange={(e) => {
                         setBinds(updateAt(binds, i, { containerPath: e.target.value }));
@@ -460,7 +459,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                           invalidate();
                         }}
                       />
-                      RO
+                      {t('ContainerFormDialog.roLabel')}
                     </label>
                     <button
                       type="button"
@@ -469,7 +468,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                         setBinds(removeAt(binds, i));
                         invalidate();
                       }}
-                      aria-label="Remove volume"
+                      aria-label={t('ContainerFormDialog.removeVolume')}
                     >
                       &#10005;
                     </button>
@@ -479,7 +478,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
             />
 
             <ListField
-              label="Devices"
+              label={t('ContainerFormDialog.devicesLabel')}
               locked={locked}
               items={devices}
               onAdd={() => setDevices([...devices, { hostPath: '', containerPath: '' }])}
@@ -513,11 +512,11 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                             {dev.label}
                           </option>
                         ))}
-                        <option value={DEVICE_CUSTOM}>Custom path…</option>
+                        <option value={DEVICE_CUSTOM}>{t('ContainerFormDialog.customPathOption')}</option>
                       </select>
                       <input
                         className="history-input"
-                        placeholder="Container path"
+                        placeholder={t('ContainerFormDialog.containerPathPlaceholder')}
                         value={d.containerPath}
                         onChange={(e) => {
                           setDevices(updateAt(devices, i, { containerPath: e.target.value }));
@@ -531,7 +530,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                           setDevices(removeAt(devices, i));
                           invalidate();
                         }}
-                        aria-label="Remove device"
+                        aria-label={t('ContainerFormDialog.removeDevice')}
                       >
                         &#10005;
                       </button>
@@ -540,7 +539,7 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                       <div className="container-form-row">
                         <input
                           className={`history-input${issue ? ' apps-field--error' : ''}`}
-                          placeholder="Host path (/dev/...)"
+                          placeholder={t('ContainerFormDialog.hostPathDevPlaceholder')}
                           value={d.hostPath}
                           onChange={(e) => {
                             setDevices(updateAt(devices, i, { hostPath: e.target.value }));
@@ -558,7 +557,11 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
 
             {stage === 'reviewed' && plan && (
               <div className="apps-plan-review">
-                <div className="apps-plan-review__title">Review before {mode === 'add' ? 'creating' : 'applying changes'}</div>
+                <div className="apps-plan-review__title">
+                  {t('ContainerFormDialog.reviewBeforeTitle', {
+                    action: mode === 'add' ? t('ContainerFormDialog.reviewBeforeCreating') : t('ContainerFormDialog.reviewBeforeApplying'),
+                  })}
+                </div>
                 {plan.errors.length > 0 ? (
                   <div className="status-note status-note--error">
                     {plan.errors.map((e) => (
@@ -568,15 +571,15 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                 ) : (
                   <div className="apps-plan-review__section">
                     <div className="apps-plan-review__kv">
-                      <span className="apps-plan-review__kv-label">Image</span>
+                      <span className="apps-plan-review__kv-label">{t('ContainerFormDialog.imageLabel')}</span>
                       <span className="apps-plan-review__kv-value">{plan.image}</span>
                     </div>
                     <div className="apps-plan-review__kv">
-                      <span className="apps-plan-review__kv-label">Network</span>
+                      <span className="apps-plan-review__kv-label">{t('ContainerFormDialog.networkLabel')}</span>
                       <span className="apps-plan-review__kv-value">
                         {plan.network}
-                        {plan.privileged ? ' · privileged' : ''}
-                        {plan.autostart ? ' · starts on boot' : ''}
+                        {plan.privileged ? t('ContainerFormDialog.privilegedSuffix') : ''}
+                        {plan.autostart ? t('ContainerFormDialog.autostartSuffix') : ''}
                       </span>
                     </div>
                   </div>
@@ -592,17 +595,17 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
 
             <div className="dialog__actions">
               <button type="button" className="btn" onClick={onClose}>
-                {stage === 'done' ? 'Close' : 'Cancel'}
+                {stage === 'done' ? t('ContainerFormDialog.close') : t('ContainerFormDialog.cancel')}
               </button>
               {stage !== 'done' && stage !== 'reviewed' && stage !== 'installing' && (
                 <button type="button" className="btn--primary" disabled={stage === 'loading'} onClick={handleReview}>
-                  {stage === 'loading' ? 'Reviewing…' : 'Review'}
+                  {stage === 'loading' ? t('ContainerFormDialog.reviewing') : t('ContainerFormDialog.review')}
                 </button>
               )}
               {stage === 'reviewed' && (
                 <>
                   <button type="button" className="btn" onClick={handleReview}>
-                    Re-check
+                    {t('ContainerFormDialog.recheck')}
                   </button>
                   <button
                     type="button"
@@ -610,13 +613,13 @@ export function ContainerFormDialog({ mode, containerId, onClose, onDone }: Cont
                     disabled={!plan || plan.errors.length > 0 || (plan.requiresPrivilegedAck && !privilegedAck)}
                     onClick={handleSubmit}
                   >
-                    {mode === 'add' ? 'Confirm create' : 'Confirm changes'}
+                    {mode === 'add' ? t('ContainerFormDialog.confirmCreate') : t('ContainerFormDialog.confirmChanges')}
                   </button>
                 </>
               )}
               {stage === 'installing' && (
                 <button type="button" className="btn--primary" disabled>
-                  {installButtonLabel(installProgress)}
+                  {installButtonLabel(t, installProgress)}
                 </button>
               )}
             </div>
@@ -638,6 +641,7 @@ interface ListFieldProps<T> {
 }
 
 function ListField<T>({ label, locked, items, onAdd, renderRow, renderLocked, renderHeader }: ListFieldProps<T>) {
+  const { t } = useTranslation('docker');
   return (
     <div className="form-field">
       <span className="form-field__label">{label}</span>
@@ -648,7 +652,7 @@ function ListField<T>({ label, locked, items, onAdd, renderRow, renderLocked, re
           {renderHeader}
           {items.map((item, i) => renderRow(item, i))}
           <button type="button" className="container-form-list__add" onClick={onAdd}>
-            + Add
+            {t('ContainerFormDialog.addButton')}
           </button>
         </>
       )}

@@ -3,7 +3,7 @@ import { request } from './request';
 import type { BenchmarkResult } from '../types/benchmark';
 import type { ImportResult } from '../types/nmdApi';
 import type { CommandResult } from '../types/settingsApi';
-import type { BackupCategoryId, LocalBackupList, NetLiveRate, RestartServicesResult, RestoreCommitResult, RestorePreview, SystemStats } from '../types/systemApi';
+import type { BackupCategoryId, BootSnapshot, BootSnapshotList, LocalBackupList, NetLiveRate, RestartServicesResult, RestoreCommitResult, RestorePreview, SystemStats } from '../types/systemApi';
 
 export const systemApi = {
   getStats: () => request<SystemStats>('/api/system'),
@@ -48,6 +48,7 @@ export const systemApi = {
 
   bootDiskImageBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/image`,
   bootDiskConfigBackupUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/config`,
+  bootDiskConfigBackupEncryptedUrl: () => `${API_BASE_URL}/api/system/boot-disk/backup/config-encrypted`,
 
   getTimezones: () => request<string[]>('/api/system/timezones'),
   setHostname: (hostname: string) =>
@@ -76,4 +77,13 @@ export const systemApi = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ durationSeconds }),
     }),
+
+  listBootSnapshots: () => request<BootSnapshotList>('/api/system/boot-snapshots'),
+  createBootSnapshot: (label?: string) =>
+    request<BootSnapshot>('/api/system/boot-snapshots', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ label }),
+    }),
+  deleteBootSnapshot: (name: string) => request<CommandResult>(`/api/system/boot-snapshots/${encodeURIComponent(name)}`, { method: 'DELETE' }),
 };

@@ -2,6 +2,7 @@ import type { ActivityStore } from '../activity/index.js';
 import { config } from '../config.js';
 import type { CreateContainerProgressCallback, DockerClient, DockerCommandResult, DockerContainerSummary } from '../docker/index.js';
 import { computeElevatedAccessReasons, isAllowedBindPath, isAllowedDevicePath, sanitizeContainerName } from '../docker/planning.js';
+import { lastKnownStatus } from '../docker/updateCheck.js';
 import { HttpError } from '../httpError.js';
 import { provisionArrayDir } from '../system/arrayDir.js';
 import type { CaFeedStore } from './feedStore.js';
@@ -48,7 +49,7 @@ function toSummary(app: CaApp, installedContainer: DockerContainerSummary | unde
         containerName: installedContainer.name,
         state: installedContainer.state,
         installedRepository: installedContainer.labels[APP_REPOSITORY_LABEL] ?? installedContainer.image,
-        updateAvailable: (installedContainer.labels[APP_REPOSITORY_LABEL] ?? installedContainer.image) !== app.Repository,
+        updateAvailable: lastKnownStatus(installedContainer.id).updateAvailable,
       }
     : null;
 
@@ -62,6 +63,7 @@ function toSummary(app: CaApp, installedContainer: DockerContainerSummary | unde
     installed,
     downloads: typeof app.downloads === 'number' ? app.downloads : null,
     stars: typeof app.stars === 'number' ? app.stars : null,
+    firstSeenAt: typeof app.FirstSeen === 'number' ? app.FirstSeen : null,
   };
 }
 
@@ -82,7 +84,15 @@ function sortApps(apps: CaApp[], sort: AppSort): void {
   } else if (sort === 'latest') {
     apps.sort((a, b) => (b.LastUpdate ?? 0) - (a.LastUpdate ?? 0));
   } else if (sort === 'new') {
-    apps.sort((a, b) => (Date.parse(b.Date ?? '') || 0) - (Date.parse(a.Date ?? '') || 0));
+    // FirstSeen (unix seconds), not Date - confirmed live against the real feed that Date is null
+    // on nearly every app despite CaApp's own "sparse coverage" comment undersellling it, while
+    // FirstSeen is well-populated (its own comment already called out the better coverage).
+    apps.sort((a, b) => (b.FirstSeen ?? 0) - (a.FirstSeen ?? 0));
+  } else if (sort === 'popular') {
+    // Downloads (all-time pull count) is the primary signal - stars only breaks a tie between
+    // apps with the same download count (most often two apps the feed has no download data for
+    // at all, both falling back to 0).
+    apps.sort((a, b) => (b.downloads ?? 0) - (a.downloads ?? 0) || (b.stars ?? 0) - (a.stars ?? 0));
   }
 }
 

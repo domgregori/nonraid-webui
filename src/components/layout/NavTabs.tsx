@@ -1,19 +1,21 @@
 import { NavLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 const TABS = [
-  { to: '/', label: 'Dashboard' },
-  { to: '/disks', label: 'Disks' },
-  { to: '/shares', label: 'Pools' },
-  { to: '/browse', label: 'Browse' },
-  { to: '/users', label: 'Sharing' },
-  { to: '/docker', label: 'Docker' },
-  { to: '/lxc', label: 'LXC' },
-  { to: '/apps', label: 'Apps' },
-  { to: '/history', label: 'History' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/', labelKey: 'NavTabs.dashboard' },
+  { to: '/disks', labelKey: 'NavTabs.disks' },
+  { to: '/shares', labelKey: 'NavTabs.pools' },
+  { to: '/browse', labelKey: 'NavTabs.browse' },
+  { to: '/users', labelKey: 'NavTabs.sharing' },
+  { to: '/docker', labelKey: 'NavTabs.docker' },
+  { to: '/lxc', labelKey: 'NavTabs.lxc' },
+  { to: '/apps', labelKey: 'NavTabs.apps' },
+  { to: '/history', labelKey: 'NavTabs.history' },
+  { to: '/settings', labelKey: 'NavTabs.settings' },
 ];
 
 export function NavTabs() {
+  const { t } = useTranslation('layout');
   return (
     <div className="nav-tabs">
       {TABS.map((tab) => (
@@ -23,7 +25,7 @@ export function NavTabs() {
           end={tab.to === '/'}
           className={({ isActive }) => `nav-tab${isActive ? ' active' : ''}`}
         >
-          {tab.label}
+          {t(tab.labelKey)}
         </NavLink>
       ))}
     </div>

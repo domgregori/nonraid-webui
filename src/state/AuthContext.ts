@@ -21,6 +21,11 @@ export interface AuthContextValue {
   /** Re-checks /auth/status and updates context state - used to finish the login flow after a
    *  second factor has been verified server-side and a real session cookie issued. */
   completeTwoFactor: () => Promise<void>;
+  /** Same underlying re-check as completeTwoFactor, named for its other use: syncing context
+   *  state after something else already changed session state server-side without going through
+   *  login()/logout() - e.g. a password change, which clears the session cookie as part of its
+   *  own response (see SettingsPage.tsx). */
+  refreshStatus: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

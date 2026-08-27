@@ -8,4 +8,5 @@ export function createUsersClient(): UsersClient {
 export type { UsersClient } from './client.js';
 export { UsersService } from './service.js';
 export type { ShareAccessEntry } from './service.js';
+export { writeUsersExport, restoreUsersExport } from './backupExport.js';
 export * from './types.js';

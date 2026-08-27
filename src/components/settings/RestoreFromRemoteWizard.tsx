@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { rcloneApi } from '../../api/rcloneApi';
 import type { RemoteBackupEntry, SyncJobWithRuntime } from '../../types/rcloneApi';
 import type { BackupCategoryId, RestorePreview } from '../../types/systemApi';
@@ -20,7 +21,10 @@ interface RestoreFromRemoteWizardProps {
   onBack?: () => void;
 }
 
-const SCOPE_LABEL: Record<string, string> = { config: 'Config backups', configAppdata: 'Config backups + appdata' };
+const SCOPE_LABEL_KEYS: Record<string, string> = {
+  config: 'RestoreFromRemoteWizard.scopeConfig',
+  configAppdata: 'RestoreFromRemoteWizard.scopeConfigAppdata',
+};
 
 // Which remote+path this instance is browsing, and how to actually fetch its archives/preview a
 // pick - a job's own fixed target (picked from the job list below) or an arbitrary remote+path
@@ -38,6 +42,7 @@ type ArchiveSource = { kind: 'job'; job: SyncJobWithRuntime } | { kind: 'path'; 
  * skipped and archives are listed straight from that remote+path instead (see ArchiveSource above).
  */
 export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, browsePath, onBack }: RestoreFromRemoteWizardProps) {
+  const { t } = useTranslation('settings');
   const [loadingJobs, setLoadingJobs] = useState(!browsePath);
   const [jobs, setJobs] = useState<SyncJobWithRuntime[]>([]);
   const [jobsError, setJobsError] = useState<string | null>(null);
@@ -113,12 +118,14 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, br
     void previewFor(archive.name);
   };
 
+  const title = focusCategory === 'array' ? t('RestoreFromRemoteWizard.recoverArrayTitle') : t('RestoreFromRemoteWizard.restoreTitle');
+
   if (preview && pickedName) {
     return (
       <ConfigRestoreWizard
         onClose={onClose}
         onRestored={onRestored}
-        title={focusCategory === 'array' ? 'Recover the array from a remote backup' : 'Restore from a remote backup'}
+        title={title}
         initialPreview={preview}
         sourceLabel={pickedName}
         focusCategory={focusCategory}
@@ -130,15 +137,13 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, br
     );
   }
 
-  const title = focusCategory === 'array' ? 'Recover the array from a remote backup' : 'Restore from a remote backup';
-
   return (
     <>
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog import-array-wizard">
         <div className="dialog__head">
           <div className="dialog__title">{title}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('RestoreFromRemoteWizard.close')}>
             &#10005;
           </button>
         </div>
@@ -146,15 +151,12 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, br
         <div className="dialog__body">
           {!browsePath && !source && (
             <>
-              <div className="toggle-row__desc">
-                Pick a Remote Backup sync job to pull an archive down from. Only jobs that upload config backups (not a live folder mirror) have
-                anything here to restore from.
-              </div>
+              <div className="toggle-row__desc">{t('RestoreFromRemoteWizard.pickJobDesc')}</div>
 
-              {loadingJobs && <div className="status-note">Loading…</div>}
+              {loadingJobs && <div className="status-note">{t('RestoreFromRemoteWizard.loading')}</div>}
               {jobsError && <div className="status-note status-note--error">{jobsError}</div>}
               {!loadingJobs && !jobsError && jobs.length === 0 && (
-                <div className="status-note">No config-backup sync jobs configured yet - set one up in Settings → Remote Backup first.</div>
+                <div className="status-note">{t('RestoreFromRemoteWizard.noJobsConfigured')}</div>
               )}
               {!loadingJobs && jobs.length > 0 && (
                 <div className="import-browser__list">
@@ -162,7 +164,7 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, br
                     <button type="button" key={j.id} className="import-browser__row" onClick={() => loadArchivesFor({ kind: 'job', job: j })}>
                       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{j.name}</span>
                       <span style={{ flexShrink: 0, color: 'var(--color-text-dim)' }}>
-                        {SCOPE_LABEL[j.scope] ?? j.scope} · {j.remoteName}
+                        {SCOPE_LABEL_KEYS[j.scope] ? t(SCOPE_LABEL_KEYS[j.scope]) : j.scope} · {j.remoteName}
                       </span>
                     </button>
                   ))}
@@ -171,7 +173,7 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, br
 
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
-                  Cancel
+                  {t('RestoreFromRemoteWizard.cancel')}
                 </button>
               </div>
             </>
@@ -180,7 +182,7 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, br
           {source && passwordEntry && (
             <>
               <div className="toggle-row__desc">
-                <strong>{passwordEntry.name}</strong> is password-encrypted. Enter its password to read what's inside.
+                <strong>{passwordEntry.name}</strong> {t('RestoreFromRemoteWizard.passwordEncrypted')}
               </div>
               <input
                 className="history-input"
@@ -191,16 +193,21 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, br
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && passwordDraft) void previewFor(passwordEntry.name, passwordDraft);
                 }}
-                placeholder="Password"
+                placeholder={t('RestoreFromRemoteWizard.passwordPlaceholder')}
               />
-              {previewingName && <div className="status-note">Downloading and reading {previewingName}…</div>}
+              {previewingName && <div className="status-note">{t('RestoreFromRemoteWizard.downloadingAndReading', { name: previewingName })}</div>}
               {passwordError && <div className="status-note status-note--error">{passwordError}</div>}
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={() => setPasswordEntry(null)} disabled={previewingName !== null}>
-                  Back
+                  {t('RestoreFromRemoteWizard.back')}
                 </button>
-                <button type="button" className="btn btn--primary-sm" disabled={!passwordDraft || previewingName !== null} onClick={() => previewFor(passwordEntry.name, passwordDraft)}>
-                  Continue
+                <button
+                  type="button"
+                  className="btn btn--primary-sm"
+                  disabled={!passwordDraft || previewingName !== null}
+                  onClick={() => previewFor(passwordEntry.name, passwordDraft)}
+                >
+                  {t('RestoreFromRemoteWizard.continue')}
                 </button>
               </div>
             </>
@@ -211,19 +218,25 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, br
               <div className="toggle-row__desc">
                 {source.kind === 'job' ? (
                   <>
-                    Archives already uploaded by <strong>{source.job.name}</strong> ({source.job.remoteName}:{source.job.remotePath || '/'}).
+                    {t('RestoreFromRemoteWizard.archivesUploadedBy')} <strong>{source.job.name}</strong> ({source.job.remoteName}:{source.job.remotePath || '/'}).
                   </>
                 ) : (
                   <>
-                    Archives found at <strong>{source.remoteName}:{source.remotePath || '/'}</strong>.
+                    {t('RestoreFromRemoteWizard.archivesFoundAt')}{' '}
+                    <strong>
+                      {source.remoteName}:{source.remotePath || '/'}
+                    </strong>
+                    .
                   </>
                 )}
               </div>
 
-              {loadingArchives && <div className="status-note">Loading…</div>}
+              {loadingArchives && <div className="status-note">{t('RestoreFromRemoteWizard.loading')}</div>}
               {archivesError && <div className="status-note status-note--error">{archivesError}</div>}
               {!loadingArchives && !archivesError && archives.length === 0 && (
-                <div className="status-note">{source.kind === 'job' ? "This job hasn't uploaded any backups yet." : 'No config backups found at this remote+path.'}</div>
+                <div className="status-note">
+                  {source.kind === 'job' ? t('RestoreFromRemoteWizard.jobHasNoBackups') : t('RestoreFromRemoteWizard.noBackupsAtRemotePath')}
+                </div>
               )}
 
               {!loadingArchives && archives.length > 0 && (
@@ -233,7 +246,7 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, br
                       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</span>
                       {a.encrypted && (
                         <span className="job-badge job-badge--encrypted" style={{ flexShrink: 0 }}>
-                          Encrypted
+                          {t('RestoreFromRemoteWizard.encrypted')}
                         </span>
                       )}
                       <span style={{ flexShrink: 0, color: 'var(--color-text-dim)' }}>
@@ -244,7 +257,7 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, br
                 </div>
               )}
 
-              {previewingName && <div className="status-note">Downloading and reading {previewingName}…</div>}
+              {previewingName && <div className="status-note">{t('RestoreFromRemoteWizard.downloadingAndReading', { name: previewingName })}</div>}
               {previewError && <div className="status-note status-note--error">{previewError}</div>}
 
               <div className="dialog__actions">
@@ -258,17 +271,17 @@ export function RestoreFromRemoteWizard({ onClose, onRestored, focusCategory, br
                       setArchivesError(null);
                     }}
                   >
-                    Back
+                    {t('RestoreFromRemoteWizard.back')}
                   </button>
                 ) : (
                   onBack && (
                     <button type="button" className="btn" onClick={onBack}>
-                      Back
+                      {t('RestoreFromRemoteWizard.back')}
                     </button>
                   )
                 )}
                 <button type="button" className="btn" onClick={onClose}>
-                  Cancel
+                  {t('RestoreFromRemoteWizard.cancel')}
                 </button>
               </div>
             </>

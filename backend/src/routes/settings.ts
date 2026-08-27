@@ -1,5 +1,6 @@
 import { Router, type Express } from 'express';
 import type { ActivityStore } from '../activity/index.js';
+import { resolveTrustProxyValue } from '../auth/index.js';
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { RcloneClient } from '../rclone/client.js';
@@ -7,6 +8,7 @@ import { redactEncryption, resolveEncryptionPatch } from '../settings/backupEncr
 import { validateCronExpression } from '../settings/cronMatch.js';
 import { NOTIFICATION_EVENTS, sendAppriseNotification, type AppSettings, type SettingsStore } from '../settings/index.js';
 import type { ShareService } from '../shares/index.js';
+import { applySpinDownTimeout } from '../system/hdparm.js';
 
 const KNOWN_EVENT_TYPES = new Set<string>(NOTIFICATION_EVENTS.map((e) => e.id));
 
@@ -98,15 +100,35 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
       }
       // Express re-reads 'trust proxy' on every request, so this takes effect immediately -
       // no restart needed, unlike TLS enable/disable. config.trustProxy is updated too since
-      // webauthn.ts's requireWebauthnConfig() reads it directly, not via app.get().
-      if (typeof patch.trustProxy === 'boolean') {
-        app.set('trust proxy', patch.trustProxy);
-        config.trustProxy = patch.trustProxy;
-        activity.log(patch.trustProxy ? 'Trust reverse proxy enabled' : 'Trust reverse proxy disabled', 'blue').catch(() => {});
+      // webauthn.ts's requireWebauthnConfig() reads it directly, not via app.get(). Runs before
+      // store.update() below persists anything, so an address that fails to resolve (bad
+      // hostname) rejects the whole request rather than saving a value that wouldn't actually work.
+      if (typeof patch.trustProxy === 'boolean' || typeof patch.trustProxyAddress === 'string') {
+        const current = await store.get();
+        const trustProxy = typeof patch.trustProxy === 'boolean' ? patch.trustProxy : current.trustProxy;
+        const trustProxyAddress = typeof patch.trustProxyAddress === 'string' ? patch.trustProxyAddress : current.trustProxyAddress;
+        app.set('trust proxy', trustProxy ? (await resolveTrustProxyValue(trustProxyAddress)) ?? true : false);
+        config.trustProxy = trustProxy;
+        activity.log(trustProxy ? 'Trust reverse proxy enabled' : 'Trust reverse proxy disabled', 'blue').catch(() => {});
       }
       if ('minFreeSpaceGb' in patch) {
         if (typeof patch.minFreeSpaceGb !== 'number' || !Number.isInteger(patch.minFreeSpaceGb) || patch.minFreeSpaceGb < 0) {
           throw new Error('minFreeSpaceGb must be a non-negative integer (GB).');
+        }
+      }
+      if ('spinDownTimeoutMinutes' in patch) {
+        if (typeof patch.spinDownTimeoutMinutes !== 'number' || !Number.isInteger(patch.spinDownTimeoutMinutes) || patch.spinDownTimeoutMinutes < 0) {
+          throw new Error('spinDownTimeoutMinutes must be a non-negative integer.');
+        }
+      }
+      if (patch.diskLabels) {
+        if (typeof patch.diskLabels !== 'object') {
+          throw new Error('diskLabels must be an object mapping disk_id to a label.');
+        }
+        for (const [key, value] of Object.entries(patch.diskLabels)) {
+          if (typeof value !== 'string' || value.length > 40) {
+            throw new Error(`diskLabels.${key} must be a string of 40 characters or fewer.`);
+          }
         }
       }
       if (patch.paritySchedule) {
@@ -169,6 +191,12 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
         // than leaving them on the old value until the next backend restart.
         await shares.remountAll();
         activity.log(`Minimum free space set to ${patch.minFreeSpaceGb} GB`, 'blue').catch(() => {});
+      }
+      if ('spinDownTimeoutMinutes' in patch) {
+        // Best-effort, same as array-start/boot-time reapplication (see routes/array.ts,
+        // index.ts) - a disk not responding to hdparm shouldn't fail the whole settings save.
+        await applySpinDownTimeout(nmd, patch.spinDownTimeoutMinutes).catch(() => {});
+        activity.log(patch.spinDownTimeoutMinutes > 0 ? `Idle spin-down set to ${patch.spinDownTimeoutMinutes} min` : 'Idle spin-down disabled', 'blue').catch(() => {});
       }
       res.json(redactSettings(updated));
     } catch (err) {

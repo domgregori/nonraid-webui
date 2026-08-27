@@ -1,0 +1,45 @@
+{
+  "ArrayHealthDialog": {
+    "title": "Array Degraded",
+    "close": "Close",
+    "noLongerDegraded": "Good news - the array is no longer degraded.",
+    "viewDisk": "View Disk",
+    "parityCheckRunning": "A parity check is already running.",
+    "starting": "Starting…",
+    "startCorrectingParityCheck": "Start Correcting Parity Check"
+  },
+  "Footer": {
+    "text": "NonRAID WebUI using NonRAID Kernel Driver. GNU General Public Licence."
+  },
+  "Header": {
+    "brandTitle": "NonRAID",
+    "logOut": "Log out"
+  },
+  "HeaderSystemInfo": {
+    "freeSuffix": "{{value}} free",
+    "upLabel": "Up {{uptime}}",
+    "cpuLabel": "CPU {{pct}}%{{tempSuffix}}",
+    "memLabel": "Mem {{pct}}%"
+  },
+  "NavTabs": {
+    "dashboard": "Dashboard",
+    "disks": "Disks",
+    "pools": "Pools",
+    "browse": "Browse",
+    "sharing": "Sharing",
+    "docker": "Docker",
+    "lxc": "LXC",
+    "apps": "Apps",
+    "history": "History",
+    "settings": "Settings"
+  },
+  "NotificationBell": {
+    "notifications": "Notifications",
+    "badgeOverflow": "9+",
+    "nothingYet": "Nothing yet.",
+    "viewAll": "View all"
+  },
+  "ToastStack": {
+    "dismiss": "Dismiss"
+  }
+}

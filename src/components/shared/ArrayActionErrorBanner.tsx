@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 /** Shared array-action error banner - Dashboard and Disks pages both let the user start/stop the
  *  array (and Disks also unassigns/restores disks), and both need the same plain-error display.
  *
@@ -15,14 +17,15 @@ interface ArrayActionErrorBannerProps {
 }
 
 export function ArrayActionErrorBanner({ actionError, stopBlockedByContainers, arrayPending, onRetryWithStopContainers }: ArrayActionErrorBannerProps) {
+  const { t } = useTranslation('shared');
   if (stopBlockedByContainers && !onRetryWithStopContainers) return null;
   return (
     <div className="status-note status-note--error">
-      {stopBlockedByContainers ? 'A disk is in use by Docker or LXC. Stop containers?' : actionError}
+      {stopBlockedByContainers ? t('ArrayActionErrorBanner.stopBlockedMessage') : actionError}
       {stopBlockedByContainers && onRetryWithStopContainers && (
         <div style={{ marginTop: 8 }}>
           <button type="button" className="btn btn--danger" disabled={arrayPending} onClick={onRetryWithStopContainers}>
-            {arrayPending ? 'Stopping…' : 'Stop Docker/LXC and retry'}
+            {arrayPending ? t('ArrayActionErrorBanner.stopping') : t('ArrayActionErrorBanner.stopAndRetry')}
           </button>
         </div>
       )}

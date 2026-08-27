@@ -96,6 +96,11 @@
   background: var(--color-surface-elevated);
 }
 
+.docker-card__badge--update {
+  color: var(--color-amber);
+  background: color-mix(in oklch, var(--color-amber) 15%, transparent);
+}
+
 .docker-card__autostart {
   display: inline-flex;
   align-items: center;

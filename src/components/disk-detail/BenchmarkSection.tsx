@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../../styles/colors';
 import type { BenchmarkResult } from '../../types/benchmark';
 import { ProgressBar } from '../shared/ProgressBar';
@@ -35,6 +36,7 @@ function formatMbPerSecond(v: number): string {
  *  resync: the server already guards it (409), surfaced here the same way every other mutating
  *  action in this codebase reports a server-side rejection - via catch, after the fact. */
 export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
+  const { t } = useTranslation('diskDetail');
   const [durationSeconds, setDurationSeconds] = useState(DURATION_PRESETS[0].seconds);
   const [phase, setPhase] = useState<RunPhase>('idle');
   const [readResult, setReadResult] = useState<BenchmarkResult | null>(null);
@@ -70,7 +72,7 @@ export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
   if (readResult && readResult.samples.length > 1) {
     series.push({
       key: 'read',
-      label: 'Read',
+      label: t('BenchmarkSection.read'),
       color: COLORS.blue,
       points: readResult.samples.map((s) => ({ ts: s.elapsedSeconds, value: s.mbPerSecond })),
     });
@@ -78,7 +80,7 @@ export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
   if (writeResult && writeResult.samples.length > 1) {
     series.push({
       key: 'write',
-      label: 'Write',
+      label: t('BenchmarkSection.write'),
       color: COLORS.green,
       points: writeResult.samples.map((s) => ({ ts: s.elapsedSeconds, value: s.mbPerSecond })),
     });
@@ -86,10 +88,10 @@ export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
 
   return (
     <div className="detail-card">
-      <div className="eyebrow">Benchmark</div>
+      <div className="eyebrow">{t('BenchmarkSection.benchmark')}</div>
 
       <div className="detail-row">
-        <span className="detail-row__label">Duration</span>
+        <span className="detail-row__label">{t('BenchmarkSection.duration')}</span>
         <select
           className="history-input"
           value={durationSeconds}
@@ -105,7 +107,7 @@ export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
       </div>
 
       <button type="button" className="btn btn--block" disabled={busy} onClick={run}>
-        {phase === 'reading' ? 'Reading…' : phase === 'writing' ? 'Writing…' : 'Run Benchmark'}
+        {phase === 'reading' ? t('BenchmarkSection.reading') : phase === 'writing' ? t('BenchmarkSection.writing') : t('BenchmarkSection.runBenchmark')}
       </button>
 
       {busy && <ProgressBar indeterminate color={COLORS.blue} height={6} />}
@@ -114,13 +116,13 @@ export function BenchmarkSection({ onRead, onWrite }: BenchmarkSectionProps) {
         <div className="detail-rows">
           {readResult && (
             <div className="detail-row">
-              <span className="detail-row__label">Read Speed</span>
+              <span className="detail-row__label">{t('BenchmarkSection.readSpeed')}</span>
               <span className="detail-row__value">{readResult.mbPerSecond.toFixed(1)} MB/s</span>
             </div>
           )}
           {writeResult && (
             <div className="detail-row">
-              <span className="detail-row__label">Write Speed</span>
+              <span className="detail-row__label">{t('BenchmarkSection.writeSpeed')}</span>
               <span className="detail-row__value">{writeResult.mbPerSecond.toFixed(1)} MB/s</span>
             </div>
           )}

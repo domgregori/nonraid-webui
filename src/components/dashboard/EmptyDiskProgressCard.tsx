@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { emptyDiskApi } from '../../api/emptyDiskApi';
 import { useEmptyDiskStatus } from '../../hooks/useEmptyDiskStatus';
 import { COLORS } from '../../styles/colors';
@@ -13,6 +14,7 @@ const TERMINAL_STATUSES = ['done', 'failed', 'cancelled'];
  *  hours in the background. Dismissal is client-side only (no backend "clear" - the job
  *  history itself is harmless to keep, this just stops re-showing an already-read result). */
 export function EmptyDiskProgressCard() {
+  const { t } = useTranslation('dashboard');
   const job = useEmptyDiskStatus();
   const [dismissedStartedAt, setDismissedStartedAt] = useState<number | null>(null);
 
@@ -23,15 +25,17 @@ export function EmptyDiskProgressCard() {
   const nothingMoved = job.totalFiles === 0;
   const label =
     job.status === 'running'
-      ? `Emptying slot ${job.slot}: ${job.movedFiles}/${job.totalFiles} files`
+      ? t('EmptyDiskProgressCard.emptying', { slot: job.slot, moved: job.movedFiles, total: job.totalFiles })
       : job.status === 'done'
         ? nothingMoved
-          ? `Slot ${job.slot}: nothing to move - it isn't part of any configured share`
-          : `Slot ${job.slot} emptied${job.error ? ` - ${job.error}` : ''}`
+          ? t('EmptyDiskProgressCard.nothingToMove', { slot: job.slot })
+          : job.error
+            ? t('EmptyDiskProgressCard.emptiedWithError', { slot: job.slot, error: job.error })
+            : t('EmptyDiskProgressCard.emptied', { slot: job.slot })
         : job.status === 'cancelled'
-          ? `Emptying slot ${job.slot} cancelled - ${job.movedFiles}/${job.totalFiles} files moved before stopping`
+          ? t('EmptyDiskProgressCard.cancelled', { slot: job.slot, moved: job.movedFiles, total: job.totalFiles })
           : job.status === 'failed'
-            ? `Emptying slot ${job.slot} failed: ${job.error ?? 'unknown error'}`
+            ? t('EmptyDiskProgressCard.failed', { slot: job.slot, error: job.error ?? t('EmptyDiskProgressCard.unknownError') })
             : '';
 
   const isTerminal = TERMINAL_STATUSES.includes(job.status);
@@ -39,15 +43,15 @@ export function EmptyDiskProgressCard() {
   return (
     <Card className="parity-card">
       <div className="parity-card__head">
-        <div className="eyebrow">Empty Disk</div>
+        <div className="eyebrow">{t('EmptyDiskProgressCard.emptyDisk')}</div>
         {job.status === 'running' && (
           <button type="button" className="btn btn--danger" onClick={() => emptyDiskApi.cancel()}>
-            Cancel
+            {t('EmptyDiskProgressCard.cancel')}
           </button>
         )}
         {isTerminal && (
           <button type="button" className="btn" onClick={() => setDismissedStartedAt(job.startedAt)}>
-            Dismiss
+            {t('EmptyDiskProgressCard.dismiss')}
           </button>
         )}
       </div>
@@ -61,7 +65,7 @@ export function EmptyDiskProgressCard() {
             {formatBytesHuman(job.movedBytes)} / {formatBytesHuman(job.totalBytes)}
           </span>
         )}
-        {job.currentFile && <span title={job.currentFile}>Current: {job.currentFile}</span>}
+        {job.currentFile && <span title={job.currentFile}>{t('EmptyDiskProgressCard.current', { file: job.currentFile })}</span>}
       </div>
     </Card>
   );

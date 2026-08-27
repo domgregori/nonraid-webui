@@ -7,6 +7,7 @@ import type { DockerClient, DockerContainerSummary } from '../docker/index.js';
 import { listAvailableDevices } from '../docker/devices.js';
 import { buildManualPlan } from '../docker/manualPlan.js';
 import { getCurrentDockerStorage, migrateDockerStorage } from '../docker/storagePath.js';
+import { checkAllContainers, lastKnownStatus, type ContainerUpdateStatus } from '../docker/updateCheck.js';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { StorageLocation } from '../settings/types.js';
@@ -304,6 +305,65 @@ export function dockerRouter(
       send({ type: 'error', message });
     } finally {
       res.end();
+    }
+  });
+
+  // Cheap, cached - whatever the last check found for every currently-listed container (or the
+  // all-null/unknown shape for one never checked yet). Safe to call on every Docker page load,
+  // same "cached vs. forced live check" split as the nonraid update system's own /update/status.
+  router.get('/docker/update-status', async (_req, res) => {
+    try {
+      const containers = await docker.listContainers();
+      const statuses: Record<string, ContainerUpdateStatus> = {};
+      for (const c of containers) statuses[c.id] = lastKnownStatus(c.id);
+      res.json(statuses);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  // Explicit "Check for updates now" for every container - the only route here that actually
+  // pulls every image. checkAllContainers is best-effort per container, so one failing doesn't
+  // block the rest.
+  router.post('/docker/update-status/check', async (_req, res) => {
+    try {
+      const results = await checkAllContainers(docker);
+      const statuses: Record<string, ContainerUpdateStatus> = {};
+      for (const s of results) statuses[s.containerId] = s;
+      res.json(statuses);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  // Pulls the container's own image reference fresh, then recreates it with its own existing
+  // config unchanged (same stop -> force-remove -> createContainer sequence
+  // PUT /docker/containers/:id uses, but built directly from inspectContainer's own result rather
+  // than a caller-supplied plan - nothing about the config is changing here). Works identically
+  // for a Community-Apps-installed container or a manually-created "custom" one; the mechanism
+  // only needs an image reference.
+  router.post('/docker/containers/:id/update-now', async (req, res) => {
+    try {
+      const existing = await docker.inspectContainer(req.params.id);
+      await docker.pullImage(existing.image);
+      await docker.stopContainer(req.params.id).catch(() => {});
+      await docker.removeContainer(req.params.id, { force: true });
+      const result = await docker.createContainer({
+        name: existing.name,
+        image: existing.image,
+        network: existing.network,
+        privileged: existing.privileged,
+        env: existing.env.map((e) => `${e.name}=${e.value}`),
+        ports: existing.ports,
+        binds: existing.binds.map((b) => `${b.hostPath}:${b.containerPath}${b.readOnly ? ':ro' : ''}`),
+        devices: existing.devices,
+        labels: existing.labels,
+        autostart: existing.autostart,
+      });
+      activity.log(`Container "${existing.name}" updated to a newer image`, 'green').catch(() => {});
+      res.json(result);
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
     }
   });
 

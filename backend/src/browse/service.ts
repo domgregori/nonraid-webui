@@ -1,14 +1,32 @@
 import { execFile } from 'node:child_process';
-import { copyFile, cp, mkdir, readdir, rename, rm, stat, unlink } from 'node:fs/promises';
+import { copyFile, cp, mkdir, open, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { ShareService } from '../shares/index.js';
 import { isMountPoint, resolveExisting, resolveForCreate } from './paths.js';
-import type { BrowseCommandResult, BrowseEntry, BrowseListing } from './types.js';
+import type { BrowseCommandResult, BrowseEntry, BrowseFileContent, BrowseListing } from './types.js';
+
+// Generous for text/config files, protects against loading something huge into a browser editor.
+const MAX_EDIT_BYTES = 2 * 1024 * 1024;
 
 const execFileAsync = promisify(execFile);
+
+/** Same simple heuristic git/`file` use - a NUL byte in the first 8KB means binary, not text.
+ *  Reads only that first chunk via a file handle rather than the whole file, so it's cheap enough
+ *  to run per-entry while listing a directory (unlike readFile(), which needs the full content
+ *  anyway and so checks the buffer it already has to read). */
+async function looksBinary(absPath: string): Promise<boolean> {
+  const fh = await open(absPath, 'r');
+  try {
+    const buf = Buffer.alloc(8000);
+    const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
+    return buf.subarray(0, bytesRead).includes(0);
+  } finally {
+    await fh.close();
+  }
+}
 
 /**
  * New content this backend's own root process creates directly (as opposed to a Docker container,
@@ -62,12 +80,21 @@ export class BrowseService {
     const dirents = await readdir(absPath, { withFileTypes: true });
     const entries: BrowseEntry[] = await Promise.all(
       dirents.map(async (d): Promise<BrowseEntry> => {
-        const entryStat = await stat(path.join(absPath, d.name)).catch(() => null);
+        const entryAbsPath = path.join(absPath, d.name);
+        const entryStat = await stat(entryAbsPath).catch(() => null);
+        const type = d.isSymbolicLink() ? 'symlink' : d.isDirectory() ? 'directory' : 'file';
+        // Only sniff files small enough to actually edit - skips the read entirely for huge files
+        // (videos, disk images, archives), which the size cap alone already disqualifies.
+        const editable =
+          type === 'file' && entryStat !== null && entryStat.size <= MAX_EDIT_BYTES
+            ? entryStat.size === 0 || !(await looksBinary(entryAbsPath).catch(() => true))
+            : undefined;
         return {
           name: d.name,
-          type: d.isSymbolicLink() ? 'symlink' : d.isDirectory() ? 'directory' : 'file',
+          type,
           size: entryStat?.size ?? 0,
           modifiedAt: (entryStat?.mtime ?? new Date(0)).toISOString(),
+          ...(editable !== undefined && { editable }),
         };
       }),
     );
@@ -152,6 +179,31 @@ export class BrowseService {
     const st = await stat(absPath);
     if (!st.isFile()) throw new HttpError(400, 'Only files can be downloaded.');
     return { absPath, name: path.basename(absPath) };
+  }
+
+  /** Loads a file's content for the Browse page's text editor - only text, and only up to
+   *  MAX_EDIT_BYTES, unlike download which has no such limits (a browser editor loading the whole
+   *  file into memory is a very different cost than streaming bytes to a download). */
+  async readFile(requestPath: string): Promise<BrowseFileContent> {
+    const { absPath } = await resolveExisting(requestPath);
+    const st = await stat(absPath);
+    if (!st.isFile()) throw new HttpError(400, 'Not a file.');
+    if (st.size > MAX_EDIT_BYTES) {
+      throw new HttpError(413, `File is too large to edit (${(st.size / 1024 / 1024).toFixed(1)}MB) - download it instead.`);
+    }
+    const buf = await readFile(absPath);
+    // Same simple heuristic git/`file` use - a NUL byte in the first 8KB means binary, not text.
+    if (buf.subarray(0, 8000).includes(0)) throw new HttpError(400, 'File appears to be binary, not text.');
+    return { content: buf.toString('utf8') };
+  }
+
+  async writeFile(requestPath: string, content: string): Promise<BrowseCommandResult> {
+    const { absPath } = await resolveExisting(requestPath);
+    const st = await stat(absPath);
+    if (!st.isFile()) throw new HttpError(400, 'Not a file.');
+    await writeFile(absPath, content, 'utf8');
+    await chownArrayOwner(absPath);
+    return { ok: true, message: `Saved "${path.basename(absPath)}"` };
   }
 
   async mkdir(parentPath: string, name: string): Promise<BrowseCommandResult> {

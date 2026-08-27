@@ -20,6 +20,7 @@ import {
   unmountArrayWithContainerRetry,
   type StoppedContainers,
 } from '../system/arrayLifecycle.js';
+import { applySpinDownTimeout } from '../system/hdparm.js';
 
 // A superblock is always exactly 4096 bytes (see nmd/superblock.ts); this
 // limit is just generous headroom so a wrong/oversized file gets multer's
@@ -145,6 +146,8 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       // their own array-start sequence. Best-effort: a failure here shouldn't fail array start.
       const settings = await settingsStore.get();
       if (settings.turboWrite) await nmd.setWriteMethod(true).catch(() => {});
+      // ATA standby timers don't survive a power cycle either - same reasoning as turboWrite above.
+      if (settings.spinDownTimeoutMinutes > 0) await applySpinDownTimeout(nmd, settings.spinDownTimeoutMinutes).catch(() => {});
 
       // nmdctl start activates the array's md device but doesn't mount each
       // disk's own filesystem - do that, then bring shares back up on top of

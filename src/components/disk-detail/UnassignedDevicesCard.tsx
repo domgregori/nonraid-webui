@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { smartApi } from '../../api/smartApi';
 import { useAvailableDevices } from '../../hooks/useAvailableDevices';
 import { COLORS } from '../../styles/colors';
@@ -32,20 +33,21 @@ function useDeviceHealth(device: string): 'passed' | 'failed' | null {
 }
 
 function DeviceRow({ device: d, onOpen, onAdd }: { device: AvailableDevice; onOpen: () => void; onAdd: () => void }) {
+  const { t } = useTranslation('diskDetail');
   const health = useDeviceHealth(d.device);
   const healthColor = health === 'failed' ? COLORS.red : health === 'passed' ? COLORS.green : COLORS.textDim;
-  const healthLabel = health === 'failed' ? 'SMART Failing' : health === 'passed' ? 'SMART OK' : 'SMART -';
+  const healthLabel = health === 'failed' ? t('UnassignedDevicesCard.smartFailing') : health === 'passed' ? t('UnassignedDevicesCard.smartOk') : t('UnassignedDevicesCard.smartUnknown');
 
   return (
     <div className="unassigned-device-row" onClick={onOpen}>
       <div className="unassigned-device-row__info">
-        <div className="unassigned-device-row__name">{d.model ?? 'Unknown drive'}</div>
+        <div className="unassigned-device-row__name">{d.model ?? t('UnassignedDevicesCard.unknownDrive')}</div>
         <div className="unassigned-device-row__meta">
-          {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : 'unknown size'}
+          {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : t('UnassignedDevicesCard.unknownSize')}
           {d.isSSD !== null ? ` · ${d.isSSD ? 'SSD' : 'HDD'}` : ''}
           {d.diskId ? ` · ${d.diskId}` : ''}
-          {d.uuid ? ` · ${d.uuid}` : ' · no filesystem'}
-          {d.locked ? ' · locked' : ''}
+          {d.uuid ? ` · ${d.uuid}` : ` · ${t('UnassignedDevicesCard.noFilesystem')}`}
+          {d.locked ? ` · ${t('UnassignedDevicesCard.locked')}` : ''}
         </div>
         <span className="disk-card__health" style={{ color: healthColor }}>
           <span className="disk-card__health-dot" style={{ background: healthColor }} />
@@ -59,15 +61,16 @@ function DeviceRow({ device: d, onOpen, onAdd }: { device: AvailableDevice; onOp
           e.stopPropagation();
           onAdd();
         }}
-        title="Assigns this disk to a slot in the array and starts rebuilding its data from parity."
+        title={t('UnassignedDevicesCard.addToArrayTitle')}
       >
-        Add to Array
+        {t('UnassignedDevicesCard.addToArray')}
       </button>
     </div>
   );
 }
 
 export function UnassignedDevicesCard() {
+  const { t } = useTranslation('diskDetail');
   const { devices, status, error, refresh } = useAvailableDevices();
   const [selected, setSelected] = useState<AvailableDevice | null>(null);
   const [inspecting, setInspecting] = useState<AvailableDevice | null>(null);
@@ -75,15 +78,15 @@ export function UnassignedDevicesCard() {
   return (
     <Card>
       <div className="disk-section-head">
-        <div className="eyebrow disk-section-label">Unassigned Devices</div>
+        <div className="eyebrow disk-section-label">{t('UnassignedDevicesCard.title')}</div>
         <button type="button" className="disk-section-link disk-section-link--btn" onClick={refresh}>
-          Refresh &#8635;
+          {t('UnassignedDevicesCard.refresh')} &#8635;
         </button>
       </div>
 
-      {status === 'loading' && <div className="status-note">Scanning for devices…</div>}
+      {status === 'loading' && <div className="status-note">{t('UnassignedDevicesCard.scanning')}</div>}
       {error && <div className="status-note status-note--error">{error}</div>}
-      {status === 'ready' && devices.length === 0 && <div className="status-note">No unassigned devices found.</div>}
+      {status === 'ready' && devices.length === 0 && <div className="status-note">{t('UnassignedDevicesCard.noDevices')}</div>}
 
       {devices.length > 0 && (
         <div className="unassigned-devices">

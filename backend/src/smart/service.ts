@@ -1,5 +1,5 @@
 import { config } from '../config.js';
-import type { SelfTestType, SmartAttributes, SmartClient, SmartHealth } from './types.js';
+import type { SelfTestType, SmartAttributes, SmartClient, SmartHealth, SmartSpinState } from './types.js';
 
 interface CacheEntry<T> {
   value: T;
@@ -19,6 +19,8 @@ export class SmartService {
   private tempInFlight = new Map<string, Promise<void>>();
   private healthCache = new Map<string, CacheEntry<SmartHealth | null>>();
   private healthInFlight = new Map<string, Promise<void>>();
+  private spinCache = new Map<string, CacheEntry<SmartSpinState>>();
+  private spinInFlight = new Map<string, Promise<void>>();
   private attrCache = new Map<string, CacheEntry<SmartAttributes | null>>();
   private attrInFlight = new Map<string, Promise<void>>();
 
@@ -37,6 +39,10 @@ export class SmartService {
 
   async getHealthStatuses(devices: string[]): Promise<Record<string, SmartHealth | null>> {
     return this.getCached(devices, this.healthCache, this.healthInFlight, (d) => this.client.getHealth(d), null, this.ttlMs);
+  }
+
+  async getSpinStates(devices: string[]): Promise<Record<string, SmartSpinState>> {
+    return this.getCached(devices, this.spinCache, this.spinInFlight, (d) => this.client.getSpinState(d), 'unknown', this.ttlMs);
   }
 
   async getAttributes(devices: string[]): Promise<Record<string, SmartAttributes | null>> {

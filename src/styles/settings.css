@@ -4,9 +4,6 @@
   gap: var(--space-xl);
 }
 
-/* Reuses .category-item/.category-item--active from apps.css — same nav-list look (and same
-   860px responsive pill-row fallback) as the Apps page's category sidebar, rather than a second
-   copy of the same pattern. */
 .settings-sidebar {
   flex: 0 0 200px;
   position: sticky;
@@ -14,6 +11,39 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* Was shared with the Apps page's own category sidebar, which has since moved to a single
+   dropdown (apps.css's .apps-filter-select) - this is now the only user, so it lives here rather
+   than as a cross-file "reuse" the other side no longer has any reason to keep around. */
+.category-item {
+  flex-shrink: 0;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
+  padding: 7px 12px;
+  cursor: pointer;
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category-item:hover {
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.category-item--active {
+  background: var(--color-blue-tint);
+  border-left-color: var(--color-blue);
+  color: var(--color-blue);
 }
 
 .settings-main {
@@ -41,6 +71,16 @@
     width: 100%;
     align-items: center;
     padding-bottom: var(--space-sm);
+  }
+
+  .category-item {
+    border-left: none;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border);
+  }
+
+  .category-item--active {
+    border-color: var(--color-blue);
   }
 }
 
@@ -106,6 +146,50 @@
 .settings-info-row__value--mono {
   font-family: var(--font-mono);
   font-size: 11px;
+}
+
+.settings-info-row__link {
+  font: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 8px;
+  color: var(--color-blue);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.changelog-body {
+  font-size: 12px;
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.changelog-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-top: 4px;
+}
+
+.changelog-heading:first-child {
+  margin-top: 0;
+}
+
+.changelog-paragraph {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.changelog-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  line-height: 1.5;
 }
 
 .settings-field {
@@ -188,6 +272,42 @@
 
 .dialog.import-array-wizard {
   width: 640px;
+}
+
+.dialog.connect-remote-modal {
+  width: 560px;
+}
+
+/* A CLI command, styled like a small terminal - --color-bg (the page's own recessed background
+   tone, darker than --color-surface in both themes) gives it a sunken well look with no new
+   color of its own to keep in sync between light/dark. */
+.cli-block {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-chip);
+  padding: 10px 14px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.cli-block--sm {
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.cli-block__prompt {
+  color: var(--color-text-dim);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.cli-block__command {
+  color: var(--color-green);
 }
 
 /* One-click shortcut for the default superblock path, shown above the upload/locate tabs when
@@ -716,6 +836,80 @@ label.field > span:first-child {
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+/* Type-to-search provider picker (AddRemoteForm) - same floating-menu shape as
+   .path-autocomplete, but with the app's own UI font instead of monospace, since these are
+   human-readable provider names (e.g. "Backblaze B2"), not filesystem paths. */
+.provider-picker {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.provider-picker__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+}
+
+.provider-picker__item {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--color-text);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.provider-picker__item:hover,
+.provider-picker__item--active {
+  background: var(--color-bg);
+}
+
+.apprise-targets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.apprise-secure-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text);
+  cursor: pointer;
+  height: 100%;
+}
+
+.apprise-pattern {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-dim);
+}
+
+.apprise-preview {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.apprise-preview code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 .provider-swatch--b2 {

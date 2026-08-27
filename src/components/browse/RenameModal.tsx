@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { BrowseEntry } from '../../types/browseApi';
 
 interface RenameModalProps {
@@ -8,6 +9,7 @@ interface RenameModalProps {
 }
 
 export function RenameModal({ entry, onCancel, onSubmit }: RenameModalProps) {
+  const { t } = useTranslation('browse');
   const [name, setName] = useState(entry.name);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -15,14 +17,14 @@ export function RenameModal({ entry, onCancel, onSubmit }: RenameModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || name === '.' || name === '..' || name.includes('/') || name.includes('\\')) {
-      setError('Enter a valid name - no slashes.');
+      setError(t('RenameModal.invalidName'));
       return;
     }
     setSubmitting(true);
     setError(null);
     const ok = await onSubmit(name);
     setSubmitting(false);
-    if (!ok) setError('Rename failed - see the page error banner for details.');
+    if (!ok) setError(t('RenameModal.requestFailed'));
   };
 
   return (
@@ -30,15 +32,15 @@ export function RenameModal({ entry, onCancel, onSubmit }: RenameModalProps) {
       <div className="detail-overlay" onClick={onCancel} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Rename {entry.name}</div>
-          <button type="button" className="detail-panel__close" onClick={onCancel} aria-label="Close">
+          <div className="dialog__title">{t('RenameModal.title', { name: entry.name })}</div>
+          <button type="button" className="detail-panel__close" onClick={onCancel} aria-label={t('RenameModal.close')}>
             &#10005;
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="dialog__body">
           <label className="form-field">
-            <span className="form-field__label">New name</span>
+            <span className="form-field__label">{t('RenameModal.newNameLabel')}</span>
             <input
               className="history-input"
               style={{ width: '100%' }}
@@ -52,10 +54,10 @@ export function RenameModal({ entry, onCancel, onSubmit }: RenameModalProps) {
 
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onCancel}>
-              Cancel
+              {t('RenameModal.cancel')}
             </button>
             <button type="submit" className="btn--primary" disabled={submitting}>
-              {submitting ? 'Renaming…' : 'Rename'}
+              {submitting ? t('RenameModal.renaming') : t('RenameModal.rename')}
             </button>
           </div>
         </form>

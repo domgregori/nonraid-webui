@@ -1,7 +1,7 @@
 import { API_BASE_URL } from './config';
 import { streamNdjson } from './progressStream';
 import { request } from './request';
-import type { BrowseCommandResult, BrowseListing, BulkOp, BulkOpProgress, BulkOpResult, PathSuggestions } from '../types/browseApi';
+import type { BrowseCommandResult, BrowseFileContent, BrowseListing, BulkOp, BulkOpProgress, BulkOpResult, PathSuggestions } from '../types/browseApi';
 
 export type PathSuggestScope = 'browse' | 'binds';
 
@@ -20,6 +20,10 @@ export const browseApi = {
   list: (path: string) => request<BrowseListing>(withPath('/api/browse', path)),
 
   downloadUrl: (path: string) => `${API_BASE_URL}${withPath('/api/browse/download', path)}`,
+
+  readFile: (path: string) => request<BrowseFileContent>(withPath('/api/browse/read', path)),
+
+  writeFile: (path: string, content: string) => request<BrowseCommandResult>('/api/browse/write', jsonInit({ path, content })),
 
   mkdir: (path: string, name: string) => request<BrowseCommandResult>('/api/browse/mkdir', jsonInit({ path, name })),
 

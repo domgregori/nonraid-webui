@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { tailscaleApi } from '../../api/tailscaleApi';
 import type { TailscaleStatus } from '../../types/tailscaleApi';
 import { ToggleSwitch } from '../shared/ToggleSwitch';
@@ -9,6 +10,7 @@ const STATUS_POLL_INTERVAL_MS = 2000;
 const STATUS_POLL_TIMEOUT_MS = 5 * 60 * 1000;
 
 export function TailscaleSection() {
+  const { t } = useTranslation('settings');
   const [status, setStatus] = useState<TailscaleStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -128,7 +130,7 @@ export function TailscaleSection() {
     try {
       await tailscaleApi.setOptions({ hostname: hostnameDraft.trim() });
       await load();
-      setOptionsNote('Saved.');
+      setOptionsNote(t('TailscaleSection.saved'));
     } catch (err) {
       setOptionsError((err as Error).message);
     } finally {
@@ -161,7 +163,7 @@ export function TailscaleSection() {
         .filter(Boolean);
       await tailscaleApi.setOptions({ advertiseRoutes });
       await load();
-      setOptionsNote('Saved. Advertised routes may need approval in your Tailscale/Headscale admin console before they take effect.');
+      setOptionsNote(t('TailscaleSection.savedAdvertiseRoutes'));
     } catch (err) {
       setOptionsError((err as Error).message);
     } finally {
@@ -170,15 +172,15 @@ export function TailscaleSection() {
   };
 
   if (loadError) return <div className="status-note status-note--error">{loadError}</div>;
-  if (!status) return <div className="status-note">Loading…</div>;
+  if (!status) return <div className="status-note">{t('TailscaleSection.loading')}</div>;
 
   if (!status.installed) {
     return (
       <div className="settings-field toggle-row--bordered">
-        <div className="toggle-row__title">Tailscale</div>
+        <div className="toggle-row__title">{t('TailscaleSection.title')}</div>
         <div className="toggle-row__desc">
-          The <code>tailscale</code> package isn't installed on this host. Re-run <code>tools/install-webui.sh</code>{' '}
-          (or install it manually) to enable this section.
+          {t('TailscaleSection.notInstalled1')} <code>tailscale</code> {t('TailscaleSection.notInstalled2')} <code>tools/install-webui.sh</code>{' '}
+          {t('TailscaleSection.notInstalled3')}
         </div>
       </div>
     );
@@ -188,13 +190,10 @@ export function TailscaleSection() {
     <div className="settings-field toggle-row--bordered">
       <div className="toggle-row">
         <div>
-          <div className="toggle-row__title">Tailscale</div>
-          <div className="toggle-row__desc">
-            Reach this NAS securely from anywhere over your tailnet, without opening any ports. Uses Tailscale's own
-            coordination server by default, or a self-hosted Headscale instance.
-          </div>
+          <div className="toggle-row__title">{t('TailscaleSection.title')}</div>
+          <div className="toggle-row__desc">{t('TailscaleSection.desc')}</div>
         </div>
-        <ToggleSwitch on={status.featureEnabled} onToggle={toggleEnabled} label="Tailscale" disabled={enabling} />
+        <ToggleSwitch on={status.featureEnabled} onToggle={toggleEnabled} label={t('TailscaleSection.title')} disabled={enabling} />
       </div>
       {enableError && <div className="status-note status-note--error">{enableError}</div>}
 
@@ -203,10 +202,10 @@ export function TailscaleSection() {
           {!status.loggedIn && !showCustomLogin && (
             <div className="settings-field__row" style={{ marginTop: 12 }}>
               <button type="button" className="btn" disabled={loggingIn || waitingForAuth} onClick={login}>
-                {loggingIn ? 'Starting…' : waitingForAuth ? 'Waiting for login…' : 'Log in'}
+                {loggingIn ? t('TailscaleSection.starting') : waitingForAuth ? t('TailscaleSection.waitingForLogin') : t('TailscaleSection.logIn')}
               </button>
               <button type="button" className="btn" onClick={() => setShowCustomLogin(true)}>
-                Custom login server
+                {t('TailscaleSection.customLoginServer')}
               </button>
             </div>
           )}
@@ -214,9 +213,9 @@ export function TailscaleSection() {
           {(showCustomLogin || status.loggedIn) && (
             <>
               <div className="toggle-row__title" style={{ marginTop: 12 }}>
-                Login server
+                {t('TailscaleSection.loginServer')}
               </div>
-              <div className="toggle-row__desc">Leave blank to use Tailscale's own server, or set a self-hosted Headscale URL.</div>
+              <div className="toggle-row__desc">{t('TailscaleSection.loginServerHint')}</div>
               <div className="settings-field__row">
                 <input
                   className="history-input"
@@ -231,7 +230,7 @@ export function TailscaleSection() {
               {!status.loggedIn && (
                 <div className="settings-field__row" style={{ marginTop: 8 }}>
                   <button type="button" className="btn" disabled={loggingIn || waitingForAuth} onClick={login}>
-                    {loggingIn ? 'Starting…' : waitingForAuth ? 'Waiting for login…' : 'Log in'}
+                    {loggingIn ? t('TailscaleSection.starting') : waitingForAuth ? t('TailscaleSection.waitingForLogin') : t('TailscaleSection.logIn')}
                   </button>
                 </div>
               )}
@@ -240,7 +239,7 @@ export function TailscaleSection() {
           {loginError && <div className="status-note status-note--error">{loginError}</div>}
           {authUrl && (
             <div className="status-note">
-              Open this link to finish signing in (works from any device):
+              {t('TailscaleSection.openLinkToSignIn')}
               <br />
               <a href={authUrl} target="_blank" rel="noreferrer">
                 {authUrl}
@@ -251,23 +250,42 @@ export function TailscaleSection() {
           {status.loggedIn && (
             <>
               <div className="toggle-row__title" style={{ marginTop: 12 }}>
-                Connected
+                {t('TailscaleSection.connected')}
               </div>
               <div className="toggle-row__desc">
-                {status.hostname && <>Hostname: <strong>{status.hostname}</strong><br /></>}
-                {status.tailscaleIps.length > 0 && <>IPs: <strong>{status.tailscaleIps.join(', ')}</strong><br /></>}
-                {status.dnsName && <>DNS name: <strong>{status.dnsName.replace(/\.$/, '')}</strong><br /></>}
-                {status.tailnetName && <>Tailnet: <strong>{status.tailnetName}</strong></>}
+                {status.hostname && (
+                  <>
+                    {t('TailscaleSection.hostname')} <strong>{status.hostname}</strong>
+                    <br />
+                  </>
+                )}
+                {status.tailscaleIps.length > 0 && (
+                  <>
+                    {t('TailscaleSection.ips')} <strong>{status.tailscaleIps.join(', ')}</strong>
+                    <br />
+                  </>
+                )}
+                {status.dnsName && (
+                  <>
+                    {t('TailscaleSection.dnsName')} <strong>{status.dnsName.replace(/\.$/, '')}</strong>
+                    <br />
+                  </>
+                )}
+                {status.tailnetName && (
+                  <>
+                    {t('TailscaleSection.tailnet')} <strong>{status.tailnetName}</strong>
+                  </>
+                )}
               </div>
               <div className="settings-field__row" style={{ marginTop: 8 }}>
                 <button type="button" className="btn" disabled={loggingOut} onClick={logout}>
-                  {loggingOut ? 'Logging out…' : 'Log out'}
+                  {loggingOut ? t('TailscaleSection.loggingOut') : t('TailscaleSection.logOut')}
                 </button>
               </div>
               {logoutError && <div className="status-note status-note--error">{logoutError}</div>}
 
               <div className="toggle-row__title" style={{ marginTop: 12 }}>
-                Hostname
+                {t('TailscaleSection.hostnameTitle')}
               </div>
               <div className="settings-field__row">
                 <input
@@ -278,39 +296,40 @@ export function TailscaleSection() {
                   disabled={savingOptions}
                 />
                 <button type="button" className="btn" disabled={savingOptions} onClick={saveHostname}>
-                  {savingOptions ? 'Saving…' : 'Save'}
+                  {savingOptions ? t('TailscaleSection.saving') : t('TailscaleSection.save')}
                 </button>
               </div>
 
               <div className="toggle-row" style={{ marginTop: 8 }}>
                 <div>
-                  <div className="toggle-row__title">Tailscale SSH</div>
-                  <div className="toggle-row__desc">Lets tailnet members SSH into this host through Tailscale, using its own access rules.</div>
+                  <div className="toggle-row__title">{t('TailscaleSection.tailscaleSsh')}</div>
+                  <div className="toggle-row__desc">{t('TailscaleSection.tailscaleSshDesc')}</div>
                 </div>
-                <ToggleSwitch on={status.ssh} onToggle={() => setToggleOption({ ssh: !status.ssh })} label="Tailscale SSH" disabled={savingOptions} />
+                <ToggleSwitch
+                  on={status.ssh}
+                  onToggle={() => setToggleOption({ ssh: !status.ssh })}
+                  label={t('TailscaleSection.tailscaleSsh')}
+                  disabled={savingOptions}
+                />
               </div>
 
               <div className="toggle-row">
                 <div>
-                  <div className="toggle-row__title">Accept DNS</div>
-                  <div className="toggle-row__desc">Use the DNS settings (including MagicDNS) configured for your tailnet.</div>
+                  <div className="toggle-row__title">{t('TailscaleSection.acceptDns')}</div>
+                  <div className="toggle-row__desc">{t('TailscaleSection.acceptDnsDesc')}</div>
                 </div>
                 <ToggleSwitch
                   on={status.acceptDns}
                   onToggle={() => setToggleOption({ acceptDns: !status.acceptDns })}
-                  label="Accept DNS"
+                  label={t('TailscaleSection.acceptDns')}
                   disabled={savingOptions}
                 />
               </div>
 
               <div className="toggle-row__title" style={{ marginTop: 8 }}>
-                Advertise this NAS's LAN
+                {t('TailscaleSection.advertiseLan')}
               </div>
-              <div className="toggle-row__desc">
-                CIDRs to advertise as subnet routes, comma-separated (e.g. 192.168.1.0/24) - lets other tailnet
-                devices reach your home network through this NAS. Disabled by default; each route also needs
-                approving in your Tailscale/Headscale admin console.
-              </div>
+              <div className="toggle-row__desc">{t('TailscaleSection.advertiseLanDesc')}</div>
               <div className="settings-field__row">
                 <input
                   className="history-input"
@@ -321,19 +340,19 @@ export function TailscaleSection() {
                   disabled={savingOptions}
                 />
                 <button type="button" className="btn" disabled={savingOptions} onClick={saveAdvertiseRoutes}>
-                  {savingOptions ? 'Saving…' : 'Save'}
+                  {savingOptions ? t('TailscaleSection.saving') : t('TailscaleSection.save')}
                 </button>
               </div>
 
               <div className="toggle-row" style={{ marginTop: 8 }}>
                 <div>
-                  <div className="toggle-row__title">Accept routes from other nodes</div>
-                  <div className="toggle-row__desc">Let this NAS reach subnets advertised by other devices on your tailnet. Disabled by default.</div>
+                  <div className="toggle-row__title">{t('TailscaleSection.acceptRoutesTitle')}</div>
+                  <div className="toggle-row__desc">{t('TailscaleSection.acceptRoutesDesc')}</div>
                 </div>
                 <ToggleSwitch
                   on={status.acceptRoutes}
                   onToggle={() => setToggleOption({ acceptRoutes: !status.acceptRoutes })}
-                  label="Accept routes"
+                  label={t('TailscaleSection.acceptRoutesLabel')}
                   disabled={savingOptions}
                 />
               </div>

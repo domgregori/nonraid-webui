@@ -1,6 +1,6 @@
 import { runSudoMaybe } from './procUtil.js';
 
-export type LogSourceId = 'webui' | 'kernel' | 'nfs' | 'smb' | 'ssh' | 'docker' | 'lxc' | 'smart' | 'avahi' | 'tailscale';
+export type LogSourceId = 'webui' | 'kernel' | 'nfs' | 'smb' | 'ssh' | 'docker' | 'lxc' | 'smart' | 'avahi' | 'tailscale' | 'rclone';
 
 export interface LogSourceDef {
   id: LogSourceId;
@@ -27,6 +27,10 @@ export const LOG_SOURCE_DEFS: LogSourceDef[] = [
   { id: 'smart', label: 'SMART', args: ['-u', 'smartmontools'] },
   { id: 'avahi', label: 'Avahi/mDNS', args: ['-u', 'avahi-daemon'] },
   { id: 'tailscale', label: 'Tailscale', args: ['-u', 'tailscaled'] },
+  // Unit name matches SERVICE_DEFS' own 'rclone-rcd' entry (rclone-rcd.service) - the RC daemon
+  // Remote Backup talks to, not `rclone` itself (there's no long-running `rclone` process; every
+  // sync/list/etc call goes through this one daemon).
+  { id: 'rclone', label: 'Remote Backup (rclone)', args: ['-u', 'rclone-rcd'] },
 ];
 
 export const WINDOW_DEFS: Record<string, number | null> = {

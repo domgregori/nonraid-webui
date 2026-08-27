@@ -1,5 +1,6 @@
 import { startRegistration } from '@simplewebauthn/browser';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { authApi } from '../../api/authApi';
 import type { PasskeySummary } from '../../types/authApi';
 import { webauthnAvailable } from '../../utils/webauthnSupport';
@@ -10,6 +11,7 @@ function formatCreatedAt(ts: number): string {
 }
 
 export function PasskeySection() {
+  const { t } = useTranslation('settings');
   const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -28,7 +30,7 @@ export function PasskeySection() {
   }, []);
 
   const addPasskey = async () => {
-    const name = nameDraft.trim() || 'Passkey';
+    const name = nameDraft.trim() || t('PasskeySection.defaultName');
     setAdding(true);
     setAddError(null);
     try {
@@ -45,14 +47,12 @@ export function PasskeySection() {
   };
 
   if (loadError) return <div className="status-note status-note--error">{loadError}</div>;
-  if (!passkeys) return <div className="status-note">Loading passkeys…</div>;
+  if (!passkeys) return <div className="status-note">{t('PasskeySection.loading')}</div>;
 
   return (
     <div className="settings-field">
-      <div className="toggle-row__title">Passkeys</div>
-      <div className="toggle-row__desc">
-        A hardware key, or your device's built-in Touch ID/Windows Hello, as 2FA.
-      </div>
+      <div className="toggle-row__title">{t('PasskeySection.title')}</div>
+      <div className="toggle-row__desc">{t('PasskeySection.desc')}</div>
 
       {passkeys.length > 0 && (
         <div className="list">
@@ -60,11 +60,11 @@ export function PasskeySection() {
             <div className="list-card" key={p.id}>
               <div className="list-card__col--name">
                 <div className="list-card__title">{p.name}</div>
-                <div className="list-card__subtitle">Added {formatCreatedAt(p.createdAt)}</div>
+                <div className="list-card__subtitle">{t('PasskeySection.added', { date: formatCreatedAt(p.createdAt) })}</div>
               </div>
               <div className="list-card__actions">
                 <button type="button" className="btn btn--danger" onClick={() => setRemoving(p)}>
-                  Remove
+                  {t('PasskeySection.remove')}
                 </button>
               </div>
             </div>
@@ -79,18 +79,16 @@ export function PasskeySection() {
               className="history-input"
               value={nameDraft}
               onChange={(e) => setNameDraft(e.target.value)}
-              placeholder="Name this passkey (e.g. YubiKey)"
+              placeholder={t('PasskeySection.namePlaceholder')}
             />
             <button type="button" className="btn btn--primary" disabled={adding} onClick={addPasskey}>
-              {adding ? 'Adding…' : 'Add Passkey'}
+              {adding ? t('PasskeySection.adding') : t('PasskeySection.addPasskey')}
             </button>
           </div>
           {addError && <div className="status-note status-note--error">{addError}</div>}
         </>
       ) : (
-        <div className="status-note">
-          Passkeys need a secure connection. This page is loaded over plain HTTP. Enable HTTPS or use reverse proxy.
-        </div>
+        <div className="status-note">{t('PasskeySection.needsSecureConnection')}</div>
       )}
 
       {removing && (

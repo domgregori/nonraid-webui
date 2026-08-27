@@ -132,13 +132,13 @@ export function rcloneRouter(client: RcloneClient, service: RcloneService, setti
   });
 
   router.post('/rclone/remotes/:name/continue', async (req, res) => {
-    const { type, state } = req.body ?? {};
+    const { type, state, result: answer } = req.body ?? {};
     if (typeof type !== 'string' || typeof state !== 'string') {
       res.status(400).json({ error: 'type and state are required.' });
       return;
     }
     try {
-      const result = await client.continueRemoteSetup(req.params.name, type, state);
+      const result = await client.continueRemoteSetup(req.params.name, type, state, typeof answer === 'string' ? answer : '');
       if (result.done) {
         activity.log(`Remote "${req.params.name}" finished authorizing`, 'blue').catch(() => {});
       }

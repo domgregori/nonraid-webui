@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cacheApi } from '../../api/cacheApi';
 import { useAvailableDevices } from '../../hooks/useAvailableDevices';
 import type { CacheReplaceStatus } from '../../types/cacheApi';
@@ -12,6 +13,7 @@ interface CacheReplaceDialogProps {
 const POLL_MS = 3000;
 
 export function CacheReplaceDialog({ onClose, onDone }: CacheReplaceDialogProps) {
+  const { t } = useTranslation('diskDetail');
   const { devices, status: devicesStatus, error: devicesError, refresh } = useAvailableDevices();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,8 +65,8 @@ export function CacheReplaceDialog({ onClose, onDone }: CacheReplaceDialogProps)
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Replace missing cache mirror member</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('CacheReplaceDialog.title')}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('CacheReplaceDialog.close')}>
             &#10005;
           </button>
         </div>
@@ -73,34 +75,33 @@ export function CacheReplaceDialog({ onClose, onDone }: CacheReplaceDialogProps)
           {!started && (
             <>
               <div className="status-note status-note--error">
-                Runs btrfs's own online replace against the missing mirror member - any data on the new device is
-                destroyed. The cache stays usable (single-disk, no redundancy) while this runs.
+                {t('CacheReplaceDialog.replaceWarning')}
               </div>
 
               <div className="disk-section-head">
-                <div className="toggle-row__desc">Pick the replacement device.</div>
+                <div className="toggle-row__desc">{t('CacheReplaceDialog.pickDevice')}</div>
                 <button type="button" className="disk-section-link disk-section-link--btn" onClick={refresh}>
-                  Refresh &#8635;
+                  {t('CacheReplaceDialog.refresh')} &#8635;
                 </button>
               </div>
 
-              {devicesStatus === 'loading' && <div className="status-note">Scanning for devices…</div>}
+              {devicesStatus === 'loading' && <div className="status-note">{t('CacheReplaceDialog.scanning')}</div>}
               {devicesError && <div className="status-note status-note--error">{devicesError}</div>}
-              {devicesStatus === 'ready' && devices.length === 0 && <div className="status-note">No unclaimed devices found yet.</div>}
+              {devicesStatus === 'ready' && devices.length === 0 && <div className="status-note">{t('CacheReplaceDialog.noDevices')}</div>}
 
               {devices.length > 0 && (
                 <div className="unassigned-devices">
                   {devices.map((d) => (
                     <div key={d.device} className="unassigned-device-row">
                       <div>
-                        <div className="unassigned-device-row__name">{d.model ?? 'Unknown drive'}</div>
+                        <div className="unassigned-device-row__name">{d.model ?? t('CacheReplaceDialog.unknownDrive')}</div>
                         <div className="unassigned-device-row__meta">
-                          {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : 'unknown size'}
-                          {d.locked ? ' · locked' : ''}
+                          {d.sizeKb != null ? formatBytesHuman(d.sizeKb * 1024) : t('CacheReplaceDialog.unknownSize')}
+                          {d.locked ? ` · ${t('CacheReplaceDialog.locked')}` : ''}
                         </div>
                       </div>
                       <button type="button" className="btn btn--danger" disabled={submitting} onClick={() => handleReplace(d.device)}>
-                        {submitting ? 'Starting…' : `Replace with ${d.model ?? 'this drive'}`}
+                        {submitting ? t('CacheReplaceDialog.starting') : t('CacheReplaceDialog.replaceWith', { model: d.model ?? t('CacheReplaceDialog.thisDrive') })}
                       </button>
                     </div>
                   ))}
@@ -111,7 +112,7 @@ export function CacheReplaceDialog({ onClose, onDone }: CacheReplaceDialogProps)
 
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
-                  Cancel
+                  {t('CacheReplaceDialog.cancel')}
                 </button>
               </div>
             </>
@@ -121,15 +122,15 @@ export function CacheReplaceDialog({ onClose, onDone }: CacheReplaceDialogProps)
             <>
               {!finished ? (
                 <div className="status-note">
-                  Replacement in progress{replaceStatus?.progressPercent != null ? ` - ${replaceStatus.progressPercent}% done` : '…'}
+                  {t('CacheReplaceDialog.inProgress')}{replaceStatus?.progressPercent != null ? ` - ${t('CacheReplaceDialog.percentDone', { pct: replaceStatus.progressPercent })}` : '…'}
                 </div>
               ) : (
-                <div className="status-note">Replacement finished - the mirror should be healthy again.</div>
+                <div className="status-note">{t('CacheReplaceDialog.finished')}</div>
               )}
               {replaceStatus?.message && <pre className="import-raw-output">{replaceStatus.message}</pre>}
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={onClose}>
-                  Close
+                  {t('CacheReplaceDialog.close')}
                 </button>
               </div>
             </>

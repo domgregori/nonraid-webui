@@ -152,11 +152,17 @@ export interface AppSettings {
   // "turbo write") - see nmd/client.ts's setWriteMethod doc comment for why
   // this has to be persisted here rather than read back from the driver.
   turboWrite: boolean;
-  // Mirrors config.trustProxy (see its doc comment) - either one being true enables it (an
-  // env var/config.toml deployment can still force it on without touching the UI). Applied live
+  // Mirrors config.trustProxy (see its doc comment) - either one being true enables it (a
+  // TRUST_PROXY env var can still force it on without touching the UI). Applied live
   // via app.set('trust proxy', ...) in routes/settings.ts's PUT handler, no restart needed -
   // unlike TLS enable/disable, Express re-reads this setting on every request.
   trustProxy: boolean;
+  // Which upstream hop actually gets its X-Forwarded-* headers trusted - IPs/CIDR ranges/the
+  // named subnet keywords Express's trust-proxy setting understands, or a hostname (resolved to
+  // its current IP at apply time, see auth/trustProxy.ts), comma/space-separated for more than
+  // one. Empty string (the default) falls back to trusting every hop, same as trustProxy always
+  // has - this only narrows that once actually filled in.
+  trustProxyAddress: string;
   notifications: NotificationSettings;
   // mergerfs's `minfreespace`, in MB, applied to every pooled share mount
   // (see shares/applier/realApplier.ts). mergerfs excludes any branch below
@@ -164,6 +170,15 @@ export interface AppSettings {
   // 4096 (4G), a sane margin on real multi-TB disks but one that silently
   // makes every branch ineligible (ENOSPC on every write) on small disks.
   minFreeSpaceGb: number;
+  // ATA standby timeout for HDD array disks (parity + data), in minutes - 0 means never. Applied
+  // via hdparm -S (system/hdparm.ts's applySpinDownTimeout), reapplied on save/array-start/boot
+  // since the drive's own timer doesn't persist across a power cycle.
+  spinDownTimeoutMinutes: number;
+  // User-chosen nicknames, keyed by NmdDisk.disk_id (a udev Model_Serial-style string - the same
+  // stable cross-reboot identity nmd/realClient.ts already uses for re-import matching), not by
+  // slot/device - those change across device-letter churn and disk swaps. Unrelated to the
+  // array-wide "Array label" setting below (nmdctl's own concept, more like a hostname).
+  diskLabels: Record<string, string>;
   paritySchedule: ParitySchedule;
   backupSchedule: BackupSchedule;
   tempAlerts: TempAlertSettings;
@@ -179,10 +194,14 @@ export type AppSettingsUpdate = Partial<{
   timeFormat: '12h' | '24h';
   turboWrite: boolean;
   trustProxy: boolean;
+  trustProxyAddress: string;
   notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {
     eventTypes?: Partial<Record<NotificationEventType, Partial<NotificationChannelToggle>>>;
   };
   minFreeSpaceGb: number;
+  spinDownTimeoutMinutes: number;
+  // A key mapped to '' removes that disk's label - see mergeDiskLabels() in store.ts.
+  diskLabels: Partial<Record<string, string>>;
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<BackupSchedule>;
   tempAlerts: Partial<TempAlertSettings>;

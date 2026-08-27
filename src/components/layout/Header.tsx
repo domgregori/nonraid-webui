@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { deriveToggleButton } from '../../selectors/status';
 import { useArrayStatus } from '../../state/useArrayStatus';
 import { useAuth } from '../../state/useAuth';
@@ -8,6 +9,7 @@ import { HeaderSystemInfo } from './HeaderSystemInfo';
 import { NotificationBell } from './NotificationBell';
 
 export function Header() {
+  const { t } = useTranslation('layout');
   const { status, arrayPending, toggleArray } = useArrayStatus();
   const { logout } = useAuth();
   const toggleBtn = deriveToggleButton(status);
@@ -16,7 +18,7 @@ export function Header() {
     <div className="header">
       <div className="header__brand-group">
         <Link to="/" className="header__brand">
-          <div className="header__title">NonRAID</div>
+          <div className="header__title">{t('Header.brandTitle')}</div>
           <img src="/logo.png" alt="" className="header__logo" />
         </Link>
         <HeaderClock />
@@ -37,7 +39,7 @@ export function Header() {
         </button>
         <NotificationBell />
         <button type="button" className="btn" onClick={() => logout()}>
-          Log out
+          {t('Header.logOut')}
         </button>
       </div>
     </div>

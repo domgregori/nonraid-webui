@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { nmdApi } from '../../api/nmdApi';
 import { ArrayActionErrorBanner } from '../shared/ArrayActionErrorBanner';
 
@@ -20,6 +21,7 @@ interface ShrinkArrayDialogProps {
  * array's own metadata changes, and parity gets rebuilt from scratch after.
  */
 export function ShrinkArrayDialog({ slot, label, onClose, onDone }: ShrinkArrayDialogProps) {
+  const { t } = useTranslation('diskDetail');
   const [confirming, setConfirming] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,33 +51,30 @@ export function ShrinkArrayDialog({ slot, label, onClose, onDone }: ShrinkArrayD
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Reconfigure array without {label} (slot {slot})</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('ShrinkArrayDialog.title', { label, slot })}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('ShrinkArrayDialog.close')}>
             &#10005;
           </button>
         </div>
 
         <div className="dialog__body">
           {done ? (
-            <div className="status-note">Array reconfigured - slot {slot} no longer exists in the array. Parity is rebuilding.</div>
+            <div className="status-note">{t('ShrinkArrayDialog.done', { slot })}</div>
           ) : (
             <>
               <div className="status-note status-note--error">
-                This stops the array, reloads the storage driver, and rebuilds the array's configuration without slot{' '}
-                {slot} - then rebuilds parity from scratch. It does not touch real files on any disk you're keeping.
+                {t('ShrinkArrayDialog.warning1', { slot })}
               </div>
               <div className="status-note status-note--error">
-                The driver reload step can leave the array briefly down if interrupted - this can take a while and
-                shouldn't be cancelled partway. If it fails, the error will include the exact command to recover
-                manually.
+                {t('ShrinkArrayDialog.warning2')}
               </div>
               {!confirming ? (
                 <div className="dialog__actions">
                   <button type="button" className="btn" onClick={onClose}>
-                    Cancel
+                    {t('ShrinkArrayDialog.cancel')}
                   </button>
                   <button type="button" className="btn btn--danger" onClick={() => setConfirming(true)}>
-                    I understand, continue
+                    {t('ShrinkArrayDialog.understandContinue')}
                   </button>
                 </div>
               ) : (
@@ -90,10 +89,10 @@ export function ShrinkArrayDialog({ slot, label, onClose, onDone }: ShrinkArrayD
                   )}
                   <div className="dialog__actions">
                     <button type="button" className="btn" disabled={running} onClick={onClose}>
-                      Cancel
+                      {t('ShrinkArrayDialog.cancel')}
                     </button>
                     <button type="button" className="btn btn--danger" disabled={running} onClick={() => handleConfirm()}>
-                      {running ? 'Reconfiguring…' : `Reconfigure Now`}
+                      {running ? t('ShrinkArrayDialog.reconfiguring') : t('ShrinkArrayDialog.reconfigureNow')}
                     </button>
                   </div>
                 </>
@@ -103,7 +102,7 @@ export function ShrinkArrayDialog({ slot, label, onClose, onDone }: ShrinkArrayD
           {done && (
             <div className="dialog__actions">
               <button type="button" className="btn" onClick={onClose}>
-                Close
+                {t('ShrinkArrayDialog.close')}
               </button>
             </div>
           )}

@@ -43,7 +43,7 @@ export interface RestoreArchiveEntry {
 }
 
 // Mirrors backend/src/system/backupCatalog.ts's BackupCategoryId.
-export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory' | 'appdata';
+export type BackupCategoryId = 'array' | 'sharing' | 'appConfig' | 'adminAccount' | 'activityHistory' | 'graphHistory' | 'appdata' | 'remoteBackup' | 'lxc' | 'users';
 
 export interface RestoreCategoryPreview {
   id: BackupCategoryId;
@@ -74,6 +74,19 @@ export interface RestoreCommitResult {
   // restored - passed back into restartServices() below so it only bounces Docker (which stops
   // every running container) when a restore actually touched it.
   dockerConfigRestored: boolean;
+  // Set only when the 'users' category's export snapshot was part of what was just restored -
+  // null when it wasn't in the selection (or the archive had no such member) rather than an
+  // all-zeros result, so the UI can tell "nothing to restore" apart from "restored, nothing new".
+  usersRestoreResult: UsersRestoreResult | null;
+  usersRestoreError: string | null;
+}
+
+// Mirrors backend/src/users/types.ts's UsersRestoreResult.
+export interface UsersRestoreResult {
+  usersCreated: string[];
+  usersSkipped: string[];
+  groupsCreated: string[];
+  groupsSkipped: string[];
 }
 
 export interface RestartServicesStepResult {
@@ -88,6 +101,11 @@ export interface RestartServicesResult {
   smb: RestartServicesStepResult;
   nfs: RestartServicesStepResult;
   driverReload: RestartServicesStepResult;
+  // Re-syncs rclone-rcd's running state with the (possibly just-restored) settings.json - starts
+  // it if Remote Backup is enabled (so a freshly-restored rclone.conf actually gets read), stops it
+  // otherwise. Not gated behind an opt-in like Docker below: unlike bouncing Docker, this can't
+  // orphan anything, at worst it interrupts one in-flight sync.
+  rcloneRcd: RestartServicesStepResult;
   // Null when the caller didn't opt in via restartDocker (see systemApi.restartServices) - Docker
   // stops every running container on restart, so it's never bounced unless daemon.json was
   // actually part of what was just restored.
@@ -112,4 +130,19 @@ export interface LocalBackupEntry {
 export interface LocalBackupList {
   destDir: string | null;
   backups: LocalBackupEntry[];
+}
+
+// Mirrors backend/src/system/bootSnapshots.ts's BootSnapshot.
+export interface BootSnapshot {
+  name: string;
+  kind: 'pre-update' | 'manual';
+  label: string | null;
+  createdAtLocal: string;
+  inGrubMenu: boolean;
+  size: { totalBytes: number; exclusiveBytes: number } | null;
+}
+
+export interface BootSnapshotList {
+  btrfsRoot: boolean;
+  snapshots: BootSnapshot[];
 }

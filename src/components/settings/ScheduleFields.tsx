@@ -1,11 +1,21 @@
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+import { useTranslation } from 'react-i18next';
+
+const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
 /** Same 12h/24h choice as the header clock (Settings -> About -> Time format), not hardcoded -
  *  this picker is the one other place in the app a literal clock time is chosen, not just displayed. */
-function hourOptions(hour12: boolean): { value: number; label: string }[] {
+function hourOptions(hour12: boolean, t: (key: string, opts?: Record<string, unknown>) => string): { value: number; label: string }[] {
   return Array.from({ length: 24 }, (_, h) => ({
     value: h,
-    label: hour12 ? (h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`) : `${String(h).padStart(2, '0')}:00`,
+    label: hour12
+      ? h === 0
+        ? t('ScheduleFields.time12', { hour: 12, period: t('ScheduleFields.am') })
+        : h < 12
+          ? t('ScheduleFields.time12', { hour: h, period: t('ScheduleFields.am') })
+          : h === 12
+            ? t('ScheduleFields.time12', { hour: 12, period: t('ScheduleFields.pm') })
+            : t('ScheduleFields.time12', { hour: h - 12, period: t('ScheduleFields.pm') })
+      : t('ScheduleFields.time24', { hour: String(h).padStart(2, '0') }),
   }));
 }
 // 1-28 only - every month has at least 28 days, so this sidesteps "the 30th
@@ -49,6 +59,7 @@ export function ScheduleFields({
   cronExpression,
   onCronExpressionChange,
 }: ScheduleFieldsProps) {
+  const { t } = useTranslation('settings');
   return (
     <>
       <div className="settings-field__row">
@@ -58,16 +69,16 @@ export function ScheduleFields({
           onChange={(e) => onFrequencyChange(e.target.value as 'daily' | 'weekly' | 'monthly' | 'cron')}
           disabled={disabled}
         >
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-          {allowCron && <option value="cron">Cron format</option>}
+          <option value="daily">{t('ScheduleFields.daily')}</option>
+          <option value="weekly">{t('ScheduleFields.weekly')}</option>
+          <option value="monthly">{t('ScheduleFields.monthly')}</option>
+          {allowCron && <option value="cron">{t('ScheduleFields.cronFormat')}</option>}
         </select>
         {frequency === 'weekly' && (
           <select className="history-input" value={dayOfWeek} onChange={(e) => onDayOfWeekChange(Number(e.target.value))} disabled={disabled}>
-            {DAY_NAMES.map((day, i) => (
+            {DAY_KEYS.map((day, i) => (
               <option key={day} value={i}>
-                {day}
+                {t(`ScheduleFields.${day}`)}
               </option>
             ))}
           </select>
@@ -76,14 +87,14 @@ export function ScheduleFields({
           <select className="history-input" value={dayOfMonth} onChange={(e) => onDayOfMonthChange(Number(e.target.value))} disabled={disabled}>
             {DAY_OF_MONTH_OPTIONS.map((day) => (
               <option key={day} value={day}>
-                Day {day}
+                {t('ScheduleFields.dayOfMonth', { day })}
               </option>
             ))}
           </select>
         )}
         {frequency !== 'cron' && (
           <select className="history-input" value={hour} onChange={(e) => onHourChange(Number(e.target.value))} disabled={disabled}>
-            {hourOptions(hour12).map((h) => (
+            {hourOptions(hour12, t).map((h) => (
               <option key={h.value} value={h.value}>
                 {h.label}
               </option>
@@ -91,10 +102,10 @@ export function ScheduleFields({
           </select>
         )}
       </div>
-      {frequency === 'monthly' && <div className="toggle-row__desc">Only days 1-28 are offered, so every month always has a matching date.</div>}
+      {frequency === 'monthly' && <div className="toggle-row__desc">{t('ScheduleFields.monthlyHint')}</div>}
       {frequency === 'cron' && (
         <label className="field" style={{ marginTop: 8 }}>
-          <span className="settings-field__label">Cron expression</span>
+          <span className="settings-field__label">{t('ScheduleFields.cronExpression')}</span>
           <input
             className="history-input"
             style={{ width: '100%', fontFamily: 'var(--font-mono)' }}
@@ -103,7 +114,7 @@ export function ScheduleFields({
             placeholder="* * * * *"
             disabled={disabled}
           />
-          <span className="settings-field__hint">minute hour day month weekday</span>
+          <span className="settings-field__hint">{t('ScheduleFields.cronHint')}</span>
         </label>
       )}
     </>

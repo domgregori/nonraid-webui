@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { emptyDiskApi } from '../../api/emptyDiskApi';
 import { nmdApi } from '../../api/nmdApi';
 import type { EmptyDiskPlanSummary } from '../../types/emptyDisk';
@@ -21,6 +22,7 @@ interface EmptyDiskDialogProps {
  * move can take hours.
  */
 export function EmptyDiskDialog({ slot, label, onClose, onStarted }: EmptyDiskDialogProps) {
+  const { t } = useTranslation('diskDetail');
   const [plan, setPlan] = useState<EmptyDiskPlanSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
@@ -73,25 +75,25 @@ export function EmptyDiskDialog({ slot, label, onClose, onStarted }: EmptyDiskDi
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Empty {label} (slot {slot})</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('EmptyDiskDialog.title', { label, slot })}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('EmptyDiskDialog.close')}>
             &#10005;
           </button>
         </div>
 
         <div className="dialog__body">
-          {!plan && !error && <div className="status-note">Checking whether the data fits on the other disks…</div>}
+          {!plan && !error && <div className="status-note">{t('EmptyDiskDialog.checking')}</div>}
           {error && <div className="status-note status-note--error">{error}</div>}
 
           {plan && (
             <>
               <div className="detail-rows">
                 <div className="detail-row">
-                  <span className="detail-row__label">Files found</span>
+                  <span className="detail-row__label">{t('EmptyDiskDialog.filesFound')}</span>
                   <span className="detail-row__value">{plan.fileCount.toLocaleString()}</span>
                 </div>
                 <div className="detail-row">
-                  <span className="detail-row__label">Total size</span>
+                  <span className="detail-row__label">{t('EmptyDiskDialog.totalSize')}</span>
                   <span className="detail-row__value">{formatBytesHuman(plan.totalBytes)}</span>
                 </div>
               </div>
@@ -99,45 +101,39 @@ export function EmptyDiskDialog({ slot, label, onClose, onStarted }: EmptyDiskDi
               {plan.fileCount === 0 ? (
                 <>
                   <div className="status-note status-note--error">
-                    Nothing to move - this disk isn't part of any configured share, so there's no file this tool knows
-                    how to relocate.
+                    {t('EmptyDiskDialog.nothingToMove')}
                     {plan.unmanagedBytes > 0 && (
                       <>
                         {' '}
-                        It still has {formatBytesHuman(plan.unmanagedBytes)} of real data on it. Removing it from the
-                        array only detaches the slot - that data stays on the physical disk, it just won't be reachable
-                        through the array anymore.
+                        {t('EmptyDiskDialog.unmanagedBytesNote', { size: formatBytesHuman(plan.unmanagedBytes) })}
                       </>
                     )}
                   </div>
                   <div className="status-note">
-                    Since there's nothing this tool can move, you can go straight to stopping the array and removing
-                    this disk from it.
+                    {t('EmptyDiskDialog.goStraightToRemove')}
                   </div>
                 </>
               ) : plan.fits ? (
                 <>
                   <div className="status-note">
-                    Fits - will be redistributed onto:{' '}
+                    {t('EmptyDiskDialog.fitsPrefix')}{' '}
                     {Object.entries(plan.perDestinationBytes)
-                      .map(([destSlot, bytes]) => `slot ${destSlot} (${formatBytesHuman(bytes)})`)
+                      .map(([destSlot, bytes]) => t('EmptyDiskDialog.slotBytes', { slot: destSlot, size: formatBytesHuman(bytes) }))
                       .join(', ')}
                     .
                   </div>
                   {plan.unmanagedBytes > 0 && (
                     <div className="status-note status-note--error">
-                      {formatBytesHuman(plan.unmanagedBytes)} on this disk isn't under any share configured for it - this
-                      won't be moved, and needs handling manually (see Browse) before this disk is truly empty.
+                      {t('EmptyDiskDialog.unmanagedNotUnderShare', { size: formatBytesHuman(plan.unmanagedBytes) })}
                     </div>
                   )}
                   <div className="status-note status-note--error">
-                    This copies every file to its new disk, verifies it, then removes the original - it can take a long
-                    time for real data and runs in the background. Watch progress on the Empty Disk card.
+                    {t('EmptyDiskDialog.copyVerifyRemove')}
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="status-note status-note--error">Doesn't fit: {plan.unfitReason}</div>
+                  <div className="status-note status-note--error">{t('EmptyDiskDialog.doesntFit', { reason: plan.unfitReason })}</div>
                   {plan.unfitExamples.length > 0 && (
                     <pre className="import-raw-output">
                       {plan.unfitExamples.map((f) => `${f.share}/${f.path}  (${formatBytesHuman(f.sizeBytes)})`).join('\n')}
@@ -150,16 +146,16 @@ export function EmptyDiskDialog({ slot, label, onClose, onStarted }: EmptyDiskDi
 
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onClose}>
-              {plan && (plan.fileCount === 0 || plan.fits) ? 'Cancel' : 'Close'}
+              {plan && (plan.fileCount === 0 || plan.fits) ? t('EmptyDiskDialog.cancel') : t('EmptyDiskDialog.close')}
             </button>
             {plan && plan.fileCount === 0 && (
               <button type="button" className="btn btn--danger" disabled={removing} onClick={handleRemove}>
-                {removing ? 'Removing…' : 'Stop Array & Remove Disk'}
+                {removing ? t('EmptyDiskDialog.removing') : t('EmptyDiskDialog.stopArrayRemoveDisk')}
               </button>
             )}
             {plan?.fits && plan.fileCount > 0 && (
               <button type="button" className="btn--primary" disabled={starting} onClick={handleStart}>
-                {starting ? 'Starting…' : 'Start Emptying'}
+                {starting ? t('EmptyDiskDialog.startingEllipsis') : t('EmptyDiskDialog.startEmptying')}
               </button>
             )}
           </div>

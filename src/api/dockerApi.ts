@@ -2,6 +2,7 @@ import { streamNdjson } from './progressStream';
 import { request } from './request';
 import type {
   ContainerDetail,
+  ContainerUpdateStatus,
   CreateContainerProgress,
   DockerCommandResult,
   DockerContainerSummary,
@@ -51,6 +52,11 @@ export const dockerApi = {
     return request<{ logs: string; nextSince: number | null }>(`/api/docker/containers/${id}/logs${qs ? `?${qs}` : ''}`);
   },
   pruneImages: () => request<PruneImagesResult>('/api/docker/images/prune', { method: 'POST' }),
+  // Cheap, cached - whatever the last check found for every currently-listed container.
+  getUpdateStatus: () => request<Record<string, ContainerUpdateStatus>>('/api/docker/update-status'),
+  // The only call that actually pulls every container's image - "Check for updates" button.
+  checkUpdates: () => request<Record<string, ContainerUpdateStatus>>('/api/docker/update-status/check', { method: 'POST' }),
+  updateContainerNow: (id: string) => request<DockerCommandResult>(`/api/docker/containers/${id}/update-now`, { method: 'POST' }),
   listDevices: () => request<HostDevice[]>('/api/docker/devices'),
   listNetworks: () => request<string[]>('/api/docker/networks'),
   getStorage: () => request<DockerStorageInfo>('/api/docker/storage'),

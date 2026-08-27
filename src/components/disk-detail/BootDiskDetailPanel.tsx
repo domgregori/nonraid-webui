@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { smartApi } from '../../api/smartApi';
 import { systemApi } from '../../api/systemApi';
 import { useSystemStats } from '../../hooks/useSystemStats';
@@ -11,17 +12,11 @@ interface BootDiskDetailPanelProps {
   onClose: () => void;
 }
 
-type ConfigStep = 'idle' | 'confirm';
-type ImageStep = 'idle' | 'warn' | 'confirm';
 type SmartLoadState = 'loading' | 'ready' | 'error';
 
-/** No async mutation here to await, unlike the array disks' detail panel - the browser's own
- *  download manager takes over completely once the link is clicked, so this just gates that link
- *  behind a confirm step rather than tracking running/done state. */
 export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
+  const { t } = useTranslation('diskDetail');
   const stats = useSystemStats();
-  const [configStep, setConfigStep] = useState<ConfigStep>('idle');
-  const [imageStep, setImageStep] = useState<ImageStep>('idle');
   const [smartAttrs, setSmartAttrs] = useState<SmartAttributes | null>(null);
   const [smartLoadState, setSmartLoadState] = useState<SmartLoadState>('loading');
 
@@ -56,34 +51,34 @@ export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
       <div className="detail-overlay" onClick={onClose} />
       <div className="detail-panel">
         <div className="detail-panel__head">
-          <div className="detail-panel__title">Boot Disk</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="detail-panel__title">{t('BootDiskDetailPanel.title')}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('BootDiskDetailPanel.close')}>
             &#10005;
           </button>
         </div>
 
         <div className="detail-panel__body">
           <div className="detail-card">
-            <div className="eyebrow">Info</div>
+            <div className="eyebrow">{t('BootDiskDetailPanel.info')}</div>
             <div className="detail-rows">
               <div className="detail-row">
-                <span className="detail-row__label">Device</span>
+                <span className="detail-row__label">{t('BootDiskDetailPanel.device')}</span>
                 <span className="detail-row__value">{boot.device}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Model</span>
+                <span className="detail-row__label">{t('BootDiskDetailPanel.model')}</span>
                 <span className="detail-row__value">{boot.model ?? '-'}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Filesystem</span>
+                <span className="detail-row__label">{t('BootDiskDetailPanel.filesystem')}</span>
                 <span className="detail-row__value">{boot.filesystem ?? '-'}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">UUID</span>
+                <span className="detail-row__label">{t('BootDiskDetailPanel.uuid')}</span>
                 <span className="detail-row__value">{boot.uuid ?? '-'}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Used</span>
+                <span className="detail-row__label">{t('BootDiskDetailPanel.used')}</span>
                 <span className="detail-row__value">
                   {usedPct !== null && boot.usedBytes !== null && boot.totalBytes !== null
                     ? `${formatMemLabel(boot.usedBytes, boot.totalBytes)} (${usedPct}%)`
@@ -91,17 +86,17 @@ export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
                 </span>
               </div>
               <div className="detail-row">
-                <span className="detail-row__label">Temperature</span>
+                <span className="detail-row__label">{t('BootDiskDetailPanel.temperature')}</span>
                 <span className="detail-row__value">{boot.tempCelsius !== null ? `${Math.round(boot.tempCelsius)}°C` : '-'}</span>
               </div>
             </div>
           </div>
 
           <div className="detail-card">
-            <div className="eyebrow">SMART</div>
-            {smartLoadState === 'loading' && <div className="status-note">Loading SMART data…</div>}
-            {smartLoadState === 'error' && <div className="status-note status-note--error">Failed to read SMART data for this device.</div>}
-            {smartLoadState === 'ready' && !smartAttrs && <div className="status-note">No SMART data available for this disk.</div>}
+            <div className="eyebrow">{t('BootDiskDetailPanel.smart')}</div>
+            {smartLoadState === 'loading' && <div className="status-note">{t('BootDiskDetailPanel.loadingSmart')}</div>}
+            {smartLoadState === 'error' && <div className="status-note status-note--error">{t('BootDiskDetailPanel.smartLoadFailed')}</div>}
+            {smartLoadState === 'ready' && !smartAttrs && <div className="status-note">{t('BootDiskDetailPanel.noSmartData')}</div>}
             {smartAttrs && <SmartOverviewRows attributes={smartAttrs} />}
           </div>
 
@@ -109,64 +104,6 @@ export function BootDiskDetailPanel({ onClose }: BootDiskDetailPanelProps) {
             onRead={(durationSeconds) => systemApi.benchmarkBootRead(durationSeconds)}
             onWrite={(durationSeconds) => systemApi.benchmarkBootWrite(durationSeconds)}
           />
-
-          <div className="detail-card">
-            <div className="eyebrow">Operations</div>
-
-            <div className="status-note">
-              <strong>Config Backup</strong> - a small archive of Samba/NFS config, this app's own
-              settings/shares/users data, and the current array superblock. Does not include the OS
-              itself.
-            </div>
-            {configStep === 'idle' ? (
-              <button type="button" className="btn" onClick={() => setConfigStep('confirm')}>
-                Download Config Backup
-              </button>
-            ) : (
-              <a
-                className="btn btn--primary-sm"
-                style={{ display: 'inline-block' }}
-                href={systemApi.bootDiskConfigBackupUrl()}
-                download
-                onClick={() => setConfigStep('idle')}
-              >
-                Confirm Download
-              </a>
-            )}
-
-            <div className="status-note status-note--error">
-              <strong>Full Disk Image</strong> - a complete byte-for-byte copy of this device
-              (compressed), read live while it's mounted and in use - not a guaranteed
-              filesystem-consistent snapshot. Can take a long time and produce a file up to the full
-              device capacity.
-            </div>
-            {imageStep === 'idle' && (
-              <button type="button" className="btn btn--danger" onClick={() => setImageStep('warn')}>
-                Download Full Disk Image
-              </button>
-            )}
-            {imageStep === 'warn' && (
-              <div className="dialog__actions">
-                <button type="button" className="btn" onClick={() => setImageStep('idle')}>
-                  Cancel
-                </button>
-                <button type="button" className="btn btn--danger" onClick={() => setImageStep('confirm')}>
-                  I understand, continue
-                </button>
-              </div>
-            )}
-            {imageStep === 'confirm' && (
-              <a
-                className="btn btn--danger"
-                style={{ display: 'inline-block' }}
-                href={systemApi.bootDiskImageBackupUrl()}
-                download
-                onClick={() => setImageStep('idle')}
-              >
-                Confirm Download
-              </a>
-            )}
-          </div>
         </div>
       </div>
     </>

@@ -4,6 +4,7 @@ import { createGzip } from 'node:zlib';
 import type { Response } from 'express';
 import type { ActivityStore } from '../activity/store.js';
 import { config } from '../config.js';
+import { ARCHIVE_EXT } from './backupCatalog.js';
 import { OPENSSL_CIPHER_ARGS, withPasswordFile } from './backupCrypto.js';
 import { spawnMaybeSudo, spawnWithPipedStdin } from './procUtil.js';
 
@@ -80,13 +81,22 @@ export function streamBootDiskImage(device: string, res: Response, activity: Act
 }
 
 /**
- * Streams a gzip-compressed tar of `paths` (already filtered to existing ones by the caller)
- * straight to the response. `--ignore-failed-read` tolerates a path disappearing or losing
- * permission between the caller's existence check and tar actually reading it.
+ * Streams a config backup archive of `paths` (already filtered to existing ones by the caller)
+ * straight to the response - plain gzip, or (when `password` is given) that same tar piped through
+ * `openssl enc` first, same "plaintext never touches disk, only the wire" property
+ * writeConfigBackupToFile's encrypted path already has. `--ignore-failed-read` tolerates a path
+ * disappearing or losing permission between the caller's existence check and tar actually reading
+ * it.
  */
-export function streamConfigBackup(paths: string[], res: Response, activity: ActivityStore): void {
+export function streamConfigBackup(paths: string[], res: Response, activity: ActivityStore, password?: string): void {
+  if (password) {
+    withPasswordFile(password, (passwordFilePath) => streamEncryptedConfigBackup(paths, res, activity, passwordFilePath)).catch((err) => {
+      if (!res.headersSent) res.status(500).json({ error: `Failed to start encrypted config backup: ${(err as Error).message}` });
+    });
+    return;
+  }
   const child = spawnMaybeSudo('tar', ['--ignore-failed-read', '-czf', '-', ...paths]);
-  const filename = `nonraid-config-backup-${Date.now()}.tar.gz`;
+  const filename = `nonraid-config-backup-${Date.now()}${ARCHIVE_EXT}`;
   let headersSent = false;
   let stderrTail = '';
 
@@ -125,6 +135,98 @@ export function streamConfigBackup(paths: string[], res: Response, activity: Act
   });
 
   activity.log('Config backup started', 'blue').catch(() => {});
+}
+
+/** Encrypted sibling of streamConfigBackup's plain path - same two-child-process wiring
+ *  (tar -> openssl) as writeEncryptedConfigBackup, but openssl's stdout goes to `res` instead of a
+ *  file, and headers only go out once openssl actually spawns (its stdout is what feeds `res`,
+ *  same "commit to the download once the thing writing to res has actually started" rule the plain
+ *  path applies to tar). */
+function streamEncryptedConfigBackup(paths: string[], res: Response, activity: ActivityStore, passwordFilePath: string): Promise<void> {
+  return new Promise((resolve) => {
+    const tar = spawnMaybeSudo('tar', ['--ignore-failed-read', '-czf', '-', ...paths]);
+    const openssl = spawnWithPipedStdin(config.opensslBin, ['enc', ...OPENSSL_CIPHER_ARGS, '-pass', `file:${passwordFilePath}`]);
+    const filename = `nonraid-config-backup-${Date.now()}${ARCHIVE_EXT}`;
+    let headersSent = false;
+    let tarStderrTail = '';
+    let opensslStderrTail = '';
+    let settled = false;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+
+    // The browser cancelling mid-download closes `res` without either child process knowing -
+    // kill both and resolve so withPasswordFile's own cleanup (the private password temp file)
+    // still runs, same reasoning as streamBootDiskImage's own res 'close' handler. Guarded on
+    // `!res.writableEnded` because 'close' also fires after a *successful* transfer (once
+    // openssl's piped stdout ends the response and the connection itself closes/gets reused) -
+    // without the guard, a normal completion could race openssl's own 'close' event and settle
+    // first, silently swallowing the real success/failure log below.
+    res.on('close', () => {
+      if (res.writableEnded) return;
+      if (!tar.killed) tar.kill();
+      if (!openssl.killed) openssl.kill();
+      finish();
+    });
+
+    tar.stderr.on('data', (chunk: Buffer) => {
+      tarStderrTail = (tarStderrTail + chunk.toString('utf8')).slice(-STDERR_TAIL_MAX);
+    });
+    openssl.stderr.on('data', (chunk: Buffer) => {
+      opensslStderrTail = (opensslStderrTail + chunk.toString('utf8')).slice(-STDERR_TAIL_MAX);
+    });
+    tar.stdout.pipe(openssl.stdin);
+
+    openssl.on('spawn', () => {
+      headersSent = true;
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      openssl.stdout.pipe(res);
+    });
+
+    const fail = (message: string) => {
+      if (headersSent) res.destroy();
+      else res.status(500).json({ error: message });
+      activity.log(`Config backup failed (encrypted): ${message}`, 'amber').catch(() => {});
+      if (!tar.killed) tar.kill();
+      if (!openssl.killed) openssl.kill();
+      finish();
+    };
+
+    tar.on('error', (err) => fail(`Failed to start config backup: ${err.message}`));
+    openssl.on('error', (err) => fail(`Failed to start openssl: ${err.message}`));
+
+    let tarDone: number | null = null;
+    let opensslDone: number | null = null;
+    let tarSignal: NodeJS.Signals | null = null;
+    let opensslSignal: NodeJS.Signals | null = null;
+    const maybeFinish = () => {
+      if (settled || tarDone === null || opensslDone === null) return;
+      if (tarDone !== 0) {
+        fail(`tar ${describeExit(tarDone, tarSignal)}: ${tarStderrTail.trim()}`);
+      } else if (opensslDone !== 0) {
+        fail(`openssl ${describeExit(opensslDone, opensslSignal)}: ${opensslStderrTail.trim()}`);
+      } else {
+        activity.log(`Config backup completed (${paths.length} paths, encrypted)`, 'blue').catch(() => {});
+        finish();
+      }
+    };
+    tar.on('close', (code, signal) => {
+      tarDone = code ?? -1;
+      tarSignal = signal;
+      maybeFinish();
+    });
+    openssl.on('close', (code, signal) => {
+      opensslDone = code ?? -1;
+      opensslSignal = signal;
+      maybeFinish();
+    });
+
+    activity.log('Config backup started (encrypted)', 'blue').catch(() => {});
+  });
 }
 
 // resolveConfigBackupPaths() moved to backupCatalog.ts, now derived from the same category list

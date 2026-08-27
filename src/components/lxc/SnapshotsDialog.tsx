@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { lxcApi } from '../../api/lxcApi';
 import type { LxcRuntimeState, LxcSnapshot } from '../../types/lxcApi';
 
@@ -10,6 +11,7 @@ interface SnapshotsDialogProps {
 }
 
 export function SnapshotsDialog({ name, containerState, onClose, onDone }: SnapshotsDialogProps) {
+  const { t } = useTranslation('lxc');
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [snapshots, setSnapshots] = useState<LxcSnapshot[]>([]);
@@ -120,15 +122,15 @@ export function SnapshotsDialog({ name, containerState, onClose, onDone }: Snaps
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog lxc-create-dialog">
         <div className="dialog__head">
-          <div className="dialog__title">Snapshots - {name}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <div className="dialog__title">{t('SnapshotsDialog.title', { name })}</div>
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('SnapshotsDialog.close')}>
             &#10005;
           </button>
         </div>
 
         <div className="dialog__body">
           <label className="form-field">
-            <span className="form-field__label">New snapshot comment (optional)</span>
+            <span className="form-field__label">{t('SnapshotsDialog.commentLabel')}</span>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 className="history-input"
@@ -138,23 +140,21 @@ export function SnapshotsDialog({ name, containerState, onClose, onDone }: Snaps
                 onChange={(e) => setComment(e.target.value)}
               />
               <button type="button" className="btn--primary" disabled={creating || containerState === 'running'} onClick={handleCreate}>
-                {creating ? 'Creating…' : 'Create Snapshot'}
+                {creating ? t('SnapshotsDialog.creating') : t('SnapshotsDialog.createSnapshot')}
               </button>
             </div>
-            {containerState === 'running' && (
-              <span className="apps-field__hint">Stop the container first - snapshots can only be taken while it's stopped.</span>
-            )}
+            {containerState === 'running' && <span className="apps-field__hint">{t('SnapshotsDialog.stopFirstHint')}</span>}
           </label>
 
           {createError && <div className="status-note status-note--error">{createError}</div>}
           {actionError && <div className="status-note status-note--error">{actionError}</div>}
 
-          {status === 'loading' && <div className="status-note">Loading snapshots…</div>}
+          {status === 'loading' && <div className="status-note">{t('SnapshotsDialog.loadingSnapshots')}</div>}
           {status === 'error' && <div className="status-note status-note--error">{loadError}</div>}
 
           {status === 'ready' && (
             <div className="list">
-              {snapshots.length === 0 && <div className="status-note">No snapshots yet.</div>}
+              {snapshots.length === 0 && <div className="status-note">{t('SnapshotsDialog.noSnapshots')}</div>}
               {snapshots.map((s) => (
                 <div className="list-card" key={s.name}>
                   <div className="list-card__col--name">
@@ -167,13 +167,13 @@ export function SnapshotsDialog({ name, containerState, onClose, onDone }: Snaps
                     <div className="list-card__actions" style={{ flexWrap: 'wrap' }}>
                       <input
                         className="history-input"
-                        placeholder="New container name"
+                        placeholder={t('SnapshotsDialog.newContainerNamePlaceholder')}
                         disabled={pending === s.name}
                         value={newContainerName}
                         onChange={(e) => setNewContainerName(e.target.value)}
                       />
                       <button type="button" className="btn" disabled={pending === s.name} onClick={resetRowState}>
-                        Cancel
+                        {t('SnapshotsDialog.cancel')}
                       </button>
                       <button
                         type="button"
@@ -181,7 +181,7 @@ export function SnapshotsDialog({ name, containerState, onClose, onDone }: Snaps
                         disabled={pending === s.name || !newContainerName.trim()}
                         onClick={() => handleRestoreAsNew(s.name)}
                       >
-                        {pending === s.name ? 'Restoring…' : 'Create Copy'}
+                        {pending === s.name ? t('SnapshotsDialog.restoring') : t('SnapshotsDialog.createCopy')}
                       </button>
                     </div>
                   ) : (
@@ -195,13 +195,13 @@ export function SnapshotsDialog({ name, containerState, onClose, onDone }: Snaps
                           setRestoringAsNewFor(s.name);
                         }}
                       >
-                        Restore as new…
+                        {t('SnapshotsDialog.restoreAsNew')}
                       </button>
                       <button type="button" className="btn btn--danger" disabled={pending !== null} onClick={() => handleRestoreInPlace(s.name)}>
-                        {pending === s.name ? 'Restoring…' : confirmingRestore === s.name ? 'Confirm?' : 'Restore in place'}
+                        {pending === s.name ? t('SnapshotsDialog.restoring') : confirmingRestore === s.name ? t('SnapshotsDialog.confirm') : t('SnapshotsDialog.restoreInPlace')}
                       </button>
                       <button type="button" className="btn btn--danger" disabled={pending !== null} onClick={() => handleDelete(s.name)}>
-                        {pending === s.name ? 'Deleting…' : confirmingDelete === s.name ? 'Confirm?' : 'Delete'}
+                        {pending === s.name ? t('SnapshotsDialog.deleting') : confirmingDelete === s.name ? t('SnapshotsDialog.confirm') : t('SnapshotsDialog.delete')}
                       </button>
                     </div>
                   )}
@@ -212,7 +212,7 @@ export function SnapshotsDialog({ name, containerState, onClose, onDone }: Snaps
 
           <div className="dialog__actions">
             <button type="button" className="btn" onClick={onClose}>
-              Close
+              {t('SnapshotsDialog.close')}
             </button>
           </div>
         </div>

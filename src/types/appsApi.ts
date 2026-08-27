@@ -64,9 +64,10 @@ export interface AppSummary {
   installed: InstalledInfo | null;
   downloads: number | null;
   stars: number | null;
+  firstSeenAt: number | null;
 }
 
-export type AppSort = 'trending' | 'latest' | 'new';
+export type AppSort = 'trending' | 'latest' | 'new' | 'popular';
 
 export interface FeedMeta {
   appCount: number;

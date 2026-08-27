@@ -286,6 +286,15 @@ export class RealSmartClient implements SmartClient {
     }
   }
 
+  async getSpinState(device: string): Promise<SmartSpinState> {
+    try {
+      const { spinState } = await this.run(device);
+      return spinState;
+    } catch {
+      return 'unknown';
+    }
+  }
+
   async getAttributes(device: string): Promise<SmartAttributes | null> {
     let data: SmartctlJson;
     let spinState: SmartSpinState;

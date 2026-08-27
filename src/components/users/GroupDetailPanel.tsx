@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { groupsApi } from '../../api/usersApi';
 import { PERMISSION_LABELS } from '../../selectors/users';
 import type { Group, ShareAccessEntry, SharePermission, User } from '../../types/usersApi';
@@ -17,6 +18,7 @@ interface GroupDetailPanelProps {
 }
 
 export function GroupDetailPanel({ group, users, pending, onClose, onDelete }: GroupDetailPanelProps) {
+  const { t } = useTranslation('users');
   const [access, setAccess] = useState<ShareAccessEntry[] | null>(null);
   const [draftAccess, setDraftAccess] = useState<ShareAccessEntry[] | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export function GroupDetailPanel({ group, users, pending, onClose, onDelete }: G
         await groupsApi.setAccess(group.name, entry.shareName, entry.permission);
       }
       setAccess(draftAccess);
-      setSaveNote('Changes saved.');
+      setSaveNote(t('GroupDetailPanel.changesSaved'));
     } catch (err) {
       setAccessError((err as Error).message);
     } finally {
@@ -84,25 +86,25 @@ export function GroupDetailPanel({ group, users, pending, onClose, onDelete }: G
       <div className="detail-panel">
         <div className="detail-panel__head">
           <div className="detail-panel__title">{group.name}</div>
-          <button type="button" className="detail-panel__close" onClick={onClose} aria-label="Close">
+          <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('GroupDetailPanel.close')}>
             &#10005;
           </button>
         </div>
 
         <div className="detail-panel__body">
           <div className="detail-card">
-            <div className="eyebrow">Info</div>
+            <div className="eyebrow">{t('GroupDetailPanel.info')}</div>
             <div className="detail-rows">
               <div className="detail-row">
-                <span className="detail-row__label">GID</span>
+                <span className="detail-row__label">{t('GroupDetailPanel.gid')}</span>
                 <span className="detail-row__value">{group.gid}</span>
               </div>
             </div>
           </div>
 
           <div className="detail-card">
-            <div className="eyebrow">Members</div>
-            {members.length === 0 && <div className="status-note">No users are in this group yet - add it from a user's own page.</div>}
+            <div className="eyebrow">{t('GroupDetailPanel.members')}</div>
+            {members.length === 0 && <div className="status-note">{t('GroupDetailPanel.noMembers')}</div>}
             {members.length > 0 && (
               <div className="detail-rows">
                 {members.map((u) => (
@@ -115,10 +117,10 @@ export function GroupDetailPanel({ group, users, pending, onClose, onDelete }: G
           </div>
 
           <div className="detail-card">
-            <div className="eyebrow">Share access</div>
+            <div className="eyebrow">{t('GroupDetailPanel.shareAccess')}</div>
             {accessError && <div className="status-note status-note--error">{accessError}</div>}
-            {access === null && !accessError && <div className="status-note">Loading…</div>}
-            {access !== null && access.length === 0 && <div className="status-note">No shares exist yet.</div>}
+            {access === null && !accessError && <div className="status-note">{t('GroupDetailPanel.loading')}</div>}
+            {access !== null && access.length === 0 && <div className="status-note">{t('GroupDetailPanel.noShares')}</div>}
             <div className="access-rows">
               {draftAccess?.map((entry) => (
                 <div className="access-row" key={entry.shareName}>
@@ -142,13 +144,13 @@ export function GroupDetailPanel({ group, users, pending, onClose, onDelete }: G
 
           {saveNote && <div className="status-note">{saveNote}</div>}
           <button type="button" className="btn btn--primary btn--block" disabled={!dirty || saving || pending} onClick={handleSave}>
-            {saving ? 'Saving…' : dirty ? 'Save Changes' : 'No Changes'}
+            {saving ? t('GroupDetailPanel.saving') : dirty ? t('GroupDetailPanel.saveChanges') : t('GroupDetailPanel.noChanges')}
           </button>
         </div>
 
         <div className="detail-actions">
           <button type="button" className="btn btn--block btn--danger" disabled={pending} onClick={handleDeleteClick}>
-            {confirmingDelete ? 'Confirm Remove Group?' : 'Remove Group'}
+            {confirmingDelete ? t('GroupDetailPanel.confirmRemove') : t('GroupDetailPanel.removeGroup')}
           </button>
         </div>
       </div>

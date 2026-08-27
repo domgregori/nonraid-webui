@@ -1,0 +1,123 @@
+{
+  "ArrayDisks": {
+    "arrayDisks": "Array Disks",
+    "manageDisks": "Manage disks"
+  },
+  "ArrayErrorCard": {
+    "arrayError": "Array Error",
+    "needsAttention": "the array needs attention before it can start normally.",
+    "reloadDriverDesc": "Resets stale internal counters - doesn't change array disks. May leave the array briefly down; let it finish."
+  },
+  "BootDiskCard": {
+    "bootDisk": "Boot Disk"
+  },
+  "CacheCard": {
+    "cache": "Cache",
+    "manage": "Manage",
+    "healthNotConfigured": "Not set up",
+    "healthHealthy": "Healthy",
+    "healthDegraded": "Degraded",
+    "healthUnavailable": "Unavailable",
+    "inUseByShares": "In use by shares",
+    "notInUseByShares": "Not in use by shares",
+    "moveNowTitle": "Files currently open (e.g. by a running Docker container) are skipped rather than failing the whole move.",
+    "starting": "Starting…",
+    "moveNow": "Move Now",
+    "usedOfTotal": "{{used}} / {{total}} used",
+    "missing": "Missing",
+    "device": "Device {{devid}}"
+  },
+  "CacheMoverProgressCard": {
+    "moving": "Moving off cache: {{moved}}/{{total}} files",
+    "nothingToMove": "Cache mover: nothing to move",
+    "finished": "Cache mover finished",
+    "finishedWithError": "Cache mover finished - {{error}}",
+    "cancelled": "Cache mover cancelled - {{moved}}/{{total}} files moved before stopping",
+    "failed": "Cache mover failed: {{error}}",
+    "unknownError": "unknown error",
+    "cacheMover": "Cache Mover",
+    "cancel": "Cancel",
+    "dismiss": "Dismiss",
+    "current": "Current: {{file}}"
+  },
+  "DiskCard": {
+    "cancel": "Cancel",
+    "clearing": "Clearing: {{pct}}%",
+    "needsFormatting": "Needs formatting - no filesystem yet",
+    "free": "{{free}} free",
+    "spinActive": "Spinning",
+    "spinStandby": "Standby"
+  },
+  "DiskQueueCard": {
+    "addParityDisk": "Add parity disk",
+    "addDataDisk": "Add data disk",
+    "addCacheMirror": "Add cache mirror",
+    "committing": "Committing…",
+    "resyncing": "Resyncing…",
+    "formatting": "Formatting…",
+    "startingPhase": "Starting…",
+    "minRemaining": "{{mins}} min remaining",
+    "hourMinRemaining": "{{hours}}h {{mins}}m remaining",
+    "speed": "Speed: {{rate}} MB/s",
+    "diskQueue": "Disk Queue",
+    "clearQueue": "Clear Queue",
+    "itemFailed": "{{type}} - {{label}} failed: {{error}}",
+    "unknownError": "unknown error",
+    "waitingOnExternal": "Waiting on an external parity operation to finish - it'll resolve on its own.",
+    "remove": "Remove",
+    "retry": "Retry",
+    "queued": "queued",
+    "recentlyCompleted": "Recently completed"
+  },
+  "DockerWidgetCard": {
+    "dockerContainers": "Docker Containers",
+    "manage": "Manage",
+    "noContainers": "No containers yet."
+  },
+  "EmptyDiskProgressCard": {
+    "emptying": "Emptying slot {{slot}}: {{moved}}/{{total}} files",
+    "nothingToMove": "Slot {{slot}}: nothing to move - it isn't part of any configured share",
+    "emptied": "Slot {{slot}} emptied",
+    "emptiedWithError": "Slot {{slot}} emptied - {{error}}",
+    "cancelled": "Emptying slot {{slot}} cancelled - {{moved}}/{{total}} files moved before stopping",
+    "failed": "Emptying slot {{slot}} failed: {{error}}",
+    "unknownError": "unknown error",
+    "emptyDisk": "Empty Disk",
+    "cancel": "Cancel",
+    "dismiss": "Dismiss",
+    "current": "Current: {{file}}"
+  },
+  "LxcWidgetCard": {
+    "lxcContainers": "LXC Containers",
+    "manage": "Manage",
+    "noContainers": "No LXC containers yet."
+  },
+  "ParityCheckCard": {
+    "newDisk": "New Disk",
+    "parityCheck": "Parity Check",
+    "cancel": "Cancel",
+    "startClearing": "Start Clearing",
+    "startParityCheck": "Start Parity Check",
+    "speed": "Speed: {{speed}}",
+    "reloadDriverDesc": "Stuck pending from an unassigned disk with nothing behind it - Start would fail. Reload resets it without changing array disks."
+  },
+  "SharesCard": {
+    "pools": "Pools",
+    "noPools": "No pools yet.",
+    "managePools": "Manage pools"
+  },
+  "StatCards": {
+    "capacity": "Capacity",
+    "free": "{{free}} free",
+    "protection": "Protection",
+    "disks": "Disks",
+    "online": "/ {{total}} online",
+    "parityDataCounts": "{{parity}} parity · {{data}} data"
+  },
+  "SystemCard": {
+    "system": "System",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "bootDisk": "Boot Disk"
+  }
+}

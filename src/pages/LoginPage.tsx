@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TwoFactorStep } from '../components/auth/TwoFactorStep';
 import { UnauthorizedError } from '../api/request';
 import { useAuth } from '../state/useAuth';
 import type { TwoFactorMethod } from '../types/authApi';
 
 export function LoginPage() {
+  const { t } = useTranslation('pages');
   const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +30,7 @@ export function LoginPage() {
     } catch (err) {
       // request() throws a bare UnauthorizedError (no body) on any 401 - the backend's real
       // "Invalid username or password." message never reaches here.
-      setError(err instanceof UnauthorizedError ? 'Invalid username or password.' : (err as Error).message);
+      setError(err instanceof UnauthorizedError ? t('LoginPage.invalidCredentials') : (err as Error).message);
     } finally {
       setPending(false);
     }
@@ -39,16 +41,16 @@ export function LoginPage() {
       <div className="auth-card card">
         <div className="auth-card__brand">
           <img src="/logo.png" alt="" className="auth-card__logo" />
-          <div className="auth-card__title">NonRAID</div>
+          <div className="auth-card__title">{t('LoginPage.brandTitle')}</div>
         </div>
-        <div className="auth-card__subtitle">Sign in to continue.</div>
+        <div className="auth-card__subtitle">{t('LoginPage.subtitle')}</div>
 
         {step === 'twofactor' ? (
           <TwoFactorStep methods={twoFactorMethods} />
         ) : (
           <form onSubmit={handleSubmit} className="auth-card__form">
             <label className="form-field">
-              <span className="form-field__label">Username</span>
+              <span className="form-field__label">{t('LoginPage.usernameLabel')}</span>
               <input
                 className="history-input"
                 value={username}
@@ -58,7 +60,7 @@ export function LoginPage() {
               />
             </label>
             <label className="form-field">
-              <span className="form-field__label">Password</span>
+              <span className="form-field__label">{t('LoginPage.passwordLabel')}</span>
               <input
                 type="password"
                 className="history-input"
@@ -71,7 +73,7 @@ export function LoginPage() {
             {error && <div className="status-note status-note--error">{error}</div>}
 
             <button type="submit" className="btn btn--primary btn--block" disabled={pending}>
-              {pending ? 'Signing in…' : 'Sign in'}
+              {pending ? t('LoginPage.signingIn') : t('LoginPage.signIn')}
             </button>
           </form>
         )}

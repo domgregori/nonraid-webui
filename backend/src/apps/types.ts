@@ -71,10 +71,9 @@ export interface InstalledInfo {
   containerName: string;
   state: 'running' | 'stopped';
   installedRepository: string; // image:tag actually running, captured as a label at install time
-  // Only a tag-string comparison against the catalog's current Repository -
-  // not a real registry/digest check - so this stays silent for ":latest"
-  // style tags that haven't changed string but did get a new build upstream.
-  updateAvailable: boolean;
+  // A real registry/digest check (see docker/updateCheck.ts) - null when this container hasn't
+  // been checked yet (or the last check failed), not "no update".
+  updateAvailable: boolean | null;
 }
 
 // Slim projection served to the catalog grid - the full feed is too large to
@@ -89,9 +88,14 @@ export interface AppSummary {
   installed: InstalledInfo | null;
   downloads: number | null;
   stars: number | null;
+  // Unix seconds this app was first seen in the feed (CaApp.FirstSeen - confirmed live to be the
+  // well-populated one; CaApp.Date is nearly always null in the real feed despite its own doc
+  // comment calling it merely "sparse"). Powers the frontend's independent client-side
+  // Newest/Oldest re-sort - a raw comparable number, not converted to a Date here.
+  firstSeenAt: number | null;
 }
 
-export type AppSort = 'trending' | 'latest' | 'new';
+export type AppSort = 'trending' | 'latest' | 'new' | 'popular';
 
 export interface AppListQuery {
   search?: string;

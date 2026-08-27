@@ -3,6 +3,7 @@ import { nmdApi } from '../api/nmdApi';
 import { CodedError } from '../api/request';
 import { smartApi } from '../api/smartApi';
 import type { NmdStatusResponse, ParityCheckAction } from '../types/nmdApi';
+import type { SmartSpinState } from '../types/smart';
 import { ArrayStatusContext, type LoadState } from './ArrayStatusContext';
 
 const STATUS_POLL_MS = 2000;
@@ -16,6 +17,7 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
   const [stopBlockedByContainers, setStopBlockedByContainers] = useState(false);
   const [temps, setTemps] = useState<Record<string, number | null>>({});
   const [diskHealths, setDiskHealths] = useState<Record<string, 'passed' | 'failed' | null>>({});
+  const [spinStates, setSpinStates] = useState<Record<string, SmartSpinState>>({});
   const [diskTypes, setDiskTypes] = useState<Record<string, boolean | null>>({});
   const [selectedDiskId, setSelectedDiskId] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState<string | null>(null);
@@ -64,11 +66,22 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshSpinStates = useCallback(async () => {
+    try {
+      const s = await smartApi.getSpinStates();
+      if (!mounted.current) return;
+      setSpinStates(s);
+    } catch {
+      // best-effort, same as temps - leave the last-known values on failure
+    }
+  }, []);
+
   useEffect(() => {
     mounted.current = true;
     refreshStatus();
     refreshTemps();
     refreshHealth();
+    refreshSpinStates();
     // Rotational type never changes at runtime - fetched once, not on an interval.
     smartApi
       .getDiskTypes()
@@ -77,13 +90,15 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
     const statusId = setInterval(refreshStatus, STATUS_POLL_MS);
     const tempId = setInterval(refreshTemps, TEMP_POLL_MS);
     const healthId = setInterval(refreshHealth, TEMP_POLL_MS);
+    const spinId = setInterval(refreshSpinStates, TEMP_POLL_MS);
     return () => {
       mounted.current = false;
       clearInterval(statusId);
       clearInterval(tempId);
       clearInterval(healthId);
+      clearInterval(spinId);
     };
-  }, [refreshStatus, refreshTemps, refreshHealth]);
+  }, [refreshStatus, refreshTemps, refreshHealth, refreshSpinStates]);
 
   const toggleArray = useCallback(
     (stopContainers = false) => {
@@ -181,6 +196,7 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
         stopBlockedByContainers,
         temps,
         diskHealths,
+        spinStates,
         diskTypes,
         selectedDiskId,
         actionNote,

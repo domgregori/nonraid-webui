@@ -20,7 +20,12 @@ export type NotificationEventType =
   | 'arrayStopped'
   | 'cacheMirrorDegraded'
   | 'cacheMoverFailed'
-  | 'cacheMoverCompleted';
+  | 'cacheMoverCompleted'
+  | 'updateAvailable'
+  | 'dockerUpdateAvailable'
+  | 'backupSkipped'
+  | 'remoteBackupRetentionFailed'
+  | 'dockerLxcStorageUnavailable';
 
 export type NotificationSeverity = 'high' | 'medium' | 'low';
 
@@ -111,8 +116,11 @@ export interface AppSettings {
   timeFormat: '12h' | '24h';
   turboWrite: boolean;
   trustProxy: boolean;
+  trustProxyAddress: string;
   notifications: NotificationSettings;
   minFreeSpaceGb: number;
+  spinDownTimeoutMinutes: number;
+  diskLabels: Record<string, string>;
   paritySchedule: ParitySchedule;
   backupSchedule: BackupSchedule;
   tempAlerts: TempAlertSettings;
@@ -126,10 +134,14 @@ export type AppSettingsUpdate = Partial<{
   timeFormat: '12h' | '24h';
   turboWrite: boolean;
   trustProxy: boolean;
+  trustProxyAddress: string;
   notifications: Partial<Omit<NotificationSettings, 'eventTypes'>> & {
     eventTypes?: Partial<Record<NotificationEventType, Partial<NotificationChannelToggle>>>;
   };
   minFreeSpaceGb: number;
+  spinDownTimeoutMinutes: number;
+  // A key mapped to '' removes that disk's label.
+  diskLabels: Partial<Record<string, string>>;
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<Omit<BackupSchedule, 'encryption'>> & { encryption?: BackupEncryptionInput };
   tempAlerts: Partial<TempAlertSettings>;

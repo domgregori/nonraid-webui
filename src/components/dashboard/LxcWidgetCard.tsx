@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { DistroIcon } from '../lxc/DistroIcon';
 import { useLxcContainers } from '../../hooks/useLxcContainers';
 import { deriveLxcContainerViewModel } from '../../selectors/lxcContainers';
@@ -17,19 +18,20 @@ const NOOP_ACTIONS = {
 };
 
 export function LxcWidgetCard() {
+  const { t } = useTranslation('dashboard');
   const { containers } = useLxcContainers();
 
   return (
     <Card>
       <div className="disk-section-head">
-        <div className="eyebrow disk-section-label">LXC Containers</div>
+        <div className="eyebrow disk-section-label">{t('LxcWidgetCard.lxcContainers')}</div>
         <Link to="/lxc" className="disk-section-link">
-          Manage &rarr;
+          {t('LxcWidgetCard.manage')} &rarr;
         </Link>
       </div>
 
       {containers.length === 0 ? (
-        <div className="status-note">No LXC containers yet.</div>
+        <div className="status-note">{t('LxcWidgetCard.noContainers')}</div>
       ) : (
         <div className="icon-grid">
           {containers.map((c) => {

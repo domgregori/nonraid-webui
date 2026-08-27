@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ArrayDisks } from '../components/dashboard/ArrayDisks';
 import { ArrayErrorCard } from '../components/dashboard/ArrayErrorCard';
 import { CacheCard } from '../components/dashboard/CacheCard';
@@ -13,12 +14,13 @@ import { ArrayActionErrorBanner } from '../components/shared/ArrayActionErrorBan
 import { useArrayStatus } from '../state/useArrayStatus';
 
 export function DashboardPage() {
+  const { t } = useTranslation('pages');
   const { status, loadState, error, actionError, stopBlockedByContainers } = useArrayStatus();
 
   return (
     <div className="dashboard">
       <div className="dashboard__main">
-        {loadState === 'loading' && !status && <div className="status-note">Loading array status…</div>}
+        {loadState === 'loading' && !status && <div className="status-note">{t('DashboardPage.loadingArrayStatus')}</div>}
         {/* 'not-configured' (no array ever created) is expected on a fresh install - OnboardingGate
             covers this with the setup wizard instead of a scary error banner. */}
         {loadState === 'error' && error && <div className="status-note status-note--error">{error}</div>}
