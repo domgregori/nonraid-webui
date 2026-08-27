@@ -153,6 +153,11 @@ export const config = {
   // account to exist to authenticate against an entry here, which is what the 'users' category's
   // exported snapshot above (recreated via UsersClient.restoreSnapshot()) is for.
   sambaPasswdPath: str('SAMBA_PASSWD_PATH', '/var/lib/samba/private/passdb.tdb'),
+  // Same env var name and default as tools/install-webui.sh's own NONRAID_SNAPSHOT_TOPVOL_MNT -
+  // both this app (system/bootSnapshots.ts) and that script mount the btrfs root filesystem's
+  // top-level subvolume (subvolid=5) here transiently to reach @snapshots, which isn't part of
+  // the normally-mounted "/" subvolume - see bootSnapshots.ts's own doc comment for why.
+  bootSnapshotsTopvolMnt: str('NONRAID_SNAPSHOT_TOPVOL_MNT', '/mnt/nonraid-topvol'),
   // Community Applications template feed - see backend/src/apps/. Primary is
   // the feed's own CDN; backup is the GitHub-hosted mirror the CA plugin itself
   // falls back to.

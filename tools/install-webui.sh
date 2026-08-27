@@ -44,9 +44,11 @@ NFSD_THREADS=32
 LOG_DIR=/var/log/nonraid-webui
 LOG_FILE="$LOG_DIR/install-$(date +%Y%m%d-%H%M%S).log"
 # snapshot_before_update below - how many pre-update btrfs snapshots (and their GRUB rescue
-# entries) to keep around at once. Overridable via env for anyone who wants more/less history;
-# not exposed as a --step-level flag since every other tunable here is a top-of-file constant too.
-NONRAID_SNAPSHOT_KEEP="${NONRAID_SNAPSHOT_KEEP:-2}"
+# entries) to keep around at once. 0 (the default) means keep every one, ever - cleanup is manual
+# from then on (the webui's own Boot disk snapshots section, or `btrfs subvolume delete` by hand),
+# not automatic. Overridable via env for anyone who wants automatic pruning back; not exposed as a
+# --step-level flag since every other tunable here is a top-of-file constant too.
+NONRAID_SNAPSHOT_KEEP="${NONRAID_SNAPSHOT_KEEP:-0}"
 NONRAID_SNAPSHOT_TOPVOL_MNT=/mnt/nonraid-topvol
 # The exact release tag (e.g. "v0.2.0") build_nonraid_driver() last successfully installed - see
 # backend/src/update/service.ts's own comment on the matching NONRAID_DRIVER_VERSION_FILE constant
@@ -124,23 +126,31 @@ snapshot_before_update() {
   fi
 
   local old_snaps count to_delete i snap
-  mapfile -t old_snaps < <(btrfs subvolume list -o "$NONRAID_SNAPSHOT_TOPVOL_MNT" 2>/dev/null \
-    | awk '{print $NF}' | grep "^@snapshots/pre-update-" | sort)
-  count="${#old_snaps[@]}"
-  if [ "$count" -gt "$NONRAID_SNAPSHOT_KEEP" ]; then
-    to_delete=$((count - NONRAID_SNAPSHOT_KEEP))
-    for ((i = 0; i < to_delete; i++)); do
-      log "Pruning old pre-update snapshot ${old_snaps[$i]}"
-      btrfs subvolume delete "$NONRAID_SNAPSHOT_TOPVOL_MNT/${old_snaps[$i]}"
-    done
+  if [ "$NONRAID_SNAPSHOT_KEEP" -gt 0 ]; then
+    mapfile -t old_snaps < <(btrfs subvolume list -o "$NONRAID_SNAPSHOT_TOPVOL_MNT" 2>/dev/null \
+      | awk '{print $NF}' | grep "^@snapshots/pre-update-" | sort)
+    count="${#old_snaps[@]}"
+    if [ "$count" -gt "$NONRAID_SNAPSHOT_KEEP" ]; then
+      to_delete=$((count - NONRAID_SNAPSHOT_KEEP))
+      for ((i = 0; i < to_delete; i++)); do
+        log "Pruning old pre-update snapshot ${old_snaps[$i]}"
+        btrfs subvolume delete "$NONRAID_SNAPSHOT_TOPVOL_MNT/${old_snaps[$i]}"
+      done
+    fi
   fi
 
+  # Both this script's own "pre-update-*" snapshots and any "manual-*" ones made on demand from
+  # the webui (backend/src/system/bootSnapshots.ts) share this one rescue menu - widened from
+  # "pre-update-" only so this regeneration (which always rewrites the whole file from scratch)
+  # doesn't silently drop a manually-created snapshot's GRUB entry the next time an update runs.
+  # Pruning above stays scoped to this script's own "pre-update-" snapshots only - manual ones are
+  # never auto-deleted, only explicitly from the webui.
   local retained tmp_cfg snap_kver
   mapfile -t retained < <(btrfs subvolume list -o "$NONRAID_SNAPSHOT_TOPVOL_MNT" 2>/dev/null \
-    | awk '{print $NF}' | grep "^@snapshots/pre-update-" | sort -r)
+    | awk '{print $NF}' | grep -E "^@snapshots/(pre-update|manual)-" | sort -r)
   tmp_cfg="$(mktemp)"
   {
-    echo "# Managed by nonraid-webui's install-webui.sh (snapshot_before_update) - regenerated on every update, don't hand-edit."
+    echo "# Managed by nonraid-webui (snapshot_before_update / system/bootSnapshots.ts) - regenerated on every update or UI-triggered snapshot change, don't hand-edit."
     echo "submenu 'NonRAID rescue snapshots' {"
     for snap in "${retained[@]}"; do
       snap_kver="$(basename "$(ls "$NONRAID_SNAPSHOT_TOPVOL_MNT/$snap"/boot/vmlinuz-* 2>/dev/null | head -1)" | sed 's/^vmlinuz-//')"

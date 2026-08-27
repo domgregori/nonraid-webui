@@ -44,6 +44,7 @@ import { smartRouter } from './routes/smart.js';
 import { sshRouter } from './routes/ssh.js';
 import { statusRouter } from './routes/status.js';
 import { systemRouter } from './routes/system.js';
+import { bootSnapshotsRouter } from './routes/bootSnapshots.js';
 import { tailscaleRouter } from './routes/tailscale.js';
 import { tlsRouter } from './routes/tls.js';
 import { updateRouter } from './routes/update.js';
@@ -235,6 +236,7 @@ async function main() {
   app.use('/api', sharesRouter(shares));
   app.use('/api', browseRouter(browse));
   app.use('/api', systemRouter(system, nmd, activity, backupScheduler, metrics, settingsStore, rclone, usersClient));
+  app.use('/api', bootSnapshotsRouter(activity));
   app.use('/api', updateRouter(activity));
   app.use('/api', servicesRouter(activity));
   app.use('/api', sshRouter(activity, authService));

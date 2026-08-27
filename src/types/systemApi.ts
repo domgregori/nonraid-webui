@@ -131,3 +131,18 @@ export interface LocalBackupList {
   destDir: string | null;
   backups: LocalBackupEntry[];
 }
+
+// Mirrors backend/src/system/bootSnapshots.ts's BootSnapshot.
+export interface BootSnapshot {
+  name: string;
+  kind: 'pre-update' | 'manual';
+  label: string | null;
+  createdAtLocal: string;
+  inGrubMenu: boolean;
+  size: { totalBytes: number; exclusiveBytes: number } | null;
+}
+
+export interface BootSnapshotList {
+  btrfsRoot: boolean;
+  snapshots: BootSnapshot[];
+}

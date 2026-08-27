@@ -16,6 +16,7 @@ import { LogsSection } from '../components/settings/LogsSection';
 import { NotificationEventToggles } from '../components/settings/NotificationEventToggles';
 import { PasskeySection } from '../components/settings/PasskeySection';
 import { RemoteBackupSection } from '../components/settings/RemoteBackupSection';
+import { BootSnapshotsSection } from '../components/settings/BootSnapshotsSection';
 import { RestoreFromLocalWizard } from '../components/settings/RestoreFromLocalWizard';
 import { RestoreFromRemoteWizard } from '../components/settings/RestoreFromRemoteWizard';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
@@ -1163,6 +1164,11 @@ export function SettingsPage() {
                   {t('SettingsPage.recovery.importArrayButton')}
                 </button>
               </div>
+            </div>
+
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">{t('SettingsPage.recovery.bootSnapshotsTitle')}</div>
+              <BootSnapshotsSection />
             </div>
           </div>
 

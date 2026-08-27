@@ -50,17 +50,7 @@
     "smart": "SMART",
     "loadingSmart": "Loading SMART data…",
     "smartLoadFailed": "Failed to read SMART data for this device.",
-    "noSmartData": "No SMART data available for this disk.",
-    "operations": "Operations",
-    "configBackupTitle": "Config Backup",
-    "configBackupDesc": "- a small archive of Samba/NFS config, this app's own settings/shares/users data, and the current array superblock. Does not include the OS itself.",
-    "downloadConfigBackup": "Download Config Backup",
-    "confirmDownload": "Confirm Download",
-    "fullDiskImageTitle": "Full Disk Image",
-    "fullDiskImageDesc": "- a complete byte-for-byte copy of this device (compressed), read live while it's mounted and in use - not a guaranteed filesystem-consistent snapshot. Can take a long time and produce a file up to the full device capacity.",
-    "downloadFullDiskImage": "Download Full Disk Image",
-    "cancel": "Cancel",
-    "understandContinue": "I understand, continue"
+    "noSmartData": "No SMART data available for this disk."
   },
   "CacheReplaceDialog": {
     "title": "Replace missing cache mirror member",

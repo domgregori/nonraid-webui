@@ -469,6 +469,23 @@
     "noBackupsAtRemotePath": "No config backups found at this remote+path.",
     "encrypted": "Encrypted"
   },
+  "BootSnapshotsSection": {
+    "loading": "Loading…",
+    "notBtrfs": "Boot snapshots need a btrfs boot disk - this host's root filesystem isn't btrfs, so this feature isn't available.",
+    "desc": "Read-only snapshots of the boot disk, manually bootable from a GRUB rescue menu entry at the physical console. One is taken automatically before every install/update and kept forever unless deleted below; make one yourself anytime too.",
+    "labelPlaceholder": "Optional label (e.g. before-lxc-test)",
+    "createButton": "Create snapshot",
+    "creating": "Creating…",
+    "noSnapshots": "No boot snapshots yet.",
+    "preUpdateKind": "automatic, before an update",
+    "manualKind": "manual",
+    "sizeLabel": "{{exclusive}} exclusive · {{total}} total",
+    "sizeUnknown": "Size unknown",
+    "noGrubEntry": "No GRUB rescue entry - missing kernel files for this snapshot.",
+    "delete": "Delete",
+    "deleting": "Deleting…",
+    "confirm": "Confirm?"
+  },
   "RemoteBackupSection": {
     "loading": "Loading…",
     "title": "Remote Backup",

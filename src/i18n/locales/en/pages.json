@@ -357,7 +357,8 @@
       "recoverArrayWizardTitle": "Recover the array from an uploaded file",
       "restoreWizardTitle": "Restore from an uploaded file",
       "cliDecryptPrefix": "Need to decrypt an encrypted backup without the webui running? Use",
-      "cliDecryptSuffix": "from a terminal - see its --help for usage."
+      "cliDecryptSuffix": "from a terminal - see its --help for usage.",
+      "bootSnapshotsTitle": "Boot disk snapshots"
     },
     "notifications": {
       "title": "Notifications",
