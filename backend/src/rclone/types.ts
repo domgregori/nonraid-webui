@@ -20,17 +20,19 @@ export interface RcloneProviderOption {
 export interface RcloneProvider {
   name: string; // e.g. "b2" - what gets sent as `type` to config/create
   description: string; // e.g. "Backblaze B2" - shown in the provider picker
-  // Only the non-advanced options - rclone's own provider schemas include many more advanced/
-  // power-user fields (chunk sizes, custom endpoints, ...) that would turn this app's simple
-  // Add-remote form into the same generic "every rclone option" UI the rclone-web reference app
-  // has; this app deliberately shows only what's needed to get a working remote, matching the
-  // mockup's 2-4 field forms.
+  // The non-advanced options - what the Add-remote form shows by default, matching the mockup's
+  // 2-4 field forms rather than every rclone option up front.
   options: RcloneProviderOption[];
+  // The advanced/power-user fields (chunk sizes, custom endpoints, ...) - rclone-web's own "Show
+  // advanced" section, rolled up behind the Add-remote form's own "More options" disclosure for
+  // the same reason. Excludes anything Hide&2 already drops from `options` (deprecated/CLI-only
+  // fields) - see realClient.ts's listProviders() for that filter.
+  advancedOptions: RcloneProviderOption[];
   // True when this provider drives rclone's own OAuth web flow (config/create returns `done:
   // false` + an authUrl to open) - lets the Add-remote form offer a one-click "Connect with X"
   // shortcut instead of the generic field form. Computed from the provider's *advanced* options
-  // (auth_url/token_url only ever appear there, filtered out of `options` above by design) rather
-  // than a hardcoded provider-name list, so it stays correct as rclone adds/changes providers.
+  // (auth_url/token_url only ever appear there) rather than a hardcoded provider-name list, so it
+  // stays correct as rclone adds/changes providers.
   oauth: boolean;
 }
 

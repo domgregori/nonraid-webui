@@ -14,7 +14,10 @@
     "cancel": "Cancel",
     "connectWith": "Connect with {{provider}}",
     "showManualFields": "Use my own API credentials…",
-    "hideManualFields": "Hide manual credentials"
+    "hideManualFields": "Hide manual credentials",
+    "providerSearchPlaceholder": "Type to search providers…",
+    "showAdvancedFields": "More options…",
+    "hideAdvancedFields": "Hide more options"
   },
   "ConnectRemoteModal": {
     "title": "Connect {{provider}}",

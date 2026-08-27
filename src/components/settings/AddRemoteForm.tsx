@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { rcloneApi } from '../../api/rcloneApi';
-import type { RcloneProvider, RcloneRemote } from '../../types/rcloneApi';
+import type { RcloneProvider, RcloneProviderOption, RcloneRemote } from '../../types/rcloneApi';
 import { ConnectRemoteModal } from './ConnectRemoteModal';
 
 interface AddRemoteFormProps {
@@ -53,6 +53,10 @@ export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCanc
   // state. Not used at all for a non-OAuth provider (its fields are the only way to configure it,
   // so they stay always visible) or while editing (the existing behavior there is unchanged).
   const [showManualFields, setShowManualFields] = useState(false);
+  // Rolls up the advanced/power-user fields (rclone-web's own "Show advanced" toggle) - off by
+  // default for every provider, OAuth or not, independent of showManualFields above (that one's
+  // specifically about de-emphasizing the *standard* credential fields in favor of Connect).
+  const [showAdvancedFields, setShowAdvancedFields] = useState(false);
 
   // Providers load asynchronously (a live rclone RC call) - a mount that races ahead of that fetch
   // starts with an empty picker and fills in the first option once the list actually arrives,
@@ -60,6 +64,60 @@ export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCanc
   useEffect(() => {
     if (!editingRemote && !remoteType && providers.length > 0) setRemoteType(providers[0].name);
   }, [providers, editingRemote, remoteType]);
+
+  // Type-to-search provider picker - a plain <select> stopped being usable once rclone's own list
+  // (70+ providers) got surfaced in full. Query text and the actual selected value are kept
+  // separate so free typing can filter without touching remoteType until something's actually
+  // picked - see the sync effect below for how the two stay consistent otherwise (menu closed,
+  // provider changed some other way, e.g. the auto-select-first-provider effect above).
+  const [providerQuery, setProviderQuery] = useState('');
+  const [providerMenuOpen, setProviderMenuOpen] = useState(false);
+  const [providerHighlighted, setProviderHighlighted] = useState(-1);
+  const providerBoxRef = useRef<HTMLDivElement>(null);
+  const selectedProvider = providers.find((p) => p.name === remoteType) ?? null;
+
+  useEffect(() => {
+    if (!providerMenuOpen) setProviderQuery(selectedProvider?.description ?? '');
+  }, [selectedProvider, providerMenuOpen]);
+
+  useEffect(() => {
+    if (!providerMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (providerBoxRef.current && !providerBoxRef.current.contains(e.target as Node)) setProviderMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [providerMenuOpen]);
+
+  const filteredProviders = providerQuery.trim()
+    ? providers.filter((p) => p.description.toLowerCase().includes(providerQuery.trim().toLowerCase()))
+    : providers;
+
+  const selectProvider = (p: RcloneProvider) => {
+    setRemoteType(p.name);
+    setRemoteFields({});
+    setShowManualFields(false);
+    setShowAdvancedFields(false);
+    setProviderQuery(p.description);
+    setProviderMenuOpen(false);
+    setProviderHighlighted(-1);
+  };
+
+  const handleProviderKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (!providerMenuOpen || filteredProviders.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setProviderHighlighted((h) => Math.min(h + 1, filteredProviders.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setProviderHighlighted((h) => Math.max(h - 1, 0));
+    } else if (e.key === 'Enter' && providerHighlighted >= 0) {
+      e.preventDefault();
+      selectProvider(filteredProviders[providerHighlighted]);
+    } else if (e.key === 'Escape') {
+      setProviderMenuOpen(false);
+    }
+  };
 
   useEffect(() => {
     if (!editingRemote) return;
@@ -71,11 +129,14 @@ export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCanc
         // with a placeholder instead; only send it back if the admin actually types a new value.
         const provider = providers.find((p) => p.name === cfg.type);
         const prefill: Record<string, string> = {};
-        for (const opt of provider?.options ?? []) {
+        for (const opt of [...(provider?.options ?? []), ...(provider?.advancedOptions ?? [])]) {
           if (opt.isPassword) continue;
           if (cfg.parameters[opt.name] !== undefined) prefill[opt.name] = cfg.parameters[opt.name];
         }
         setRemoteFields(prefill);
+        // Auto-expand "More options" when editing a remote that actually has a saved advanced
+        // field set - otherwise a value silently sits in state with no visible field for it.
+        setShowAdvancedFields((provider?.advancedOptions ?? []).some((opt) => cfg.parameters[opt.name] !== undefined));
       })
       .catch((err) => setRemoteError((err as Error).message))
       .finally(() => setRemoteConfigLoading(false));
@@ -134,7 +195,45 @@ export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCanc
     setConnectModal({ name, type: remoteType });
   };
 
-  const selectedProvider = providers.find((p) => p.name === remoteType) ?? null;
+  // Whether the standard option fields (and, below, "More options") actually render - always true
+  // while editing or for a non-OAuth provider (no disclosure to roll them up behind in the first
+  // place), otherwise only once the admin has expanded "Use my own API credentials...".
+  const manualFieldsVisible = editingRemote !== null || !selectedProvider?.oauth || showManualFields;
+
+  // Shared between `options` and `advancedOptions` below - a bool renders as a checkbox, anything
+  // else as a plain text/password input (see RcloneProviderOption's own doc comment on why that's
+  // good enough for every provider this app targets).
+  const renderOptionField = (opt: RcloneProviderOption) => (
+    <label className="field" key={opt.name}>
+      <span>{opt.help.split('\n')[0]}</span>
+      {opt.type === 'bool' ? (
+        <input
+          className="round-checkbox"
+          type="checkbox"
+          checked={remoteFields[opt.name] === 'true'}
+          onChange={(e) =>
+            setRemoteFields((prev) => ({
+              ...prev,
+              [opt.name]: String(e.target.checked),
+            }))
+          }
+        />
+      ) : (
+        <input
+          className="history-input"
+          type={opt.isPassword ? 'password' : 'text'}
+          value={remoteFields[opt.name] ?? ''}
+          onChange={(e) =>
+            setRemoteFields((prev) => ({
+              ...prev,
+              [opt.name]: e.target.value,
+            }))
+          }
+          placeholder={editingRemote && opt.isPassword ? t('AddRemoteForm.keepCurrentValue') : opt.default || undefined}
+        />
+      )}
+    </label>
+  );
 
   return (
     <div className="add-remote-panel">
@@ -154,22 +253,39 @@ export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCanc
                 <input className="history-input" value={selectedProvider?.description ?? remoteType} disabled />
               ) : (
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <select
-                    className="history-input"
-                    style={{ flex: 1, minWidth: 0 }}
-                    value={remoteType}
-                    onChange={(e) => {
-                      setRemoteType(e.target.value);
-                      setRemoteFields({});
-                      setShowManualFields(false);
-                    }}
-                  >
-                    {providers.map((p) => (
-                      <option key={p.name} value={p.name}>
-                        {p.description}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="provider-picker" ref={providerBoxRef}>
+                    <input
+                      className="history-input"
+                      style={{ width: '100%' }}
+                      value={providerQuery}
+                      autoComplete="off"
+                      placeholder={t('AddRemoteForm.providerSearchPlaceholder')}
+                      onChange={(e) => {
+                        setProviderQuery(e.target.value);
+                        setProviderMenuOpen(true);
+                        setProviderHighlighted(-1);
+                      }}
+                      onFocus={() => setProviderMenuOpen(true)}
+                      onKeyDown={handleProviderKeyDown}
+                    />
+                    {providerMenuOpen && filteredProviders.length > 0 && (
+                      <div className="provider-picker__menu">
+                        {filteredProviders.map((p, i) => (
+                          <div
+                            key={p.name}
+                            className={`provider-picker__item${i === providerHighlighted ? ' provider-picker__item--active' : ''}`}
+                            onMouseDown={(e) => {
+                              e.preventDefault(); // keep input focus so this fires before blur would close the menu
+                              selectProvider(p);
+                            }}
+                            onMouseEnter={() => setProviderHighlighted(i)}
+                          >
+                            {p.description}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   {selectedProvider?.oauth && (
                     <button type="button" className="btn btn--primary-sm" style={{ flexShrink: 0 }} disabled={remoteSaving} onClick={connectOAuth}>
                       {t('AddRemoteForm.connectWith', { provider: selectedProvider.description })}
@@ -193,38 +309,18 @@ export function AddRemoteForm({ providers, editingRemote = null, onAdded, onCanc
                 {showManualFields ? t('AddRemoteForm.hideManualFields') : t('AddRemoteForm.showManualFields')}
               </button>
             )}
-            {(editingRemote || !selectedProvider?.oauth || showManualFields) &&
-              selectedProvider?.options.map((opt) => (
-                <label className="field" key={opt.name}>
-                  <span>{opt.help.split('\n')[0]}</span>
-                  {opt.type === 'bool' ? (
-                    <input
-                      className="round-checkbox"
-                      type="checkbox"
-                      checked={remoteFields[opt.name] === 'true'}
-                      onChange={(e) =>
-                        setRemoteFields((prev) => ({
-                          ...prev,
-                          [opt.name]: String(e.target.checked),
-                        }))
-                      }
-                    />
-                  ) : (
-                    <input
-                      className="history-input"
-                      type={opt.isPassword ? 'password' : 'text'}
-                      value={remoteFields[opt.name] ?? ''}
-                      onChange={(e) =>
-                        setRemoteFields((prev) => ({
-                          ...prev,
-                          [opt.name]: e.target.value,
-                        }))
-                      }
-                      placeholder={editingRemote && opt.isPassword ? t('AddRemoteForm.keepCurrentValue') : opt.default || undefined}
-                    />
-                  )}
-                </label>
-              ))}
+            {manualFieldsVisible && selectedProvider?.options.map(renderOptionField)}
+            {/* On an OAuth provider, "More options" lives inside the manual-credentials disclosure
+                above - Connect is the primary path there, so nothing past the standard fields
+                should be visible until an admin has already chosen to go manual (or is editing,
+                where everything's always shown). A non-OAuth provider has no such disclosure to
+                nest under, so this only ever depends on manualFieldsVisible itself. */}
+            {manualFieldsVisible && (selectedProvider?.advancedOptions.length ?? 0) > 0 && (
+              <button type="button" className="btn field-grid--full" style={{ justifySelf: 'start' }} onClick={() => setShowAdvancedFields((v) => !v)}>
+                {showAdvancedFields ? t('AddRemoteForm.hideAdvancedFields') : t('AddRemoteForm.showAdvancedFields')}
+              </button>
+            )}
+            {manualFieldsVisible && showAdvancedFields && selectedProvider?.advancedOptions.map(renderOptionField)}
           </div>
           <div className="settings-field__row">
             <button type="button" className="btn btn--primary-sm" disabled={remoteSaving} onClick={() => submitRemote()}>

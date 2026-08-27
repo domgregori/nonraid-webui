@@ -172,10 +172,29 @@ export class RealRcloneClient implements RcloneClient {
    * (root@nonraid.lan, rclone v1.75.0): `curl -u user:pass -X POST
    * http://127.0.0.1:5572/config/providers` returned the full 69-provider list with the same
    * per-option schema `rclone config providers` prints, confirming the architecture notes'
-   * "likely, but verify" question. Only non-advanced options are kept - see RcloneProvider's own
-   * doc comment for why.
+   * "likely, but verify" question. Split into `options`/`advancedOptions` - see RcloneProvider's
+   * own doc comment for why.
    */
   async listProviders(): Promise<RcloneProvider[]> {
+    function toProviderOption(o: RcProviderOptionJson): RcloneProviderOption {
+      return {
+        name: o.Name,
+        help: o.Help,
+        default: o.Default === null || o.Default === undefined ? '' : String(o.Default),
+        required: o.Required,
+        isPassword: o.IsPassword,
+        type: o.Type,
+      };
+    }
+    // Hide&2 doesn't catch every deprecated field - confirmed live that drive's
+    // "use_created_date"-style fields (e.g. "Deprecated: use --server-side-across-configs
+    // instead.") are Advanced: true but Hide: 0, so they'd otherwise show up under "More options"
+    // despite rclone itself considering them dead. rclone's own convention is that a deprecated
+    // field's Help always starts with the literal word "Deprecated" - checked as a second,
+    // independent filter alongside Hide&2 rather than replacing it (the two catch different cases).
+    function isDeprecated(o: RcProviderOptionJson): boolean {
+      return o.Help.trim().toLowerCase().startsWith('deprecated');
+    }
     const { providers } = await rcCall<{ providers: RcProviderJson[] }>('config/providers');
     return providers.map((p) => ({
       name: p.Name,
@@ -187,18 +206,14 @@ export class RealRcloneClient implements RcloneClient {
       // dynamic field form actually renders.
       oauth: p.Options.some((o) => o.Name === 'auth_url') && p.Options.some((o) => o.Name === 'token_url'),
       // !Advanced already drops most deprecated/internal fields (they're almost always also
-      // marked Advanced) - the Hide check catches the rest, like drive's alternate_export, which
-      // rclone marks deprecated but NOT advanced (confirmed live).
-      options: p.Options.filter((o) => !o.Advanced && !(o.Hide & 2)).map(
-        (o): RcloneProviderOption => ({
-          name: o.Name,
-          help: o.Help,
-          default: o.Default === null || o.Default === undefined ? '' : String(o.Default),
-          required: o.Required,
-          isPassword: o.IsPassword,
-          type: o.Type,
-        }),
-      ),
+      // marked Advanced) - the Hide and isDeprecated checks catch the rest, like drive's
+      // alternate_export (Hide&2, not Advanced) and use_created_date (Advanced, Hide 0, but its
+      // own Help says "Deprecated: ...").
+      options: p.Options.filter((o) => !o.Advanced && !(o.Hide & 2) && !isDeprecated(o)).map(toProviderOption),
+      // The mirror image of `options` above - Advanced: true, same Hide&2 + isDeprecated exclusion.
+      // Rolled up behind the Add-remote form's own "More options" disclosure rather than always
+      // shown, matching rclone-web's own "Show advanced" toggle (which also hides these).
+      advancedOptions: p.Options.filter((o) => o.Advanced && !(o.Hide & 2) && !isDeprecated(o)).map(toProviderOption),
     }));
   }
 

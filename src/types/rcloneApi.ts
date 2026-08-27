@@ -21,6 +21,9 @@ export interface RcloneProvider {
   name: string;
   description: string;
   options: RcloneProviderOption[];
+  // The advanced/power-user fields, rolled up behind AddRemoteForm's own "More options"
+  // disclosure - see backend/src/rclone/types.ts's RcloneProvider doc comment.
+  advancedOptions: RcloneProviderOption[];
   // True for a provider that drives rclone's own OAuth web flow (config/create returns `done:
   // false` + an authUrl) - lets AddRemoteForm offer a one-click "Connect with X" shortcut.
   oauth: boolean;
