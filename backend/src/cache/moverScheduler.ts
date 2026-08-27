@@ -84,7 +84,12 @@ export class CacheMoverScheduler {
       await this.mover.run();
       this.activity.log('Cache mover started automatically (scheduled)', 'blue').catch(() => {});
     } catch (err) {
-      this.activity.log(`Scheduled cache mover failed to start: ${(err as Error).message}`, 'red').catch(() => {});
+      // Same event type as checkJobCompletion()'s own 'failed' branch above - from an admin's
+      // perspective "the scheduled mover never started" and "it started then failed" are the same
+      // problem (the cache isn't draining to the array as expected), not two things to tell apart.
+      const msg = `Scheduled cache mover failed to start: ${(err as Error).message}`;
+      this.activity.log(msg, 'red', 'cacheMoverFailed').catch(() => {});
+      notifyEvent(this.settings, 'cacheMoverFailed', 'NonRAID: cache mover failed', msg);
     }
   }
 }

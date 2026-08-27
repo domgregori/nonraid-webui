@@ -97,13 +97,15 @@ export class BackupScheduler {
       destDir = resolveBackupDestDir(schedule.destination);
     } catch (err) {
       const msg = `${label} skipped - ${(err as Error).message}`;
-      this.activity.log(msg, 'amber').catch(() => {});
+      this.activity.log(msg, 'amber', 'backupSkipped').catch(() => {});
+      notifyEvent(this.settings, 'backupSkipped', 'NonRAID: backup skipped', msg);
       throw err;
     }
 
     if (!destDir) {
       const msg = `${label} skipped - no destination directory configured`;
-      this.activity.log(msg, 'amber').catch(() => {});
+      this.activity.log(msg, 'amber', 'backupSkipped').catch(() => {});
+      notifyEvent(this.settings, 'backupSkipped', 'NonRAID: backup skipped', msg);
       throw new Error('No destination directory configured - set one below and save first.');
     }
     // The 'boot'/'array' picker options resolve to a fixed convention path (e.g.
@@ -119,7 +121,8 @@ export class BackupScheduler {
       await access(destDir, constants.W_OK);
     } catch {
       const msg = `${label} skipped - destination "${destDir}" doesn't exist or isn't writable`;
-      this.activity.log(msg, 'amber').catch(() => {});
+      this.activity.log(msg, 'amber', 'backupSkipped').catch(() => {});
+      notifyEvent(this.settings, 'backupSkipped', 'NonRAID: backup skipped', msg);
       throw new Error(`Destination "${destDir}" doesn't exist or isn't writable.`);
     }
 
@@ -130,7 +133,8 @@ export class BackupScheduler {
       if (schedule.encryption.enabled) {
         if (!schedule.encryption.passwordObscured) {
           const msg = `${label} skipped - encryption is on but no password is saved`;
-          this.activity.log(msg, 'amber').catch(() => {});
+          this.activity.log(msg, 'amber', 'backupSkipped').catch(() => {});
+          notifyEvent(this.settings, 'backupSkipped', 'NonRAID: backup skipped', msg);
           throw new Error('Encryption is on but no password is saved - set one in Settings → Local Backups.');
         }
         password = await this.rclone.reveal(schedule.encryption.passwordObscured);
@@ -142,7 +146,8 @@ export class BackupScheduler {
       const paths = await resolveConfigBackupPaths(this.nmd, this.settings, includeAppdata);
       if (paths.length === 0) {
         const msg = `${label} skipped - no config files found to back up`;
-        this.activity.log(msg, 'amber').catch(() => {});
+        this.activity.log(msg, 'amber', 'backupSkipped').catch(() => {});
+        notifyEvent(this.settings, 'backupSkipped', 'NonRAID: backup skipped', msg);
         throw new Error('No config files found to back up.');
       }
       const destPath = path.join(destDir, `${BACKUP_PREFIX}${Date.now()}${ARCHIVE_EXT}`);

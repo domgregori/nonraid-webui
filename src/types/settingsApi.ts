@@ -22,7 +22,9 @@ export type NotificationEventType =
   | 'cacheMoverFailed'
   | 'cacheMoverCompleted'
   | 'updateAvailable'
-  | 'dockerUpdateAvailable';
+  | 'dockerUpdateAvailable'
+  | 'backupSkipped'
+  | 'remoteBackupRetentionFailed';
 
 export type NotificationSeverity = 'high' | 'medium' | 'low';
 

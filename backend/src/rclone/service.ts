@@ -308,7 +308,9 @@ export class RcloneService {
 
       if (!job.retention.forever) {
         await this.enforceRetention(job).catch((err) => {
-          this.activity.log(`${job.name}: retention cleanup failed - ${(err as Error).message}`, 'amber').catch(() => {});
+          const msg = `${job.name}: retention cleanup failed - ${(err as Error).message}`;
+          this.activity.log(msg, 'amber', 'remoteBackupRetentionFailed').catch(() => {});
+          notifyEvent(this.settings, 'remoteBackupRetentionFailed', 'NonRAID: remote backup retention cleanup failed', msg);
         });
       }
 
