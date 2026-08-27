@@ -73,9 +73,9 @@ Proxmox VE. Update this list as items change or new items appear.
   `lxc-templates` provides the `download` template used by "Add Container". Same as Docker: no
   install step exists elsewhere, must be installed explicitly.
 - **Node.js, version 20.6 or newer, or 21.7 or newer.** Not 18.x. This app no longer uses `.env`
-  files (config is plain environment variables now, see `backend/README.md`'s Config section) so
-  this floor is no longer strictly required by anything specific — kept as the known-good version
-  this app has actually been verified against, not yet re-tested against anything older.
+  files (config is plain environment variables, see `backend/src/config.ts`) so this floor is no
+  longer strictly required by anything specific — kept as the known-good version this app has
+  actually been verified against, not yet re-tested against anything older.
 - `npm`.
 
 ## Build output

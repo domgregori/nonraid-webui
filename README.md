@@ -82,22 +82,23 @@ npm install
 npm run dev   # http://localhost
 ```
 
-Run both, then open the frontend. Users
-needs root (`useradd`/`smbpasswd` family) — see `backend/README.md`'s Privileges section. For a real
+Run both, then open the frontend. The backend runs as root (`nmdctl`/Docker/`smartctl`/
+`useradd`/`smbpasswd`/... all need it) — no privilege drop, no sudoers rule. For a real
 end-to-end test environment (real kernel driver, real array, real Samba/NFS), use a VM — see the main
 `nonraid` repo's development docs.
 
-See `backend/README.md` for the API and configuration.
+See `backend/API.md` for the full API reference; config is plain environment variables, see each
+module's own `str(...)`/`num(...)` calls in `backend/src/config.ts`.
 
 ## Project layout
 
 ```
 src/
   types/       domain types (Disk, Parity, Container, Settings, ...) +
-               nmdApi.ts/dockerApi.ts/sharesApi.ts/usersApi.ts/systemApi.ts (mirror the backend's
-               wire types)
+               nmdApi.ts/dockerApi.ts/sharesApi.ts/usersApi.ts/systemApi.ts/rcloneApi.ts (mirror
+               the backend's wire types)
   api/         fetch wrappers for the backend (nmdApi, dockerApi, smartApi, sharesApi, usersApi,
-               systemApi)
+               systemApi, rcloneApi)
   state/       AppStoreProvider (settings + Grafana URL, local-only) and
                ArrayStatusProvider (polls the backend for array/parity/disk/temp state,
                owns disk-detail selection — this is the real one)
@@ -105,9 +106,13 @@ src/
                useSystemStats — polling hooks with create/update/remove actions where relevant
   selectors/   pure derivation functions (backend response -> view models)
   components/  layout, dashboard, disk-detail, shares (create/edit form), users (add-user modal,
-               groups modal, per-user detail panel with share-access grid), shared UI primitives
+               groups modal, per-user detail panel with share-access grid), settings (backup/
+               recovery/rclone remote forms, boot snapshots, notifications, TLS, ...),
+               shared UI primitives
   pages/       one component per route
   styles/      CSS token file + per-area stylesheets
+  i18n/        react-i18next setup + per-namespace locale JSON (src/i18n/locales/en/*.json) - every
+               piece of UI text goes through t(), not a literal string
   utils/       format.ts (units/dates for display) + webauthnSupport.ts (passkey capability checks)
   assets/      static images (logo, etc.)
 
@@ -123,10 +128,23 @@ backend/                 Express API wrapping nmdctl, Docker, lxc-*, smartctl, s
                    per-user/group SMB permissions) + ShareApplier interface (mergerfs/Samba/NFS)
                    + ShareService (orchestrates all three)
   src/users/       UsersClient interface + RealUsersClient (shells out to useradd/smbpasswd/etc.,
-                   host /etc/passwd+/etc/group as source of truth) + UsersService
-  src/system/      SystemStatsService (host CPU/memory via Node's os module)
+                   host /etc/passwd+/etc/group as source of truth) + UsersService +
+                   backupExport.ts (managed users/groups + shadow-hash snapshot for config backups)
+  src/system/      SystemStatsService (host CPU/memory) + the Local Backups system (backupCatalog/
+                   backupScheduler/backupStream/backupCrypto/backupMeta/configRestore) + boot disk
+                   snapshots (bootSnapshots.ts, btrfs + GRUB rescue menu) + hostConfig (hostname/
+                   timezone/reboot) + hdparm (spin-down timers) + services.ts (managed systemd
+                   units) + logs.ts (journalctl tailing) + benchmark.ts
+  src/rclone/      RcloneClient interface + RealRcloneClient (talks to rclone's own `rclone-rcd` RC
+                   daemon over HTTP - no local copy of remote definitions) + RcloneService (sync
+                   job scheduling/retention/restore) + syncJobStore.ts (this app's own sync-job
+                   records, separate from rclone's remotes)
+  src/settings/    app settings store (settings.json), notification catalog/dispatch (Apprise),
+                   schedule matching, backup-encryption password handling
+  src/update/      UpdateScheduler - checks for and applies nonraid-webui/driver updates
   src/routes/      /api/status, /api/array/*, /api/parity/*, /api/docker/*, /api/lxc/*,
-                   /api/smart/*, /api/shares/*, /api/users/*, /api/groups/*, /api/system
+                   /api/smart/*, /api/shares/*, /api/users/*, /api/groups/*, /api/system,
+                   /api/rclone/*, /api/settings, /api/tls/*, /api/auth/*
   src/auth/        session cookies, password hashing, login rate limiting, request-origin
                    detection (for the Secure cookie flag and passkey RP ID)
   src/tls/         built-in HTTPS: self-signed cert generation, imported cert inspection, TLS

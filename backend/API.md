@@ -1,7 +1,11 @@
 # nonraid-webui backend API
 
-Full HTTP API reference. For an architectural overview (modules, privileges, config env vars),
-see `backend/README.md`.
+Full HTTP API reference. Config is plain environment variables, read once at startup with hardcoded
+defaults when unset - see each module's own `str(...)`/`num(...)` calls in `backend/src/config.ts`
+for the full list. This backend runs as root (no privilege drop, no sudoers rule) since every
+external tool it shells out to (`nmdctl`, Docker, `smartctl`, `mount`/`mergerfs`, `useradd`/
+`smbpasswd`, ...) needs root anyway - see the root README's Project layout section for which
+backend module owns which subsystem.
 
 ## Conventions
 
@@ -214,8 +218,26 @@ Operates over the whole `/mnt` tree (not scoped per-share) - paths are absolute 
 | POST | `/system/boot-disk/benchmark/read` | `{ durationSeconds? }` | `404` if no boot disk detected, `409` if a parity check/clear is active. |
 | POST | `/system/boot-disk/benchmark/write` | `{ durationSeconds? }` | |
 | GET | `/system/boot-disk/backup/image` | - | Streams a raw image of the boot disk. `404` if none detected. |
-| GET | `/system/boot-disk/backup/config` | - | Streams a config-only backup archive (NonRAID config files + a metrics.db checkpoint). `400` if nothing was found to back up. |
+| GET | `/system/boot-disk/backup/config` | - | Streams a config-only backup archive (NonRAID config files, a metrics.db checkpoint, managed users/groups + their SMB passwords, and each LXC container's own config file - never its rootfs). `400` if nothing was found to back up. |
+| GET | `/system/boot-disk/backup/config-encrypted` | - | Same archive as above, encrypted with whatever password is already saved for Local Backups (Settings → Backups' own Encryption section). `400` if no password is saved, or if nothing was found to back up. |
 | POST | `/system/backup/run-now` | - | Runs the same backup the schedule would, on demand, to the configured destination (Settings → Backups). |
+
+### Boot disk snapshots
+
+Read-only btrfs snapshots of the boot disk - `404`/empty results when the root filesystem isn't
+btrfs (`{ btrfsRoot: false }` on the list route), same "feature just isn't available here"
+degradation as Tailscale/Rclone's own `installed: false`. Both the automatic ones
+`tools/install-webui.sh` takes before every install/update and on-demand ones created here share
+one GRUB rescue menu, kept in sync on every create/delete - there's no "reboot into this" action
+from the UI (an earlier version had one; dropped after confirming live that GRUB's own one-shot
+next-boot override doesn't reliably self-clear on this setup). Booting into one for real recovery
+is still done manually from the physical GRUB menu. See `backend/src/system/bootSnapshots.ts`.
+
+| Method | Path | Body/Params | Response / Notes |
+|---|---|---|---|
+| GET | `/system/boot-snapshots` | - | `{ btrfsRoot: boolean, snapshots: BootSnapshot[] }` - each snapshot has `name`, `kind` (`pre-update` \| `manual`), `label`, `createdAtLocal`, `inGrubMenu`, and `size` (`{ totalBytes, exclusiveBytes }` from `btrfs filesystem du`, or `null` if that query failed). |
+| POST | `/system/boot-snapshots` | `{ label? }` | Creates a read-only snapshot (`manual-<timestamp>[-label]`) and regenerates the GRUB rescue menu. `400` if root isn't btrfs. |
+| DELETE | `/system/boot-snapshots/:name` | - | Deletes the snapshot subvolume and regenerates the GRUB rescue menu. `:name` must match this feature's own naming pattern. |
 
 ### Config restore
 
@@ -244,7 +266,7 @@ bytes (gzip magic vs. not) instead.
 | POST | `/system/backup/restore/preview` | multipart `file`, `password?` | Lists archive contents by category, flags the array superblock member and whether restoring it is currently allowed (only when the array has nothing assigned yet). Returns a `token`. |
 | GET | `/system/backup/local/list` | - | What's already sitting at the configured Local Backups destination. `{ destDir: string \| null, backups: [{ name, sizeBytes, modifiedAt, encrypted, categories: string[] \| null }] }` - `destDir: null` covers both "nothing configured yet" and a destination picker that can't resolve without more setup (the `array` mode with no disk slot chosen); either way `backups` is `[]`, not an error. `encrypted`/`categories` come from the archive's own `.meta.json` sidecar. |
 | POST | `/system/backup/local/restore/preview` | `{ name, password? }` | Same preview shape as the upload route, sourced from one of `GET /system/backup/local/list`'s own entries instead of a fresh upload. `name` must exactly match a real entry there - no arbitrary host path accepted. |
-| POST | `/system/backup/restore/commit` | `{ token, categories?: string[] }` | Re-validates fresh (array must be stopped). `categories` omitted/malformed restores everything (back-compat with pre-selection clients). Best-effort superblock reload if the superblock was restored - a reload failure is reported in the body, not a `502`, since the files are safely on disk either way. |
+| POST | `/system/backup/restore/commit` | `{ token, categories?: string[] }` | Re-validates fresh (array must be stopped). `categories` omitted/malformed restores everything (back-compat with pre-selection clients). Best-effort superblock reload if the superblock was restored - a reload failure is reported in the body, not a `502`, since the files are safely on disk either way. When the archive's managed-users export was part of what got restored, also recreates whatever users/groups are missing on this host (`useradd -u <original uid>` + implanting the captured `/etc/shadow` hash directly, never the original plaintext) - reported as `usersRestoreResult: { usersCreated, usersSkipped, groupsCreated, groupsSkipped } | null` (`null` when that category wasn't restored) and `usersRestoreError: string | null`. |
 
 ## Services
 
@@ -284,10 +306,10 @@ locally (`backend/src/rclone/syncJobStore.ts`).
 |---|---|---|---|
 | GET | `/rclone/status` | - | `{ installed, running, featureEnabled }`. `installed: false` (not an error) when the `rclone` binary isn't on PATH; `running` reflects whether `rclone-rcd` answered a live RC call just now. |
 | PUT | `/rclone/enabled` | `{ enabled: boolean }` | Persists the toggle and best-effort starts/stops the `rclone-rcd` systemd unit to match. |
-| GET | `/rclone/providers` | - | Every backend rclone supports, live from its own `config/providers` RC call, reduced to the handful of non-advanced fields (name/help/default/required/isPassword/type) this app's dynamic Add-remote form actually renders - not the full advanced option set. |
+| GET | `/rclone/providers` | - | Every backend rclone supports, live from its own `config/providers` RC call. Each provider's fields are split into `options` (the standard ones, always shown) and `advancedOptions` (rclone-web's own "Show advanced" set, rolled up behind the Add-remote form's own "More options" disclosure) - both exclude genuinely deprecated fields (rclone's `Hide` bitmask, plus a help-text check for the ones `Hide` alone doesn't catch). |
 | GET | `/rclone/remotes` | - | Configured remotes with live per-remote status (`ok` \| `authExpired` \| `error` \| `unknown`), from `config/listremotes` plus a `checkRemote()` probe on each. |
 | POST | `/rclone/remotes` | `{ name, type, parameters }` | `config/create`. OAuth-based providers (Google Drive, Dropbox, ...) return mid-flow instead of finishing immediately (`{ done: false, state, ... }`) - the frontend then calls `.../continue` once the user's done authorizing. |
-| POST | `/rclone/remotes/:name/continue` | `{ type, state }` | Resumes an in-progress OAuth remote setup (`config/create` called again with the saved `state`) until it reports `done: true`. |
+| POST | `/rclone/remotes/:name/continue` | `{ type, state, result }` | Resumes an in-progress OAuth remote setup (`config/create` called again with the saved `state`, answering its next prompt with `result`) until it reports `done: true`. |
 | GET | `/rclone/remotes/:name` | - | The remote's current saved config (`config/dump`, scoped to one remote) - backs the Edit-remote form's pre-filled values. |
 | PUT | `/rclone/remotes/:name` | `{ parameters }` | `config/update` - merges the given fields into the existing remote config rather than replacing it wholesale. Provider type itself isn't editable this way (delete + recreate instead). |
 | DELETE | `/rclone/remotes/:name` | - | `config/delete`. Any sync job still pointing at this remote isn't deleted or blocked - it starts reporting a "remote missing" error state instead (see `GET /rclone/jobs`). |

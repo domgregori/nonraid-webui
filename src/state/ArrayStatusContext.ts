@@ -54,7 +54,7 @@ export interface ArrayStatusContextValue {
   parityAction: (action: ParityCheckAction) => void;
   selectDisk: (id: string) => void;
   closeDetail: () => void;
-  /** Real - calls the backend, which writes directly to /proc/nmdcmd (see backend/README.md). */
+  /** Real - calls the backend, which writes directly to /proc/nmdcmd (see backend/src/nmd/). */
   unassignDisk: (slot: number) => void;
   /** Undoes an *uncommitted* unassign (DISK_NP_MISSING, identity still intact) - only
    *  applies before the array has been started since. See ReplaceDiskDialog for the
