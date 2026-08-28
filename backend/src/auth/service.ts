@@ -10,10 +10,10 @@ import {
   COOKIE_NAME,
   TWO_FACTOR_PENDING_COOKIE_NAME,
 } from './cookies.js';
-import { hashPassword, verifyPassword, signSession, verifySession, signTwoFactorPending, verifyTwoFactorPending, hashSecret, generateBackupCode } from './crypto.js';
+import { hashPassword, verifyPassword, signSession, verifySession, signTwoFactorPending, verifyTwoFactorPending, hashSecret, verifySecret, generateBackupCode, generateApiToken } from './crypto.js';
 import type { RequestOrigin } from './requestOrigin.js';
 import { generateTotpSecret, totpProvisioningUri, totpQrDataUri, verifyTotpCode } from './totp.js';
-import type { AuthRecord, AuthStatus, TotpBackupCode, TwoFactorMethod } from './types.js';
+import type { ApiToken, AuthRecord, AuthStatus, TotpBackupCode, TwoFactorMethod } from './types.js';
 import { passkeyAuthenticationOptions, passkeyRegistrationOptions, verifyPasskeyAuthentication, verifyPasskeyRegistration } from './webauthn.js';
 
 const BACKUP_CODE_COUNT = 10;
@@ -51,11 +51,16 @@ export class AuthService {
     return (await this.store.get()) !== null;
   }
 
-  async isAuthenticated(cookieHeader: string | undefined): Promise<boolean> {
+  // `authorizationHeader` is optional and only consulted when the cookie check fails - a session
+  // cookie is the cheap, common case (one HMAC verify), while a bearer token means a linear scrypt
+  // scan over every stored token (see verifyBearerToken below), so there's no reason to pay that
+  // cost on every browser request that already carries a valid cookie.
+  async isAuthenticated(cookieHeader: string | undefined, authorizationHeader?: string): Promise<boolean> {
     const record = await this.store.get();
     if (!record) return false;
     const cookies = parseCookies(cookieHeader);
-    return verifySession(record.sessionSecret, cookies[COOKIE_NAME]) !== null;
+    if (verifySession(record.sessionSecret, cookies[COOKIE_NAME]) !== null) return true;
+    return this.verifyBearerToken(record, authorizationHeader);
   }
 
   async status(cookieHeader: string | undefined): Promise<AuthStatus> {
@@ -249,6 +254,30 @@ export class AuthService {
     await this.store.removePasskey(id);
   }
 
+  // --- API tokens (CLI/scripting auth) ---
+
+  // Session-gated like everything else above, deliberately: a token can only be minted or revoked
+  // by someone who already holds a real session cookie, never by presenting another token - see
+  // ApiToken's doc comment in types.ts for why that matters. Returns the raw token exactly once;
+  // only its hash is ever persisted.
+  async createApiToken(cookieHeader: string | undefined, name: string): Promise<{ id: string; name: string; createdAt: number; token: string }> {
+    await this.requireSession(cookieHeader);
+    const token = generateApiToken();
+    const hash = await hashSecret(token);
+    const created = await this.store.createApiToken(name, hash);
+    return { id: created.id, name: created.name, createdAt: created.createdAt, token };
+  }
+
+  async listApiTokens(cookieHeader: string | undefined): Promise<Omit<ApiToken, 'hash'>[]> {
+    const record = await this.requireSession(cookieHeader);
+    return (record.apiTokens ?? []).map(({ hash: _hash, ...rest }) => rest);
+  }
+
+  async revokeApiToken(cookieHeader: string | undefined, id: string): Promise<void> {
+    await this.requireSession(cookieHeader);
+    await this.store.revokeApiToken(id);
+  }
+
   // Re-verifies the current session and issues a fresh cookie for it - used when something about
   // cookie *policy* changes mid-session (currently: disabling TLS, which must flip cookieSecure to
   // false so the browser doesn't carry a now-unusable Secure cookie into the plain-HTTP page it's
@@ -270,6 +299,25 @@ export class AuthService {
     const plain = Array.from({ length: BACKUP_CODE_COUNT }, () => generateBackupCode());
     const hashed: TotpBackupCode[] = await Promise.all(plain.map(async (plainCode) => ({ hash: await hashSecret(plainCode), usedAt: null })));
     return { plain, hashed };
+  }
+
+  // Linear scan over every stored token, verifying each with scrypt (hashSecret's format has a
+  // per-token salt, so there's no way to index straight to the right entry without recomputing the
+  // hash you're trying to look up) - fine for a single-admin account with a handful of tokens, not
+  // something this codebase needs to scale past. Bumps lastUsedAt best-effort on a match; never
+  // awaited by the caller, matching this codebase's other fire-and-forget writes (e.g. activity
+  // logging).
+  private async verifyBearerToken(record: AuthRecord, authorizationHeader: string | undefined): Promise<boolean> {
+    if (!authorizationHeader?.startsWith('Bearer ')) return false;
+    const presented = authorizationHeader.slice('Bearer '.length).trim();
+    if (!presented) return false;
+    for (const entry of record.apiTokens ?? []) {
+      if (await verifySecret(presented, entry.hash)) {
+        this.store.touchApiToken(entry.id).catch(() => {});
+        return true;
+      }
+    }
+    return false;
   }
 
   private async requireSession(cookieHeader: string | undefined): Promise<AuthRecord> {

@@ -569,6 +569,19 @@
   font-size: 13px;
 }
 
+/* One-time API token reveal panel — see ApiTokensSection.tsx. Same visual language as
+   .backup-codes-grid above, but a single long value (not a grid of short codes) so it's one
+   full-width, wrapping block instead. */
+.api-token-reveal {
+  padding: var(--space-md);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  word-break: break-all;
+}
+
 /* Themed <input type="file"> (TLS cert/key import) — the native control can't
    be restyled wholesale, but ::file-selector-button has solid modern support
    and lets the button half match .btn while the "no file chosen" text half

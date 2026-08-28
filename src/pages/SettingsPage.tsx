@@ -8,6 +8,7 @@ import { lxcApi } from '../api/lxcApi';
 import { nmdApi } from '../api/nmdApi';
 import { settingsApi } from '../api/settingsApi';
 import { systemApi } from '../api/systemApi';
+import { ApiTokensSection } from '../components/settings/ApiTokensSection';
 import { AppriseTargetsField } from '../components/settings/AppriseTargetsField';
 import { ConfigRestoreWizard } from '../components/settings/ConfigRestoreWizard';
 import { EncryptBackupModal } from '../components/settings/EncryptBackupModal';
@@ -1330,6 +1331,7 @@ export function SettingsPage() {
             <TwoFactorSection />
             <PasskeySection />
             <SshKeysSection />
+            <ApiTokensSection />
           </div>
 
           <div className={`settings-card${activeSection === 'tailscale' ? '' : ' settings-hidden'}`}>

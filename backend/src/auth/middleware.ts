@@ -12,7 +12,7 @@ import type { AuthService } from './service.js';
 export function requireAuth(authService: AuthService) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const authenticated = await authService.isAuthenticated(req.headers.cookie);
+      const authenticated = await authService.isAuthenticated(req.headers.cookie, req.headers.authorization);
       if (!authenticated) {
         res.status(401).json({ error: 'Unauthorized' });
         return;

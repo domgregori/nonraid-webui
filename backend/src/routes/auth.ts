@@ -2,10 +2,11 @@ import { Router, type Response } from 'express';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import type { ActivityStore } from '../activity/index.js';
 import type { AuthService } from '../auth/index.js';
-import { loginRateLimiter, totpVerifyRateLimiter } from '../auth/index.js';
+import { loginRateLimiter, requireStepUp, totpVerifyRateLimiter } from '../auth/index.js';
 import { serializeClearTwoFactorPendingCookie } from '../auth/cookies.js';
 import { requestOrigin } from '../auth/requestOrigin.js';
 import {
+  validateApiTokenNameInput,
   validateCurrentPasswordInput,
   validateLoginInput,
   validatePasskeyNameInput,
@@ -199,6 +200,41 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
     try {
       await authService.removePasskey(req.headers.cookie, req.params.id);
       activity.log('Passkey removed', 'amber').catch(() => {});
+      res.json({ ok: true });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // --- API tokens (CLI/scripting auth) - session-gated, see AuthService.createApiToken ---
+
+  // Minting a token grants durable, non-interactive API access - same class of risk as adding a
+  // trusted SSH key (routes/ssh.ts), so it gets the same step-up re-auth gate (currentPassword,
+  // +totpCode if enrolled) rather than just a valid session cookie. Revocation only removes
+  // access - a strictly safety-positive action - so it stays plain-session-gated below, by design.
+  router.post('/auth/tokens', totpVerifyRateLimiter, requireStepUp(authService), async (req, res) => {
+    try {
+      const name = validateApiTokenNameInput(req.body);
+      const result = await authService.createApiToken(req.headers.cookie, name);
+      activity.log(`API token "${name}" created`, 'green').catch(() => {});
+      res.status(201).json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  router.get('/auth/tokens', async (req, res) => {
+    try {
+      res.json(await authService.listApiTokens(req.headers.cookie));
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  router.delete('/auth/tokens/:id', async (req, res) => {
+    try {
+      await authService.revokeApiToken(req.headers.cookie, req.params.id);
+      activity.log('API token revoked', 'amber').catch(() => {});
       res.json({ ok: true });
     } catch (err) {
       handleError(err, res);

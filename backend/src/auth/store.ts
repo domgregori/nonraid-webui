@@ -1,9 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import { generateSecret, verifySecret } from './crypto.js';
-import type { AuthRecord, PasskeyCredential, TotpBackupCode } from './types.js';
+import type { ApiToken, AuthRecord, PasskeyCredential, TotpBackupCode } from './types.js';
 
 /**
  * Owns auth.json - same pattern as settings/store.ts (in-memory cache,
@@ -206,6 +207,62 @@ export class AuthStore {
       const record: AuthRecord = { ...current, passkeys: existing.map((p) => (p.id === id ? { ...p, counter } : p)) };
       await this.persistAtomic(record);
       return record;
+    });
+    this.writeQueue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+
+  // --- API tokens ---
+
+  createApiToken(name: string, hash: string): Promise<ApiToken> {
+    const result = this.writeQueue.then(async () => {
+      const current = await this.load();
+      if (!current) throw new HttpError(409, 'No admin account is configured yet.');
+      const token: ApiToken = { id: randomUUID(), name, hash, createdAt: Date.now(), lastUsedAt: null };
+      const record: AuthRecord = { ...current, apiTokens: [...(current.apiTokens ?? []), token] };
+      await this.persistAtomic(record);
+      return token;
+    });
+    this.writeQueue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+
+  revokeApiToken(id: string): Promise<void> {
+    const result = this.writeQueue.then(async () => {
+      const current = await this.load();
+      if (!current) throw new HttpError(409, 'No admin account is configured yet.');
+      const existing = current.apiTokens ?? [];
+      if (!existing.some((t) => t.id === id)) {
+        throw new HttpError(404, 'No API token with that ID.');
+      }
+      const record: AuthRecord = { ...current, apiTokens: existing.filter((t) => t.id !== id) };
+      await this.persistAtomic(record);
+    });
+    this.writeQueue = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+
+  // Best-effort, called on every bearer-token-authenticated request (see
+  // AuthService.isAuthenticated) - callers deliberately never await this, so it must never throw
+  // in a way that could surface as an unhandled rejection. Silently no-ops if the token was
+  // revoked between verifying it and this write landing.
+  touchApiToken(id: string): Promise<void> {
+    const result = this.writeQueue.then(async () => {
+      const current = await this.load();
+      if (!current) return;
+      const existing = current.apiTokens ?? [];
+      if (!existing.some((t) => t.id === id)) return;
+      const record: AuthRecord = { ...current, apiTokens: existing.map((t) => (t.id === id ? { ...t, lastUsedAt: Date.now() } : t)) };
+      await this.persistAtomic(record);
     });
     this.writeQueue = result.then(
       () => {},

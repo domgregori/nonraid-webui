@@ -146,6 +146,27 @@
     "removeKeyDesc": "Removing this key can lock out SSH access if it's the only one trusted.",
     "removeKey": "Remove key"
   },
+  "ApiTokensSection": {
+    "title": "API tokens",
+    "desc": "Tokens let the CLI or other scripts use the API without a password.",
+    "confirm": "Confirm?",
+    "revoke": "Revoke",
+    "noTokens": "No tokens yet.",
+    "namePlaceholder": "Name this token (for example: laptop cli)",
+    "createToken": "Create token",
+    "confirmItsYou": "Confirm it's you",
+    "createTokenDesc": "This token will have full API access until you revoke it.",
+    "created": "Created {{time}}",
+    "lastUsed": "Last used {{time}}",
+    "neverUsed": "Not used yet",
+    "revealTitle": "Save this token now",
+    "revealDesc": "You can see this token only once. Copy it now and store it somewhere safe.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "selectedForCopy": "Selected - press Ctrl+C",
+    "savedAck": "I saved this token.",
+    "done": "Done"
+  },
   "StorageLocationField": {
     "bootDisk": "Boot Disk",
     "cache": "Cache",

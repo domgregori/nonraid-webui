@@ -9,6 +9,21 @@ export interface AuthRecord {
   // one - nothing that decides whether 2FA is required at login reads this field, only `totp`.
   pendingTotp?: PendingTotpEnrollment;
   passkeys?: PasskeyCredential[];
+  apiTokens?: ApiToken[];
+}
+
+// A long-lived credential for the CLI (or any other non-browser client) to authenticate without a
+// session cookie - sent as `Authorization: Bearer <raw token>`. Only ever mintable/revocable by
+// someone already holding a real session cookie (see routes/auth.ts's token routes and
+// requireSession) - never by another token - so there's no bootstrapping problem where a leaked
+// token could mint further tokens for itself.
+export interface ApiToken {
+  id: string;
+  name: string; // user-supplied label, e.g. "laptop cli"
+  hash: string; // "saltHex:hashHex" of the raw token, same scrypt format as passwordHash - see
+  // crypto.ts. The raw token itself is never stored, only shown once at creation time.
+  createdAt: number;
+  lastUsedAt: number | null;
 }
 
 // secret is stored in the clear (base32), unlike passwordHash/backup-code hashes below - the

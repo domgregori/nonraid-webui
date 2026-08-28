@@ -1,0 +1,33 @@
+{
+  "name": "nonraid-cli",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Command-line client for nonraid-webui's REST API - plain CLI by default, `nonraid tui` for an interactive Ink-based dashboard.",
+  "bin": {
+    "nonraid": "dist/index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json && chmod +x dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "chalk": "^6.0.0",
+    "commander": "^15.0.0",
+    "ink": "^7.1.1",
+    "prompts": "^2.4.2",
+    "react": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "@types/prompts": "^2.4.9",
+    "@types/react": "^19.2.18",
+    "tsx": "^4.19.2",
+    "typescript": "~5.7.2"
+  }
+}

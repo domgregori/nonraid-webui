@@ -47,6 +47,16 @@ export function generateBackupCode(): string {
   return `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8, 12)}`;
 }
 
+// CLI/API bearer tokens - "nrd_" prefix keeps them greppable/recognizable (e.g. in shell history
+// or a leaked log line) the way "ghp_"/"sk_" prefixes work for other token systems. 24 random
+// bytes base64url-encoded gives 32 chars of entropy after the prefix, comfortably more than the
+// backup-code alphabet above needs to guard against guessing. Hashed at rest with hashSecret, same
+// as everything else in this file that isn't itself a signed cookie payload - see ApiToken's doc
+// comment in types.ts.
+export function generateApiToken(): string {
+  return `nrd_${randomBytes(24).toString('base64url')}`;
+}
+
 /**
  * Shared signing/verification core for every cookie this app issues - session and 2FA-pending
  * cookies alike are both "signed {purpose, issuedAt, expiresAt}", just with a different `purpose`.

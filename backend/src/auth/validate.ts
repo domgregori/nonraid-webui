@@ -105,3 +105,19 @@ export function validatePasskeyNameInput(input: unknown): string {
   }
   return name;
 }
+
+// Same shape as PASSKEY_NAME_RE - a user-facing label for an API token (e.g. "laptop cli"), not an
+// OS identifier.
+const API_TOKEN_NAME_RE = /^[\x20-\x7e]{1,64}$/;
+
+export function validateApiTokenNameInput(input: unknown): string {
+  if (typeof input !== 'object' || input === null) {
+    throw new HttpError(400, 'Request body must be a JSON object.');
+  }
+  const i = input as Record<string, unknown>;
+  const name = typeof i.name === 'string' ? i.name.trim() : '';
+  if (!API_TOKEN_NAME_RE.test(name)) {
+    throw new HttpError(400, 'name must be 1-64 printable characters.');
+  }
+  return name;
+}

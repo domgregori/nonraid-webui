@@ -11,9 +11,10 @@ backend module owns which subsystem.
 
 - **Base path**: every route below is mounted under `/api` (e.g. `GET /status` in this doc means
   `GET /api/status`).
-- **Auth**: every route requires a valid session cookie *except* `GET /api/health` and everything
-  under `/api/auth/*` (login/setup/status are necessarily reachable pre-session). A request with no
-  or an invalid session gets `401`.
+- **Auth**: every route requires a valid session cookie or `Authorization: Bearer <token>` *except*
+  `GET /api/health` and everything under `/api/auth/*` (login/setup/status are necessarily reachable
+  pre-session; the token-management routes are session-only, see the Auth section below). A request
+  with neither gets `401`.
 - **Errors**: `{ error: string }`. Status is usually `400` (bad request/validation), `404` (not
   found), `409` (conflict - name already exists, a queued operation is already running, etc.), or
   `502` (the underlying command failed - nmdctl/Docker/smartctl/mergerfs/Samba/openssl/apprise/...).
@@ -369,6 +370,14 @@ Public (no session required): `status`, `setup`, `login`, `logout`, and the TOTP
 *login-time verification* endpoints (gated by a short-lived pending-2FA cookie instead, issued by
 `login` when a second factor is enrolled). Everything else here requires a session.
 
+**API tokens**: every non-auth route in this API also accepts `Authorization: Bearer <token>` as an
+alternative to a session cookie (see `requireAuth`/`AuthService.isAuthenticated`) - this is what the
+`nonraid` CLI uses. Tokens are minted/listed/revoked below; creation requires a real session plus
+step-up re-auth, while revocation only needs a session (removing access is strictly safety-positive,
+and a token can never mint or revoke itself or another token, avoiding any bootstrapping problem).
+The raw token is returned exactly once, at creation time, and never stored or shown again - only a
+salted hash of it persists server-side.
+
 | Method | Path | Body/Params | Response / Notes |
 |---|---|---|---|
 | GET | `/auth/status` | - | `{ configured, authenticated, ... }`. |
@@ -387,6 +396,9 @@ Public (no session required): `status`, `setup`, `login`, `logout`, and the TOTP
 | DELETE | `/auth/2fa/passkey/:id` | - | |
 | POST | `/auth/2fa/passkey/auth-options` | - | WebAuthn login challenge. |
 | POST | `/auth/2fa/passkey/auth-verify` | `{ response }` | Login-time second factor. `response` is `AuthenticationResponseJSON`. |
+| POST | `/auth/tokens` | `{ name, currentPassword, totpCode? }` | Step-up gated (same class of risk as adding an SSH key) - `totpCode` required only if TOTP is enrolled. `201`, `{ id, name, createdAt, token }` - `token` (`nrd_...`) is shown once and never retrievable again. |
+| GET | `/auth/tokens` | - | `{ id, name, createdAt, lastUsedAt }[]` - never the hash or raw token. |
+| DELETE | `/auth/tokens/:id` | - | Session-gated only (not step-up) - revokes one token immediately. |
 
 ## Activity, Logs, Metrics
 
