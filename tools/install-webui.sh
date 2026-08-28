@@ -24,6 +24,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="$REPO_ROOT/backend"
+CLI_DIR="$REPO_ROOT/cli"
 INSTALL_ROOT=/opt/nonraid-webui
 NODE_BIN=/usr/bin/node
 MERGERFS_MIN="2.42.0"
@@ -581,6 +582,20 @@ build_frontend() {
   (cd "$REPO_ROOT" && npm ci && npm run build)
 }
 
+build_cli() {
+  log "Building the nonraid CLI"
+  (cd "$CLI_DIR" && npm ci && npm run build)
+}
+
+# Symlinked (not copied like nmdctl above) straight into the dev checkout's own cli/dist +
+# cli/node_modules - unlike the backend/frontend, the CLI has no separate /opt staging copy, so
+# node's module resolution needs those to stay right where npm put them. dist/index.js already has
+# its own #!/usr/bin/env node shebang and is chmod +x'd by cli's own build script.
+install_cli() {
+  log "Installing the nonraid CLI to /usr/local/bin/nonraid"
+  ln -sf "$CLI_DIR/dist/index.js" /usr/local/bin/nonraid
+}
+
 stage_backend() {
   log "Staging backend into $INSTALL_ROOT/backend"
   mkdir -p "$INSTALL_ROOT/backend"
@@ -697,6 +712,12 @@ update_frontend() {
   restart_webui
 }
 
+# No restart_webui here - the CLI is a standalone binary, not part of the nonraid-webui service.
+update_cli() {
+  build_cli
+  install_cli
+}
+
 # The kernel module - rebuilds/reinstalls it via DKMS, same as install_nonraid_driver in a full
 # run. Deliberately does not unload/reload the *live* module (that's a separate, disruptive
 # operation - stops the array, needs Docker/LXC out of the way first - triggered from the app
@@ -763,10 +784,12 @@ STEPS=(
   check_required_tools
   build_backend
   build_frontend
+  build_cli
   stage_install
   install_webui_systemd_unit
   install_rclone_systemd_unit
   install_docker_lxc_array_ordering
+  install_cli
   start_services
   print_summary
 )
@@ -777,6 +800,7 @@ STEPS=(
 SHORTCUTS=(
   update_backend
   update_frontend
+  update_cli
   update_driver
   update_script
   update_packages

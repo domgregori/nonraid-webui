@@ -69,12 +69,16 @@ function runInstallScript(steps: string[]): Promise<ApplyResult> {
 // apply that to every already-installed system the moment its admin updates the webui, not just on
 // a fresh install. This is only as fast as the underlying distro's own package repo, though - if a
 // fix hasn't landed there yet, re-running this does nothing until it has.
+//
+// build_cli/install_cli are here for the same reason - a release that changes the CLI (e.g. to
+// match a backend API change) should refresh the already-installed `nonraid` binary too, not leave
+// it silently stale until someone happens to run a fresh install.
 export function applyWebuiUpdate(): Promise<ApplyResult> {
   return runInstallScriptGroups([
     ['snapshot_before_update'],
     ['update_script'], // a SHORTCUT - must run alone, before the STEPS group below, so the build
     // actually picks up what this just pulled (see runInstallScriptGroups's own comment).
-    ['install_system_packages', 'build_backend', 'build_frontend', 'stage_install', 'pin_kernel_minor'],
+    ['install_system_packages', 'build_backend', 'build_frontend', 'build_cli', 'stage_install', 'install_cli', 'pin_kernel_minor'],
   ]);
 }
 
