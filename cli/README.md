@@ -2,6 +2,10 @@
 
 A command-line client for the nonraid-webui backend API. Runs as a plain CLI by default; `nonraid-tool tui` opens an interactive dashboard instead.
 
+```bash
+nonraid-tool --version   # or: nonraid-tool version, or: nonraid-tool -V
+```
+
 ## Install
 
 `nonraid-tool` is built and installed by the webui's own install script, as part of a normal install or update:
