@@ -71,8 +71,8 @@ function runInstallScript(steps: string[]): Promise<ApplyResult> {
 // fix hasn't landed there yet, re-running this does nothing until it has.
 //
 // build_cli/install_cli are here for the same reason - a release that changes the CLI (e.g. to
-// match a backend API change) should refresh the already-installed `nonraid` binary too, not leave
-// it silently stale until someone happens to run a fresh install.
+// match a backend API change) should refresh the already-installed `nonraid-tool` binary too, not
+// leave it silently stale until someone happens to run a fresh install.
 export function applyWebuiUpdate(): Promise<ApplyResult> {
   return runInstallScriptGroups([
     ['snapshot_before_update'],

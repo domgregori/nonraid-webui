@@ -100,7 +100,7 @@ export function App({ client, host }: Props) {
   return (
     <Box flexDirection="column">
       <Text bold color="cyan">
-        nonraid tui — {host}
+        nonraid-tool tui — {host}
       </Text>
       {error && <Text color="red">status error: {error}</Text>}
       {status && (

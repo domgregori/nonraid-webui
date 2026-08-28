@@ -5,7 +5,7 @@ import type { ApiTokenEntry, CreatedApiToken } from '../../types/apiTokenApi';
 import { formatRelativeTime } from '../../utils/format';
 import { StepUpModal } from '../shared/StepUpModal';
 
-/** Long-lived bearer tokens for the `nonraid` CLI (or any other non-browser client) - list/create/
+/** Long-lived bearer tokens for the `nonraid-tool` CLI (or any other non-browser client) - list/create/
  *  revoke. Creating one is step-up gated like adding a trusted SSH key (SshKeysSection.tsx) - it
  *  grants durable API access. Revoking one is not - removing access is strictly safety-positive, so
  *  it's just the same click-once-to-arm "Confirm?" pattern BrowsePage.tsx's own Delete button uses,

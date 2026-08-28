@@ -1,6 +1,7 @@
 // Session-cookie login, used only for the two moments the CLI needs a real session rather than a
-// bearer token: `nonraid login`'s one-time token-minting bootstrap, and `nonraid logout --revoke`'s
-// optional server-side cleanup (see logout.ts's doc comment for why revocation itself needs this).
+// bearer token: `nonraid-tool login`'s one-time token-minting bootstrap, and
+// `nonraid-tool logout --revoke`'s optional server-side cleanup (see logout.ts's doc comment for
+// why revocation itself needs this).
 // Every other command in this CLI talks to the API purely via Authorization: Bearer, never cookies.
 import prompts from 'prompts';
 

@@ -1,7 +1,7 @@
 // Local CLI credential store - one JSON file, one admin-per-box the same way backend/src/auth's
 // auth.json is one-admin-per-box. No write queue/atomic rename here (unlike auth/store.ts): this
-// file is only ever touched by one interactive `nonraid login`/`logout` invocation at a time, never
-// under concurrent request load the way the server's store is.
+// file is only ever touched by one interactive `nonraid-tool login`/`logout` invocation at a time,
+// never under concurrent request load the way the server's store is.
 import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,11 +9,11 @@ import path from 'node:path';
 export interface CliConfig {
   host: string; // e.g. "https://nonraid.lan" or "http://nonraid.lan:80" - includes protocol, no trailing slash
   token: string; // raw "nrd_..." bearer token, see backend/src/auth/crypto.ts's generateApiToken
-  tokenId: string; // so `nonraid logout` can revoke the exact token server-side, not just forget it locally
+  tokenId: string; // so `nonraid-tool logout` can revoke the exact token server-side, not just forget it locally
   insecure?: boolean; // skip TLS certificate verification - for a self-signed cert host, see api/client.ts
 }
 
-const CONFIG_DIR = path.join(os.homedir(), '.config', 'nonraid-cli');
+const CONFIG_DIR = path.join(os.homedir(), '.config', 'nonraid-tool');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
 export function configPath(): string {

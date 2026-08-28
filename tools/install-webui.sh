@@ -583,7 +583,7 @@ build_frontend() {
 }
 
 build_cli() {
-  log "Building the nonraid CLI"
+  log "Building the nonraid-tool CLI"
   (cd "$CLI_DIR" && npm ci && npm run build)
 }
 
@@ -592,8 +592,8 @@ build_cli() {
 # node's module resolution needs those to stay right where npm put them. dist/index.js already has
 # its own #!/usr/bin/env node shebang and is chmod +x'd by cli's own build script.
 install_cli() {
-  log "Installing the nonraid CLI to /usr/local/bin/nonraid"
-  ln -sf "$CLI_DIR/dist/index.js" /usr/local/bin/nonraid
+  log "Installing the nonraid-tool CLI to /usr/local/bin/nonraid-tool"
+  ln -sf "$CLI_DIR/dist/index.js" /usr/local/bin/nonraid-tool
 }
 
 stage_backend() {

@@ -28,7 +28,7 @@ export async function loginCommand(opts: LoginOptions): Promise<void> {
 
   const { cookie, password } = await passwordLogin(base);
 
-  const defaultName = `nonraid-cli@${os.hostname()}`;
+  const defaultName = `nonraid-tool@${os.hostname()}`;
   const { tokenName } = await prompts({ type: 'text', name: 'tokenName', message: 'Name for this token', initial: defaultName }, { onCancel: () => process.exit(130) });
 
   // POST /auth/tokens is step-up gated (same class of risk as adding a trusted SSH key) -

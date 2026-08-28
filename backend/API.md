@@ -372,7 +372,7 @@ Public (no session required): `status`, `setup`, `login`, `logout`, and the TOTP
 
 **API tokens**: every non-auth route in this API also accepts `Authorization: Bearer <token>` as an
 alternative to a session cookie (see `requireAuth`/`AuthService.isAuthenticated`) - this is what the
-`nonraid` CLI uses. Tokens are minted/listed/revoked below; creation requires a real session plus
+`nonraid-tool` CLI uses. Tokens are minted/listed/revoked below; creation requires a real session plus
 step-up re-auth, while revocation only needs a session (removing access is strictly safety-positive,
 and a token can never mint or revoke itself or another token, avoiding any bootstrapping problem).
 The raw token is returned exactly once, at creation time, and never stored or shown again - only a

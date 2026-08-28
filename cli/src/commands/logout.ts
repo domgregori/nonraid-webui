@@ -7,11 +7,11 @@ interface LogoutOptions {
 
 /**
  * By design (see backend/src/auth/service.ts's createApiToken/revokeApiToken doc comments), a
- * token can never revoke itself or any other token - only a real session can. So plain `nonraid
- * logout` just forgets the token locally; the token stays valid server-side until an admin revokes
- * it (currently only possible with a session, e.g. `--revoke` here, which re-prompts for the
- * password to get one, or a future web UI token-management page). This mirrors "losing your laptop
- * doesn't revoke your SSH key" - local logout and server-side revocation are deliberately separate
+ * token can never revoke itself or any other token - only a real session can. So plain
+ * `nonraid-tool logout` just forgets the token locally; the token stays valid server-side until
+ * revoked with a session, either `--revoke` here (re-prompts for the password to get one) or the
+ * Settings > Security > API tokens page in the web UI. This mirrors "losing your laptop doesn't
+ * revoke your SSH key" - local logout and server-side revocation are deliberately separate
  * operations.
  */
 export async function logoutCommand(opts: LogoutOptions): Promise<void> {

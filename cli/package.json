@@ -1,11 +1,11 @@
 {
-  "name": "nonraid-cli",
+  "name": "nonraid-tool",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Command-line client for nonraid-webui's REST API - plain CLI by default, `nonraid tui` for an interactive Ink-based dashboard.",
+  "description": "Command-line client for nonraid-webui's REST API - plain CLI by default, `nonraid-tool tui` for an interactive Ink-based dashboard.",
   "bin": {
-    "nonraid": "dist/index.js"
+    "nonraid-tool": "dist/index.js"
   },
   "engines": {
     "node": ">=22"

@@ -10,7 +10,7 @@ import { runAction } from './output.js';
 
 const program = new Command();
 
-program.name('nonraid').description("Command-line client for nonraid-webui's REST API.").version('0.1.0');
+program.name('nonraid-tool').description("Command-line client for nonraid-webui's REST API.").version('0.1.0');
 
 program
   .command('login')
