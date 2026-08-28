@@ -1,7 +1,8 @@
 import { Command } from 'commander';
 import { resolveClient } from '../context.js';
 import { printTable, runAction } from '../output.js';
-import type { CommandResult, NmdStatusResponse } from '../api/types.js';
+import { printSmartAttributes } from './smart.js';
+import type { CommandResult, NmdStatusResponse, SmartAttributes } from '../api/types.js';
 
 export function registerArrayCommand(program: Command): void {
   const array = program.command('array').description('array status and lifecycle');
@@ -83,6 +84,28 @@ export function registerDiskCommand(program: Command): void {
         const client = await resolveClient();
         const result = await client.post<CommandResult>(`/disks/${slot}/spin-up`);
         console.log(result.message);
+      }),
+    );
+
+  disk
+    .command('smart <slot>')
+    .description('SMART attributes for the disk in the given slot')
+    .action(
+      runAction(async (slot: string) => {
+        const client = await resolveClient();
+        const attrs = await client.get<SmartAttributes>(`/disks/${slot}/smart`);
+        printSmartAttributes(attrs);
+      }),
+    );
+
+  disk
+    .command('self-test <slot> <type>')
+    .description('start a SMART self-test: short | long | conveyance')
+    .action(
+      runAction(async (slot: string, type: string) => {
+        const client = await resolveClient();
+        await client.post(`/disks/${slot}/smart/self-test`, { type });
+        console.log(`${type} self-test started on slot ${slot}.`);
       }),
     );
 }
