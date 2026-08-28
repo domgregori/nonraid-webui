@@ -168,6 +168,12 @@ export function UpdateSection() {
                   </span>
                 </div>
               )}
+              {key === 'nonraidWebui' && (
+                <div className="settings-info-row">
+                  <span className="settings-info-row__label">{t('UpdateSection.cliTool')}</span>
+                  <span className="settings-info-row__value settings-info-row__value--mono">{status.cliTool ?? t('UpdateSection.cliToolNotInstalled')}</span>
+                </div>
+              )}
               <div className="settings-info-row">
                 <span className="settings-info-row__label">{t('UpdateSection.latest')}</span>
                 <span className="settings-info-row__value settings-info-row__value--mono">

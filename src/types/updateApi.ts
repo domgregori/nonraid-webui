@@ -21,6 +21,10 @@ export interface ComponentUpdateStatus {
 export interface UpdateStatus {
   nonraid: ComponentUpdateStatus;
   nonraidWebui: ComponentUpdateStatus;
+  /** The installed nonraid-tool CLI's own version (e.g. "0.1.0"), or null if not installed - no
+   *  latest/upToDate/update button of its own, it's rebuilt+reinstalled as part of the same
+   *  nonraidWebui update, never independently. */
+  cliTool: string | null;
   /** epoch ms of the last live check, or null if one has never run. */
   checkedAt: number | null;
 }

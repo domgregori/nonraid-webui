@@ -101,6 +101,7 @@ export const config = {
   // admin isn't nagged to regenerate one every year.
   tlsSelfSignedDays: num('TLS_SELF_SIGNED_DAYS', 3650),
   opensslBin: str('OPENSSL_BIN', 'openssl'),
+  nonraidToolBin: str('NONRAID_TOOL_BIN', 'nonraid-tool'),
   nmdBin: str('NMD_BIN', 'nmdctl'),
   nmdTimeoutMs: num('NMD_TIMEOUT_MS', 15_000),
   // nmdctl's own `unassign` has an unconditional interactive confirm prompt with

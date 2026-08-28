@@ -254,6 +254,8 @@
     "installed": "Installed",
     "notTaggedRelease": "Not a tagged release",
     "running": "Running",
+    "cliTool": "CLI tool (nonraid-tool)",
+    "cliToolNotInstalled": "Not installed",
     "olderBuild": "Older build - reload from Settings > Services",
     "latest": "Latest",
     "noReleasesPublished": "No releases published yet",
