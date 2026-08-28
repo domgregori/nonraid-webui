@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { Command } from 'commander';
 import { loginCommand } from './commands/login.js';
 import { logoutCommand } from './commands/logout.js';
@@ -16,9 +19,22 @@ import { registerCacheCommand } from './commands/cache.js';
 import { registerRcloneCommand } from './commands/rclone.js';
 import { runAction } from './output.js';
 
+// Read the version from package.json rather than hardcoding it a second time here - this file
+// works the same way whether run compiled (dist/index.js) or straight from source via tsx
+// (src/index.ts), since package.json is one directory up from both.
+const pkgPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version: string };
+
 const program = new Command();
 
-program.name('nonraid-tool').description("Command-line client for nonraid-webui's REST API.").version('0.1.0');
+program.name('nonraid-tool').description("Command-line client for nonraid-webui's REST API.").version(pkg.version);
+
+// A `version` subcommand alongside the standard -V/--version flag - some scripts/muscle memory
+// reach for one or the other. Same output as --version, not a separate "richer" report.
+program
+  .command('version')
+  .description('print the CLI version')
+  .action(() => console.log(pkg.version));
 
 program
   .command('login')
