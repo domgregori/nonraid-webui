@@ -36,7 +36,9 @@ nonraid-tool login
 
 Prompts for the backend URL, username, and password (plus a 2FA code if enrolled), then mints a long-lived API token and saves it to `~/.config/nonraid-tool/config.json` (mode `0600`). Every later command reads that file automatically — no need to log in again.
 
-`nonraid-tool logout` forgets the token locally. Add `--revoke` to also invalidate it on the server (re-prompts for the password, since revoking a token needs a real session). Tokens can also be listed and revoked from the web UI: **Settings → Security → API tokens**.
+Tokens have a scope: `login` mints a full-access one by default, or add `--read-only` for a token that can only run `GET`-style commands (`ls`, `status`, `info`, ...) — anything that starts, stops, or changes something gets rejected server-side. Handy for monitoring scripts that shouldn't be able to touch anything.
+
+`nonraid-tool logout` forgets the token locally. Add `--revoke` to also invalidate it on the server (re-prompts for the password, since revoking a token needs a real session). Tokens can also be created (with either scope), listed, and revoked from the web UI: **Settings → Security → API tokens**.
 
 Passkey-only accounts can't complete `login` from a terminal — enroll TOTP or a backup code as a fallback first.
 

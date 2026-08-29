@@ -4,7 +4,7 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import { generateSecret, verifySecret } from './crypto.js';
-import type { ApiToken, AuthRecord, PasskeyCredential, TotpBackupCode } from './types.js';
+import type { ApiToken, ApiTokenScope, AuthRecord, PasskeyCredential, TotpBackupCode } from './types.js';
 
 /**
  * Owns auth.json - same pattern as settings/store.ts (in-memory cache,
@@ -217,11 +217,11 @@ export class AuthStore {
 
   // --- API tokens ---
 
-  createApiToken(name: string, hash: string): Promise<ApiToken> {
+  createApiToken(name: string, hash: string, scope: ApiTokenScope): Promise<ApiToken> {
     const result = this.writeQueue.then(async () => {
       const current = await this.load();
       if (!current) throw new HttpError(409, 'No admin account is configured yet.');
-      const token: ApiToken = { id: randomUUID(), name, hash, createdAt: Date.now(), lastUsedAt: null };
+      const token: ApiToken = { id: randomUUID(), name, hash, scope, createdAt: Date.now(), lastUsedAt: null };
       const record: AuthRecord = { ...current, apiTokens: [...(current.apiTokens ?? []), token] };
       await this.persistAtomic(record);
       return token;

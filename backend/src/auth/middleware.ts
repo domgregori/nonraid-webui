@@ -2,6 +2,10 @@ import type { NextFunction, Request, Response } from 'express';
 import { HttpError } from '../httpError.js';
 import type { AuthService } from './service.js';
 
+// Verbs a read-only token may still use - everything else 403s for it (see ApiTokenScope's own
+// doc comment in types.ts for why this is a blanket method-based rule, not a per-route allowlist).
+const READ_ONLY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 /**
  * Gates every route mounted after it. Express 4 does not auto-catch a
  * rejected async middleware - an uncaught throw here would hang the request
@@ -12,9 +16,13 @@ import type { AuthService } from './service.js';
 export function requireAuth(authService: AuthService) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const authenticated = await authService.isAuthenticated(req.headers.cookie, req.headers.authorization);
+      const { authenticated, tokenScope } = await authService.isAuthenticated(req.headers.cookie, req.headers.authorization);
       if (!authenticated) {
         res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      if (tokenScope === 'read-only' && !READ_ONLY_METHODS.has(req.method)) {
+        res.status(403).json({ error: 'This token is read-only.' });
         return;
       }
       next();

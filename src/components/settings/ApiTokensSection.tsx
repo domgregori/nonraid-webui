@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { apiTokenApi } from '../../api/apiTokenApi';
-import type { ApiTokenEntry, CreatedApiToken } from '../../types/apiTokenApi';
+import type { ApiTokenEntry, ApiTokenScope, CreatedApiToken } from '../../types/apiTokenApi';
 import { formatRelativeTime } from '../../utils/format';
 import { StepUpModal } from '../shared/StepUpModal';
 
@@ -17,6 +17,7 @@ export function ApiTokensSection() {
   const [tokens, setTokens] = useState<ApiTokenEntry[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState('');
+  const [scopeDraft, setScopeDraft] = useState<ApiTokenScope>('full');
   const [confirmingCreate, setConfirmingCreate] = useState(false);
   const [armedId, setArmedId] = useState<string | null>(null);
   const [revokeError, setRevokeError] = useState<string | null>(null);
@@ -86,7 +87,9 @@ export function ApiTokensSection() {
     return (
       <div className="settings-field">
         <div className="toggle-row__title">{t('ApiTokensSection.revealTitle')}</div>
-        <div className="toggle-row__desc">{t('ApiTokensSection.revealDesc')}</div>
+        <div className="toggle-row__desc">
+          {t('ApiTokensSection.revealDesc')} {revealed.scope === 'read-only' ? t('ApiTokensSection.revealScopeReadOnly') : t('ApiTokensSection.revealScopeFull')}
+        </div>
         <div className="api-token-reveal" ref={revealRef}>
           {revealed.token}
         </div>
@@ -121,7 +124,10 @@ export function ApiTokensSection() {
           {tokens.map((tok) => (
             <div className="remote-row" key={tok.id}>
               <div className="remote-row__body">
-                <div className="remote-row__name">{tok.name}</div>
+                <div className="remote-row__name" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {tok.name}
+                  {tok.scope === 'read-only' && <span className="job-badge job-badge--disabled">{t('ApiTokensSection.scopeReadOnly')}</span>}
+                </div>
                 <div className="remote-row__meta">
                   {t('ApiTokensSection.created', { time: formatRelativeTime(tok.createdAt) })} ·{' '}
                   {tok.lastUsedAt ? t('ApiTokensSection.lastUsed', { time: formatRelativeTime(tok.lastUsedAt) }) : t('ApiTokensSection.neverUsed')}
@@ -146,6 +152,10 @@ export function ApiTokensSection() {
         onChange={(e) => setNameDraft(e.target.value)}
         placeholder={t('ApiTokensSection.namePlaceholder')}
       />
+      <select className="history-input" value={scopeDraft} onChange={(e) => setScopeDraft(e.target.value as ApiTokenScope)}>
+        <option value="full">{t('ApiTokensSection.scopeFull')}</option>
+        <option value="read-only">{t('ApiTokensSection.scopeReadOnly')}</option>
+      </select>
       <div className="settings-field__row">
         <button type="button" className="btn" disabled={!nameDraft.trim()} onClick={() => setConfirmingCreate(true)}>
           {t('ApiTokensSection.createToken')}
@@ -155,12 +165,13 @@ export function ApiTokensSection() {
       {confirmingCreate && (
         <StepUpModal
           title={t('ApiTokensSection.confirmItsYou')}
-          description={t('ApiTokensSection.createTokenDesc')}
+          description={scopeDraft === 'read-only' ? t('ApiTokensSection.createTokenDescReadOnly') : t('ApiTokensSection.createTokenDesc')}
           confirmLabel={t('ApiTokensSection.createToken')}
           onClose={() => setConfirmingCreate(false)}
           onConfirm={async (password, totpCode) => {
-            const created = await apiTokenApi.create(nameDraft.trim(), password, totpCode);
+            const created = await apiTokenApi.create(nameDraft.trim(), scopeDraft, password, totpCode);
             setNameDraft('');
+            setScopeDraft('full');
             setRevealed(created);
             await load();
           }}

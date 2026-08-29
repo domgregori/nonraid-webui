@@ -1,4 +1,5 @@
 import { HttpError } from '../httpError.js';
+import type { ApiTokenScope } from './types.js';
 
 // This admin credential has nothing to do with the OS - unlike
 // users/validate.ts's NAME_RE, which exists because those become real
@@ -120,4 +121,13 @@ export function validateApiTokenNameInput(input: unknown): string {
     throw new HttpError(400, 'name must be 1-64 printable characters.');
   }
   return name;
+}
+
+// Defaults to 'full' when omitted - the only scope that existed before this concept did, so a
+// caller that doesn't say otherwise gets the same behavior as always.
+export function validateApiTokenScopeInput(input: unknown): ApiTokenScope {
+  const i = (typeof input === 'object' && input !== null ? input : {}) as Record<string, unknown>;
+  if (i.scope === undefined) return 'full';
+  if (i.scope === 'full' || i.scope === 'read-only') return i.scope;
+  throw new HttpError(400, "scope must be 'full' or 'read-only'.");
 }

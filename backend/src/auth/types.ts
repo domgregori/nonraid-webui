@@ -12,6 +12,14 @@ export interface AuthRecord {
   apiTokens?: ApiToken[];
 }
 
+// 'full' behaves exactly like a session cookie. 'read-only' is enforced by HTTP method, not a
+// per-route allowlist (see middleware.ts's requireAuth): GET/HEAD pass, everything else gets a
+// 403. A blanket verb-based rule rather than modeling every route's real semantics - this whole
+// app already follows REST conventions closely enough (see backend/API.md) that "non-GET =
+// mutation" holds almost everywhere, and the failure mode of getting it wrong (a 403 on a route
+// that was actually harmless) is a nuisance, not a security hole, unlike the reverse.
+export type ApiTokenScope = 'full' | 'read-only';
+
 // A long-lived credential for the CLI (or any other non-browser client) to authenticate without a
 // session cookie - sent as `Authorization: Bearer <raw token>`. Only ever mintable/revocable by
 // someone already holding a real session cookie (see routes/auth.ts's token routes and
@@ -22,6 +30,7 @@ export interface ApiToken {
   name: string; // user-supplied label, e.g. "laptop cli"
   hash: string; // "saltHex:hashHex" of the raw token, same scrypt format as passwordHash - see
   // crypto.ts. The raw token itself is never stored, only shown once at creation time.
+  scope: ApiTokenScope;
   createdAt: number;
   lastUsedAt: number | null;
 }

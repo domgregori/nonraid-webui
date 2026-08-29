@@ -41,6 +41,7 @@ program
   .description('log in with username/password and mint a local API token')
   .option('--host <url>', 'backend URL, e.g. http://nonraid.lan')
   .option('--insecure', 'skip TLS certificate verification (self-signed cert)')
+  .option('--read-only', 'mint a read-only token instead of full access')
   .action(runAction(loginCommand));
 
 program

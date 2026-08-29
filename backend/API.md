@@ -378,6 +378,12 @@ and a token can never mint or revoke itself or another token, avoiding any boots
 The raw token is returned exactly once, at creation time, and never stored or shown again - only a
 salted hash of it persists server-side.
 
+Every token has a `scope`: `'full'` (default, behaves exactly like a session cookie) or
+`'read-only'`. A read-only token gets `403` on any request whose method isn't `GET`/`HEAD`/
+`OPTIONS` - a blanket verb-based rule, not a per-route allowlist, so it's a close but not perfect
+match for "which routes actually mutate something" (see `ApiTokenScope`'s doc comment in
+`backend/src/auth/types.ts`).
+
 | Method | Path | Body/Params | Response / Notes |
 |---|---|---|---|
 | GET | `/auth/status` | - | `{ configured, authenticated, ... }`. |
@@ -396,8 +402,8 @@ salted hash of it persists server-side.
 | DELETE | `/auth/2fa/passkey/:id` | - | |
 | POST | `/auth/2fa/passkey/auth-options` | - | WebAuthn login challenge. |
 | POST | `/auth/2fa/passkey/auth-verify` | `{ response }` | Login-time second factor. `response` is `AuthenticationResponseJSON`. |
-| POST | `/auth/tokens` | `{ name, currentPassword, totpCode? }` | Step-up gated (same class of risk as adding an SSH key) - `totpCode` required only if TOTP is enrolled. `201`, `{ id, name, createdAt, token }` - `token` (`nrd_...`) is shown once and never retrievable again. |
-| GET | `/auth/tokens` | - | `{ id, name, createdAt, lastUsedAt }[]` - never the hash or raw token. |
+| POST | `/auth/tokens` | `{ name, scope?, currentPassword, totpCode? }` | Step-up gated (same class of risk as adding an SSH key) - `totpCode` required only if TOTP is enrolled. `scope` is `'full'` (default) or `'read-only'`. `201`, `{ id, name, scope, createdAt, token }` - `token` (`nrd_...`) is shown once and never retrievable again. |
+| GET | `/auth/tokens` | - | `{ id, name, scope, createdAt, lastUsedAt }[]` - never the hash or raw token. |
 | DELETE | `/auth/tokens/:id` | - | Session-gated only (not step-up) - revokes one token immediately. |
 
 ## Activity, Logs, Metrics

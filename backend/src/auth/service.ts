@@ -13,7 +13,7 @@ import {
 import { hashPassword, verifyPassword, signSession, verifySession, signTwoFactorPending, verifyTwoFactorPending, hashSecret, verifySecret, generateBackupCode, generateApiToken } from './crypto.js';
 import type { RequestOrigin } from './requestOrigin.js';
 import { generateTotpSecret, totpProvisioningUri, totpQrDataUri, verifyTotpCode } from './totp.js';
-import type { ApiToken, AuthRecord, AuthStatus, TotpBackupCode, TwoFactorMethod } from './types.js';
+import type { ApiToken, ApiTokenScope, AuthRecord, AuthStatus, TotpBackupCode, TwoFactorMethod } from './types.js';
 import { passkeyAuthenticationOptions, passkeyRegistrationOptions, verifyPasskeyAuthentication, verifyPasskeyRegistration } from './webauthn.js';
 
 const BACKUP_CODE_COUNT = 10;
@@ -55,12 +55,18 @@ export class AuthService {
   // cookie is the cheap, common case (one HMAC verify), while a bearer token means a linear scrypt
   // scan over every stored token (see verifyBearerToken below), so there's no reason to pay that
   // cost on every browser request that already carries a valid cookie.
-  async isAuthenticated(cookieHeader: string | undefined, authorizationHeader?: string): Promise<boolean> {
+  //
+  // `tokenScope` is null for a session cookie (a real login always has full access, same as
+  // before this concept existed) and for a failed/absent auth attempt - only a matched bearer
+  // token carries a real scope, which requireAuth (middleware.ts) uses to 403 a mutating request
+  // made with a read-only token.
+  async isAuthenticated(cookieHeader: string | undefined, authorizationHeader?: string): Promise<{ authenticated: boolean; tokenScope: ApiTokenScope | null }> {
     const record = await this.store.get();
-    if (!record) return false;
+    if (!record) return { authenticated: false, tokenScope: null };
     const cookies = parseCookies(cookieHeader);
-    if (verifySession(record.sessionSecret, cookies[COOKIE_NAME]) !== null) return true;
-    return this.verifyBearerToken(record, authorizationHeader);
+    if (verifySession(record.sessionSecret, cookies[COOKIE_NAME]) !== null) return { authenticated: true, tokenScope: null };
+    const tokenScope = await this.verifyBearerToken(record, authorizationHeader);
+    return { authenticated: tokenScope !== null, tokenScope };
   }
 
   async status(cookieHeader: string | undefined): Promise<AuthStatus> {
@@ -260,12 +266,12 @@ export class AuthService {
   // by someone who already holds a real session cookie, never by presenting another token - see
   // ApiToken's doc comment in types.ts for why that matters. Returns the raw token exactly once;
   // only its hash is ever persisted.
-  async createApiToken(cookieHeader: string | undefined, name: string): Promise<{ id: string; name: string; createdAt: number; token: string }> {
+  async createApiToken(cookieHeader: string | undefined, name: string, scope: ApiTokenScope): Promise<{ id: string; name: string; scope: ApiTokenScope; createdAt: number; token: string }> {
     await this.requireSession(cookieHeader);
     const token = generateApiToken();
     const hash = await hashSecret(token);
-    const created = await this.store.createApiToken(name, hash);
-    return { id: created.id, name: created.name, createdAt: created.createdAt, token };
+    const created = await this.store.createApiToken(name, hash, scope);
+    return { id: created.id, name: created.name, scope: created.scope, createdAt: created.createdAt, token };
   }
 
   async listApiTokens(cookieHeader: string | undefined): Promise<Omit<ApiToken, 'hash'>[]> {
@@ -307,17 +313,17 @@ export class AuthService {
   // something this codebase needs to scale past. Bumps lastUsedAt best-effort on a match; never
   // awaited by the caller, matching this codebase's other fire-and-forget writes (e.g. activity
   // logging).
-  private async verifyBearerToken(record: AuthRecord, authorizationHeader: string | undefined): Promise<boolean> {
-    if (!authorizationHeader?.startsWith('Bearer ')) return false;
+  private async verifyBearerToken(record: AuthRecord, authorizationHeader: string | undefined): Promise<ApiTokenScope | null> {
+    if (!authorizationHeader?.startsWith('Bearer ')) return null;
     const presented = authorizationHeader.slice('Bearer '.length).trim();
-    if (!presented) return false;
+    if (!presented) return null;
     for (const entry of record.apiTokens ?? []) {
       if (await verifySecret(presented, entry.hash)) {
         this.store.touchApiToken(entry.id).catch(() => {});
-        return true;
+        return entry.scope;
       }
     }
-    return false;
+    return null;
   }
 
   private async requireSession(cookieHeader: string | undefined): Promise<AuthRecord> {

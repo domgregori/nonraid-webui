@@ -6,11 +6,13 @@ import { saveConfig } from '../config.js';
 interface LoginOptions {
   host?: string;
   insecure?: boolean;
+  readOnly?: boolean;
 }
 
 interface CreateTokenResponse {
   id: string;
   name: string;
+  scope: 'full' | 'read-only';
   createdAt: number;
   token: string;
 }
@@ -33,8 +35,9 @@ export async function loginCommand(opts: LoginOptions): Promise<void> {
 
   // POST /auth/tokens is step-up gated (same class of risk as adding a trusted SSH key) -
   // stepUpFetch supplies the password and only prompts for a fresh 2FA code if the backend asks.
-  const created = (await stepUpFetch(base, '/api/auth/tokens', 'POST', cookie, password, { name: tokenName || defaultName })) as CreateTokenResponse;
+  const scope = opts.readOnly ? 'read-only' : 'full';
+  const created = (await stepUpFetch(base, '/api/auth/tokens', 'POST', cookie, password, { name: tokenName || defaultName, scope })) as CreateTokenResponse;
 
   await saveConfig({ host: base, token: created.token, tokenId: created.id, insecure: !!opts.insecure });
-  console.log(`Logged in as ${host}. Token "${created.name}" saved - future commands won't ask for a password again.`);
+  console.log(`Logged in as ${host}. Token "${created.name}" (${created.scope}) saved - future commands won't ask for a password again.`);
 }

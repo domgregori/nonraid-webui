@@ -7,6 +7,7 @@ import { serializeClearTwoFactorPendingCookie } from '../auth/cookies.js';
 import { requestOrigin } from '../auth/requestOrigin.js';
 import {
   validateApiTokenNameInput,
+  validateApiTokenScopeInput,
   validateCurrentPasswordInput,
   validateLoginInput,
   validatePasskeyNameInput,
@@ -215,8 +216,9 @@ export function authRouter(authService: AuthService, activity: ActivityStore): R
   router.post('/auth/tokens', totpVerifyRateLimiter, requireStepUp(authService), async (req, res) => {
     try {
       const name = validateApiTokenNameInput(req.body);
-      const result = await authService.createApiToken(req.headers.cookie, name);
-      activity.log(`API token "${name}" created`, 'green').catch(() => {});
+      const scope = validateApiTokenScopeInput(req.body);
+      const result = await authService.createApiToken(req.headers.cookie, name, scope);
+      activity.log(`API token "${name}" created (${scope})`, 'green').catch(() => {});
       res.status(201).json(result);
     } catch (err) {
       handleError(err, res);
