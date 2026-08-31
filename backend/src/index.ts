@@ -61,6 +61,7 @@ import { createSmartClient, SmartService } from './smart/index.js';
 import { BackupScheduler } from './system/backupScheduler.js';
 import { applySpinDownTimeout } from './system/hdparm.js';
 import { SystemStatsService } from './system/service.js';
+import { installShutdownHook } from './system/shutdownHook.js';
 import { createTailscaleClient } from './tailscale/index.js';
 import { TlsStore } from './tls/index.js';
 import { createUsersClient, UsersService } from './users/index.js';
@@ -84,6 +85,11 @@ async function main() {
   const diskQueue = new DiskQueueService(nmd, cache, activity, shares, lxc);
   new ActivityWatcher(nmd, smart, activity, settingsStore, cache);
   new ParityScheduler(nmd, settingsStore, activity);
+  // Unmounts shares on SIGTERM/SIGINT so nonraid.service's own ExecStop (which only knows about
+  // the raw array disks, not this app's mergerfs/bind-mount share layer on top of them) can
+  // actually stop the array cleanly on a real host reboot - see shutdownHook.ts's doc comment for
+  // the full chain from a left-mounted share to a forced parity check on next boot.
+  installShutdownHook({ shares });
   const metrics = new MetricsService(openMetricsDb());
   // Constructed ahead of BackupScheduler (moved up from its former call site further down) purely
   // so BackupScheduler can take a real RcloneClient - it only ever calls reveal() on it, to turn a
