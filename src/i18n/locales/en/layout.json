@@ -2,7 +2,7 @@
   "ArrayHealthDialog": {
     "title": "Array Degraded",
     "close": "Close",
-    "noLongerDegraded": "Good news - the array is no longer degraded.",
+    "noLongerDegraded": "The array is no longer degraded.",
     "viewDisk": "View Disk",
     "parityCheckRunning": "A parity check is already running.",
     "starting": "Starting…",

@@ -2,7 +2,7 @@
   "ShareExportModal": {
     "dialogTitle": "Share \"{{name}}\"",
     "close": "Close",
-    "desc": "Choose how the \"{{name}}\" pool is reachable over the network. Per-user SMB permissions are set on each user's own page below.",
+    "desc": "Share \"{{name}}\" pool over the network via Samba or NFS. User and group share permissions configurable.",
     "smb": "SMB",
     "smbPublic": "Public (guest access)",
     "nfs": "NFS",
@@ -22,9 +22,9 @@
       "fillUpLabel": "Fill-up",
       "fillUpDesc": "Fills disks in order - writes go to the first disk (in disk order) with room until it’s full, then moves on to the next.",
       "highWaterLabel": "High-water",
-      "highWaterDesc": "Keeps files under the same path together on one disk when possible, otherwise picks the disk with the most free space. An approximation of the classic High-Water allocation policy, not an exact match.",
+      "highWaterDesc": "Keeps files under the same path together on one disk when possible, otherwise picks the disk with the most free space.",
       "singleDiskLabel": "Single disk",
-      "singleDiskDesc": "Pins this pool to exactly one disk - no spreading files across drives.",
+      "singleDiskDesc": "Pins this pool to exactly one disk.",
       "cacheOnlyLabel": "Cache only",
       "cacheOnlyDesc": "Lives entirely on the cache disks - no array disk is used, and the mover never touches it.",
       "cacheOnlyLabelDisabled": "{{label}} (set up a cache pool first)"

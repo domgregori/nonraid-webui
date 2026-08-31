@@ -124,7 +124,7 @@ export function EmptyDiskDialog({ slot, label, onClose, onStarted }: EmptyDiskDi
                   </div>
                   {plan.unmanagedBytes > 0 && (
                     <div className="status-note status-note--error">
-                      {t('EmptyDiskDialog.unmanagedNotUnderShare', { size: formatBytesHuman(plan.unmanagedBytes) })}
+                      {t('EmptyDiskDialog.unmanagedNotUnderPool', { size: formatBytesHuman(plan.unmanagedBytes) })}
                     </div>
                   )}
                   <div className="status-note status-note--error">

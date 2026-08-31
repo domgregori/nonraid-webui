@@ -23,7 +23,7 @@
     "showMore": "Show more ({{count}} remaining)",
     "attributionPrefix": "Catalog data from",
     "attributionLinkText": "Community Applications",
-    "attributionSuffix": ", an independent, community-curated Docker app template repository. Templates are not vetted by this project - review the container's ports, volumes, and image before installing."
+    "attributionSuffix": ", an independent, community-curated Docker app template from github.com/Squidly271/community.applications. Templates are not vetted by this project. Review the container's ports, volumes, and image before installing."
   },
   "BrowsePage": {
     "title": "Browse",
@@ -45,7 +45,7 @@
     "move": "Move",
     "confirmQuestion": "Confirm?",
     "delete": "Delete",
-    "emptyFolder": "This folder is empty - drag files here, or use Upload."
+    "emptyFolder": "Folder is empty. Drag files here, or use Upload."
   },
   "DashboardPage": {
     "loadingArrayStatus": "Loading array status…"
@@ -76,7 +76,7 @@
     "destroy": "Destroy",
     "updateDialogTitle": "Update {{name}}",
     "close": "Close",
-    "updateDialogDesc": "Pulls the newer image and recreates this container with its existing config unchanged. It'll be briefly unavailable while it restarts.",
+    "updateDialogDesc": "Pulls the newer image and recreates this container with its existing config. It'll be briefly unavailable while it restarts.",
     "cancel": "Cancel"
   },
   "HistoryPage": {
@@ -132,7 +132,7 @@
   "SharesPage": {
     "title": "Pools",
     "addPool": "Add Pool",
-    "desc": "A pool is a unified folder spanning one or more disks - a place to store files.",
+    "desc": "A pool is a unified folder spanning one or more disks to store files.",
     "loadingPools": "Loading pools…",
     "allocationLabel": "Allocation: {{value}}",
     "edit": "Edit",
@@ -165,7 +165,7 @@
   "SetupPage": {
     "passwordMismatch": "Passwords do not match.",
     "brandTitle": "NonRAID",
-    "subtitle": "Create the admin account to finish setup. This is the only account for this dashboard.",
+    "subtitle": "Create the account to finish setup.",
     "usernameLabel": "Username",
     "passwordLabel": "Password",
     "confirmPasswordLabel": "Confirm password",
@@ -213,11 +213,11 @@
       "timeFormatFieldTitle": "Time format",
       "timeFormat12h": "12-hour (2:30 PM)",
       "timeFormat24h": "24-hour (14:30)",
-      "setupTourTitle": "Setup tour",
-      "setupTourDesc": "Walk back through array setup, cache, and the Apps/Docker/LXC/Notifications tour.",
-      "replayButton": "Replay setup tour",
+      "setupTourTitle": "Setup wizard",
+      "setupTourDesc": "Rerun the original onboarding wizard.",
+      "replayButton": "Rerun wizard",
       "rebootTitle": "Reboot system",
-      "rebootDesc": "Reboots the whole host, not just this app. The array stops and unmounts cleanly first (the normal shutdown sequence - same as if you ran this at the console), then Docker, LXC, Samba, and NFS all stop too. Everything comes back on its own once the host finishes booting; this page reconnects automatically, no need to refresh by hand.",
+      "rebootDesc": "Reboots the host. The array stops and unmounts cleanly first, then Docker, LXC, Samba, and NFS all stop too. This page reconnects automatically.",
       "rebootButton": "Reboot System",
       "confirmRebootButton": "Confirm Reboot",
       "rebootingButton": "Rebooting…"
@@ -238,14 +238,14 @@
       "themeLight": "Light",
       "themeDark": "Dark",
       "languageLabel": "Language",
-      "languageDesc": "Only English is available today - more languages may be added later."
+      "languageDesc": "Only English is available for now."
     },
     "array": {
       "title": "Array",
       "turboWriteTitle": "Turbo write",
-      "turboWriteDesc": "Faster writes but at the expense of more power draw and all drives must be spun up on HDDs. Best for large transfters, rebuilds, and parity checks.",
+      "turboWriteDesc": "Faster writes but at the expense of more power draw. All HDD drives must be spun up. Best for large transfters, rebuilds, and parity checks.",
       "spinDownTitle": "Idle spin-down",
-      "spinDownDesc": "Spin down HDD data and parity disks after this long with no activity. Programmed directly on each drive - SSDs and the boot disk are never affected.",
+      "spinDownDesc": "Spin down HDD data and parity disks when no activity. Boot disk is not affected.",
       "spinDownNever": "Never",
       "spinDownMinutes": "{{count}} minutes",
       "spinDownHours_one": "{{count}} hour",
@@ -255,16 +255,16 @@
       "arrayMustBeStoppedDesc": "Array must be stopped first.",
       "superblockPathTitle": "Superblock path",
       "reloadDriverTitle": "Reload driver",
-      "reloadDriverDesc": "Resets stale internal counters - doesn't change array disks.",
-      "reloadDriverPromptDesc": "Resets stale internal counters - doesn't change array disks. May leave the array briefly down; let it finish."
+      "reloadDriverDesc": "Reload kernel driver",
+      "reloadDriverPromptDesc": "Only use this if you know what you're doing!"
     },
     "cache": {
       "title": "Cache",
       "useCacheTitle": "Use cache for pools",
-      "useCacheDesc": "Writes to the cache mirror first. A scheduled mover then drains cache onto the array below. Speeds up read/writes.",
-      "useCacheToggleLabel": "Use cache for shares",
+      "useCacheDesc": "Writes to the cache mirror first. A scheduled mover then drains cache onto the array below. Speeds up read/writes since parity isn't used.",
+      "useCacheToggleLabel": "Use cache for pools",
       "autoMoverTitle": "Automatic mover",
-      "autoMoverDesc": "Moves everything on cache onto the array.",
+      "autoMoverDesc": "Moves everything from cache onto the array.",
       "runMoverTitle": "Run mover now",
       "runMoverDesc1": "Moves cache onto the array now.",
       "runMoverDesc2": "A file that's currently open (e.g. by a running Docker container) is skipped rather than failing the whole run.",
@@ -300,8 +300,8 @@
     "shares": {
       "title": "Pools",
       "minFreeSpaceTitle": "Minimum free space (GB)",
-      "minFreeSpaceDesc": "When a pool spans multiple disks, mergerfs won't pick a disk with less free space than this for a new file. Its own default is 4GB.",
-      "minFreeSpaceError": "Enter a non-negative whole number of MB."
+      "minFreeSpaceDesc": "When a pool spans multiple disks, a disk with less free space than this will not be written to. the default is 4GB.",
+      "minFreeSpaceError": "Enter a non-negative whole number of GBs."
     },
     "backups": {
       "title": "Local Backups",
@@ -327,58 +327,58 @@
       "changePasswordButton": "Change password…",
       "disableEncryptionButton": "Disable encryption",
       "scheduleLabel": "Schedule",
-      "retainError": "Enter a positive whole number for how many backups to keep, or check \"Keep all backups forever\".",
+      "retainError": "Number of backups to keep, or check \"Keep all backups forever\".",
       "destDiskError": "Pick a disk for the destination.",
       "destPathError": "Enter a destination path.",
       "cronExpressionError": "Enter a cron expression.",
       "backUpNowTitle": "Back up config now",
       "backUpNowButton": "Back up now",
       "backingUpButton": "Backing up…",
-      "backUpNowTooltip": "Writes a config backup into the currently-configured destination directory, right now.",
-      "downloadCopyButton": "Download a copy",
-      "downloadCopyTooltip": "Downloads a config backup straight to this device's browser downloads - doesn't touch the array or its destination directory.",
-      "downloadEncryptedCopyTooltip": "Downloads a config backup straight to this device's browser downloads, encrypted with the saved backup password - doesn't touch the array or its destination directory.",
+      "backUpNowTooltip": "Creates a backup and stores in currently-configured destination directory.",
+      "downloadCopyButton": "Download backup",
+      "downloadCopyTooltip": "Backup config and download to your browser",
+      "downloadEncryptedCopyTooltip": "Backup config and download to your browser. Password encrypted.",
       "backupWrittenResult": "Backup written ({{size}})."
     },
     "recovery": {
       "title": "Recovery",
       "restoreConfigTitle": "Restore configuration",
-      "restoreConfigDesc": "Bring back this app's settings/pools/shares/users, Samba/NFS config, and (only while the array is currently blank) the array superblock, from a previously-saved config backup.",
+      "restoreConfigDesc": "Restore NonRAID's settings/pools/shares/users, Samba/NFS config, and if no array exists - the array superblock.",
       "fromUpload": "From an uploaded file…",
       "fromLocal": "From a local backup…",
       "fromRemote": "From a remote backup…",
       "recoverArrayTitle": "Recover just the array",
-      "recoverArrayDesc": "Restores only the array superblock - disk assignments and parity configuration - out of a config backup, leaving every other setting untouched. Only takes effect while this array currently has nothing assigned; stop and clear the array first if it isn't already blank.",
+      "recoverArrayDesc": "Restores only the array superblock, i.e. disk assignments and parity configuration. Settings will not be restored.",
       "importArrayTitle": "Import an existing array",
-      "importDescPrefix": "Migrate the disks and configuration from a previous NonRAID or Unraid array in directly, using its own",
+      "importDescPrefix": "Migrate the disks and configuration from a previous NonRAID or Unraid array in directly, using a",
       "importDescSuffix": "superblock file rather than a config backup.",
       "importArrayButton": "Import array…",
       "recoverArrayWizardTitle": "Recover the array from an uploaded file",
       "restoreWizardTitle": "Restore from an uploaded file",
-      "cliDecryptPrefix": "Need to decrypt an encrypted backup without the webui running? Use",
+      "cliDecryptPrefix": "To decrypt an encrypted backup without the webui use",
       "cliDecryptSuffix": "from a terminal - see its --help for usage.",
       "bootSnapshotsTitle": "Boot disk snapshots"
     },
     "notifications": {
       "title": "Notifications",
       "appriseToggleTitle": "Apprise notifications",
-      "appriseToggleDesc": "Master switch for the Apprise channel below - the in-app bell/toast (Webui column) has no master switch of its own, it's controlled purely per-event.",
+      "appriseToggleDesc": "Turn on/off notifications services from apprise.",
       "whichEventsTitle": "Which events notify",
       "tempUnitCelsius": "°C",
       "tempThresholdError": "Enter a temperature between 0 and 100°C.",
       "targetUrlsTitle": "Apprise target URLs",
       "targetUrlsDescPrefix": "One or more",
       "targetUrlsLinkText": "apprise service URLs",
-      "targetUrlsDescSuffix": ", space or newline separated (e.g. mailto://, discord://, pushover://).",
+      "targetUrlsDescSuffix": ".",
       "sendTestButton": "Send test notification",
       "sendingButton": "Sending…"
     },
     "security": {
       "title": "Security",
       "trustProxyTitle": "Trust reverse proxy",
-      "trustProxyDesc": "Only enable if a reverse proxy is the sole way to reach this backend (it's firewalled off from any other direct access) and that proxy always sets/overwrites X-Forwarded-Proto/Host/For itself - otherwise a direct client could spoof those headers to fake an HTTPS connection or dodge login/TOTP rate limiting. Once enabled, the session cookie's Secure flag and passkey RP ID/origin are detected from the request automatically, no need to set them by hand.",
+      "trustProxyDesc": "Only enable if using a reverse proxy to reach this backend. Make sure to set the trusted addresses, otherwise all are trusted.",
       "trustProxyAddressTitle": "Trusted proxy address",
-      "trustProxyAddressDesc": "Optional - an IP, CIDR range, or hostname for the reverse proxy itself. Only forwarded headers arriving via this address are trusted; left blank, any hop is trusted once the toggle above is on. Multiple addresses can be comma-separated.",
+      "trustProxyAddressDesc": "An IP, CIDR range, or hostname for the reverse proxy itself. Only forwarded headers arriving via this address are trusted; left blank, any hop is trusted once the toggle above is on. Multiple addresses can be comma-separated.",
       "trustProxyAddressPlaceholder": "e.g. 192.168.1.10 or proxy.example.com",
       "changePasswordTitle": "Change admin password",
       "changePasswordDesc": "Also signs out every other session.",
@@ -387,7 +387,7 @@
       "changePasswordButton": "Change password",
       "passwordMismatchError": "New passwords do not match.",
       "stepUpTitle": "Confirm it's you",
-      "stepUpDesc": "Changing your password signs you out of every session, including this one."
+      "stepUpDesc": "Changing your password signs you out of all sessions."
     },
     "tailscale": {
       "title": "Tailscale"
