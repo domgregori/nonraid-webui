@@ -81,6 +81,9 @@ Every group has its own `--help` with the full, current flag list — this table
 | `rclone status / enable / disable / providers` | Remote Backup feature state, supported providers |
 | `rclone remote ls / add / show / set / rm` | Configured rclone remotes (non-OAuth providers only) |
 | `rclone job ls / create / update / rm / enable / disable / sync / cancel / backups` | Remote backup sync jobs |
+| `decrypt-backup <archive>` | Decrypt a local `.nrb` config backup archive - a pure local file operation, no login/API access needed |
+
+`decrypt-backup` is the odd one out in that table: it never talks to the backend at all, so it works with the webui down, the array stopped, or the archive opened on a completely different machine. Prompts for the password (masked) unless `NRB_PASSWORD` is set in the environment. Add `-x`/`--extract` to unpack straight into a directory instead of leaving a `.tar.gz`, or `-o`/`--output <path>` to control where it's written.
 
 Examples:
 
@@ -92,6 +95,7 @@ nonraid-tool share create media --disks 1,2,3 --protocols smb,nfs
 nonraid-tool user grant alice media read-write
 nonraid-tool metrics cpu_percent,mem_used_bytes --range 7d
 nonraid-tool rclone job sync <id>   # id from `rclone job ls`, not the job's --name
+nonraid-tool decrypt-backup nonraid-config-backup-1234567890.nrb
 ```
 
 A few operations are disruptive or long-running by nature and worth knowing about before running them: `disk self-test` starts a real SMART test that can take hours; `system reboot` and `system set-hostname`/`set-timezone` affect the whole host; `cache setup`/`replace` reassign real disks.

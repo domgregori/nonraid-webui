@@ -17,6 +17,7 @@ import { registerSmartCommand } from './commands/smart.js';
 import { registerActivityCommand, registerLogsCommand, registerMetricsCommand } from './commands/activity.js';
 import { registerCacheCommand } from './commands/cache.js';
 import { registerRcloneCommand } from './commands/rclone.js';
+import { registerDecryptBackupCommand } from './commands/decryptBackup.js';
 import { runAction } from './output.js';
 
 // Read the version from package.json rather than hardcoding it a second time here - this file
@@ -49,6 +50,9 @@ program
   .description('forget the locally saved token')
   .option('--revoke', 're-authenticate and revoke the token server-side too')
   .action(runAction(logoutCommand));
+
+// No login/backend needed - a pure local file operation, unlike every command below it.
+registerDecryptBackupCommand(program);
 
 registerArrayCommand(program);
 registerDiskCommand(program);

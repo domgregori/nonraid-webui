@@ -1,127 +1,84 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import type { ApiClient } from '../api/client.js';
-import type { CommandResult, DockerContainerSummary, LxcContainerSummary, NmdStatusResponse } from '../api/types.js';
+import { ArrayScreen } from './screens/ArrayScreen.js';
+import { CacheScreen } from './screens/CacheScreen.js';
+import { DisksScreen } from './screens/DisksScreen.js';
+import { DockerScreen } from './screens/DockerScreen.js';
+import { LxcScreen } from './screens/LxcScreen.js';
+import { RcloneScreen } from './screens/RcloneScreen.js';
+import { SharesScreen } from './screens/SharesScreen.js';
+import { SystemScreen } from './screens/SystemScreen.js';
+import { UsersScreen } from './screens/UsersScreen.js';
 
 interface Props {
   client: ApiClient;
   host: string;
 }
 
-interface ContainerItem {
-  kind: 'docker' | 'lxc';
-  id: string; // name - both Docker's and LXC's start/stop routes accept a name, see commands/docker.ts's comment
-  name: string;
-  state: string;
-}
-
-const POLL_MS = 5000;
+// One tab per resource area the plain CLI already covers - each screen owns its own polling/
+// selection/action-key handling (see the shared usePolling/useListNav hooks), the shell here is
+// just the header/tab bar and which one is currently mounted. Digits 1-9 jump directly to a tab;
+// no screen's own action keys use a digit, so there's no conflict switching mid-list-selection.
+const TABS = [
+  { key: '1', label: 'Array', Screen: ArrayScreen },
+  { key: '2', label: 'Disks', Screen: DisksScreen },
+  { key: '3', label: 'Docker', Screen: DockerScreen },
+  { key: '4', label: 'LXC', Screen: LxcScreen },
+  { key: '5', label: 'Shares', Screen: SharesScreen },
+  { key: '6', label: 'Users', Screen: UsersScreen },
+  { key: '7', label: 'System', Screen: SystemScreen },
+  { key: '8', label: 'Cache', Screen: CacheScreen },
+  { key: '9', label: 'Rclone', Screen: RcloneScreen },
+] as const;
 
 export function App({ client, host }: Props) {
   const { exit } = useApp();
-  const [status, setStatus] = useState<NmdStatusResponse | null>(null);
-  const [dockerContainers, setDockerContainers] = useState<DockerContainerSummary[]>([]);
-  const [lxcContainers, setLxcContainers] = useState<LxcContainerSummary[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => {
-    try {
-      const [s, d, l] = await Promise.all([
-        client.get<NmdStatusResponse>('/status'),
-        client.get<DockerContainerSummary[]>('/docker/containers').catch(() => []),
-        client.get<LxcContainerSummary[]>('/lxc/containers').catch(() => []),
-      ]);
-      setStatus(s);
-      setDockerContainers(d);
-      setLxcContainers(l);
-      setError(null);
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }, [client]);
-
-  useEffect(() => {
-    void refresh();
-    const timer = setInterval(() => void refresh(), POLL_MS);
-    return () => clearInterval(timer);
-  }, [refresh]);
-
-  const items: ContainerItem[] = [
-    ...dockerContainers.map((c) => ({ kind: 'docker' as const, id: c.name, name: c.name, state: c.state })),
-    ...lxcContainers.map((c) => ({ kind: 'lxc' as const, id: c.name, name: c.name, state: c.state })),
-  ];
-
-  const toggle = useCallback(
-    async (item: ContainerItem) => {
-      setBusy(true);
-      setMessage(null);
-      const running = item.state === 'running';
-      const base = item.kind === 'docker' ? '/docker/containers' : '/lxc/containers';
-      const action = running ? 'stop' : 'start';
-      try {
-        const result = await client.post<CommandResult>(`${base}/${encodeURIComponent(item.id)}/${action}`);
-        setMessage(result.message);
-        await refresh();
-      } catch (err) {
-        setMessage((err as Error).message);
-      } finally {
-        setBusy(false);
-      }
-    },
-    [client, refresh],
-  );
+  const [activeIndex, setActiveIndex] = useState(0);
 
   useInput((input, key) => {
     if (input === 'q' || key.escape) {
       exit();
       return;
     }
-    if (input === 'r') {
-      void refresh();
+    if (key.tab) {
+      setActiveIndex((i) => (key.shift ? (i - 1 + TABS.length) % TABS.length : (i + 1) % TABS.length));
       return;
     }
-    if (key.upArrow) {
-      setSelected((i) => Math.max(0, i - 1));
-      return;
-    }
-    if (key.downArrow) {
-      setSelected((i) => Math.min(items.length - 1, i + 1));
-      return;
-    }
-    if (input === 's' && !busy) {
-      const item = items[selected];
-      if (item) void toggle(item);
-    }
+    const jump = TABS.findIndex((t) => t.key === input);
+    if (jump !== -1) setActiveIndex(jump);
   });
+
+  const Active = TABS[activeIndex]!.Screen;
 
   return (
     <Box flexDirection="column">
-      <Text bold color="cyan">
-        nonraid-tool tui — {host}
-      </Text>
-      {error && <Text color="red">status error: {error}</Text>}
-      {status && (
-        <Box marginTop={1}>
-          <Text>
-            Array: <Text bold>{status.array.state}</Text> ({status.array.disks_imported}/{status.array.total_slots} disks)
-            {status.resync.active ? `  parity ${status.resync.action} ${status.resync.progress_percent}%` : ''}
+      <Box borderStyle="single" borderColor="cyan" flexDirection="column" paddingX={1}>
+        <Box justifyContent="space-between">
+          <Text bold color="cyan">
+            nonraid-tool — {host}
           </Text>
+          <Text dimColor>1-9 / Tab switch · q quit</Text>
         </Box>
-      )}
-      <Box flexDirection="column" marginTop={1}>
-        <Text underline>Containers ({items.length}) — up/down select, s start/stop, r refresh, q quit</Text>
-        {items.length === 0 && <Text dimColor>none</Text>}
-        {items.map((item, i) => (
-          <Text key={`${item.kind}-${item.id}`} color={i === selected ? 'cyan' : undefined}>
-            {i === selected ? '> ' : '  '}[{item.kind}] {item.name} — {item.state}
-          </Text>
-        ))}
+        <Box>
+          {TABS.map((t, i) =>
+            i === activeIndex ? (
+              <Text key={t.key} bold color="black" backgroundColor="cyan">
+                {' '}
+                {t.key}:{t.label}{' '}
+              </Text>
+            ) : (
+              <Text key={t.key} dimColor>
+                {' '}
+                {t.key}:{t.label}{' '}
+              </Text>
+            ),
+          )}
+        </Box>
       </Box>
-      {busy && <Text dimColor>working…</Text>}
-      {message && <Text color="yellow">{message}</Text>}
+      <Box borderStyle="single" flexDirection="column" paddingX={1}>
+        <Active client={client} />
+      </Box>
     </Box>
   );
 }
