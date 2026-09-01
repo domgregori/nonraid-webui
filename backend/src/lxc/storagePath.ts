@@ -14,6 +14,16 @@ import type { LxcClient } from './client.js';
 
 const execFileAsync = promisify(execFile);
 
+// LXC's own global config - read by every lxc-* tool (including lxc-autostart, called with no -P
+// flag by the stock lxc.service unit) whenever it needs a default lxcpath and none was given
+// explicitly. Same role as Docker's /etc/docker/daemon.json data-root: without keeping this in
+// sync, relocating LXC storage moves this app's own view of where containers live
+// (config.lxcDefaultPath) but leaves the *system's* autostart-at-real-boot mechanism still
+// scanning the old (now empty, for an array/cache move) default - confirmed live: after a move,
+// lxc.service's own lxc-autostart never found the relocated containers at all, so nothing with
+// lxc.start.auto=1 ever came back up on a real reboot, independent of this app entirely.
+const LXC_GLOBAL_CONF = '/etc/lxc/lxc.conf';
+
 export interface StoragePathProgress {
   phase: string;
   message: string;
@@ -157,6 +167,11 @@ export async function migrateLxcStorage(
     onProgress({ phase: 'switching', message: 'Switching to the new location…' });
     config.lxcDefaultPath = targetPath;
     await deps.settingsStore.update({ lxcStorage: target });
+    // Keep LXC's own global default in step - see LXC_GLOBAL_CONF's doc comment. Best-effort: a
+    // failure here shouldn't fail the whole move, since this app's own lxc-* calls (which all
+    // pass an explicit path derived from config.lxcDefaultPath) already work correctly regardless
+    // - only the system's own autostart-at-boot depends on this file being right.
+    await setVariable(LXC_GLOBAL_CONF, 'lxc.lxcpath', targetPath).catch(() => {});
 
     if (runningNames.length > 0) {
       onProgress({ phase: 'restarting', message: 'Restarting containers…' });

@@ -59,6 +59,7 @@ import { notifyEvent } from './settings/notify.js';
 import { createShareApplier, ShareAccessStore, ShareService, ShareStore } from './shares/index.js';
 import { createSmartClient, SmartService } from './smart/index.js';
 import { BackupScheduler } from './system/backupScheduler.js';
+import { restoreDockerAndAutostartLxc } from './system/arrayLifecycle.js';
 import { applySpinDownTimeout } from './system/hdparm.js';
 import { SystemStatsService } from './system/service.js';
 import { installShutdownHook } from './system/shutdownHook.js';
@@ -193,6 +194,15 @@ async function main() {
         activity.log(msg, 'amber', 'dockerLxcStorageUnavailable').catch(() => {});
         notifyEvent(settingsStore, 'dockerLxcStorageUnavailable', 'NonRAID: Docker/LXC storage unavailable', msg);
       }
+    } else {
+      // The array was already up by the time this backend started (nonraid.service assembled it
+      // independently at real boot, per the comment above) - lxc.service's own autostart *should*
+      // cover this on its own, but only when it can actually find the containers (see
+      // storagePath.ts's LXC_GLOBAL_CONF comment for the relocated-storage gap that closes) and
+      // only for a real host boot, not e.g. this backend restarting on its own mid-session with
+      // the array already running. Same restore call /array/start already uses - cheap and
+      // idempotent (a no-op for anything already running) either way.
+      await restoreDockerAndAutostartLxc({ lxc, activity });
     }
   } catch {
     // best-effort - never block startup over this check itself
