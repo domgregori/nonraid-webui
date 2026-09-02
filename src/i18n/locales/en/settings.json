@@ -175,6 +175,8 @@
     "bootDisk": "Boot Disk",
     "cache": "Cache",
     "diskSlot": "Disk {{slot}}",
+    "customPathOption": "Custom path…",
+    "customPathPlaceholder": "/mnt/user/...",
     "currently": "Currently:",
     "cacheNotSetUp": "Cache (set up a cache pool first)",
     "moving": "Moving…",

@@ -77,7 +77,7 @@ const DEFAULTS: AppSettings = {
     encryption: { enabled: false, passwordObscured: null },
   },
   tempAlerts: { cpuWarnAboveCelsius: 55, diskWarnAboveCelsius: 55 },
-  lxcStorage: { mode: 'boot', diskSlot: null },
+  lxcStorage: { mode: 'boot', diskSlot: null, customPath: null },
   cache: { enabled: false, fsUuid: null },
   cacheSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3, cronExpression: '' },
   tailscale: { enabled: false, loginServer: '' },

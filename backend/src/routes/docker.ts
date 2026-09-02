@@ -15,15 +15,24 @@ import { provisionArrayDir } from '../system/arrayDir.js';
 
 function parseStorageLocation(body: unknown): StorageLocation {
   const mode = (body as { mode?: unknown })?.mode;
-  if (mode !== 'boot' && mode !== 'array' && mode !== 'cache') {
-    throw new HttpError(400, 'mode must be "boot", "array", or "cache".');
+  if (mode !== 'boot' && mode !== 'array' && mode !== 'cache' && mode !== 'custom') {
+    throw new HttpError(400, 'mode must be "boot", "array", "cache", or "custom".');
   }
-  if (mode !== 'array') return { mode, diskSlot: null };
-  const diskSlot = (body as { diskSlot?: unknown })?.diskSlot;
-  if (typeof diskSlot !== 'number' || !Number.isInteger(diskSlot) || diskSlot < 0) {
-    throw new HttpError(400, 'diskSlot is required and must be a non-negative integer when mode is "array".');
+  if (mode === 'array') {
+    const diskSlot = (body as { diskSlot?: unknown })?.diskSlot;
+    if (typeof diskSlot !== 'number' || !Number.isInteger(diskSlot) || diskSlot < 0) {
+      throw new HttpError(400, 'diskSlot is required and must be a non-negative integer when mode is "array".');
+    }
+    return { mode, diskSlot, customPath: null };
   }
-  return { mode, diskSlot };
+  if (mode === 'custom') {
+    const customPath = (body as { customPath?: unknown })?.customPath;
+    if (typeof customPath !== 'string' || !customPath.trim().startsWith('/')) {
+      throw new HttpError(400, 'customPath is required and must be an absolute path when mode is "custom".');
+    }
+    return { mode, diskSlot: null, customPath: customPath.trim() };
+  }
+  return { mode, diskSlot: null, customPath: null };
 }
 
 export function dockerRouter(

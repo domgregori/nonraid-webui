@@ -10,6 +10,7 @@ import type { NmdClient } from '../nmd/index.js';
 import type { StorageLocation } from '../settings/types.js';
 import { runSudoMaybe } from '../system/procUtil.js';
 import type { DockerClient } from './client.js';
+import { isAllowedBindPath } from './planning.js';
 
 const execFileAsync = promisify(execFile);
 // Exported so backupCatalog.ts can back this up under the same name a relocated Docker storage
@@ -23,18 +24,26 @@ export interface StoragePathProgress {
 }
 
 export interface DockerStorageInfo {
-  // 'custom' covers a data-root this app didn't set (e.g. hand-edited outside boot/array/cache
-  // convention) - there's nothing to migrate *from* cleanly in that case beyond just picking a new target.
+  // 'custom' covers both a data-root this app didn't set (e.g. hand-edited outside the
+  // boot/array/cache convention) and one an admin typed directly (see StorageLocation's own doc
+  // comment for why this app doesn't try to guess a pool subfolder on the admin's behalf).
   mode: 'boot' | 'array' | 'cache' | 'custom';
   diskSlot: number | null;
   path: string;
 }
 
 /** Boot → today's real default; array disk N / the cache pool → a fixed subfolder, same convention
- *  as the LXC side (lxc/storagePath.ts) so the two are easy to reason about together. */
+ *  as the LXC side (lxc/storagePath.ts) so the three are easy to reason about together. Anything
+ *  else (a pool, or any other path) is 'custom' - the admin types the exact target rather than
+ *  picking a pool by name and getting a fixed "/system/docker" suffix appended underneath it,
+ *  which silently doubled up for anyone whose pool happened to be named "system" itself. */
 export function resolveDockerPath(location: StorageLocation): string {
   if (location.mode === 'boot') return '/var/lib/docker';
   if (location.mode === 'cache') return `${config.cacheMountPoint}/system/docker`;
+  if (location.mode === 'custom') {
+    if (!location.customPath) throw new Error('customPath is required when mode is "custom".');
+    return location.customPath;
+  }
   if (location.diskSlot === null) throw new Error('diskSlot is required when mode is "array".');
   return `/mnt/disk${location.diskSlot}/system/docker`;
 }
@@ -69,6 +78,33 @@ async function requireCacheUsable(cache: CacheService): Promise<void> {
   if (status.health === 'not-configured' || status.health === 'unavailable') {
     throw new HttpError(400, `Cache pool isn't available (${status.health}) - set it up on the Disks page first.`);
   }
+}
+
+/** A typed custom path has to resolve inside one of this app's own bind roots (config.appsBindRoots
+ *  - same trust boundary a manually-typed container bind mount already has to clear, see
+ *  docker/planning.ts's isAllowedBindPath) before Docker gets pointed at it - without this, a typo
+ *  or a deliberately hostile value could point Docker's entire data-root at /etc, /root, or
+ *  anywhere else outside the array/pool space this app is willing to let it write. */
+async function requireAllowedCustomPath(customPath: string): Promise<void> {
+  if (!(await isAllowedBindPath(customPath, config.appsBindRoots))) {
+    throw new HttpError(400, `"${customPath}" isn't inside an allowed location - it needs to be under ${config.appsBindRoots.join(' or ')}.`);
+  }
+}
+
+/** Walks up from `targetPath` to the nearest directory that already exists, for a free-space check
+ *  during the 'checking' phase below - the target leaf itself (and any number of its parents) may
+ *  not exist yet for a freshly-typed custom path, unlike the boot/array/cache presets, which always
+ *  resolve under a mountpoint that's guaranteed to already be there. Falls back to '/' (always
+ *  exists) rather than looping forever. */
+async function nearestExistingAncestor(targetPath: string): Promise<string> {
+  let dir = targetPath;
+  for (let i = 0; i < 32; i++) {
+    if (await pathExists(dir)) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return dir;
+    dir = parent;
+  }
+  return '/';
 }
 
 // One storage move at a time, system-wide - see lxc/storagePath.ts's identical lock for why.
@@ -141,10 +177,14 @@ export async function migrateDockerStorage(
     if (target.mode === 'cache') {
       await requireCacheUsable(deps.cache);
     }
+    if (target.mode === 'custom') {
+      await requireAllowedCustomPath(targetPath);
+    }
 
     onProgress({ phase: 'checking', message: 'Checking available space…' });
     const sourceSize = await dirSizeBytes(currentPath);
-    const targetMount = target.mode === 'array' ? `/mnt/disk${target.diskSlot}` : target.mode === 'cache' ? config.cacheMountPoint : '/';
+    const targetMount =
+      target.mode === 'array' ? `/mnt/disk${target.diskSlot}` : target.mode === 'cache' ? config.cacheMountPoint : await nearestExistingAncestor(targetPath);
     const available = await freeSpaceBytes(targetMount);
     if (sourceSize > 0 && available < sourceSize * 1.1) {
       throw new Error(`Not enough free space at the target - needs about ${Math.ceil((sourceSize * 1.1) / 1024 / 1024)} MB.`);

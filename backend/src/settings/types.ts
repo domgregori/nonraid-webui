@@ -95,8 +95,14 @@ export interface TempAlertSettings {
 // survive an app restart. Docker's equivalent isn't persisted here at all - its real storage root
 // lives in /etc/docker/daemon.json, so that file is read live instead (see docker/storagePath.ts).
 export interface StorageLocation {
-  mode: 'boot' | 'array' | 'cache';
+  mode: 'boot' | 'array' | 'cache' | 'custom';
   diskSlot: number | null; // meaningful only when mode === 'array'
+  // meaningful only when mode === 'custom' - a full path typed directly, not a fixed subfolder
+  // appended under a picked pool. A pool-picker + fixed "/system/docker" suffix (an earlier version
+  // of this) breaks the moment a pool is itself named "system" (or any name the suffix collides
+  // with) - confirmed live: picking pool "system" produced /mnt/user/system/system/lxc. Letting the
+  // admin type the exact target instead sidesteps that class of collision entirely.
+  customPath: string | null;
 }
 
 // The cache mirror's persisted identity - deliberately not raw /dev/sdX paths, which aren't stable

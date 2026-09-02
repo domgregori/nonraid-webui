@@ -4,6 +4,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import type { CacheService } from '../cache/service.js';
 import { config } from '../config.js';
+import { isAllowedBindPath } from '../docker/planning.js';
 import { HttpError } from '../httpError.js';
 import type { NmdClient } from '../nmd/index.js';
 import type { SettingsStore } from '../settings/index.js';
@@ -30,10 +31,17 @@ export interface StoragePathProgress {
 }
 
 /** Boot → today's real default; array disk N / the cache pool → a fixed subfolder, same convention
- *  as the Docker side (docker/storagePath.ts) so the two are easy to reason about together. */
+ *  as the Docker side (docker/storagePath.ts) so the three are easy to reason about together.
+ *  Anything else (a pool, or any other path) is 'custom' - the admin types the exact target rather
+ *  than picking a pool by name and getting a fixed "/system/lxc" suffix appended underneath it,
+ *  which silently doubled up for anyone whose pool happened to be named "system" itself. */
 export function resolveLxcPath(location: StorageLocation): string {
   if (location.mode === 'boot') return '/var/lib/lxc';
   if (location.mode === 'cache') return `${config.cacheMountPoint}/system/lxc`;
+  if (location.mode === 'custom') {
+    if (!location.customPath) throw new Error('customPath is required when mode is "custom".');
+    return location.customPath;
+  }
   if (location.diskSlot === null) throw new Error('diskSlot is required when mode is "array".');
   return `/mnt/disk${location.diskSlot}/system/lxc`;
 }
@@ -44,6 +52,27 @@ async function requireCacheUsable(cache: CacheService): Promise<void> {
   if (status.health === 'not-configured' || status.health === 'unavailable') {
     throw new HttpError(400, `Cache pool isn't available (${status.health}) - set it up on the Disks page first.`);
   }
+}
+
+/** Same "has to resolve inside an allowed bind root" gate as the Docker side (see
+ *  docker/storagePath.ts's requireAllowedCustomPath). */
+async function requireAllowedCustomPath(customPath: string): Promise<void> {
+  if (!(await isAllowedBindPath(customPath, config.appsBindRoots))) {
+    throw new HttpError(400, `"${customPath}" isn't inside an allowed location - it needs to be under ${config.appsBindRoots.join(' or ')}.`);
+  }
+}
+
+/** Same ancestor-walk as the Docker side (see docker/storagePath.ts's nearestExistingAncestor) -
+ *  a freshly-typed custom path's leaf (or several of its parents) may not exist yet. */
+async function nearestExistingAncestor(targetPath: string): Promise<string> {
+  let dir = targetPath;
+  for (let i = 0; i < 32; i++) {
+    if (await pathExists(dir)) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return dir;
+    dir = parent;
+  }
+  return '/';
 }
 
 // One storage move at a time, system-wide - concurrent moves (or a move racing a benchmark's own
@@ -141,10 +170,14 @@ export async function migrateLxcStorage(
     if (target.mode === 'cache') {
       await requireCacheUsable(deps.cache);
     }
+    if (target.mode === 'custom') {
+      await requireAllowedCustomPath(targetPath);
+    }
 
     onProgress({ phase: 'checking', message: 'Checking available space…' });
     const sourceSize = await dirSizeBytes(currentPath);
-    const targetMount = target.mode === 'array' ? `/mnt/disk${target.diskSlot}` : target.mode === 'cache' ? config.cacheMountPoint : '/';
+    const targetMount =
+      target.mode === 'array' ? `/mnt/disk${target.diskSlot}` : target.mode === 'cache' ? config.cacheMountPoint : await nearestExistingAncestor(targetPath);
     const available = await freeSpaceBytes(targetMount);
     if (sourceSize > 0 && available < sourceSize * 1.1) {
       throw new Error(`Not enough free space at the target - needs about ${Math.ceil((sourceSize * 1.1) / 1024 / 1024)} MB.`);
