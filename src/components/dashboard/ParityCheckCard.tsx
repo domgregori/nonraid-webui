@@ -25,7 +25,9 @@ export function ParityCheckCard() {
   return (
     <Card className="parity-card">
       <div className="parity-card__head">
-        <div className="eyebrow">{parity.isClearing ? t('ParityCheckCard.newDisk') : t('ParityCheckCard.parityCheck')}</div>
+        <div className="eyebrow">
+          {parity.isClearing ? t('ParityCheckCard.newDisk') : parity.isRebuild ? t('ParityCheckCard.rebuild') : t('ParityCheckCard.parityCheck')}
+        </div>
         <div className="parity-card__actions">
           {parity.isRunning && (
             <>
@@ -39,7 +41,11 @@ export function ParityCheckCard() {
           )}
           {parity.canStart && (
             <button type="button" className="btn--primary-sm" disabled={parityPending} onClick={parity.startHandler}>
-              {parity.isClearing ? t('ParityCheckCard.startClearing') : t('ParityCheckCard.startParityCheck')}
+              {parity.isClearing
+                ? t('ParityCheckCard.startClearing')
+                : parity.isRebuild
+                  ? t('ParityCheckCard.startRebuild')
+                  : t('ParityCheckCard.startParityCheck')}
             </button>
           )}
         </div>

@@ -95,9 +95,11 @@
   "ParityCheckCard": {
     "newDisk": "New Disk",
     "parityCheck": "Parity Check",
+    "rebuild": "Rebuild",
     "cancel": "Cancel",
     "startClearing": "Start Clearing",
     "startParityCheck": "Start Parity Check",
+    "startRebuild": "Start Rebuild",
     "speed": "Speed: {{speed}}",
     "reloadDriverDesc": "Stuck pending from an unassigned disk with nothing behind it - Start would fail. Reload resets it without changing array disks."
   },

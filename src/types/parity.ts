@@ -10,6 +10,13 @@ export interface ParityViewModel {
    *  realClient.ts's parityCheck doc comment). Start would just fail; only a driver reload fixes
    *  it, so the UI leads with that instead of a start button that's guaranteed to error. */
   needsDriverReload: boolean;
+  /** True for a pending or active resync on a degraded array that isn't a new-disk clear - a real
+   *  disk rebuild (e.g. after replacing a failed disk) reports its action as plain "check" at the
+   *  driver level, indistinguishable string-wise from a routine scheduled check, even though
+   *  nmdctl's own CLI already relabels this exact state "Data-Rebuild Disk N" using the array's
+   *  degraded state as context. Callers use this to show "Rebuild" language instead of generic
+   *  parity-check language - degraded is otherwise only used for the progress bar color. */
+  isRebuild: boolean;
   canStart: boolean;
   barColor: string;
   progressPct: number;

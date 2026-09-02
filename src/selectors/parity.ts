@@ -17,10 +17,13 @@ function formatEtaCompact(seconds: number): string {
   return `${Math.floor(mins / 60)}h ${mins % 60}m remain`;
 }
 
-/** resync is a single shared field - a new-disk clear or a parity rebuild uses the same progress data as a parity check, just a different `action` value. */
-function progressVerb(action: string): string {
+/** resync is a single shared field - a new-disk clear or a parity rebuild uses the same progress
+ *  data as a parity check, just a different `action` value - except a rebuild's action is often
+ *  plain "check" too (see isRebuild's own doc comment), hence the separate flag rather than
+ *  trusting the action string alone for this one. */
+function progressVerb(action: string, isRebuild: boolean): string {
   if (action.startsWith('clear')) return 'Clearing new disk';
-  if (action.startsWith('recon')) return 'Reconstructing parity';
+  if (action.startsWith('recon') || isRebuild) return 'Reconstructing parity';
   return 'Checking';
 }
 
@@ -42,24 +45,30 @@ export function deriveParityViewModel(
     resync.pending && !resync.active && resync.size_gb === 0 && !resync.action.trim().toLowerCase().startsWith('check');
   const canStart = arrayStarted && !resync.active && !pending && !needsDriverReload;
   const progressPct = Math.round(resync.progress_percent);
+  const isClearing = resync.action.trim().toLowerCase().startsWith('clear');
+  // See ParityViewModel's own doc comment for why this needs isDegraded rather than the action
+  // string alone - a real rebuild's action is plain "check", same as a routine scheduled check.
+  const isRebuild = degraded && !isClearing && (resync.pending || resync.active);
 
   return {
     isRunning: resync.active,
-    isClearing: resync.action.trim().toLowerCase().startsWith('clear'),
+    isClearing,
     needsDriverReload,
+    isRebuild,
     canStart,
     progressPct,
     barColor: degraded ? COLORS.red : COLORS.blue,
     progressLabel: resync.active
-      ? `${progressVerb(resync.action)}: ${progressPct}%`
+      ? `${progressVerb(resync.action, isRebuild)}: ${progressPct}%`
       : needsDriverReload
         ? 'Stuck pending with no real disk behind it - reload the driver to clear this'
         : resync.pending
-          ? // Queued but not yet started (e.g. a new disk waiting to be cleared before it joins) -
-            // distinct from resync.active, and from the driver's perspective can sit like this
-            // indefinitely until something calls Start. Falling through to the "Last check"
-            // summary below here would misreport a still-pending operation as already finished.
-            `${resync.action.trim().toLowerCase().startsWith('clear') ? 'New disk needs to be cleared' : 'Queued'} - press Start to begin`
+          ? // Queued but not yet started (e.g. a new disk waiting to be cleared before it joins, or
+            // a disk waiting to be rebuilt after a replacement) - distinct from resync.active, and
+            // from the driver's perspective can sit like this indefinitely until something calls
+            // Start. Falling through to the "Last check" summary below here would misreport a
+            // still-pending operation as already finished.
+            `${isClearing ? 'New disk needs to be cleared' : isRebuild ? 'Disk needs to be rebuilt' : 'Queued'} - press Start to begin`
           : array.counters.sync_errors > 0
             ? `Last check: completed, ${array.counters.sync_errors} errors`
             : 'Last check: completed, 0 errors',
