@@ -9,6 +9,7 @@ import type {
   UserInput,
   UserUpdateInput,
 } from '../types/usersApi';
+import type { PendingImportUser } from '../types/unraidImportApi';
 
 const jsonInit = (method: string, body: unknown): RequestInit => ({
   method,
@@ -24,6 +25,11 @@ export const usersApi = {
   getAccess: (username: string) => request<ShareAccessEntry[]>(`/api/users/${encodeURIComponent(username)}/access`),
   setAccess: (username: string, shareName: string, permission: SharePermission) =>
     request<{ ok: boolean }>(`/api/users/${encodeURIComponent(username)}/access/${encodeURIComponent(shareName)}`, jsonInit('PUT', { permission })),
+  listPendingImport: () => request<PendingImportUser[]>('/api/users/pending-import'),
+  createFromPendingImport: (username: string, password: string) =>
+    request<User>(`/api/users/pending-import/${encodeURIComponent(username)}`, jsonInit('POST', { password })),
+  discardPendingImport: (username: string) =>
+    request<{ ok: boolean }>(`/api/users/pending-import/${encodeURIComponent(username)}`, { method: 'DELETE' }),
 };
 
 export const groupsApi = {

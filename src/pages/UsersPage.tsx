@@ -4,6 +4,7 @@ import { ShareExportModal } from '../components/shares/ShareExportModal';
 import { AddGroupModal } from '../components/users/AddGroupModal';
 import { AddUserModal } from '../components/users/AddUserModal';
 import { GroupDetailPanel } from '../components/users/GroupDetailPanel';
+import { PendingImportUsersSection } from '../components/users/PendingImportUsersSection';
 import { UserDetailPanel } from '../components/users/UserDetailPanel';
 import { useGroups } from '../hooks/useGroups';
 import { useShares } from '../hooks/useShares';
@@ -100,6 +101,8 @@ export function UsersPage() {
           <div className="status-note">{t('UsersPage.noPools')}</div>
         )}
       </div>
+
+      <PendingImportUsersSection />
 
       <div className="eyebrow disk-section-label">{t('UsersPage.usersHeading')}</div>
       <div className="page-header">

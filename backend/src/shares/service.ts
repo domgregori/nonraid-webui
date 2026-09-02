@@ -255,17 +255,66 @@ export class ShareService {
   }
 
   async create(input: unknown): Promise<Share> {
+    const ctx = await this.buildContext();
+    const share = await this.createOne(input, ctx);
+    await this.resyncExports();
+    return share;
+  }
+
+  /**
+   * Same per-share work as create() (validate, duplicate check, mount the mergerfs branch, write
+   * to the store), minus the ApplyContext build and the resyncExports() call - both hoisted out to
+   * the caller so createMany() below can share one of each across a whole batch instead of paying
+   * for them once per share. buildContext() alone is a real nmdctl status poll; resyncExports()
+   * rewrites the *entire* smb.conf/exports from the full current share list and reloads smbd/nfsd
+   * for real, not just this one share - calling it N times for N shares does the same full-list
+   * rewrite N times, mostly to produce N-1 intermediate states nobody ever needed. Confirmed live:
+   * a 23-share import each doing its own create() visibly got slower share over share as the
+   * rewritten list grew, exactly this pattern.
+   */
+  private async createOne(input: unknown, ctx: ApplyContext): Promise<Share> {
     const share = validateShareInput(input);
     if (await this.store.get(share.name)) {
       throw new HttpError(409, `Share "${share.name}" already exists.`);
     }
-
-    const ctx = await this.buildContext();
     await this.applier.mountShare(share, ctx);
     await this.store.upsert(share);
-    await this.resyncExports();
     this.activity.log(`Share "${share.name}" created`, 'green').catch(() => {});
     return share;
+  }
+
+  /**
+   * Bulk version of create() - one ApplyContext and one resyncExports() for the whole batch
+   * instead of one each per share (see createOne()'s doc comment for why that matters). Best-effort
+   * per share, same as the unraid-import route's own loop used to be: one bad input doesn't stop
+   * the rest of the batch, it just lands in `failed` instead of `created`. Shares up to that point
+   * still get the config resync even if a later one in the batch fails.
+   *
+   * `onProgress`, when given, fires once per share right before that share's own createOne() work
+   * starts (mount + store write, not the batch-wide resync) - so a caller streaming this back (see
+   * the unraid-import route) can show which share is in flight, the way the Apps/Docker/LXC install
+   * routes already stream their own per-layer progress (api/progressStream.ts's ndjson protocol).
+   */
+  async createMany(
+    inputs: unknown[],
+    onProgress?: (progress: { name: string; index: number; total: number }) => void,
+  ): Promise<{ created: Share[]; failed: { name: string; error: string }[] }> {
+    const ctx = await this.buildContext();
+    const created: Share[] = [];
+    const failed: { name: string; error: string }[] = [];
+
+    for (const [index, input] of inputs.entries()) {
+      const name = typeof input === 'object' && input && 'name' in input && typeof input.name === 'string' ? input.name : '(unknown)';
+      onProgress?.({ name, index, total: inputs.length });
+      try {
+        created.push(await this.createOne(input, ctx));
+      } catch (err) {
+        failed.push({ name, error: (err as Error).message });
+      }
+    }
+
+    if (created.length > 0) await this.resyncExports();
+    return { created, failed };
   }
 
   async update(name: string, input: unknown): Promise<Share> {

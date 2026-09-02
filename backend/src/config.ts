@@ -129,6 +129,7 @@ export const config = {
   smbConfPath: str('SMB_CONF_PATH', '/etc/samba/smb.conf'),
   exportsPath: str('EXPORTS_PATH', '/etc/exports'),
   shareAccessConfigPath: str('SHARE_ACCESS_CONFIG_PATH', path.join(process.cwd(), 'data', 'share-access.json')),
+  pendingImportUsersConfigPath: str('PENDING_IMPORT_USERS_CONFIG_PATH', path.join(process.cwd(), 'data', 'pending-import-users.json')),
   systemStatsIntervalMs: num('SYSTEM_STATS_INTERVAL_MS', 2_000),
   // Managed users/groups live in [start, end], so they're clearly distinguishable
   // from real host system accounts (never touches anything outside this range).

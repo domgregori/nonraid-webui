@@ -62,6 +62,36 @@ export function usersRouter(users: UsersService): Router {
     }
   });
 
+  router.get('/users/pending-import', async (_req, res) => {
+    try {
+      res.json(await users.listPendingImportUsers());
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  router.post('/users/pending-import/:username', async (req, res) => {
+    try {
+      const password = req.body?.password;
+      if (typeof password !== 'string' || !password) {
+        res.status(400).json({ error: 'password is required.' });
+        return;
+      }
+      res.status(201).json(await users.createUserFromPendingImport(req.params.username, password));
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  router.delete('/users/pending-import/:username', async (req, res) => {
+    try {
+      await users.discardPendingImportUser(req.params.username);
+      res.json({ ok: true });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   router.get('/groups', async (_req, res) => {
     try {
       res.json(await users.listGroups());

@@ -4,10 +4,10 @@ import { config } from '../config.js';
 
 const execFileAsync = promisify(execFile);
 
-async function run(bin: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+async function run(bin: string, args: string[], timeout = 15_000): Promise<{ stdout: string; stderr: string }> {
   try {
     return await execFileAsync(bin, args, {
-      timeout: 15_000,
+      timeout,
       maxBuffer: 4 * 1024 * 1024,
     });
   } catch (err) {
@@ -15,6 +15,14 @@ async function run(bin: string, args: string[]): Promise<{ stdout: string; stder
     throw new Error(e.stderr?.trim() || e.stdout?.trim() || e.message);
   }
 }
+
+// find/setfacl below walk every file and directory already under dirPath, not just dirPath
+// itself - fine for a fresh, empty share, but a share pointed at real pre-existing data can be
+// enormous (confirmed live: a Proxmox Backup Server chunk store and a media library each around
+// 150,000 files/directories) and takes real minutes to walk, not the 15s mkdir/chown (which only
+// ever touch dirPath itself, never recurse) reasonably need. Generous rather than unbounded - a
+// share creation that's *genuinely* hung should still fail eventually instead of blocking forever.
+const RECURSIVE_TIMEOUT_MS = 30 * 60 * 1000;
 
 /**
  * Creates `dirPath` if missing and makes it (and everything created under it afterward - by this
@@ -42,7 +50,7 @@ export async function provisionArrayDir(dirPath: string): Promise<void> {
   // code, even for content this backend's own root process creates directly (browse/service.ts,
   // fileMove/service.ts). Only directories, not files - `find -type d` avoids setting the same bit
   // on a regular file, where it means something unrelated (mandatory locking).
-  await run('find', [dirPath, '-type', 'd', '-exec', 'chmod', 'g+s', '{}', '+']);
+  await run('find', [dirPath, '-type', 'd', '-exec', 'chmod', 'g+s', '{}', '+'], RECURSIVE_TIMEOUT_MS);
   const acl = `u:${config.arrayDataOwner}:rwx,g:${config.arrayDataGroup}:rwx`;
-  await run('setfacl', ['-R', '-m', acl, '-d', '-m', acl, dirPath]);
+  await run('setfacl', ['-R', '-m', acl, '-d', '-m', acl, dirPath], RECURSIVE_TIMEOUT_MS);
 }

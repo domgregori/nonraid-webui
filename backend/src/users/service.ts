@@ -5,6 +5,7 @@ import type { ShareStore } from '../shares/store.js';
 import type { SharePermission } from '../shares/types.js';
 import { HttpError } from '../httpError.js';
 import type { UsersClient } from './client.js';
+import type { PendingImportUsersStore } from './pendingImportStore.js';
 import type { Group, User, UserCommandResult } from './types.js';
 import { validateGroupInput, validatePermission, validateUserInput, validateUserUpdateInput } from './validate.js';
 
@@ -20,6 +21,7 @@ export class UsersService {
     private shareStore: ShareStore,
     private shares: ShareService,
     private activity: ActivityStore,
+    private pendingImport: PendingImportUsersStore,
   ) {}
 
   listUsers(): Promise<User[]> {
@@ -104,6 +106,41 @@ export class UsersService {
 
   async setGroupAccess(name: string, shareName: string, permissionInput: unknown): Promise<void> {
     await this.setAccess('groups', name, shareName, permissionInput);
+  }
+
+  listPendingImportUsers() {
+    return this.pendingImport.getAll();
+  }
+
+  /**
+   * Turns one "Import from Unraid" pending user into a real account, with the password the admin
+   * just chose for it (a share never carries a secret, so this is the one part of that import that
+   * always needs a person in the loop - see PendingImportUsersStore's own doc comment). Applies the
+   * remembered read/write share list from the original import right away, write winning over read
+   * where a share appears in both, then drops the pending entry either way - a failure after the
+   * account itself is created still needs it gone, or every retry would try to create the same
+   * username again and fail on "already exists" instead of finishing the access wiring.
+   */
+  async createUserFromPendingImport(username: string, password: string): Promise<User> {
+    const pending = (await this.pendingImport.getAll()).find((u) => u.username === username);
+    if (!pending) throw new HttpError(404, `"${username}" isn't a pending Unraid import.`);
+
+    const user = await this.createUser({ username, password, groups: [] });
+    try {
+      for (const shareName of pending.readShares) {
+        if (await this.shareStore.get(shareName)) await this.setUserAccess(username, shareName, 'read-only');
+      }
+      for (const shareName of pending.writeShares) {
+        if (await this.shareStore.get(shareName)) await this.setUserAccess(username, shareName, 'read-write');
+      }
+    } finally {
+      await this.pendingImport.remove(username);
+    }
+    return user;
+  }
+
+  discardPendingImportUser(username: string): Promise<void> {
+    return this.pendingImport.remove(username);
   }
 
   private async setAccess(principalType: 'users' | 'groups', principal: string, shareName: string, permissionInput: unknown): Promise<void> {

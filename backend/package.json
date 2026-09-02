@@ -14,15 +14,19 @@
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.3.2",
+    "adm-zip": "^0.6.0",
     "better-sqlite3": "^12.11.1",
     "cors": "^2.8.5",
     "dockerode": "^5.0.1",
     "express": "^4.21.2",
+    "fast-xml-parser": "^5.11.1",
     "multer": "^2.2.0",
     "otplib": "^13.4.1",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "tar": "^7.5.22"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/better-sqlite3": "^9.6.0",
     "@types/cors": "^2.8.17",
     "@types/dockerode": "^4.0.1",
@@ -30,6 +34,7 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^24.13.2",
     "@types/qrcode": "^1.5.6",
+    "@types/tar": "^6.1.13",
     "tsx": "^4.19.2",
     "typescript": "~5.7.2"
   }

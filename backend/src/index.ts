@@ -50,6 +50,7 @@ import { tailscaleRouter } from './routes/tailscale.js';
 import { tlsRouter } from './routes/tls.js';
 import { updateRouter } from './routes/update.js';
 import { UpdateScheduler } from './update/scheduler.js';
+import { unraidImportRouter } from './routes/unraidImport.js';
 import { usersRouter } from './routes/users.js';
 import { createRcloneClient } from './rclone/index.js';
 import { RcloneService } from './rclone/service.js';
@@ -65,7 +66,7 @@ import { SystemStatsService } from './system/service.js';
 import { installShutdownHook } from './system/shutdownHook.js';
 import { createTailscaleClient } from './tailscale/index.js';
 import { TlsStore } from './tls/index.js';
-import { createUsersClient, UsersService } from './users/index.js';
+import { createUsersClient, PendingImportUsersStore, UsersService } from './users/index.js';
 
 async function main() {
   const nmd = createNmdClient();
@@ -121,7 +122,8 @@ async function main() {
   const cacheMover = new CacheMoverService(nmd, shareStore, settingsStore);
   new CacheMoverScheduler(cacheMover, nmd, settingsStore, activity);
   const system = new SystemStatsService(smart);
-  const users = new UsersService(usersClient, shareAccessStore, shareStore, shares, activity);
+  const pendingImportUsers = new PendingImportUsersStore();
+  const users = new UsersService(usersClient, shareAccessStore, shareStore, shares, activity, pendingImportUsers);
   const caFeedStore = new CaFeedStore();
   await caFeedStore.start();
   const apps = new AppsService(caFeedStore, docker, activity);
@@ -286,6 +288,7 @@ async function main() {
   app.use('/api', servicesRouter(activity));
   app.use('/api', sshRouter(activity, authService));
   app.use('/api', usersRouter(users));
+  app.use('/api', unraidImportRouter(nmd, shares, pendingImportUsers, docker, config.appsBindRoots, activity, apps));
   app.use('/api', appsRouter(apps));
   app.use('/api', activityRouter(activity));
   app.use('/api', tlsRouter(tlsStore, activity, authService));

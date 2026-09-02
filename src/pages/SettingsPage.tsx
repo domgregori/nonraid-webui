@@ -13,6 +13,7 @@ import { AppriseTargetsField } from '../components/settings/AppriseTargetsField'
 import { ConfigRestoreWizard } from '../components/settings/ConfigRestoreWizard';
 import { EncryptBackupModal } from '../components/settings/EncryptBackupModal';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
+import { ImportUnraidWizard } from '../components/settings/ImportUnraidWizard';
 import { LogsSection } from '../components/settings/LogsSection';
 import { NotificationEventToggles } from '../components/settings/NotificationEventToggles';
 import { PasskeySection } from '../components/settings/PasskeySection';
@@ -236,6 +237,7 @@ export function SettingsPage() {
   const [timezoneError, setTimezoneError] = useState<string | null>(null);
 
   const [showImportWizard, setShowImportWizard] = useState(false);
+  const [showImportUnraidWizard, setShowImportUnraidWizard] = useState(false);
 
   const [newPasswordDraft, setNewPasswordDraft] = useState('');
   const [confirmPasswordDraft, setConfirmPasswordDraft] = useState('');
@@ -1168,6 +1170,16 @@ export function SettingsPage() {
             </div>
 
             <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">{t('SettingsPage.recovery.importUnraidTitle')}</div>
+              <div className="toggle-row__desc">{t('SettingsPage.recovery.importUnraidDesc')}</div>
+              <div className="settings-field__row">
+                <button type="button" className="btn" onClick={() => setShowImportUnraidWizard(true)}>
+                  {t('SettingsPage.recovery.importUnraidButton')}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-field toggle-row--bordered">
               <div className="toggle-row__title">{t('SettingsPage.recovery.bootSnapshotsTitle')}</div>
               <BootSnapshotsSection />
             </div>
@@ -1183,6 +1195,7 @@ export function SettingsPage() {
           {restoreDialog?.source === 'local' && <RestoreFromLocalWizard onClose={() => setRestoreDialog(null)} focusCategory={restoreDialog.focusCategory} />}
           {restoreDialog?.source === 'remote' && <RestoreFromRemoteWizard onClose={() => setRestoreDialog(null)} focusCategory={restoreDialog.focusCategory} />}
           {showImportWizard && <ImportArrayWizard onClose={() => setShowImportWizard(false)} />}
+          {showImportUnraidWizard && <ImportUnraidWizard onClose={() => setShowImportUnraidWizard(false)} />}
 
           <div className={`settings-card${activeSection === 'notifications' ? '' : ' settings-hidden'}`}>
             <div className="settings-card__title">{t('SettingsPage.notifications.title')}</div>

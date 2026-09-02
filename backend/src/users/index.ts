@@ -9,4 +9,6 @@ export type { UsersClient } from './client.js';
 export { UsersService } from './service.js';
 export type { ShareAccessEntry } from './service.js';
 export { writeUsersExport, restoreUsersExport } from './backupExport.js';
+export { PendingImportUsersStore } from './pendingImportStore.js';
+export type { PendingImportUser } from './pendingImportStore.js';
 export * from './types.js';

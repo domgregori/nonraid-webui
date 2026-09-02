@@ -147,6 +147,12 @@
     "loadingPools": "Loading pools…",
     "configureSharing": "Configure Sharing",
     "noPools": "No pools yet - create one from the Pools tab first.",
+    "pendingImportHeading": "Imported from Unraid, awaiting a password",
+    "pendingImportDesc": "These accounts were found during an Unraid import. Set a password for each one to actually create it, or remove it to discard.",
+    "pendingImportShareCount_one": "{{count}} share to get access to",
+    "pendingImportShareCount_other": "{{count}} shares to get access to",
+    "pendingImportPasswordPlaceholder": "New password",
+    "pendingImportAdd": "Add",
     "usersHeading": "Users",
     "addUser": "Add User",
     "loadingUsers": "Loading users…",
@@ -357,6 +363,9 @@
       "restoreWizardTitle": "Restore from an uploaded file",
       "cliDecryptPrefix": "To decrypt an encrypted backup without the webui use",
       "cliDecryptSuffix": "from a terminal - see its --help for usage.",
+      "importUnraidTitle": "Import shares and users from Unraid",
+      "importUnraidDesc": "Bring over share definitions and user accounts from an Unraid install's config/ directory - an archive (.tar, .tar.gz, .zip) or a whole folder.",
+      "importUnraidButton": "Import from Unraid…",
       "bootSnapshotsTitle": "Boot disk snapshots"
     },
     "notifications": {
