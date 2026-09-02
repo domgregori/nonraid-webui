@@ -313,6 +313,20 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
                             }`
                           : ` · ${t('ImportArrayWizard.noMatchingDisk')}`}
                       </div>
+                      {/* A missing slot isn't itself a reason to block the import (see #71) - the
+                          rest of the array can still come up fine with one slot unassigned. What
+                          was actually confusing during a real incident wasn't the import itself,
+                          it was not knowing what to do about the gap *afterward* - this sets that
+                          expectation up front instead of leaving it a post-import surprise. Data
+                          and parity get different copy: a missing data disk is a rebuild once
+                          replaced, but a missing parity disk has no prior data to rebuild *from* -
+                          it needs a fresh parity build instead, a materially different operation
+                          worth naming correctly here. */}
+                      {slot.status === 'missing' && (
+                        <div className="unassigned-device-row__meta">
+                          {slot.role === 'data' ? t('ImportArrayWizard.missingDataHint') : t('ImportArrayWizard.missingParityHint')}
+                        </div>
+                      )}
                     </div>
                     <span className={`import-status-pill import-status-pill--${slot.status}`}>{t(STATUS_LABEL_KEYS[slot.status])}</span>
                   </div>

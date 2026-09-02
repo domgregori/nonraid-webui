@@ -441,6 +441,8 @@
     "slotLabel": "Slot {{slot}}",
     "expects": "Expects {{size}}",
     "noMatchingDisk": "no matching disk connected",
+    "missingDataHint": "After import, replace this disk from the Disks page to start a rebuild.",
+    "missingParityHint": "After import, assign a parity disk from the Disks page - there's no prior data to rebuild from, so this needs a fresh parity build instead.",
     "startOver": "Start over",
     "continue": "Continue",
     "confirmStopsCurrentArray": "This stops the currently running array, backs up its superblock, and loads this one instead.",
