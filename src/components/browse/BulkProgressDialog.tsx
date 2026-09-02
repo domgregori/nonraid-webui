@@ -42,6 +42,11 @@ export function BulkProgressDialog({ job, onCancel, onDismiss }: BulkProgressDia
                   ? t('BulkProgressDialog.progressWithName', { current: job.progress.index + 1, total: job.total, name: job.progress.name })
                   : t('BulkProgressDialog.progressNoName', { total: job.total })}
               </div>
+              {job.progress?.currentFile && (
+                <div className="toggle-row__desc">
+                  {t('BulkProgressDialog.fileProgress', { filesDone: job.progress.filesDone, currentFile: job.progress.currentFile })}
+                </div>
+              )}
               <div className="dialog__actions">
                 <button type="button" className="btn btn--danger" onClick={onCancel}>
                   {t('BulkProgressDialog.cancel')}

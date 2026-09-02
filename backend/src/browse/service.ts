@@ -13,6 +13,29 @@ const MAX_EDIT_BYTES = 2 * 1024 * 1024;
 
 const execFileAsync = promisify(execFile);
 
+/** Fires as a recursive copy/move progresses - `filesDone` is a running count, not a fraction of
+ *  a known total (getting a total would mean walking the whole tree twice - once to count, once
+ *  to actually copy - which costs real time on a big tree for a number that's only cosmetic). */
+export type FileProgressCallback = (currentFile: string, filesDone: number) => void;
+
+// `cp()`'s own `filter` option runs once per file/directory it visits during a recursive
+// copy - not there to filter anything here, but the only hook Node's cp() exposes for
+// observing progress on an operation it otherwise runs as one opaque call. A large tree
+// (confirmed live elsewhere in this app: real shares with 150,000+ entries) would mean
+// this many ndjson events too if every single one produced a tick, so only every 20th
+// file actually sends one - the caller still needs the correctness of the same cp() call
+// on every file, this only limits how often that gets reported.
+const PROGRESS_EVERY_N_FILES = 20;
+function throttledFilter(onFile: FileProgressCallback | undefined): ((src: string) => boolean) | undefined {
+  if (!onFile) return undefined;
+  let filesDone = 0;
+  return (src: string) => {
+    filesDone++;
+    if (filesDone % PROGRESS_EVERY_N_FILES === 0) onFile(path.basename(src), filesDone);
+    return true;
+  };
+}
+
 /** Same simple heuristic git/`file` use - a NUL byte in the first 8KB means binary, not text.
  *  Reads only that first chunk via a file handle rather than the whole file, so it's cheap enough
  *  to run per-entry while listing a directory (unlike readFile(), which needs the full content
@@ -235,7 +258,7 @@ export class BrowseService {
     return { ok: true, message: `Renamed to "${newName}"` };
   }
 
-  async move(requestPath: string, destParentPath: string): Promise<BrowseCommandResult> {
+  async move(requestPath: string, destParentPath: string, onFile?: FileProgressCallback): Promise<BrowseCommandResult> {
     const { root, absPath } = await resolveExisting(requestPath);
     if (absPath === root) throw new HttpError(400, 'Cannot move the browse root.');
     if (await isMountPoint(absPath)) {
@@ -258,14 +281,14 @@ export class BrowseService {
       // return ENOTCONN instead when source and destination land on different physical
       // branches - same reason saveUpload() below falls back to copy+remove. cp's recursive
       // option handles both files and directories in one call.
-      await cp(absPath, destAbs, { recursive: true });
+      await cp(absPath, destAbs, { recursive: true, filter: throttledFilter(onFile) });
       await chownArrayOwner(destAbs, true);
       await rm(absPath, { recursive: true });
     }
     return { ok: true, message: `Moved "${name}"` };
   }
 
-  async copy(requestPath: string, destParentPath: string): Promise<BrowseCommandResult> {
+  async copy(requestPath: string, destParentPath: string, onFile?: FileProgressCallback): Promise<BrowseCommandResult> {
     const { root, absPath } = await resolveExisting(requestPath);
     if (absPath === root) throw new HttpError(400, 'Cannot copy the browse root.');
 
@@ -278,7 +301,7 @@ export class BrowseService {
     const destExists = await stat(destAbs).then(() => true).catch(() => false);
     if (destExists) throw new HttpError(409, `"${name}" already exists at the destination.`);
 
-    await cp(absPath, destAbs, { recursive: true });
+    await cp(absPath, destAbs, { recursive: true, filter: throttledFilter(onFile) });
     await chownArrayOwner(destAbs, true);
     return { ok: true, message: `Copied "${name}"` };
   }

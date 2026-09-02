@@ -38,6 +38,13 @@ export interface BulkOpProgress {
   index: number;
   total: number;
   name: string;
+  // Sub-progress *within* this one entry, for a copy/move whose source is a directory with many
+  // files - absent for delete (no equivalent hook - see backend browse/service.ts) and absent for
+  // the first tick of any entry (fires only once real per-file work starts). filesDone is a
+  // running count, not a fraction of a known total - see backend's own FileProgressCallback doc
+  // comment for why getting a real total isn't worth a second walk of the tree just for this.
+  currentFile?: string;
+  filesDone?: number;
 }
 
 export interface BulkOpResult {

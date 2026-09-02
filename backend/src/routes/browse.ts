@@ -5,7 +5,7 @@ import multer from 'multer';
 import { suggestDirectories } from '../browse/suggest.js';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
-import type { BrowseService } from '../browse/service.js';
+import type { BrowseService, FileProgressCallback } from '../browse/service.js';
 
 function handleError(err: unknown, res: Response) {
   if (err instanceof HttpError) {
@@ -143,11 +143,18 @@ export function browseRouter(browse: BrowseService): Router {
       for (let i = 0; i < paths.length; i++) {
         if (cancelled) break;
         const p = paths[i] as string;
-        send({ type: 'progress', index: i, total: paths.length, name: p.split('/').pop() ?? p });
+        const name = p.split('/').pop() ?? p;
+        send({ type: 'progress', index: i, total: paths.length, name });
+        // Sub-progress *within* this one entry - a single directory can be thousands of files,
+        // long enough that the coarse "index/total" tick above sat unchanged for the entire
+        // operation with nothing to show it wasn't just hung. Delete isn't included: rm() has no
+        // equivalent hook the way cp() does (see browse/service.ts's throttledFilter), and deleting
+        // doesn't write data the way copy/move do, so it's far less likely to look stalled anyway.
+        const onFile: FileProgressCallback = (currentFile, filesDone) => send({ type: 'progress', index: i, total: paths.length, name, currentFile, filesDone });
         try {
           if (op === 'delete') await browse.remove(p);
-          else if (op === 'copy') await browse.copy(p, destPath as string);
-          else await browse.move(p, destPath as string);
+          else if (op === 'copy') await browse.copy(p, destPath as string, onFile);
+          else await browse.move(p, destPath as string, onFile);
           succeeded.push(p);
         } catch (err) {
           failed.push({ path: p, error: (err as Error).message });

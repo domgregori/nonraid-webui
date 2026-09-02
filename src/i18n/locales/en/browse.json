@@ -15,6 +15,7 @@
     "cancel": "Cancel",
     "progressWithName": "{{current}} of {{total}} - {{name}}",
     "progressNoName": "0 of {{total}}",
+    "fileProgress": "{{filesDone}} files so far - {{currentFile}}",
     "cancelledNote": "Cancelled - some items may have completed before it stopped. The listing has been refreshed.",
     "cancelledAfter": "Cancelled after {{count}} item(s).",
     "succeededOnly": "{{count}} succeeded.",
