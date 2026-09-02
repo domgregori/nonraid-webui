@@ -222,6 +222,7 @@ install_system_packages() {
     apprise \
     docker.io \
     lxc lxc-templates \
+    bridge-utils \
     avahi-daemon \
     linux-headers-amd64
 
@@ -654,6 +655,119 @@ install_docker_lxc_array_ordering() {
   systemctl daemon-reload
 }
 
+# Bridges the host's primary NIC as br0 so an LXC container can get a real LAN DHCP lease (attach
+# its network to br0 in the LXC tab) instead of being limited to lxc-net's own lxcbr0, which is a
+# private NAT the host's LAN router never sees into. Idempotent: skips outright if br0 already
+# exists, if the primary interface is already bridged some other way, or if /etc/network/interfaces
+# doesn't match the plain-DHCP default this expects to find — never re-runs on a repeat
+# install/update, and never touches a deliberately customized network config.
+#
+# The actual interface flap (ifdown/ifup) is genuinely disruptive for the length of one DHCP
+# negotiation on whatever interface currently carries the host's default route — including, on a
+# remote install, the very SSH connection running this script. A detached watchdog is written and
+# launched *before* the flap (so it survives regardless of what happens to this script's own
+# session afterward) and checks 40 seconds later whether br0 actually got a real address and can
+# reach the gateway; if not, it reverts /etc/network/interfaces to the pre-migration backup and
+# brings the original interface back up directly. Confirmed live: this exact flow, hand-run once
+# before this function existed, correctly self-healed a genuinely broken dual-DHCP state (the
+# primary interface's own persistent dhcpcd instance kept its old address alongside br0's new one,
+# with a lower route metric, so nothing external could reach the host) that a plain flip-and-hope
+# migration would have left the host unreachable on.
+ensure_lxc_bridge() {
+  log "Checking LXC LAN bridge (br0)"
+
+  if [ -d /sys/class/net/br0 ]; then
+    log "br0 already exists - leaving it alone"
+    return
+  fi
+
+  local iface
+  iface="$(ip route show default 2>/dev/null | awk '/default/ {for (i=1;i<=NF;i++) if ($i=="dev") print $(i+1); exit}')"
+  if [ -z "$iface" ]; then
+    log "Could not determine the primary network interface (no default route) - skipping br0 setup."
+    return
+  fi
+  if [ -d "/sys/class/net/$iface/bridge" ] || [ -d "/sys/class/net/$iface/brport" ]; then
+    log "$iface is already a bridge or already bridged - skipping br0 setup."
+    return
+  fi
+  if ! grep -q "iface $iface inet dhcp" /etc/network/interfaces 2>/dev/null; then
+    log "$iface isn't configured for plain DHCP in /etc/network/interfaces - skipping br0 setup (looks customized, not touching it)."
+    return
+  fi
+
+  log "Bridging $iface as br0 so LXC containers can get a real LAN DHCP lease"
+  local ts backup mig_log
+  ts="$(date +%s)"
+  backup="/etc/network/interfaces.bak-$ts"
+  mig_log=/var/log/nonraid-br0-migration.log
+
+  cp /etc/network/interfaces "$backup"
+
+  cat > /etc/network/interfaces <<IFACES
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+source /etc/network/interfaces.d/*
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface, bridged so LXC containers can get a real LAN
+# DHCP lease (attach a container's network to br0 in the LXC tab) instead of
+# sitting behind lxcbr0's private NAT.
+auto br0
+iface br0 inet dhcp
+    bridge_ports $iface
+    bridge_stp off
+    bridge_fd 0
+
+allow-hotplug $iface
+iface $iface inet manual
+IFACES
+
+  cat > /usr/local/sbin/nonraid-br0-revert-check.sh <<'REVERTSCRIPT'
+#!/bin/bash
+# Detached watchdog for ensure_lxc_bridge() in install-webui.sh - see that function's own doc
+# comment for why this exists. $1 is the pre-migration /etc/network/interfaces backup to restore.
+LOG=/var/log/nonraid-br0-migration.log
+BACKUP="$1"
+GRACE=40
+exec >> "$LOG" 2>&1
+echo "=== $(date) revert-check started, backup=$BACKUP, sleeping ${GRACE}s ==="
+sleep "$GRACE"
+IP=$(ip -4 -br addr show br0 2>/dev/null | awk '{print $3}' | cut -d/ -f1)
+GW=$(ip route show default 2>/dev/null | awk '/default/ {print $3; exit}')
+echo "check: br0 IP=[$IP] default GW=[$GW]"
+if [ -n "$IP" ] && [ -n "$GW" ] && ping -c1 -W3 "$GW" >/dev/null 2>&1; then
+  echo "br0 is healthy (reached $GW) - keeping bridge config"
+  exit 0
+fi
+echo "br0 did NOT come up cleanly - reverting to $BACKUP"
+cp "$BACKUP" /etc/network/interfaces
+ifdown br0 >>"$LOG" 2>&1
+ip link set br0 down >>"$LOG" 2>&1
+brctl delbr br0 >>"$LOG" 2>&1 || ip link delete br0 >>"$LOG" 2>&1
+# The original interface's own name is read back out of the backup rather than passed in
+# separately - it's already right there as the "allow-hotplug X" line the pre-migration config
+# always has, one less thing for this script's two halves to have to agree on independently.
+ifup "$(grep -oP '(?<=allow-hotplug )\S+' "$BACKUP" | head -1)" >>"$LOG" 2>&1 || true
+echo "=== $(date) revert complete ==="
+REVERTSCRIPT
+  chmod +x /usr/local/sbin/nonraid-br0-revert-check.sh
+
+  setsid nohup /usr/local/sbin/nonraid-br0-revert-check.sh "$backup" < /dev/null > /dev/null 2>&1 &
+  disown
+
+  log "Bringing down $iface, bringing up br0 (a brief network interruption is normal here)..."
+  {
+    ifdown "$iface" || true
+    ifup br0 || true
+  } >>"$mig_log" 2>&1
+  log "br0 migration issued - a detached watchdog will confirm (and auto-revert if needed) within ~40s. See $mig_log."
+}
+
 start_system_services() {
   log "Starting system services"
   # samba/nfs-kernel-server/docker.io/avahi-daemon's own postinst scripts already enable+start their
@@ -789,6 +903,7 @@ STEPS=(
   install_webui_systemd_unit
   install_rclone_systemd_unit
   install_docker_lxc_array_ordering
+  ensure_lxc_bridge
   install_cli
   start_services
   print_summary
