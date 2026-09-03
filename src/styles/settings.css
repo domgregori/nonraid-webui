@@ -13,6 +13,17 @@
   gap: 2px;
 }
 
+.settings-search {
+  width: 100%;
+  margin-bottom: var(--space-sm);
+}
+
+.settings-search-empty {
+  font-size: 12px;
+  color: var(--color-text-dim);
+  padding: 7px 12px;
+}
+
 /* Was shared with the Apps page's own category sidebar, which has since moved to a single
    dropdown (apps.css's .apps-filter-select) - this is now the only user, so it lives here rather
    than as a cross-file "reuse" the other side no longer has any reason to keep around. */

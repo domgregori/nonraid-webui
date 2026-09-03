@@ -84,6 +84,29 @@ export function SettingsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<(typeof SECTIONS)[number]['id']>(() => sectionFromHash(window.location.hash));
+  // Sidebar search - filters SECTIONS down to whichever ones actually contain the query, read
+  // straight from each card's own rendered text (settingsMainRef, matched via each card's
+  // data-section-id) rather than a hand-maintained index of every field's title/description. Every
+  // settings-card always renders regardless of activeSection (see `settings-hidden`, a display:none
+  // class, not a conditional unmount) specifically so this can find text in a section that isn't
+  // the one currently showing - textContent works on a display:none element exactly like a visible
+  // one. null = no active search, show every section (the normal, everyday state).
+  const [settingsSearch, setSettingsSearch] = useState('');
+  const [matchingSectionIds, setMatchingSectionIds] = useState<Set<string> | null>(null);
+  const settingsMainRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const query = settingsSearch.trim().toLowerCase();
+    if (!query) {
+      setMatchingSectionIds(null);
+      return;
+    }
+    const matches = new Set<string>();
+    settingsMainRef.current?.querySelectorAll<HTMLElement>('[data-section-id]').forEach((el) => {
+      const id = el.dataset.sectionId;
+      if (id && el.textContent?.toLowerCase().includes(query)) matches.add(id);
+    });
+    setMatchingSectionIds(matches);
+  }, [settingsSearch]);
   // Which Recovery-hub restore dialog is open, if any - `source` picks upload vs. local vs. remote
   // (ConfigRestoreWizard vs. RestoreFromLocalWizard vs. RestoreFromRemoteWizard, all three sharing
   // the same review/confirm/result flow once a preview comes back), `focusCategory` set to 'array'
@@ -654,15 +677,27 @@ export function SettingsPage() {
 
       <div className="settings-layout">
         <aside className="settings-sidebar">
-          {SECTIONS.map((s) => (
-            <button key={s.id} type="button" className={`category-item${activeSection === s.id ? ' category-item--active' : ''}`} onClick={() => selectSection(s.id)}>
-              {t(`SettingsPage.sections.${s.id}`)}
-            </button>
-          ))}
+          <input
+            type="text"
+            className="history-input settings-search"
+            value={settingsSearch}
+            onChange={(e) => setSettingsSearch(e.target.value)}
+            placeholder={t('SettingsPage.searchPlaceholder')}
+            aria-label={t('SettingsPage.searchPlaceholder')}
+          />
+          {matchingSectionIds && matchingSectionIds.size === 0 ? (
+            <div className="settings-search-empty">{t('SettingsPage.searchNoResults')}</div>
+          ) : (
+            SECTIONS.filter((s) => !matchingSectionIds || matchingSectionIds.has(s.id)).map((s) => (
+              <button key={s.id} type="button" className={`category-item${activeSection === s.id ? ' category-item--active' : ''}`} onClick={() => selectSection(s.id)}>
+                {t(`SettingsPage.sections.${s.id}`)}
+              </button>
+            ))
+          )}
         </aside>
 
-        <div className="settings-main">
-          <div className={`settings-card${activeSection === 'about' ? '' : ' settings-hidden'}`}>
+        <div className="settings-main" ref={settingsMainRef}>
+          <div className={`settings-card${activeSection === 'about' ? '' : ' settings-hidden'}`} data-section-id="about">
             <div className="settings-card__title">{t('SettingsPage.about.title')}</div>
             <div className="settings-info-grid">
               <InfoRow label={t('SettingsPage.about.hostnameLabel')} value={stats?.hostname ?? '-'} />
@@ -749,7 +784,7 @@ export function SettingsPage() {
             </div>
           </div>
 
-          <div className={`settings-card${activeSection === 'network' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'network' ? '' : ' settings-hidden'}`} data-section-id="network">
             <div className="settings-card__title">{t('SettingsPage.network.title')}</div>
             <div className="toggle-row__desc" style={{ marginBottom: 10 }}>
               {t('SettingsPage.network.ifaceAddressesDesc')}
@@ -779,7 +814,7 @@ export function SettingsPage() {
             )}
           </div>
 
-          <div className={`settings-card${activeSection === 'appearance' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'appearance' ? '' : ' settings-hidden'}`} data-section-id="appearance">
             <div className="settings-card__title">{t('SettingsPage.appearance.title')}</div>
             <div className="settings-field">
               <div className="toggle-row__title">{t('SettingsPage.appearance.themeLabel')}</div>
@@ -806,7 +841,7 @@ export function SettingsPage() {
             </div>
           </div>
 
-          <div className={`settings-card${activeSection === 'array' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'array' ? '' : ' settings-hidden'}`} data-section-id="array">
             <div className="settings-card__title">{t('SettingsPage.array.title')}</div>
             <div className="toggle-row">
               <div>
@@ -871,7 +906,7 @@ export function SettingsPage() {
             </div>
           </div>
 
-          <div className={`settings-card${activeSection === 'cache' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'cache' ? '' : ' settings-hidden'}`} data-section-id="cache">
             <div className="settings-card__title">{t('SettingsPage.cache.title')}</div>
             <div className="toggle-row">
               <div>
@@ -918,7 +953,7 @@ export function SettingsPage() {
             {cacheMoverError && <div className="status-note status-note--error">{cacheMoverError}</div>}
           </div>
 
-          <div className={`settings-card${activeSection === 'docker-lxc' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'docker-lxc' ? '' : ' settings-hidden'}`} data-section-id="docker-lxc">
             <div className="settings-card__title">{t('SettingsPage.dockerLxc.title')}</div>
             <div className="settings-field toggle-row--bordered">
               <div className="toggle-row__title">{t('SettingsPage.dockerLxc.appLinkHostTitle')}</div>
@@ -960,17 +995,17 @@ export function SettingsPage() {
             </div>
           </div>
 
-          <div className={`settings-card${activeSection === 'services' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'services' ? '' : ' settings-hidden'}`} data-section-id="services">
             <div className="settings-card__title">{t('SettingsPage.sections.services')}</div>
             <ServicesSection />
           </div>
 
-          <div className={`settings-card${activeSection === 'logs' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'logs' ? '' : ' settings-hidden'}`} data-section-id="logs">
             <div className="settings-card__title">{t('SettingsPage.logs.title')}</div>
             <LogsSection active={activeSection === 'logs'} />
           </div>
 
-          <div className={`settings-card${activeSection === 'parity' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'parity' ? '' : ' settings-hidden'}`} data-section-id="parity">
             <div className="settings-card__title">{t('SettingsPage.parity.title')}</div>
             <div className="toggle-row">
               <div>
@@ -989,7 +1024,7 @@ export function SettingsPage() {
             </div>
           </div>
 
-          <div className={`settings-card${activeSection === 'shares' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'shares' ? '' : ' settings-hidden'}`} data-section-id="shares">
             <div className="settings-card__title">{t('SettingsPage.shares.title')}</div>
             <div className="settings-field">
               <div className="toggle-row__title">{t('SettingsPage.shares.minFreeSpaceTitle')}</div>
@@ -1004,7 +1039,7 @@ export function SettingsPage() {
             </div>
           </div>
 
-          <div className={`settings-card${activeSection === 'backups' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'backups' ? '' : ' settings-hidden'}`} data-section-id="backups">
             <div className="settings-card__title settings-card__title--with-link">
               <span>{t('SettingsPage.backups.title')}</span>
               <Link to="/settings#recovery" className="settings-card__title-link">
@@ -1145,7 +1180,7 @@ export function SettingsPage() {
             <RemoteBackupSection />
           </div>
 
-          <div className={`settings-card${activeSection === 'recovery' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'recovery' ? '' : ' settings-hidden'}`} data-section-id="recovery">
             <div className="settings-card__title">{t('SettingsPage.recovery.title')}</div>
 
             <div className="settings-field toggle-row--bordered">
@@ -1227,7 +1262,7 @@ export function SettingsPage() {
           {showImportWizard && <ImportArrayWizard onClose={() => setShowImportWizard(false)} />}
           {showImportUnraidWizard && <ImportUnraidWizard onClose={() => setShowImportUnraidWizard(false)} />}
 
-          <div className={`settings-card${activeSection === 'notifications' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'notifications' ? '' : ' settings-hidden'}`} data-section-id="notifications">
             <div className="settings-card__title">{t('SettingsPage.notifications.title')}</div>
             <div className="toggle-row">
               <div>
@@ -1310,7 +1345,7 @@ export function SettingsPage() {
             </div>
           </div>
 
-          <div className={`settings-card${activeSection === 'security' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'security' ? '' : ' settings-hidden'}`} data-section-id="security">
             <div className="settings-card__title">{t('SettingsPage.security.title')}</div>
             <TlsSection />
             <div className="toggle-row">
@@ -1377,12 +1412,12 @@ export function SettingsPage() {
             <ApiTokensSection />
           </div>
 
-          <div className={`settings-card${activeSection === 'tailscale' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'tailscale' ? '' : ' settings-hidden'}`} data-section-id="tailscale">
             <div className="settings-card__title">{t('SettingsPage.tailscale.title')}</div>
             <TailscaleSection />
           </div>
 
-          <div className={`settings-card${activeSection === 'update' ? '' : ' settings-hidden'}`}>
+          <div className={`settings-card${activeSection === 'update' ? '' : ' settings-hidden'}`} data-section-id="update">
             <div className="settings-card__title">{t('SettingsPage.update.title')}</div>
             <UpdateSection />
           </div>

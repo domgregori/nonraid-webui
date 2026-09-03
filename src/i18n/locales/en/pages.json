@@ -187,6 +187,8 @@
   },
   "SettingsPage": {
     "pageTitle": "Settings",
+    "searchPlaceholder": "Search settings…",
+    "searchNoResults": "No matching settings.",
     "save": "Save",
     "saving": "Saving…",
     "cancel": "Cancel",
