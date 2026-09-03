@@ -106,9 +106,10 @@ async function isFuseMount(mountPoint: string): Promise<boolean> {
 
 /**
  * Deterministic, non-zero fsid for a FUSE-backed NFS export - stable across re-syncs since it's a
- * pure function of the share name (fsid=0 is reserved for the NFSv4 pseudo-root, so the hash is
- * shifted off it). FNV-1a, more than collision-resistant enough for the small number of shares any
- * one host will realistically have.
+ * pure function of the share name (0 has special meaning as the NFSv4 pseudo-root, so the hash is
+ * shifted off it regardless of whether this app currently exports one there - see
+ * writeExportsBlock's own doc comment). FNV-1a, more than collision-resistant enough for the small
+ * number of shares any one host will realistically have.
  */
 function stableFsid(name: string): number {
   let hash = 0x811c9dc5;
@@ -374,6 +375,18 @@ export class RealShareApplier implements ShareApplier {
     }
   }
 
+  /**
+   * Used to also unshift an NFSv4 pseudo-filesystem root line here (`shareMountRoot
+   * *(ro,fsid=0,crossmnt,...)`), letting a client mount `server:/<name>` directly instead of the
+   * real absolute path (`server:/mnt/user/<name>`) - the same short form SMB already gets for free
+   * from its own share-name abstraction. Removed: confirmed live that a share's crossmnt path could
+   * get left unwritable after its underlying mount was torn down and rebuilt (mergerfs remount, a
+   * share resync) while a client had it mounted through the pseudo-root - writes into
+   * `server:/<name>` failed outright, while the same client mounting the real absolute path
+   * (`server:/mnt/user/<name>`, this function's own per-share lines below, unaffected by any of
+   * this) worked immediately. Not chased further since every client can just use the real path
+   * instead - NFSv3 clients were already on it regardless (v3 has no pseudo-root concept at all).
+   */
   private async writeExportsBlock(shares: Share[]): Promise<void> {
     const lines: string[] = [];
     for (const s of shares) {
@@ -396,22 +409,6 @@ export class RealShareApplier implements ShareApplier {
       for (const host of hosts) {
         lines.push(`${userMountPath(s.name)} ${host}(${opts})`);
       }
-    }
-    if (lines.length > 0) {
-      // NFSv4 pseudo-filesystem root: without this, a client has to mount a share's real absolute
-      // path (server:/mnt/user/<name>) - fsid=0 makes shareMountRoot itself the root a client sees
-      // when it mounts "server:/", and `crossmnt` lets that resolution continue past the mount
-      // boundary into each share's own separate mount underneath it (a bind mount or mergerfs FUSE
-      // mount, not a real subdirectory of shareMountRoot), so `server:/<name>` alone resolves - the
-      // same short form SMB already gets for free from its own share-name abstraction. Read-only
-      // and `*` since nothing is ever written to shareMountRoot itself and real access control for
-      // each share's actual content still lives entirely on that share's own export line above,
-      // unaffected by this: a host not allowed on a given share still can't read/write into it -
-      // crossmnt only makes the path resolvable, not the access grant. fsid=0 is reserved for
-      // exactly this - see stableFsid()'s own doc comment on why per-share fsids are shifted off it.
-      // NFSv3 clients are unaffected either way - v3 has no pseudo-root concept, so they keep
-      // mounting the real absolute path regardless of this line.
-      lines.unshift(`${config.shareMountRoot} *(ro,fsid=0,crossmnt,no_subtree_check,root_squash)`);
     }
     await replaceManagedBlock(config.exportsPath, lines);
     // best-effort - NFS kernel server may not be available in every environment

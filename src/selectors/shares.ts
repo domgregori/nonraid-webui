@@ -25,9 +25,13 @@ export interface ShareViewModel {
 
 /**
  * One connection string per enabled protocol - `smb://host/name` is a real share-name
- * abstraction (see smb.conf's `[name]` section), but NFS has no such thing on its own; the short
- * `nfs://host/name` form only resolves because writeExportsBlock() now exports config.shareMountRoot
- * itself as an NFSv4 pseudo-root (fsid=0,crossmnt) - see its own doc comment for why. Uses
+ * abstraction (see smb.conf's `[name]` section), but NFS has no such thing on its own: this app
+ * used to also export an NFSv4 pseudo-root so `nfs://host/name` alone would resolve, removed after
+ * a live failure (see backend/src/shares/applier/realApplier.ts's writeExportsBlock doc comment) -
+ * the real absolute path below is what every NFS client actually mounts now, v3 and v4 alike.
+ * Mirrors backend/src/config.ts's shareMountRoot default (SHARE_MOUNT_ROOT, "/mnt/user") the same
+ * way hooks/useBrowse.ts's own DEFAULT_PATH does - not fetched from the server, since this app
+ * doesn't expose its own config values to the frontend elsewhere either. Uses
  * window.location.hostname (whatever address the browser is actually connected through right now),
  * same pattern selectors/containers.ts's resolveContainerWebUi() already uses for Docker/LXC links.
  */
@@ -35,7 +39,7 @@ export function deriveShareEndpoints(share: Pick<ShareWithStats, 'name' | 'proto
   const host = window.location.hostname;
   const endpoints: string[] = [];
   if (share.protocols.includes('smb')) endpoints.push(`smb://${host}/${share.name}`);
-  if (share.protocols.includes('nfs')) endpoints.push(`nfs://${host}/${share.name}`);
+  if (share.protocols.includes('nfs')) endpoints.push(`nfs://${host}/mnt/user/${share.name}`);
   return endpoints;
 }
 
