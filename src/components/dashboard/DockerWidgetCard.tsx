@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useDockerContainers } from '../../hooks/useDockerContainers';
+import { useSettings } from '../../hooks/useSettings';
 import { deriveContainerViewModel } from '../../selectors/containers';
 import { Card } from '../shared/Card';
 import { IconTile } from './IconTile';
@@ -21,6 +22,7 @@ const NOOP_ACTIONS = {
 export function DockerWidgetCard() {
   const { t } = useTranslation('dashboard');
   const { containers } = useDockerContainers();
+  const { settings } = useSettings();
 
   return (
     <Card>
@@ -36,7 +38,7 @@ export function DockerWidgetCard() {
       ) : (
         <div className="icon-grid">
           {containers.map((c) => {
-            const view = deriveContainerViewModel(c, NOOP_ACTIONS);
+            const view = deriveContainerViewModel(c, NOOP_ACTIONS, settings?.containerWebUiUrls?.[c.name] ?? null);
             return <IconTile key={c.id} name={view.name} statusLabel={view.statusLabel} statusColor={view.statusColor} iconUrl={c.icon} webUiUrl={view.webUiUrl} />;
           })}
         </div>

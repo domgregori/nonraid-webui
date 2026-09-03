@@ -19,10 +19,11 @@ function mergeEventTypes(
   return merged;
 }
 
-// Per-key merge for diskLabels, same reasoning as mergeEventTypes above - a patch touching one
-// disk's label must not blow away every other disk's already-persisted one. A patch value of ''
-// removes that disk's entry entirely, rather than persisting an empty-string label.
-function mergeDiskLabels(base: Record<string, string>, patch: Partial<Record<string, string>> | undefined): Record<string, string> {
+// Per-key merge for a flat string record (diskLabels, containerWebUiUrls) - same reasoning as
+// mergeEventTypes above, a patch touching one key must not blow away every other already-persisted
+// one. A patch value of '' removes that key's entry entirely, rather than persisting an
+// empty-string value.
+function mergeStringRecord(base: Record<string, string>, patch: Partial<Record<string, string>> | undefined): Record<string, string> {
   if (!patch) return { ...base };
   const merged = { ...base };
   for (const [key, value] of Object.entries(patch)) {
@@ -62,6 +63,7 @@ const DEFAULTS: AppSettings = {
   minFreeSpaceGb: 4,
   spinDownTimeoutMinutes: 0,
   diskLabels: {},
+  containerWebUiUrls: {},
   paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2, cronExpression: '' },
   backupSchedule: {
     enabled: false,
@@ -103,6 +105,7 @@ export class SettingsStore {
       ...settings,
       notifications: { ...settings.notifications, eventTypes: { ...settings.notifications.eventTypes } },
       diskLabels: { ...settings.diskLabels },
+      containerWebUiUrls: { ...settings.containerWebUiUrls },
       paritySchedule: { ...settings.paritySchedule },
       backupSchedule: { ...settings.backupSchedule },
       tempAlerts: { ...settings.tempAlerts },
@@ -126,7 +129,8 @@ export class SettingsStore {
           ...patch.notifications,
           eventTypes: mergeEventTypes(current.notifications.eventTypes, patch.notifications?.eventTypes),
         },
-        diskLabels: mergeDiskLabels(current.diskLabels, patch.diskLabels),
+        diskLabels: mergeStringRecord(current.diskLabels, patch.diskLabels),
+        containerWebUiUrls: mergeStringRecord(current.containerWebUiUrls, patch.containerWebUiUrls),
         paritySchedule: { ...current.paritySchedule, ...patch.paritySchedule },
         backupSchedule: {
           ...current.backupSchedule,

@@ -4,6 +4,7 @@ import { AppIcon } from '../components/apps/AppIcon';
 import { ContainerFormDialog } from '../components/docker/ContainerFormDialog';
 import { LogsDialog } from '../components/docker/LogsDialog';
 import { useDockerContainers } from '../hooks/useDockerContainers';
+import { useSettings } from '../hooks/useSettings';
 import { deriveContainerViewModel } from '../selectors/containers';
 
 type DialogState =
@@ -30,9 +31,30 @@ export function DockerPage() {
     updateNow,
     refresh,
   } = useDockerContainers();
+  const { settings, update: updateSettings } = useSettings();
   const [dialog, setDialog] = useState<DialogState>(null);
   const [confirmingDestroy, setConfirmingDestroy] = useState<string | null>(null);
   const [confirmingUpdate, setConfirmingUpdate] = useState<{ id: string; name: string } | null>(null);
+  const [editingUrlFor, setEditingUrlFor] = useState<string | null>(null);
+  const [urlDraft, setUrlDraft] = useState('');
+  const [urlSaving, setUrlSaving] = useState(false);
+
+  const startEditingUrl = (containerId: string, currentValue: string) => {
+    setEditingUrlFor(containerId);
+    setUrlDraft(currentValue);
+  };
+
+  const saveUrl = async (containerName: string) => {
+    setUrlSaving(true);
+    try {
+      // An empty draft removes the override (see mergeStringRecord in backend/src/settings/store.ts)
+      // rather than persisting an empty string, reverting the container back to auto-detection.
+      await updateSettings({ containerWebUiUrls: { [containerName]: urlDraft.trim() } });
+      setEditingUrlFor(null);
+    } finally {
+      setUrlSaving(false);
+    }
+  };
 
   const handleDestroyClick = (id: string) => {
     if (confirmingDestroy === id) {
@@ -50,17 +72,21 @@ export function DockerPage() {
   };
 
   const views = containers.map((c) =>
-    deriveContainerViewModel(c, {
-      isPending: pendingIds.has(c.id),
-      updateAvailable: updateStatus[c.id]?.updateAvailable ?? null,
-      onToggle: () => (c.state === 'running' ? stop(c.id) : start(c.id)),
-      onRestart: () => restart(c.id),
-      onEdit: () => setDialog({ mode: 'edit', containerId: c.id }),
-      onViewLogs: () => setDialog({ mode: 'logs', containerId: c.id, containerName: c.name }),
-      onDestroy: () => handleDestroyClick(c.id),
-      onToggleAutostart: () => setAutostart(c.id, !c.autostart),
-      onUpdateNow: () => setConfirmingUpdate({ id: c.id, name: c.name }),
-    }),
+    deriveContainerViewModel(
+      c,
+      {
+        isPending: pendingIds.has(c.id),
+        updateAvailable: updateStatus[c.id]?.updateAvailable ?? null,
+        onToggle: () => (c.state === 'running' ? stop(c.id) : start(c.id)),
+        onRestart: () => restart(c.id),
+        onEdit: () => setDialog({ mode: 'edit', containerId: c.id }),
+        onViewLogs: () => setDialog({ mode: 'logs', containerId: c.id, containerName: c.name }),
+        onDestroy: () => handleDestroyClick(c.id),
+        onToggleAutostart: () => setAutostart(c.id, !c.autostart),
+        onUpdateNow: () => setConfirmingUpdate({ id: c.id, name: c.name }),
+      },
+      settings?.containerWebUiUrls?.[c.name] ?? null,
+    ),
   );
 
   return (
@@ -107,12 +133,45 @@ export function DockerPage() {
                 <span className="docker-card__badge docker-card__badge--custom">{t('DockerPage.customBadge')}</span>
               )}
               {c.updateAvailable && <span className="docker-card__badge docker-card__badge--update">{t('DockerPage.updateAvailableBadge')}</span>}
-              {c.webUiUrl && (
-                <a className="docker-card__weburl" href={c.webUiUrl} target="_blank" rel="noreferrer">
-                  {t('DockerPage.webUi')} &#8599;
-                </a>
-              )}
             </div>
+            {editingUrlFor === c.id ? (
+              <div className="docker-card__url-edit">
+                <input
+                  className="history-input"
+                  style={{ width: '100%' }}
+                  value={urlDraft}
+                  placeholder={t('DockerPage.webUiUrlPlaceholder')}
+                  onChange={(e) => setUrlDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveUrl(c.name);
+                    if (e.key === 'Escape') setEditingUrlFor(null);
+                  }}
+                  autoFocus
+                />
+                <button type="button" className="btn" disabled={urlSaving} onClick={() => saveUrl(c.name)}>
+                  {urlSaving ? t('DockerPage.saving') : t('DockerPage.save')}
+                </button>
+                <button type="button" className="btn" disabled={urlSaving} onClick={() => setEditingUrlFor(null)}>
+                  {t('DockerPage.cancel')}
+                </button>
+              </div>
+            ) : (
+              <div className="docker-card__url-row">
+                {c.webUiUrl && (
+                  <a className="docker-card__weburl" href={c.webUiUrl} target="_blank" rel="noreferrer">
+                    {t('DockerPage.webUi')} &#8599;
+                  </a>
+                )}
+                <button
+                  type="button"
+                  className="docker-card__url-edit-btn"
+                  title={t('DockerPage.editWebUiUrl')}
+                  onClick={() => startEditingUrl(c.id, c.customWebUiUrl ?? '')}
+                >
+                  {c.customWebUiUrl ? t('DockerPage.editWebUiUrl') : t('DockerPage.setWebUiUrl')}
+                </button>
+              </div>
+            )}
             <div className="docker-card__stats">
               <span>{t('DockerPage.cpuLabel')} {c.cpuLabel}</span>
               <span>{t('DockerPage.memLabel')} {c.memLabel}</span>

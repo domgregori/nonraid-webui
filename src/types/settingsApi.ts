@@ -121,6 +121,7 @@ export interface AppSettings {
   minFreeSpaceGb: number;
   spinDownTimeoutMinutes: number;
   diskLabels: Record<string, string>;
+  containerWebUiUrls: Record<string, string>;
   paritySchedule: ParitySchedule;
   backupSchedule: BackupSchedule;
   tempAlerts: TempAlertSettings;
@@ -142,6 +143,8 @@ export type AppSettingsUpdate = Partial<{
   spinDownTimeoutMinutes: number;
   // A key mapped to '' removes that disk's label.
   diskLabels: Partial<Record<string, string>>;
+  // A key mapped to '' removes that container's URL override.
+  containerWebUiUrls: Partial<Record<string, string>>;
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<Omit<BackupSchedule, 'encryption'>> & { encryption?: BackupEncryptionInput };
   tempAlerts: Partial<TempAlertSettings>;

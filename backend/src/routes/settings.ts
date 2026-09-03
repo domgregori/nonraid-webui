@@ -131,6 +131,21 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
           }
         }
       }
+      if (patch.containerWebUiUrls) {
+        if (typeof patch.containerWebUiUrls !== 'object') {
+          throw new Error('containerWebUiUrls must be an object mapping container name to a URL.');
+        }
+        for (const [key, value] of Object.entries(patch.containerWebUiUrls)) {
+          if (typeof value !== 'string' || value.length > 500) {
+            throw new Error(`containerWebUiUrls.${key} must be a string of 500 characters or fewer.`);
+          }
+          // Empty string removes the override (see mergeStringRecord) - only a real value needs
+          // the shape check.
+          if (value && !/^https?:\/\//i.test(value)) {
+            throw new Error(`containerWebUiUrls.${key} must start with http:// or https://.`);
+          }
+        }
+      }
       if (patch.paritySchedule) {
         validateSchedulePatch('paritySchedule', patch.paritySchedule);
       }

@@ -77,6 +77,36 @@
   text-decoration: underline;
 }
 
+.docker-card__url-row {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.docker-card__url-edit-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.docker-card__url-edit-btn:hover {
+  color: var(--color-text-secondary);
+  text-decoration: underline;
+}
+
+.docker-card__url-edit {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 .docker-card__badge {
   font-size: 10px;
   font-weight: 700;

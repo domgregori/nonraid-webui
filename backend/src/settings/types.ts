@@ -185,6 +185,13 @@ export interface AppSettings {
   // slot/device - those change across device-letter churn and disk swaps. Unrelated to the
   // array-wide "Array label" setting below (nmdctl's own concept, more like a hostname).
   diskLabels: Record<string, string>;
+  // User-provided override for a Docker container's "Open" link, keyed by container name (not id -
+  // that changes on every recreate, the container's name is what actually stays stable across an
+  // update/edit the way this needs). Exists because the auto-detected URL (a CA template's own
+  // WebUI field, or failing that a best-effort guess at the first published port - see
+  // selectors/containers.ts's resolveContainerWebUi()) has no way to know which port is really the
+  // UI for a manually-added container, or a CA container with more than one published port.
+  containerWebUiUrls: Record<string, string>;
   paritySchedule: ParitySchedule;
   backupSchedule: BackupSchedule;
   tempAlerts: TempAlertSettings;
@@ -208,6 +215,8 @@ export type AppSettingsUpdate = Partial<{
   spinDownTimeoutMinutes: number;
   // A key mapped to '' removes that disk's label - see mergeDiskLabels() in store.ts.
   diskLabels: Partial<Record<string, string>>;
+  // A key mapped to '' removes that container's URL override - same merge as diskLabels above.
+  containerWebUiUrls: Partial<Record<string, string>>;
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<BackupSchedule>;
   tempAlerts: Partial<TempAlertSettings>;
