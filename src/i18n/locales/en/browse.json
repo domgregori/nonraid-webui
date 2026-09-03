@@ -1,6 +1,7 @@
 {
   "BulkActionBar": {
     "selectedCount": "{{count}} selected",
+    "downloadArchive": "Download .tar.gz",
     "copy": "Copy",
     "move": "Move",
     "confirm": "Confirm?",

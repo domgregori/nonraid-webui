@@ -49,6 +49,8 @@ export interface UseBrowse {
   up: () => void;
   refresh: () => void;
   downloadUrl: (entry: BrowseEntry) => string;
+  /** A folder, or several selected entries within the current directory, as one .tar.gz. */
+  downloadArchiveUrl: (entries: BrowseEntry[]) => string;
   mkdir: (name: string) => Promise<boolean>;
   rename: (entry: BrowseEntry, newName: string) => Promise<boolean>;
   upload: (files: FileList | File[]) => Promise<boolean>;
@@ -121,6 +123,7 @@ export function useBrowse(): UseBrowse {
   );
 
   const downloadUrl = useCallback((entry: BrowseEntry) => browseApi.downloadUrl(joinPath(path, entry.name)), [path]);
+  const downloadArchiveUrl = useCallback((entries: BrowseEntry[]) => browseApi.downloadArchiveUrl(path, entries.map((e) => e.name)), [path]);
 
   const withAction = useCallback(
     async (action: () => Promise<void>): Promise<boolean> => {
@@ -236,6 +239,7 @@ export function useBrowse(): UseBrowse {
     up,
     refresh,
     downloadUrl,
+    downloadArchiveUrl,
     mkdir,
     rename,
     upload,

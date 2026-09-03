@@ -4,8 +4,10 @@ import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 
 // A single path segment for something not yet on disk (upload filename, rename
-// target, mkdir name) - never a separator or a traversal token.
-function assertValidSegmentName(name: unknown): asserts name is string {
+// target, mkdir name) - never a separator or a traversal token. Also reused by
+// browse/service.ts's archive download to validate each selected entry name, which is exactly
+// the same "one plain segment, not yet resolved against a parent" shape.
+export function assertValidSegmentName(name: unknown): asserts name is string {
   if (
     typeof name !== 'string' ||
     !name ||

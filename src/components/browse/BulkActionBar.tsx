@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 interface BulkActionBarProps {
   count: number;
+  downloadHref: string;
   onClear: () => void;
   onCopy: () => void;
   onMove: () => void;
@@ -11,7 +12,7 @@ interface BulkActionBarProps {
 
 /** Replaces the normal New Folder/Upload toolbar row whenever there's an active selection -
  *  reads as "you're in selection mode" rather than just another static toolbar. */
-export function BulkActionBar({ count, onClear, onCopy, onMove, onDelete }: BulkActionBarProps) {
+export function BulkActionBar({ count, downloadHref, onClear, onCopy, onMove, onDelete }: BulkActionBarProps) {
   const { t } = useTranslation('browse');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -27,6 +28,9 @@ export function BulkActionBar({ count, onClear, onCopy, onMove, onDelete }: Bulk
   return (
     <div className="browse-bulk-bar">
       <span className="browse-bulk-bar__count">{t('BulkActionBar.selectedCount', { count })}</span>
+      <a className="btn" href={downloadHref} download={`${count}-items.tar.gz`}>
+        {t('BulkActionBar.downloadArchive')}
+      </a>
       <button type="button" className="btn" onClick={onCopy}>
         {t('BulkActionBar.copy')}
       </button>

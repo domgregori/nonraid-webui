@@ -80,6 +80,7 @@ export function BrowsePage() {
         {browse.selected.size > 0 ? (
           <BulkActionBar
             count={browse.selected.size}
+            downloadHref={browse.downloadArchiveUrl(selectedEntries)}
             onClear={browse.clearSelection}
             onCopy={() => setTransfer({ op: 'copy', entries: selectedEntries })}
             onMove={() => setTransfer({ op: 'move', entries: selectedEntries })}
@@ -230,6 +231,11 @@ export function BrowsePage() {
                 {entry.type === 'file' && (
                   <a className="btn" href={browse.downloadUrl(entry)} download={entry.name}>
                     {t('BrowsePage.download')}
+                  </a>
+                )}
+                {entry.type === 'directory' && (
+                  <a className="btn" href={browse.downloadArchiveUrl([entry])} download={`${entry.name}.tar.gz`}>
+                    {t('BrowsePage.downloadArchive')}
                   </a>
                 )}
                 <button type="button" className="btn" onClick={() => setRenamingEntry(entry)}>

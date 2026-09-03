@@ -21,6 +21,12 @@ export const browseApi = {
 
   downloadUrl: (path: string) => `${API_BASE_URL}${withPath('/api/browse/download', path)}`,
 
+  // A folder, or several selected entries within one folder - `dir` is their shared parent (the
+  // Browse page's selection is always siblings), `names` their basenames. Kept short even for a
+  // large selection since only the names travel in the URL, not each one's full path.
+  downloadArchiveUrl: (dir: string, names: string[]) =>
+    `${API_BASE_URL}/api/browse/download-archive?path=${encodeURIComponent(dir)}&names=${encodeURIComponent(JSON.stringify(names))}`,
+
   readFile: (path: string) => request<BrowseFileContent>(withPath('/api/browse/read', path)),
 
   writeFile: (path: string, content: string) => request<BrowseCommandResult>('/api/browse/write', jsonInit({ path, content })),

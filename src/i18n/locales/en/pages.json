@@ -40,6 +40,7 @@
     "fileConflictTooltip": "File exists on multiple disks ({{locations}}) - please fix",
     "calculate": "Calculate",
     "download": "Download",
+    "downloadArchive": "Download .tar.gz",
     "rename": "Rename",
     "copy": "Copy",
     "move": "Move",

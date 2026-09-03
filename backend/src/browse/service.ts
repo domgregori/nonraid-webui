@@ -2,10 +2,12 @@ import { execFile } from 'node:child_process';
 import { copyFile, cp, mkdir, open, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import * as tar from 'tar';
+import type { Pack } from 'tar';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { ShareService } from '../shares/index.js';
-import { isMountPoint, resolveExisting, resolveForCreate } from './paths.js';
+import { assertValidSegmentName, isMountPoint, resolveExisting, resolveForCreate } from './paths.js';
 import type { BrowseCommandResult, BrowseEntry, BrowseFileContent, BrowseListing } from './types.js';
 
 // Generous for text/config files, protects against loading something huge into a browser editor.
@@ -202,6 +204,59 @@ export class BrowseService {
     const st = await stat(absPath);
     if (!st.isFile()) throw new HttpError(400, 'Only files can be downloaded.');
     return { absPath, name: path.basename(absPath) };
+  }
+
+  /**
+   * Resolves a folder (or several selected entries within one folder - the Browse page's
+   * selection is always siblings, never a cross-directory pick) into what streamArchive() needs:
+   * a cwd and a list of plain entry names underneath it. Archiving relative to that cwd (rather
+   * than absolute paths) is what keeps each archive entry's own path short and portable instead of
+   * embedding "/mnt/user/whatever/" into every file's path inside the archive.
+   *
+   * Each name is validated as a single path segment (assertValidSegmentName - same check
+   * resolveForCreate uses) before being joined onto the already-resolved, already-inside-the-
+   * browse-root parent directory, so there's no way for a crafted name to escape it via `..` or
+   * an absolute path slipped into the array.
+   */
+  async resolveArchiveTargets(dirPath: string, names: unknown[]): Promise<{ cwd: string; entries: string[]; archiveName: string }> {
+    if (!Array.isArray(names) || names.length === 0) throw new HttpError(400, 'At least one item is required.');
+    for (const name of names) assertValidSegmentName(name);
+    const validNames = names as string[];
+
+    const { absPath: dirAbs } = await resolveExisting(dirPath);
+    const dirStat = await stat(dirAbs);
+    if (!dirStat.isDirectory()) throw new HttpError(400, 'Not a directory.');
+
+    for (const name of validNames) {
+      try {
+        await stat(path.join(dirAbs, name));
+      } catch {
+        throw new HttpError(404, `"${name}" doesn't exist.`);
+      }
+    }
+
+    const archiveName = validNames.length === 1 ? `${validNames[0]}.tar.gz` : `${validNames.length}-items.tar.gz`;
+    return { cwd: dirAbs, entries: validNames, archiveName };
+  }
+
+  /**
+   * Streams a .tar.gz of `entries` (relative to `cwd`, see resolveArchiveTargets) directly to the
+   * response rather than buffering an archive in memory first - the `tar` package (already a
+   * dependency, for the Unraid-import side's own archive reading) returns a live Pack stream when
+   * called with neither `file` nor `sync` set, so a multi-gigabyte folder's compressed bytes never
+   * have to sit in the Node process at once.
+   *
+   * .tar.gz over .zip: this app has no zip-writing library (adm-zip, also already a dependency,
+   * only reads for the Unraid-import side and is fully in-memory besides), while `tar` is already
+   * pulled in and streams natively. Every mainstream OS can open a .tar.gz today (Windows 11's own
+   * Explorer included).
+   */
+  streamArchive(cwd: string, entries: string[]): Pack {
+    // tar.create()'s overloaded type signature covers the file/sync/callback variants too, so TS
+    // can't narrow it down on its own - passing neither `file` nor `sync` here always returns a
+    // live Pack stream at runtime (this package's own documented behavior), never one of the other
+    // union members, hence the cast.
+    return tar.create({ gzip: true, cwd, portable: true }, entries) as Pack;
   }
 
   /** Loads a file's content for the Browse page's text editor - only text, and only up to
