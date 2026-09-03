@@ -19,7 +19,8 @@ export interface ShareApplier {
    */
   syncExports(allShares: Share[], accessByShare: Record<string, ShareAccess>): Promise<ShareCommandResult>;
   getStats(share: Share, ctx: ApplyContext): Promise<ShareStats>;
-  // Live SMB tree-connection count per share name, right now - best-effort, returns {} on any
-  // failure (smbstatus missing, smbd not running) rather than throwing. See realApplier.ts.
-  getActiveConnectionCounts(): Promise<Record<string, number>>;
+  // Live SMB tree-connections plus, for each NFS-enabled share, however many of its allowed hosts
+  // currently have an open connection to the NFS port - per share name, right now. Best-effort,
+  // returns {} (or partial results) on any failure rather than throwing. See realApplier.ts.
+  getActiveConnectionCounts(shares: Share[]): Promise<Record<string, number>>;
 }

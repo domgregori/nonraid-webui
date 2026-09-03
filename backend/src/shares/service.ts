@@ -238,11 +238,11 @@ export class ShareService {
   }
 
   async list(): Promise<ShareWithStats[]> {
-    const [shares, ctx, access, connectionCounts] = await Promise.all([
-      this.store.list(),
+    const shares = await this.store.list();
+    const [ctx, access, connectionCounts] = await Promise.all([
       this.buildContext(),
       this.aclStore.getAll(),
-      this.applier.getActiveConnectionCounts(),
+      this.applier.getActiveConnectionCounts(shares),
     ]);
     return Promise.all(
       shares.map(async (s) => ({

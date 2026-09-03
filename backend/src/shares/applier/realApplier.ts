@@ -85,6 +85,64 @@ async function closeSmbClients(shareName: string): Promise<void> {
   await run('smbcontrol', ['smbd', 'close-share', shareName]).catch(() => {});
 }
 
+async function getSmbConnectionCounts(): Promise<Record<string, number>> {
+  try {
+    const { stdout } = await run('smbstatus', ['--json']);
+    const data = JSON.parse(stdout) as { tcons?: Record<string, { service?: string }> };
+    const counts: Record<string, number> = {};
+    for (const tcon of Object.values(data.tcons ?? {})) {
+      const service = tcon.service;
+      if (!service || service === 'IPC$' || service === 'print$') continue;
+      counts[service] = (counts[service] ?? 0) + 1;
+    }
+    return counts;
+  } catch {
+    return {};
+  }
+}
+
+/** `ss`'s peer-address column - `host:port` for IPv4, `[host]:port` for IPv6/IPv4-mapped (the
+ *  brackets exist specifically so the port's own leading colon isn't ambiguous with the address's).
+ *  The final ":" is always the port separator either way, brackets or not, so lastIndexOf finds it
+ *  correctly without needing to special-case the two forms. IPv4-mapped IPv6 (::ffff:a.b.c.d, how
+ *  an IPv4 client's address sometimes surfaces on a dual-stack listener - confirmed live elsewhere
+ *  in this app's own NFS auth-failure logging) is unwrapped back to plain IPv4 so it actually
+ *  matches a share's allowedHosts entries, which are always written as plain IPv4. */
+function parsePeerIp(column: string): string | null {
+  const idx = column.lastIndexOf(':');
+  if (idx === -1) return null;
+  const raw = column.slice(0, idx).replace(/^\[|\]$/g, '');
+  const v4Mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(raw);
+  return v4Mapped ? v4Mapped[1]! : raw;
+}
+
+/**
+ * Distinct client IPs currently holding an open TCP connection to the NFS port - the closest thing
+ * to a live "who's connected" signal NFS actually offers here. Real per-share tracking (the way
+ * SMB's tcons give an exact tree-connect count) doesn't exist for NFS: NFSv3's rmtab is populated
+ * by the separate MOUNT protocol, which this app's NFSv4-only exports (see writeExportsBlock's own
+ * doc comment on why the old pseudo-root NFSv3/v4 split is gone) never trigger at all, and even
+ * where rmtab does apply it's widely disabled/unreliable on modern distros regardless. A single
+ * NFSv4 client connection can also legitimately serve more than one export at once, so this can
+ * only ever say "connected to this host", not "actively reading this specific share right now" -
+ * callers narrow it per share via allowedHosts themselves. Best-effort: `ss` missing or nfsd not
+ * listening returns an empty set rather than throwing.
+ */
+async function getConnectedNfsIps(): Promise<Set<string>> {
+  try {
+    const { stdout } = await run('ss', ['-tn', 'state', 'established', '( sport = :2049 )']);
+    const ips = new Set<string>();
+    for (const line of stdout.split('\n').slice(1)) {
+      const peer = line.trim().split(/\s+/)[3];
+      const ip = peer ? parsePeerIp(peer) : null;
+      if (ip) ips.add(ip);
+    }
+    return ips;
+  } catch {
+    return new Set();
+  }
+}
+
 /**
  * True when `mountPoint` is currently a FUSE mount (mergerfs, in this app's case). knfsd can
  * derive a stable filesystem id from a real block device or bind mount on its own, but not from
@@ -257,27 +315,24 @@ export class RealShareApplier implements ShareApplier {
   }
 
   /**
-   * NFS is deliberately not counted here - this host has no reliable equivalent to smbstatus for
-   * it (showmount/nfs-common isn't installed, and NFSv3's rmtab-based client tracking is widely
-   * disabled/unreliable on modern distros anyway), so a fabricated NFS number would be worse than
-   * just not showing one. Best-effort: any failure here (smbstatus missing, smbd not running)
-   * returns {} rather than throwing - this is a nice-to-have overlay on the share list, not
-   * something that should ever break it.
+   * SMB's real per-tree-connect count (smbstatus), plus - for each NFS-enabled share - however
+   * many of its allowed hosts currently have an open connection to the NFS port (getConnectedNfsIps
+   * below). Summed together for a share exported over both protocols, same single number either
+   * way. Best-effort throughout: any failure (smbstatus/ss missing, smbd/nfsd not running)
+   * contributes nothing rather than throwing - this is a nice-to-have overlay on the share list,
+   * not something that should ever break it.
    */
-  async getActiveConnectionCounts(): Promise<Record<string, number>> {
-    try {
-      const { stdout } = await run('smbstatus', ['--json']);
-      const data = JSON.parse(stdout) as { tcons?: Record<string, { service?: string }> };
-      const counts: Record<string, number> = {};
-      for (const tcon of Object.values(data.tcons ?? {})) {
-        const service = tcon.service;
-        if (!service || service === 'IPC$' || service === 'print$') continue;
-        counts[service] = (counts[service] ?? 0) + 1;
-      }
-      return counts;
-    } catch {
-      return {};
+  async getActiveConnectionCounts(shares: Share[]): Promise<Record<string, number>> {
+    const [counts, connectedNfsIps] = await Promise.all([getSmbConnectionCounts(), getConnectedNfsIps()]);
+    for (const share of shares) {
+      if (!share.protocols.includes('nfs')) continue;
+      const hosts = share.nfs?.allowedHosts?.length ? share.nfs.allowedHosts : ['*'];
+      // `*` can't be narrowed by IP the way a real host list can - any connected client could be
+      // the one using this share, so every currently-connected client counts rather than none.
+      const nfsCount = hosts.includes('*') ? connectedNfsIps.size : hosts.filter((h) => connectedNfsIps.has(h)).length;
+      if (nfsCount > 0) counts[share.name] = (counts[share.name] ?? 0) + nfsCount;
     }
+    return counts;
   }
 
   async syncExports(allShares: Share[], accessByShare: Record<string, ShareAccess>): Promise<ShareCommandResult> {
