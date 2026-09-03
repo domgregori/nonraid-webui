@@ -61,8 +61,15 @@ export class ActivityWatcher {
   // null = confirmed not currently erroring.
   private lastErrorState: string | null | undefined = undefined;
   // Map, not a Set, so a slot's *first* observation can be seeded without logging - same
-  // undefined-means-unseen idiom as diskSnapshots/healthSnapshots above.
+  // undefined-means-unseen idiom as diskSnapshots/healthSnapshots above. Holds the last
+  // *confirmed* (i.e. already logged, or seeded) state - see needsFormatPending below for the
+  // one-tick debounce sitting in front of it.
   private needsFormatSnapshots = new Map<number, boolean>();
+  // Whether the *immediately preceding* tick also saw needsFormat === true for this slot, without
+  // that having been confirmed/logged yet - see checkNeedsFormat's own doc comment for why this
+  // exists. Cleared the instant a tick reads false again, so only the notify side is debounced,
+  // never "back to normal".
+  private needsFormatPending = new Map<number, boolean>();
 
   constructor(
     private nmd: NmdClient,
@@ -116,20 +123,51 @@ export class ActivityWatcher {
     }
   }
 
-  /** Edge-triggered per slot, same seed-then-diff idiom as checkDisks above. Only logs a slot
-   *  newly *needing* format - a slot that gets formatted (leaves the set) is silent, same
-   *  no-recovery-event reasoning as checkCacheMirror. */
+  /**
+   * Edge-triggered per slot, same seed-then-diff idiom as checkDisks above, plus a one-tick
+   * debounce in front of the actual notify: needsFormat has to read true on two *consecutive*
+   * ticks before this logs anything. The `status.array.state === 'STARTED'` gate in tick() above
+   * only rules out the obvious case (every disk looks unformatted while the array itself is
+   * stopped) - it doesn't cover a narrower race where the array as a whole is already STARTED but
+   * one specific disk is still a beat behind on actually being mounted/probed, which can read as
+   * blank/unknown filesystem for exactly one poll tick even though the disk is, and always was,
+   * completely fine. Confirmed live: a real false alarm on a healthy, mounted, 36%-full XFS disk,
+   * traced to this exact race around a backend restart. A genuinely unformatted disk stays
+   * unformatted on every subsequent tick regardless, so this only ever delays a real notification
+   * by one tick (activityWatcherIntervalMs, 30s by default) - it doesn't risk ever missing one.
+   *
+   * Only logs a slot newly *needing* format - a slot that gets formatted (leaves the set) is
+   * silent, same no-recovery-event reasoning as checkCacheMirror.
+   */
   private checkNeedsFormat(disks: NmdDisk[]): void {
     for (const disk of disks) {
-      const prev = this.needsFormatSnapshots.get(disk.slot);
       const needsFormat = diskNeedsFormat(disk);
-      this.needsFormatSnapshots.set(disk.slot, needsFormat);
-      if (prev === undefined) continue; // first observation of this slot - seed only
 
-      if (needsFormat && !prev) {
+      if (!needsFormat) {
+        // Recovered (or never was a problem) - clear immediately. Only the rising edge needs to
+        // survive two ticks; going back to "fine" is trusted the instant it's observed.
+        this.needsFormatPending.set(disk.slot, false);
+        this.needsFormatSnapshots.set(disk.slot, false);
+        continue;
+      }
+
+      const prevConfirmed = this.needsFormatSnapshots.get(disk.slot);
+      if (prevConfirmed === undefined) {
+        // first observation of this slot ever - seed only, same as before debouncing existed.
+        this.needsFormatSnapshots.set(disk.slot, true);
+        continue;
+      }
+      if (prevConfirmed) continue; // already confirmed and logged - nothing new
+
+      if (this.needsFormatPending.get(disk.slot)) {
+        // True on this tick *and* the immediately preceding one - confirmed, not a blip.
+        this.needsFormatSnapshots.set(disk.slot, true);
+        this.needsFormatPending.set(disk.slot, false);
         const text = `Disk ${disk.slot} (${diskLabel(disk)}) needs formatting - no filesystem detected`;
         this.activity.log(text, 'amber', 'diskNeedsFormat').catch(() => {});
         notifyEvent(this.settings, 'diskNeedsFormat', 'NonRAID: disk needs formatting', text);
+      } else {
+        this.needsFormatPending.set(disk.slot, true);
       }
     }
   }
