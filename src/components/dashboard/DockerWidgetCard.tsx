@@ -38,7 +38,7 @@ export function DockerWidgetCard() {
       ) : (
         <div className="icon-grid">
           {containers.map((c) => {
-            const view = deriveContainerViewModel(c, NOOP_ACTIONS, settings?.containerWebUiUrls?.[c.name] ?? null);
+            const view = deriveContainerViewModel(c, NOOP_ACTIONS, settings?.containerWebUiUrls?.[c.name] ?? null, settings?.appLinkHost);
             return <IconTile key={c.id} name={view.name} statusLabel={view.statusLabel} statusColor={view.statusColor} iconUrl={c.icon} webUiUrl={view.webUiUrl} />;
           })}
         </div>

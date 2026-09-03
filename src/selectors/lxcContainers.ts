@@ -37,7 +37,22 @@ function preferIPv4(ips: string[]): string[] {
   return v4.length > 0 ? v4 : ips;
 }
 
-export function deriveLxcContainerViewModel(container: LxcContainerSummary, actions: LxcContainerActions): LxcContainerViewModel {
+/**
+ * `linkHost`, when set (Settings' appLinkHost), replaces window.location.hostname in the [IP]
+ * placeholder a container's own webUiUrl carries (set at creation time in CreateLxcDialog, stored
+ * directly in the container's own config - see backend/src/lxc/realClient.ts's WEBUI_KEY) - the same
+ * reverse-proxy fix as Docker's resolveContainerWebUi in selectors/containers.ts, see that one's own
+ * doc comment for why window.location.hostname breaks under a proxy. Centralized here (rather than
+ * left to each call site to substitute, as before) so every caller gets it consistently - the
+ * Dashboard's LxcWidgetCard previously passed webUiUrl straight through with no substitution at all,
+ * showing a literal unresolved "[IP]" in its link.
+ */
+function resolveLxcWebUi(webUiUrl: string | null, linkHost: string): string | null {
+  if (!webUiUrl) return null;
+  return webUiUrl.replace('[IP]', linkHost || window.location.hostname);
+}
+
+export function deriveLxcContainerViewModel(container: LxcContainerSummary, actions: LxcContainerActions, linkHost = ''): LxcContainerViewModel {
   const running = container.state === 'running';
   return {
     name: container.name,
@@ -45,7 +60,7 @@ export function deriveLxcContainerViewModel(container: LxcContainerSummary, acti
     statusColor: STATE_COLOR[container.state],
     autostart: container.autostart,
     description: container.description,
-    webUiUrl: container.webUiUrl,
+    webUiUrl: resolveLxcWebUi(container.webUiUrl, linkHost),
     distribution: container.distribution,
     cpuLabel: container.cpuPercent === null ? '-' : `${Math.round(container.cpuPercent)}%`,
     memLabel: container.memUsedBytes === null ? '-' : formatBytesAsMB(container.memUsedBytes),

@@ -5,6 +5,7 @@ import { DistroIcon } from '../components/lxc/DistroIcon';
 import { EditLxcConfigDialog } from '../components/lxc/EditLxcConfigDialog';
 import { SnapshotsDialog } from '../components/lxc/SnapshotsDialog';
 import { useLxcContainers } from '../hooks/useLxcContainers';
+import { useSettings } from '../hooks/useSettings';
 import { deriveLxcContainerViewModel } from '../selectors/lxcContainers';
 
 type DialogState = { mode: 'add' } | { mode: 'edit'; name: string } | { mode: 'snapshots'; name: string } | null;
@@ -12,6 +13,7 @@ type DialogState = { mode: 'add' } | { mode: 'edit'; name: string } | { mode: 's
 export function LxcPage() {
   const { t } = useTranslation('pages');
   const { containers, status, error, pendingNames, start, stop, restart, destroy, setAutostart, refresh } = useLxcContainers();
+  const { settings } = useSettings();
   const [dialog, setDialog] = useState<DialogState>(null);
   const [confirmingDestroy, setConfirmingDestroy] = useState<string | null>(null);
 
@@ -25,15 +27,19 @@ export function LxcPage() {
   };
 
   const views = containers.map((c) =>
-    deriveLxcContainerViewModel(c, {
-      isPending: pendingNames.has(c.name),
-      onToggle: () => (c.state === 'running' ? stop(c.name) : start(c.name)),
-      onRestart: () => restart(c.name),
-      onDestroy: () => handleDestroyClick(c.name),
-      onEdit: () => setDialog({ mode: 'edit', name: c.name }),
-      onSnapshots: () => setDialog({ mode: 'snapshots', name: c.name }),
-      onToggleAutostart: () => setAutostart(c.name, !c.autostart),
-    }),
+    deriveLxcContainerViewModel(
+      c,
+      {
+        isPending: pendingNames.has(c.name),
+        onToggle: () => (c.state === 'running' ? stop(c.name) : start(c.name)),
+        onRestart: () => restart(c.name),
+        onDestroy: () => handleDestroyClick(c.name),
+        onEdit: () => setDialog({ mode: 'edit', name: c.name }),
+        onSnapshots: () => setDialog({ mode: 'snapshots', name: c.name }),
+        onToggleAutostart: () => setAutostart(c.name, !c.autostart),
+      },
+      settings?.appLinkHost,
+    ),
   );
 
   return (
@@ -70,7 +76,7 @@ export function LxcPage() {
             </div>
             {c.webUiUrl && (
               <div className="docker-card__badges">
-                <a className="docker-card__weburl" href={c.webUiUrl.replace('[IP]', window.location.hostname)} target="_blank" rel="noreferrer">
+                <a className="docker-card__weburl" href={c.webUiUrl} target="_blank" rel="noreferrer">
                   {t('LxcPage.webUi')} &#8599;
                 </a>
               </div>

@@ -287,6 +287,9 @@
     },
     "dockerLxc": {
       "title": "Docker & LXC Storage",
+      "appLinkHostTitle": "App link address",
+      "appLinkHostDesc": "Host used for a Docker/LXC app's \"Open\" link (an IP, or a name like nonraid.lan) - leave blank to use whatever address loaded this page. Set this if you access the dashboard through a reverse proxy: a container's own port usually isn't reachable at the proxy's own domain, so links built from it break. Doesn't include the port - that's still detected per app.",
+      "appLinkHostPlaceholder": "e.g. nonraid.lan or 192.168.1.10",
       "dockerStorageTitle": "Docker",
       "dockerStorageDesc": "Location of docker system and image file storage.",
       "pruneImagesTitle": "Prune unused Docker images",

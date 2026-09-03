@@ -192,6 +192,18 @@ export interface AppSettings {
   // selectors/containers.ts's resolveContainerWebUi()) has no way to know which port is really the
   // UI for a manually-added container, or a CA container with more than one published port.
   containerWebUiUrls: Record<string, string>;
+  // Host (bare hostname or IP, no protocol/port) substituted into every Docker/LXC "Open" link in
+  // place of window.location.hostname - empty string means "use whatever the browser is actually
+  // connected through right now" (today's default, unaffected). Exists because that default breaks
+  // under a reverse proxy: the app itself is reachable at some public/proxied domain, but a
+  // container's own published port almost never is (nothing forwards it, and even if something did,
+  // the proxy's own domain+TLS termination doesn't carry over to a raw container port) - pointing
+  // this at the LAN address instead (an IP, or a name like "nonraid.lan") makes the generated links
+  // actually resolve for anyone on the LAN, independent of whatever address loaded the dashboard
+  // itself. Unlike containerWebUiUrls above, this is one setting for every container at once, not a
+  // per-container override - the two combine: a per-container override is a full URL and always
+  // wins outright, this only ever affects the *host* half of an auto-detected link.
+  appLinkHost: string;
   paritySchedule: ParitySchedule;
   backupSchedule: BackupSchedule;
   tempAlerts: TempAlertSettings;
@@ -213,10 +225,11 @@ export type AppSettingsUpdate = Partial<{
   };
   minFreeSpaceGb: number;
   spinDownTimeoutMinutes: number;
-  // A key mapped to '' removes that disk's label - see mergeDiskLabels() in store.ts.
+  // A key mapped to '' removes that disk's label - see mergeStringRecord() in store.ts.
   diskLabels: Partial<Record<string, string>>;
   // A key mapped to '' removes that container's URL override - same merge as diskLabels above.
   containerWebUiUrls: Partial<Record<string, string>>;
+  appLinkHost: string;
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<BackupSchedule>;
   tempAlerts: Partial<TempAlertSettings>;

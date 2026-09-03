@@ -173,6 +173,8 @@ export function SettingsPage() {
 
   const [trustProxyAddressDraft, setTrustProxyAddressDraft] = useState('');
 
+  const [appLinkHostDraft, setAppLinkHostDraft] = useState('');
+
   const [paritySchedEnabled, setParitySchedEnabled] = useState(false);
   const [paritySchedFrequency, setParitySchedFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'cron'>('weekly');
   const [paritySchedDay, setParitySchedDay] = useState(0);
@@ -252,6 +254,7 @@ export function SettingsPage() {
   const appriseInitialized = useRef(false);
   const minFreeSpaceInitialized = useRef(false);
   const trustProxyAddressInitialized = useRef(false);
+  const appLinkHostInitialized = useRef(false);
   const paritySchedInitialized = useRef(false);
   const tempThresholdInitialized = useRef(false);
   const backupSchedInitialized = useRef(false);
@@ -306,6 +309,13 @@ export function SettingsPage() {
     if (settings && !trustProxyAddressInitialized.current) {
       setTrustProxyAddressDraft(settings.trustProxyAddress);
       trustProxyAddressInitialized.current = true;
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    if (settings && !appLinkHostInitialized.current) {
+      setAppLinkHostDraft(settings.appLinkHost);
+      appLinkHostInitialized.current = true;
     }
   }, [settings]);
 
@@ -491,6 +501,8 @@ export function SettingsPage() {
   // never throws (it swallows failures into the shared saving/saveError below), so that's what
   // actually surfaces a bad address, same as every other settings field in this file.
   const saveTrustProxyAddress = () => update({ trustProxyAddress: trustProxyAddressDraft.trim() });
+
+  const saveAppLinkHost = () => update({ appLinkHost: appLinkHostDraft.trim() });
 
   const saveParitySchedule = async () => {
     setParitySchedSaving(true);
@@ -908,6 +920,24 @@ export function SettingsPage() {
 
           <div className={`settings-card${activeSection === 'docker-lxc' ? '' : ' settings-hidden'}`}>
             <div className="settings-card__title">{t('SettingsPage.dockerLxc.title')}</div>
+            <div className="settings-field toggle-row--bordered">
+              <div className="toggle-row__title">{t('SettingsPage.dockerLxc.appLinkHostTitle')}</div>
+              <div className="toggle-row__desc">{t('SettingsPage.dockerLxc.appLinkHostDesc')}</div>
+              <div className="settings-field__row">
+                <input
+                  className="history-input"
+                  style={{ flex: 1, minWidth: 200 }}
+                  value={appLinkHostDraft}
+                  onChange={(e) => setAppLinkHostDraft(e.target.value)}
+                  placeholder={t('SettingsPage.dockerLxc.appLinkHostPlaceholder')}
+                  disabled={!settings}
+                />
+                <button type="button" className="btn" disabled={!settings || saving} onClick={saveAppLinkHost}>
+                  {saving ? t('SettingsPage.saving') : t('SettingsPage.save')}
+                </button>
+              </div>
+              {saveError && <div className="status-note status-note--error">{saveError}</div>}
+            </div>
             <StorageLocationField title={t('SettingsPage.dockerLxc.dockerStorageTitle')} desc={t('SettingsPage.dockerLxc.dockerStorageDesc')} dataDisks={dataDisks} getStorage={dockerApi.getStorage} moveStorage={dockerApi.moveStorage} />
             <div className="settings-field toggle-row--bordered">
               <div className="toggle-row__title">{t('SettingsPage.dockerLxc.pruneImagesTitle')}</div>

@@ -122,6 +122,10 @@ export interface AppSettings {
   spinDownTimeoutMinutes: number;
   diskLabels: Record<string, string>;
   containerWebUiUrls: Record<string, string>;
+  // Bare host substituted into every Docker/LXC "Open" link in place of window.location.hostname -
+  // empty means "use whatever address the browser is actually connected through". See its own doc
+  // comment in backend/src/settings/types.ts for the reverse-proxy problem this exists to fix.
+  appLinkHost: string;
   paritySchedule: ParitySchedule;
   backupSchedule: BackupSchedule;
   tempAlerts: TempAlertSettings;
@@ -145,6 +149,7 @@ export type AppSettingsUpdate = Partial<{
   diskLabels: Partial<Record<string, string>>;
   // A key mapped to '' removes that container's URL override.
   containerWebUiUrls: Partial<Record<string, string>>;
+  appLinkHost: string;
   paritySchedule: Partial<ParitySchedule>;
   backupSchedule: Partial<Omit<BackupSchedule, 'encryption'>> & { encryption?: BackupEncryptionInput };
   tempAlerts: Partial<TempAlertSettings>;

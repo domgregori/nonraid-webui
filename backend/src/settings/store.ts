@@ -64,6 +64,7 @@ const DEFAULTS: AppSettings = {
   spinDownTimeoutMinutes: 0,
   diskLabels: {},
   containerWebUiUrls: {},
+  appLinkHost: '',
   paritySchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 2, cronExpression: '' },
   backupSchedule: {
     enabled: false,

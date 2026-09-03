@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { DistroIcon } from '../lxc/DistroIcon';
 import { useLxcContainers } from '../../hooks/useLxcContainers';
+import { useSettings } from '../../hooks/useSettings';
 import { deriveLxcContainerViewModel } from '../../selectors/lxcContainers';
 import { Card } from '../shared/Card';
 import { IconTile } from './IconTile';
@@ -20,6 +21,7 @@ const NOOP_ACTIONS = {
 export function LxcWidgetCard() {
   const { t } = useTranslation('dashboard');
   const { containers } = useLxcContainers();
+  const { settings } = useSettings();
 
   return (
     <Card>
@@ -35,7 +37,7 @@ export function LxcWidgetCard() {
       ) : (
         <div className="icon-grid">
           {containers.map((c) => {
-            const view = deriveLxcContainerViewModel(c, NOOP_ACTIONS);
+            const view = deriveLxcContainerViewModel(c, NOOP_ACTIONS, settings?.appLinkHost);
             return (
               <IconTile
                 key={c.name}

@@ -146,6 +146,17 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
           }
         }
       }
+      if ('appLinkHost' in patch) {
+        if (typeof patch.appLinkHost !== 'string' || patch.appLinkHost.length > 253) {
+          throw new Error('appLinkHost must be a string of 253 characters or fewer.');
+        }
+        // A bare host - the port comes from each container's own detected/published port, and the
+        // protocol always defaults to http (matching today's window.location.hostname behavior), so
+        // "://" or "/" here means someone pasted a full URL by mistake rather than just the host.
+        if (patch.appLinkHost.trim() && /[:/]/.test(patch.appLinkHost.trim())) {
+          throw new Error('appLinkHost must be a bare hostname or IP, not a full URL - no "://", port, or path.');
+        }
+      }
       if (patch.paritySchedule) {
         validateSchedulePatch('paritySchedule', patch.paritySchedule);
       }

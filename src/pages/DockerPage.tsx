@@ -86,6 +86,7 @@ export function DockerPage() {
         onUpdateNow: () => setConfirmingUpdate({ id: c.id, name: c.name }),
       },
       settings?.containerWebUiUrls?.[c.name] ?? null,
+      settings?.appLinkHost,
     ),
   );
 

@@ -34,17 +34,25 @@ function firstPublishedHostPort(ports: string): number | null {
  * `overrideUrl` (Settings' own containerWebUiUrls, keyed by container name - see its own doc
  * comment in backend/src/settings/types.ts) wins over everything else: a person who bothered to
  * type one in knows better than any auto-detection. Failing that, `webUiUrl` is the backend's real
- * resolution of the CA template's WebUI field against this container's actual ports. `[IP]` is left
+ * resolution of the CA template's WebUI field against this container's actual ports; `[IP]` is left
  * unresolved by the backend (it has no reliable way to know which address the browser reaches it
- * on), so fill it in here the same way the Apps install dialog does. Last resort: the first
+ * on), so it's filled in here, same as the Apps install dialog does. Last resort: the first
  * published port, a guess that's wrong often enough for a manually-added container (or a CA
- * container with more than one published port) to be exactly what the override exists to fix.
+ * container with more than one published port) to be exactly what the per-container override exists
+ * to fix.
+ *
+ * `linkHost`, when set (Settings' appLinkHost - see its own doc comment in backend/src/settings/
+ * types.ts), replaces window.location.hostname in both of the auto-detected paths above - the fix
+ * for a reverse proxy, where the browser's own address isn't one a container's published port is
+ * ever reachable at. Doesn't touch overrideUrl, which is already a complete URL a person typed
+ * in - only the host half of an *auto-detected* link is this setting's business.
  */
-function resolveContainerWebUi(container: DockerContainerSummary, overrideUrl: string | null): string | null {
+function resolveContainerWebUi(container: DockerContainerSummary, overrideUrl: string | null, linkHost: string): string | null {
   if (overrideUrl) return overrideUrl;
-  if (container.webUiUrl) return container.webUiUrl.replace('[IP]', window.location.hostname);
+  const host = linkHost || window.location.hostname;
+  if (container.webUiUrl) return container.webUiUrl.replace('[IP]', host);
   const hostPort = firstPublishedHostPort(container.ports);
-  return hostPort ? `http://${window.location.hostname}:${hostPort}` : null;
+  return hostPort ? `http://${host}:${hostPort}` : null;
 }
 
 /**
@@ -68,7 +76,12 @@ function deriveStatus(container: DockerContainerSummary): { label: string; color
   return { label: 'Stopped', color: COLORS.textDim };
 }
 
-export function deriveContainerViewModel(container: DockerContainerSummary, actions: ContainerActions, customWebUiUrl: string | null = null): ContainerViewModel {
+export function deriveContainerViewModel(
+  container: DockerContainerSummary,
+  actions: ContainerActions,
+  customWebUiUrl: string | null = null,
+  linkHost = '',
+): ContainerViewModel {
   const running = container.state === 'running';
   const status = deriveStatus(container);
   return {
@@ -90,7 +103,7 @@ export function deriveContainerViewModel(container: DockerContainerSummary, acti
     // Editable regardless of running state (it's just a settings value) - only the link itself,
     // below, is gated on actually being reachable right now.
     customWebUiUrl,
-    webUiUrl: running ? resolveContainerWebUi(container, customWebUiUrl) : null,
+    webUiUrl: running ? resolveContainerWebUi(container, customWebUiUrl, linkHost) : null,
     autostart: container.autostart,
     updateAvailable: actions.updateAvailable,
     onToggle: actions.onToggle,
