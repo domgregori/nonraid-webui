@@ -1,4 +1,16 @@
 {
+  "BulkContainerActionDialog": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "stopAllTitle": "Stop All",
+    "stopAllConfirm": "Stop all {{count}} running container(s)? Each is stopped one at a time.",
+    "stopping": "Stopping {{current}} of {{total}}: {{name}}",
+    "stoppedDone": "Stopped {{count}} of {{total}} container(s).",
+    "restartAllTitle": "Restart All",
+    "restartAllConfirm": "Restart all {{count}} running container(s)? Each is restarted one at a time.",
+    "restarting": "Restarting {{current}} of {{total}}: {{name}}",
+    "restartedDone": "Restarted {{count}} of {{total}} container(s)."
+  },
   "ArrayActionErrorBanner": {
     "stopBlockedMessage": "A disk is in use by Docker or LXC. Stop containers?",
     "stopping": "Stopping…",
@@ -17,6 +29,7 @@
     "title": "Reload Storage Driver",
     "close": "Close",
     "stopContainersLabel": "Stop Docker/LXC if blocking the reload - restarted automatically after.",
+    "storageOnArrayNote": "Docker or LXC storage is on an array disk, so this is checked automatically - uncheck it to skip stopping them instead.",
     "cancel": "Cancel",
     "reloading": "Reloading…",
     "confirmReload": "Confirm Reload"
