@@ -220,6 +220,7 @@ install_system_packages() {
     smartmontools hdparm \
     xfsprogs btrfs-progs parted acl \
     apprise \
+    fd-find \
     docker.io \
     lxc lxc-templates \
     bridge-utils \

@@ -52,3 +52,16 @@ export interface BulkOpResult {
   failed: { path: string; error: string }[];
   cancelled: boolean;
 }
+
+export interface SearchMatch {
+  path: string;
+  name: string;
+  type: 'file' | 'directory';
+}
+
+export interface SearchResult {
+  count: number;
+  /** True once MAX_SEARCH_RESULTS (backend/src/routes/browse.ts) was hit - there may be more
+   *  matches than what's shown, not just exactly this many. */
+  truncated: boolean;
+}

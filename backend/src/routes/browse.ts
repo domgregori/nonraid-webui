@@ -1,5 +1,7 @@
 import { unlink } from 'node:fs/promises';
 import os from 'node:os';
+import path from 'node:path';
+import readline from 'node:readline';
 import { Router, type Response } from 'express';
 import multer from 'multer';
 import { suggestDirectories } from '../browse/suggest.js';
@@ -196,6 +198,64 @@ export function browseRouter(browse: BrowseService): Router {
       }
 
       send({ type: 'done', result: { succeeded, failed, cancelled } });
+    } catch (err) {
+      send({ type: 'error', message: err instanceof HttpError ? err.message : (err as Error).message });
+    } finally {
+      res.end();
+    }
+  });
+
+  // Streamed the same way /browse/bulk is - a recursive fdfind over a real share can take a while
+  // on a cold/spun-down disk, and matches trickling in as they're found reads far better than one
+  // big blocking response. Capped at MAX_SEARCH_RESULTS: an unqualified query on "search
+  // everywhere" (e.g. a single common letter) could otherwise match everything on the array, one
+  // ndjson line at a time, for no benefit over just narrowing the query. Cancel works the same way
+  // as /browse/bulk - the client aborting its fetch closes the connection, which req.on('close')
+  // below turns into killing fdfind rather than needing a separate cancel endpoint.
+  const MAX_SEARCH_RESULTS = 200;
+  router.post('/browse/search', async (req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache' });
+    const send = (event: object) => res.write(`${JSON.stringify(event)}\n`);
+
+    try {
+      const { path: dirPath, query } = req.body as { path?: unknown; query?: unknown };
+      if (typeof query !== 'string' || !query.trim()) {
+        throw new HttpError(400, 'query is required.');
+      }
+      const root = await browse.resolveSearchRoot(typeof dirPath === 'string' ? dirPath : '');
+      const child = browse.searchProcess(root, query.trim());
+      req.on('close', () => child.kill());
+
+      // fdfind failing to even start (not installed, not on PATH) surfaces as an 'error' event on
+      // the child itself, not as readline output - captured here rather than thrown directly since
+      // it can fire either before or interleaved with the loop below reading its (empty) stdout.
+      let spawnError: Error | null = null;
+      child.on('error', (err) => {
+        spawnError = err;
+      });
+
+      const rl = readline.createInterface({ input: child.stdout });
+      let count = 0;
+      let truncated = false;
+      for await (const line of rl) {
+        if (!line) continue;
+        if (count >= MAX_SEARCH_RESULTS) {
+          truncated = true;
+          child.kill();
+          rl.close();
+          break;
+        }
+        count++;
+        // fdfind's own output already tags a directory match with a trailing "/" (confirmed live,
+        // even in piped/non-tty output) - reading that is free, where determining type any other
+        // way would mean a stat() per result.
+        const isDirectory = line.endsWith('/');
+        const absPath = isDirectory ? line.slice(0, -1) : line;
+        send({ type: 'progress', match: { path: absPath, name: path.basename(absPath), type: isDirectory ? 'directory' : 'file' } });
+      }
+
+      if (spawnError) throw new Error(`fdfind failed to start: ${(spawnError as Error).message}`);
+      send({ type: 'done', result: { count, truncated } });
     } catch (err) {
       send({ type: 'error', message: err instanceof HttpError ? err.message : (err as Error).message });
     } finally {

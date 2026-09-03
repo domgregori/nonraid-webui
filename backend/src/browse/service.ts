@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { copyFile, cp, mkdir, open, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -257,6 +257,34 @@ export class BrowseService {
     // live Pack stream at runtime (this package's own documented behavior), never one of the other
     // union members, hence the cast.
     return tar.create({ gzip: true, cwd, portable: true }, entries) as Pack;
+  }
+
+  /** Resolves the root to search under - same resolveExisting() every other browse operation uses,
+   *  just with the extra "must be a directory" check searchProcess() needs (unlike most callers
+   *  here, which happily resolve a file too). An empty/missing requestPath already falls through to
+   *  config.browseDefaultPath inside resolveExisting - exactly what "search everywhere" wants, no
+   *  separate case needed for it. */
+  async resolveSearchRoot(requestPath: string): Promise<string> {
+    const { absPath } = await resolveExisting(requestPath);
+    const st = await stat(absPath);
+    if (!st.isDirectory()) throw new HttpError(400, 'Not a directory.');
+    return absPath;
+  }
+
+  /**
+   * Spawns `fdfind` (Debian's package name for `fd` - a `find` alternative chosen for two real
+   * wins over it here, not just speed: its default output already tags a directory match with a
+   * trailing "/" - see the caller in routes/browse.ts, which reads that instead of a `stat()` per
+   * result - and `--fixed-strings` takes the query as a literal substring with zero escaping, where
+   * `find -iname` would need every glob metacharacter (`*`, `?`, `[`) hand-escaped first to stop an
+   * admin's own search text from being reinterpreted as a pattern. `--hidden --no-ignore` because
+   * this is a general file share, not a git checkout - a stray `.gitignore`-named file in someone's
+   * project backup share should never silently hide files from search, and dotfiles are real
+   * content here (list() itself never hides them either). `--` before the query stops a query that
+   * happens to start with `-` from being parsed as another fdfind flag.
+   */
+  searchProcess(root: string, query: string): ChildProcessWithoutNullStreams {
+    return spawn('fdfind', ['--ignore-case', '--fixed-strings', '--hidden', '--no-ignore', '--absolute-path', '--', query, root]);
   }
 
   /** Loads a file's content for the Browse page's text editor - only text, and only up to

@@ -5,11 +5,22 @@ import { BulkProgressDialog } from '../components/browse/BulkProgressDialog';
 import { Breadcrumbs } from '../components/browse/Breadcrumbs';
 import { NewFolderModal } from '../components/browse/NewFolderModal';
 import { RenameModal } from '../components/browse/RenameModal';
+import { SearchBar } from '../components/browse/SearchBar';
 import { TransferModal } from '../components/browse/TransferModal';
 import { useBrowse } from '../hooks/useBrowse';
+import { useBrowseSearch } from '../hooks/useBrowseSearch';
 import { LOCATION_TYPE_COLOR, LOCATION_TYPE_LABEL } from '../selectors/browse';
-import type { BrowseEntry, BrowseLocationType } from '../types/browseApi';
+import type { BrowseEntry, BrowseLocationType, SearchMatch } from '../types/browseApi';
 import { formatFileSize } from '../utils/format';
+
+/** The folder a search match should land on when clicked - itself for a directory match, its
+ *  parent for a file match (there's no single-file view, so landing in the listing that contains
+ *  it is the closest equivalent to "reveal this file"). */
+function targetFolderFor(match: SearchMatch): string {
+  if (match.type === 'directory') return match.path;
+  const idx = match.path.lastIndexOf('/');
+  return idx <= 0 ? '/' : match.path.slice(0, idx);
+}
 
 // Lazy - CodeMirror's core (not just its per-language chunks, which already code-split on their
 // own) is real weight, and this app has no other route-level code-splitting today. Loading it
@@ -24,6 +35,7 @@ function formatModified(iso: string): string {
 export function BrowsePage() {
   const { t } = useTranslation('pages');
   const browse = useBrowse();
+  const search = useBrowseSearch(browse.path);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -108,6 +120,8 @@ export function BrowsePage() {
         )}
       </div>
 
+      <SearchBar search={search} />
+
       <Breadcrumbs path={browse.path} onNavigate={browse.navigate} />
 
       {(presentLocationTypes.length > 0 || hasFileConflicts) && (
@@ -144,18 +158,39 @@ export function BrowsePage() {
           if (e.dataTransfer.files.length > 0) browse.upload(e.dataTransfer.files);
         }}
       >
-        <div className="browse-table__head">
-          <div className="browse-row__checkbox">
-            <input type="checkbox" checked={allSelected} onChange={() => (allSelected ? browse.clearSelection() : browse.selectAll())} aria-label={t('BrowsePage.selectAll')} />
-          </div>
-          <div>{t('BrowsePage.nameColumn')}</div>
-          <div>{t('BrowsePage.sizeColumn')}</div>
-          <div>{t('BrowsePage.modifiedColumn')}</div>
-          <div>{t('BrowsePage.locationColumn')}</div>
-          <div />
-        </div>
+        {search.active ? (
+          <>
+            {search.results.map((match) => (
+              <div
+                key={match.path}
+                className="browse-search-row"
+                onClick={() => {
+                  browse.navigate(targetFolderFor(match));
+                  search.clear();
+                }}
+              >
+                <span className={`browse-row__name-text--${match.type}`}>{match.name}</span>
+                <span className="browse-search-row__path">{match.path}</span>
+              </div>
+            ))}
+            {!search.searching && search.results.length === 0 && !search.error && (
+              <div className="browse-dropzone-hint">{t('BrowsePage.noSearchResults')}</div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="browse-table__head">
+              <div className="browse-row__checkbox">
+                <input type="checkbox" checked={allSelected} onChange={() => (allSelected ? browse.clearSelection() : browse.selectAll())} aria-label={t('BrowsePage.selectAll')} />
+              </div>
+              <div>{t('BrowsePage.nameColumn')}</div>
+              <div>{t('BrowsePage.sizeColumn')}</div>
+              <div>{t('BrowsePage.modifiedColumn')}</div>
+              <div>{t('BrowsePage.locationColumn')}</div>
+              <div />
+            </div>
 
-        {browse.canGoUp && (
+            {browse.canGoUp && (
           <div className="browse-row browse-row--dir" onClick={browse.up}>
             <div className="browse-row__checkbox" />
             <div className="browse-row__name">
@@ -255,8 +290,10 @@ export function BrowsePage() {
           );
         })}
 
-        {browse.status === 'ready' && entries.length === 0 && (
-          <div className="browse-dropzone-hint">{t('BrowsePage.emptyFolder')}</div>
+            {browse.status === 'ready' && entries.length === 0 && (
+              <div className="browse-dropzone-hint">{t('BrowsePage.emptyFolder')}</div>
+            )}
+          </>
         )}
       </div>
 

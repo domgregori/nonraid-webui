@@ -46,7 +46,8 @@
     "move": "Move",
     "confirmQuestion": "Confirm?",
     "delete": "Delete",
-    "emptyFolder": "Folder is empty. Drag files here, or use Upload."
+    "emptyFolder": "Folder is empty. Drag files here, or use Upload.",
+    "noSearchResults": "No matches."
   },
   "DashboardPage": {
     "loadingArrayStatus": "Loading array status…"

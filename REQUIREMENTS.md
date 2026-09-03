@@ -29,6 +29,9 @@ Proxmox VE. Update this list as items change or new items appear.
   share's and the cache pool's mount point, so files created under them later inherit the right
   ownership without a per-file chown.
 - `smartmontools` (`smartctl`) — used by the webui for disk temperature.
+- `fd-find` (binary name `fdfind`, not `fd` — a Debian packaging naming conflict with an unrelated
+  package) — used by the Browse page's search feature for a fast, parallel recursive filename
+  search.
 - `hdparm` — used by the Disks page's spin-down/spin-up actions
   (`backend/src/system/hdparm.ts`). Not installed by default; without it, the backend's own error
   is clear rather than a crash, same graceful-failure treatment as `apprise`/`smartmontools`

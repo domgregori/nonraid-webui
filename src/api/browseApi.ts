@@ -1,7 +1,17 @@
 import { API_BASE_URL } from './config';
 import { streamNdjson } from './progressStream';
 import { request } from './request';
-import type { BrowseCommandResult, BrowseFileContent, BrowseListing, BulkOp, BulkOpProgress, BulkOpResult, PathSuggestions } from '../types/browseApi';
+import type {
+  BrowseCommandResult,
+  BrowseFileContent,
+  BrowseListing,
+  BulkOp,
+  BulkOpProgress,
+  BulkOpResult,
+  PathSuggestions,
+  SearchMatch,
+  SearchResult,
+} from '../types/browseApi';
 
 export type PathSuggestScope = 'browse' | 'binds';
 
@@ -44,6 +54,16 @@ export const browseApi = {
       '/api/browse/bulk',
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paths, op, destPath }), signal },
       onProgress,
+    ),
+
+  // Recursive filename search rooted at `path` (the current folder for "here", or omitted/'' for
+  // "everywhere" - the backend already falls through to the default browse root exactly like list()
+  // does for an empty path). Streamed/cancelable the same way bulk() is.
+  search: (path: string, query: string, onMatch: (m: SearchMatch) => void, signal: AbortSignal) =>
+    streamNdjson<{ match: SearchMatch }, SearchResult>(
+      '/api/browse/search',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, query }), signal },
+      (p) => onMatch(p.match),
     ),
 
   suggest: (path: string, scope: PathSuggestScope) =>
