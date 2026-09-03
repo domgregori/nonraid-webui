@@ -1,7 +1,15 @@
 import { Router } from 'express';
 import type { ActivityStore } from '../activity/index.js';
 import { applyDriverUpdate, applyWebuiUpdate } from '../update/apply.js';
-import { checkForUpdates, fetchReleaseNotes, lastKnownUpdateStatus, repoUrlForComponent, type ComponentUpdateStatus, type UpdateStatus } from '../update/service.js';
+import {
+  checkForUpdates,
+  fetchReleaseNotes,
+  hasUpdateAvailable,
+  lastKnownUpdateStatus,
+  repoUrlForComponent,
+  type ComponentUpdateStatus,
+  type UpdateStatus,
+} from '../update/service.js';
 
 const COMPONENT_LABELS = { nonraid: 'NonRAID driver', nonraidWebui: 'NonRAID WebUI' } as const;
 type ComponentKey = keyof typeof COMPONENT_LABELS;
@@ -57,7 +65,7 @@ export function updateRouter(activity: ActivityStore): Router {
 
     const status: UpdateStatus = await checkForUpdates(true);
     const target: ComponentUpdateStatus = status[component];
-    if (target.upToDate !== false) {
+    if (!hasUpdateAvailable(target)) {
       res.status(409).json({ error: 'No update available for this component.' });
       return;
     }

@@ -173,6 +173,23 @@ export async function fetchReleaseNotes(repoUrl: string, tag: string): Promise<s
   return data.body?.trim() || null;
 }
 
+/**
+ * `upToDate === false` (a real installed tag that isn't the latest one) is the obvious case, but
+ * `installed === null` with a real `latest` is just as actionable, not genuinely unknown - a
+ * manually-built/dev install, or a fresh install from before this app tracked BUILD_TAG at all,
+ * would otherwise never be offered an update no matter how far behind it actually is. Mirrored on
+ * the frontend (components/settings/UpdateSection.tsx's own hasUpdateAvailable) for the button's
+ * visibility - this one gates whether routes/update.ts's /update/apply actually lets the request
+ * through, so the two have to agree or the button shows without working (confirmed live: fixing
+ * only the frontend check left a visible "Update Now" that 409'd the moment it was clicked).
+ * Genuinely unknown (checkError, or latest === null - no releases published yet / GitHub
+ * unreachable) still isn't "available" either way.
+ */
+export function hasUpdateAvailable(component: ComponentUpdateStatus): boolean {
+  if (component.upToDate === false) return true;
+  return component.upToDate === null && component.installed === null && component.latest !== null;
+}
+
 async function checkComponent(installed: string | null, repoUrl: string, runningMatchesInstalled: boolean | null = null): Promise<ComponentUpdateStatus> {
   try {
     const latest = await latestTag(repoUrl);
