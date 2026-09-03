@@ -122,6 +122,21 @@ Serializes disk-add/parity/cache-mirror operations that can't safely run concurr
 | PUT | `/shares/:name` | same body as POST | Renaming (body `name` ≠ `:name`) unmounts the old pool and mounts a new one. |
 | DELETE | `/shares/:name` | - | Unmounts + un-exports only - never deletes files. |
 
+## Unraid Import
+
+Preview-then-commit, same shape as the array import/config restore flows above: nothing is
+created until a commit route is called, and a single preview `token` (30 min TTL, swept
+server-side) covers both commit steps - a wizard session that imports shares and Docker
+containers separately still uses the one token for both. Reads an Unraid `config/` directory,
+either an uploaded archive (`.tar`, `.tar.gz`, `.zip`) or a folder picked directly, and reports
+shares, Docker container templates, and user accounts found in it.
+
+| Method | Path | Body/Params | Response / Notes |
+|---|---|---|---|
+| POST | `/unraid-import/preview` | multipart `files` (or archive `file`), `mode: 'archive'\|'folder'`, `paths?` | Parses (no side effects). Returns `{ token, shares, dockerContainers, users, warnings }`. Upload capped at 512MB - large enough for `config/` alone, well short of a full flash-drive backup (kernel/rootfs images included), which fails with a message pointing at `config/` specifically. |
+| POST | `/unraid-import/commit-shares` | `{ token, shareNames: string[] }` | **NDJSON.** Creates the selected shares (each spanning every current data disk), one `progress` event per share (see `ShareService.createMany()` - one `ApplyContext`/`smb.conf` resync for the whole batch, not one per share). Also queues every user this import found onto `/users/pending-import` regardless of which shares were selected. `{ type: 'done', result: { created, failed, usersQueued } }`. |
+| POST | `/unraid-import/commit-docker-containers` | `{ token, containerNames: string[] }` | **NDJSON.** Installs the selected containers, one `progress` event per container. A name already in use under Docker is skipped, not attempted. Never auto-grants elevated host access (privileged, host networking, ...) - a container that needs it is left out with a message to recreate it manually via Add Container instead. `{ type: 'done', result: { created, skipped, failed } }`. |
+
 ## Browse
 
 Operates over the whole `/mnt` tree (not scoped per-share) - paths are absolute strings passed as a
@@ -133,10 +148,12 @@ Operates over the whole `/mnt` tree (not scoped per-share) - paths are absolute 
 | GET | `/browse/suggest` | `?path=&scope=binds\|browse` | Directory-name autocomplete. `binds` scopes to Docker/Apps bind-mount roots, `browse` to the file-browser root. |
 | GET | `/browse/size` | `?path=` | `{ bytes }` - on-demand recursive size (`du`), not part of `list()`. |
 | GET | `/browse/download` | `?path=` | Streams the file. |
+| GET | `/browse/download-archive` | `?path=&names=` | Streams a `.tar.gz` of a folder, or several selected entries within one folder - `path` is their shared parent, `names` a JSON-encoded array of basenames. Built with the `tar` package's own streaming Pack (never buffered server-side). |
 | POST | `/browse/mkdir` | `{ path, name }` | `201` on success. |
 | POST | `/browse/rename` | `{ path, newName }` | |
 | POST | `/browse/upload` | multipart `files`, `path` field | `201`, `{ ok, results }`. |
 | POST | `/browse/bulk` | `{ paths: string[], op: 'copy'\|'move'\|'delete', destPath? }` | **NDJSON.** Applies `op` to each path in turn, one `progress` event per item. Cancel by aborting the fetch (closes the connection). |
+| POST | `/browse/search` | `{ path, query, regex? }` | **NDJSON.** Recursive filename search under `path` (empty/omitted = the default browse root, i.e. "search everywhere") via `fdfind`. `progress` events carry `{ match: { path, name, type: 'file'\|'directory' } }`; capped at 200 results (`{ type: 'done', result: { count, truncated } }`). `regex: true` switches from the default literal-substring match to fdfind's own regex syntax. Cancel by aborting the fetch. |
 
 ## Docker
 
@@ -278,6 +295,20 @@ bytes (gzip magic vs. not) instead.
 | POST | `/services/:id/stop` | - | |
 | POST | `/services/:id/restart` | - | `:id = webui` is special-cased to a self-exit (relies on the unit's `Restart=on-failure`) rather than `systemctl restart`, which would be killed by systemd's own stop phase first. |
 
+## Update
+
+Versioning convention: only a real pushed git tag (`v0.1.0`, `v0.2.0`, ...) on the relevant
+GitHub repo counts as "a version" for either component - never a bare commit hash. `installed`
+comes back `null` (not an error) for any build that isn't exactly at a tag - a manual/dev build,
+or a fresh install from before this app tracked its own version.
+
+| Method | Path | Body/Params | Response / Notes |
+|---|---|---|---|
+| GET | `/update/status` | - | Cached result of the last check (`UpdateStatus`) - never hits the network, safe to poll. All-null/unknown shape before the first check has ever run. |
+| POST | `/update/check` | - | Live check against GitHub (`git ls-remote --tags`) for both components. `UpdateStatus`: `{ nonraid, nonraidWebui, cliTool, checkedAt }`, each component `{ installed, latest, upToDate, checkError, runningMatchesInstalled }` - `upToDate`/`runningMatchesInstalled` are `null` (not `false`) when it can't be determined, not just "no". An update is available whenever `upToDate === false`, *or* `installed === null` with a real `latest` (not built from a tagged release at all, but a release still exists to move to) - see `hasUpdateAvailable()` in `backend/src/update/service.ts`. |
+| GET | `/update/changelog` | `?component=nonraid\|nonraidWebui&tag=` | `{ tag, body }` - the GitHub Release body for `tag` on that component's repo, `body: null` when that tag has no Release object (a plain pushed tag with nothing published). |
+| POST | `/update/apply` | `{ component: 'nonraid'\|'nonraidWebui' }` | Re-checks live first; `409` if no update is available (same `hasUpdateAvailable()` gate as above). Runs `install-webui.sh` on the host. `nonraid`: rebuilds/reinstalls the kernel module via DKMS only - never touches the *live* loaded module (reload that separately via Settings > Services). `nonraidWebui`: builds + stages only, then this backend restarts itself in place on success (response still returns first: `{ ok, message: "...restarting now...", output }` - the client reconnects automatically). `ApplyResult`: `{ ok, message, output }` - `output` is the last 200 lines of the install script's combined stdout+stderr. |
+
 ## Tailscale
 
 Disabled by default (`settings.tailscale.enabled`) - `GET /tailscale/status` still works either
@@ -352,6 +383,16 @@ Managed accounts/groups only - uid/gid ≥ `USERS_UID_RANGE_START` (default `200
 | DELETE | `/groups/:name` | - | Also purges the group from every share's access list and resyncs `smb.conf`. |
 | GET | `/groups/:name/access` | - | Same shape as the per-user access endpoint. |
 | PUT | `/groups/:name/access/:shareName` | `{ permission }` | Same as the per-user version, applied via Samba's `@groupname` syntax. |
+
+**Pending Unraid-import users**: an Unraid import (see below) queues a real account here rather
+than creating it outright, since it needs a password a person has to choose - never something a
+share config carries.
+
+| Method | Path | Body/Params | Response / Notes |
+|---|---|---|---|
+| GET | `/users/pending-import` | - | `{ username, readShares, writeShares }[]` - queued from an Unraid import, not yet created. |
+| POST | `/users/pending-import/:username` | `{ password }` | Creates the real account and applies its remembered read/write share access, then drops the pending entry. `400` if `password` is missing. |
+| DELETE | `/users/pending-import/:username` | - | Discards the pending entry without creating anything. |
 
 ## TLS
 
