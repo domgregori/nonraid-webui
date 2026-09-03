@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { dockerApi } from '../api/dockerApi';
 import { AppIcon } from '../components/apps/AppIcon';
 import { ContainerFormDialog } from '../components/docker/ContainerFormDialog';
 import { LogsDialog } from '../components/docker/LogsDialog';
+import { BulkContainerActionDialog } from '../components/shared/BulkContainerActionDialog';
 import { useDockerContainers } from '../hooks/useDockerContainers';
 import { useSettings } from '../hooks/useSettings';
 import { deriveContainerViewModel } from '../selectors/containers';
@@ -38,6 +40,9 @@ export function DockerPage() {
   const [editingUrlFor, setEditingUrlFor] = useState<string | null>(null);
   const [urlDraft, setUrlDraft] = useState('');
   const [urlSaving, setUrlSaving] = useState(false);
+  const [bulkAction, setBulkAction] = useState<'stop' | 'restart' | null>(null);
+
+  const runningContainers = containers.filter((c) => c.state === 'running').map((c) => ({ id: c.id, name: c.name }));
 
   const startEditingUrl = (containerId: string, currentValue: string) => {
     setEditingUrlFor(containerId);
@@ -97,6 +102,12 @@ export function DockerPage() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" className="btn" disabled={checkingUpdates} onClick={checkAllUpdates}>
             {checkingUpdates ? t('DockerPage.checking') : t('DockerPage.checkForUpdates')}
+          </button>
+          <button type="button" className="btn" disabled={runningContainers.length === 0} onClick={() => setBulkAction('stop')}>
+            {t('DockerPage.stopAll')}
+          </button>
+          <button type="button" className="btn" disabled={runningContainers.length === 0} onClick={() => setBulkAction('restart')}>
+            {t('DockerPage.restartAll')}
           </button>
           <button type="button" className="btn--primary" onClick={() => setDialog({ mode: 'add' })}>
             {t('DockerPage.addContainer')}
@@ -227,6 +238,16 @@ export function DockerPage() {
 
       {dialog?.mode === 'logs' && (
         <LogsDialog containerId={dialog.containerId} containerName={dialog.containerName} onClose={() => setDialog(null)} />
+      )}
+
+      {bulkAction && (
+        <BulkContainerActionDialog
+          action={bulkAction}
+          items={runningContainers}
+          run={bulkAction === 'stop' ? dockerApi.stopContainer : dockerApi.restartContainer}
+          onDone={refresh}
+          onClose={() => setBulkAction(null)}
+        />
       )}
 
       {confirmingUpdate && (

@@ -61,6 +61,8 @@
     "title": "Docker Containers",
     "checking": "Checking…",
     "checkForUpdates": "Check for updates",
+    "stopAll": "Stop All",
+    "restartAll": "Restart All",
     "addContainer": "Add Container",
     "loadingContainers": "Loading containers…",
     "autostart": "Autostart",
@@ -123,6 +125,8 @@
   },
   "LxcPage": {
     "title": "LXC Containers",
+    "stopAll": "Stop All",
+    "restartAll": "Restart All",
     "addContainer": "Add Container",
     "loadingContainers": "Loading containers…",
     "autostart": "Autostart",

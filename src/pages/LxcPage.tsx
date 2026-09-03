@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { lxcApi } from '../api/lxcApi';
 import { CreateLxcDialog } from '../components/lxc/CreateLxcDialog';
 import { DistroIcon } from '../components/lxc/DistroIcon';
 import { EditLxcConfigDialog } from '../components/lxc/EditLxcConfigDialog';
 import { SnapshotsDialog } from '../components/lxc/SnapshotsDialog';
+import { BulkContainerActionDialog } from '../components/shared/BulkContainerActionDialog';
 import { useLxcContainers } from '../hooks/useLxcContainers';
 import { useSettings } from '../hooks/useSettings';
 import { deriveLxcContainerViewModel } from '../selectors/lxcContainers';
@@ -16,6 +18,9 @@ export function LxcPage() {
   const { settings } = useSettings();
   const [dialog, setDialog] = useState<DialogState>(null);
   const [confirmingDestroy, setConfirmingDestroy] = useState<string | null>(null);
+  const [bulkAction, setBulkAction] = useState<'stop' | 'restart' | null>(null);
+
+  const runningContainers = containers.filter((c) => c.state === 'running').map((c) => ({ id: c.name, name: c.name }));
 
   const handleDestroyClick = (name: string) => {
     if (confirmingDestroy === name) {
@@ -46,9 +51,17 @@ export function LxcPage() {
     <div className="page">
       <div className="page-header">
         <div className="page-title">{t('LxcPage.title')}</div>
-        <button type="button" className="btn--primary" onClick={() => setDialog({ mode: 'add' })}>
-          {t('LxcPage.addContainer')}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn" disabled={runningContainers.length === 0} onClick={() => setBulkAction('stop')}>
+            {t('LxcPage.stopAll')}
+          </button>
+          <button type="button" className="btn" disabled={runningContainers.length === 0} onClick={() => setBulkAction('restart')}>
+            {t('LxcPage.restartAll')}
+          </button>
+          <button type="button" className="btn--primary" onClick={() => setDialog({ mode: 'add' })}>
+            {t('LxcPage.addContainer')}
+          </button>
+        </div>
       </div>
 
       {status === 'loading' && <div className="status-note">{t('LxcPage.loadingContainers')}</div>}
@@ -126,6 +139,16 @@ export function LxcPage() {
           containerState={containers.find((c) => c.name === dialog.name)?.state ?? 'unknown'}
           onClose={() => setDialog(null)}
           onDone={refresh}
+        />
+      )}
+
+      {bulkAction && (
+        <BulkContainerActionDialog
+          action={bulkAction}
+          items={runningContainers}
+          run={bulkAction === 'stop' ? lxcApi.stopContainer : lxcApi.restartContainer}
+          onDone={refresh}
+          onClose={() => setBulkAction(null)}
         />
       )}
     </div>
