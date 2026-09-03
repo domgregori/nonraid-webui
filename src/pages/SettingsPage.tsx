@@ -708,7 +708,6 @@ export function SettingsPage() {
               <InfoRow label={t('SettingsPage.about.arrayHealthLabel')} value={status ? deriveProtection(status).short : '-'} />
               <InfoRow label={t('SettingsPage.about.arraySizeLabel')} value={status ? `${status.array.size.data_disk_count} ${t('SettingsPage.about.dataDiskUnit')}${status.array.size.data_disk_count === 1 ? '' : 's'}, ${status.array.size.data_gb} ${t('SettingsPage.about.gbUnit')}` : '-'} />
               <InfoRow label={t('SettingsPage.about.superblockLabel')} value={status?.array.superblock ?? '-'} mono />
-              <InfoRow label={t('SettingsPage.about.versionLabel')} value={stats ? `v${stats.version}${stats.buildVersion ? ` (${stats.buildVersion})` : ''}` : '-'} mono />
             </div>
 
             <div className="settings-field toggle-row--bordered">

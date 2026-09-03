@@ -222,7 +222,6 @@
       "dataDiskUnit": "data disk",
       "gbUnit": "GB",
       "superblockLabel": "Superblock",
-      "versionLabel": "Version",
       "hostnameFieldTitle": "Hostname",
       "timezoneFieldTitle": "Timezone",
       "timeFormatFieldTitle": "Time format",
