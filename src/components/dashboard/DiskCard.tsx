@@ -40,7 +40,6 @@ function stopPropagation<T>(handler: () => T): (e: MouseEvent) => void {
 }
 
 export function ParityDiskCard({ disk, onClick }: DiskCardProps) {
-  const { t } = useTranslation('dashboard');
   return (
     <div className="disk-card disk-card--parity" style={{ borderColor: disk.borderColor }} onClick={onClick}>
       <div className="disk-card__head">
@@ -51,19 +50,9 @@ export function ParityDiskCard({ disk, onClick }: DiskCardProps) {
         </span>
       </div>
       <DeviceLine disk={disk} />
-      {/* Parity has no filesystem, so "used" here means how much of it currently protects real
-       *  data - the largest data disk's own size - not literal file content (see deriveDisk's own
-       *  doc comment). */}
-      <div className="progress-track">
-        <div className="progress-track__fill" style={{ width: disk.barWidth, background: disk.barColor }} />
-      </div>
       <div className="disk-card__row">
         <span>{disk.sizeLabel}</span>
-        <span>{t('DiskCard.protecting', { pct: disk.usedLabel })}</span>
-      </div>
-      <div className="disk-card__row--sub">
-        <span>{t('DiskCard.free', { free: disk.freeLabel })}</span>
-        <span style={{ color: disk.tempColor }}>{disk.tempLabel}</span>
+        <span>{disk.tempLabel}</span>
       </div>
       <div className="disk-card__row--sub">
         <span className="disk-card__health" style={{ color: disk.healthColor }}>

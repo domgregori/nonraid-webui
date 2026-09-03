@@ -44,7 +44,6 @@
     "cancel": "Cancel",
     "clearing": "Clearing: {{pct}}%",
     "needsFormatting": "Needs formatting - no filesystem yet",
-    "protecting": "{{pct}} protecting",
     "free": "{{free}} free",
     "spinActive": "Spinning",
     "spinStandby": "Standby"
