@@ -12,7 +12,7 @@ interface BulkContainerActionDialogProps {
    *  not the page's own hook action, since that also tracks a single pendingIds entry and fires a
    *  refresh() after every single container; this runs its own progress instead and refreshes once
    *  via onDone when everything's done. */
-  run: (id: string) => Promise<void>;
+  run: (id: string) => Promise<unknown>;
   onDone: () => void;
   onClose: () => void;
 }
