@@ -10,6 +10,39 @@ export interface StoppedContainers {
 }
 
 /**
+ * Thrown by unmountArrayWithContainerRetry() specifically when the final unmount - the one that
+ * runs *after* Docker/LXC have already been stopped - still fails (something else entirely is
+ * holding a disk open). A plain throw would lose which containers got stopped along the way: the
+ * function's normal return value is how callers learn that, and a throw never returns anything.
+ * Without this, a caller's own catch-block restore (see every route that calls this) would use
+ * whatever `stopped` it had *before* the call - still the untouched default - and silently leave
+ * Docker/LXC stopped with no automatic recovery, even though this function is the one that
+ * stopped them. Carries the same StoppedContainers a successful call would have returned, so
+ * `stoppedContainersFromError()` below can hand it back to restoreStoppedContainers() either way.
+ */
+export class ContainerRetryError extends Error {
+  constructor(
+    message: string,
+    public readonly stopped: StoppedContainers,
+  ) {
+    super(message);
+    this.name = 'ContainerRetryError';
+  }
+}
+
+/**
+ * Recovers the right StoppedContainers to restore after a failed unmountArrayWithContainerRetry()
+ * call (or a later step failing after it already succeeded): a ContainerRetryError carries what it
+ * actually stopped before the final unmount failed anyway; any other error means either nothing
+ * was ever stopped (the plain, stopContainers-declined throw) or the call itself succeeded and a
+ * *later* step failed - `fallback` is the caller's own already-assigned `stopped` variable, which
+ * is correct in both of those cases.
+ */
+export function stoppedContainersFromError(err: unknown, fallback: StoppedContainers): StoppedContainers {
+  return err instanceof ContainerRetryError ? err.stopped : fallback;
+}
+
+/**
  * Unmounts the raw array disk filesystems, retrying once with Docker and every running LXC
  * container stopped if the plain attempt fails - the common case being Docker's own data root
  * relocated onto an array disk (see docker/storagePath.ts and lxc/storagePath.ts for the same
@@ -22,6 +55,11 @@ export interface StoppedContainers {
  * own strictness (a share-unmount failure is fatal for the interactive /array/stop, but best-effort
  * for the recovery-oriented /array/reload-driver) - collapsing that distinction here would erase a
  * documented, deliberate difference between the two.
+ *
+ * If Docker/LXC get stopped but the disks are *still* busy afterward (something else entirely has
+ * one open), this throws a ContainerRetryError rather than a plain one - see its own doc comment
+ * for why, and use stoppedContainersFromError() in a catch block rather than assuming "it threw, so
+ * nothing was stopped".
  */
 export async function unmountArrayWithContainerRetry(
   deps: { nmd: NmdClient; shares: ShareService; lxc: LxcClient; activity: ActivityStore },
@@ -45,7 +83,11 @@ export async function unmountArrayWithContainerRetry(
     }
 
     await deps.shares.unmountAll().catch(() => {});
-    await deps.nmd.unmountDisks(); // still busy after stopping containers - let this one throw for real
+    try {
+      await deps.nmd.unmountDisks(); // still busy after stopping containers - let this one throw for real
+    } catch (retryErr) {
+      throw new ContainerRetryError((retryErr as Error).message, stopped);
+    }
   }
   return stopped;
 }

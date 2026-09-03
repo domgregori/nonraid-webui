@@ -17,6 +17,7 @@ import {
   mountArrayDisksBestEffort,
   restoreDockerAndAutostartLxc,
   restoreStoppedContainers,
+  stoppedContainersFromError,
   unmountArrayWithContainerRetry,
   type StoppedContainers,
 } from '../system/arrayLifecycle.js';
@@ -199,8 +200,10 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
     } catch (err) {
       // The stop attempt itself failed (or never got past unmountDisks) - restore whatever we
       // stopped along the way, since the array is still running and there's no reason for
-      // Docker/LXC to stay down.
-      await restoreStoppedContainers(lxc, stopped);
+      // Docker/LXC to stay down. stoppedContainersFromError() covers the case where the *retried*
+      // unmount (after stopping them) is what actually failed - `stopped` itself is still the
+      // pre-call default then, since the throw happened before this assignment.
+      await restoreStoppedContainers(lxc, stoppedContainersFromError(err, stopped));
       res.status(502).json({ error: (err as Error).message });
     }
   });
@@ -328,6 +331,13 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
     }
     stagedImports.delete(token);
 
+    // Opt-in, same convention as /array/stop, /array/shrink, and /array/reload-driver - only
+    // matters when preview.currentArrayActive was true (an existing array is up and running with
+    // Docker/LXC storage potentially relocated onto one of its disks); a blank/already-stopped
+    // array has nothing mounted for unmountDisks() below to find busy in the first place.
+    const stopContainers = req.body?.stopContainers === true;
+    let stopped: StoppedContainers = { dockerStopped: false, stoppedLxcNames: [] };
+
     try {
       // Re-checked against the live safety gate rather than trusting
       // whatever the client remembers from the original preview response -
@@ -345,10 +355,11 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
         return;
       }
 
-      // Same reasoning as /array/stop - shares/disk mounts have to come down
-      // before the module can be safely unloaded and reloaded.
+      // Same reasoning as /array/stop - shares/disk mounts have to come down before the module can
+      // be safely unloaded and reloaded, with the same opt-in Docker/LXC-stop retry if something
+      // (e.g. Docker's own data root relocated onto the array being replaced) is holding one busy.
       await shares.unmountAll().catch(() => {});
-      await nmd.unmountDisks().catch(() => {});
+      stopped = await unmountArrayWithContainerRetry({ nmd, shares, lxc, activity }, stopContainers);
 
       const { result, targetPath, backedUpTo } = await nmd.commitImportedSuperblock(staged.filePath);
       const status = await nmd.getStatus();
@@ -362,6 +373,10 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
 
       res.json({ importResult: result, targetPath, backedUpTo, status });
     } catch (err) {
+      // Same as /array/stop - the new superblock isn't loaded (or the array's still on the old
+      // one), so there's nothing for Docker/LXC to have lost access to; no reason to leave them
+      // down. See /array/stop's own comment on why this goes through stoppedContainersFromError().
+      await restoreStoppedContainers(lxc, stoppedContainersFromError(err, stopped));
       res.status(502).json({ error: (err as Error).message });
     } finally {
       await unlink(staged.filePath).catch(() => {});
@@ -396,7 +411,8 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       // The unmount/reconfigure attempt failed - restore whatever we stopped along the way, since
       // the array is presumably still running (or at worst needs the same manual recovery this
       // action always risked, unrelated to Docker/LXC) and there's no reason for them to stay down.
-      await restoreStoppedContainers(lxc, stopped);
+      // See /array/stop's own comment on why this goes through stoppedContainersFromError().
+      await restoreStoppedContainers(lxc, stoppedContainersFromError(err, stopped));
       res.status(502).json({ error: (err as Error).message });
     }
   });
@@ -424,6 +440,10 @@ export function arrayRouter(nmd: NmdClient, settingsStore: SettingsStore, activi
       activity.log('Driver reloaded to recover from stale array state', 'amber').catch(() => {});
       res.json(result);
     } catch (err) {
+      // See /array/stop's own comment on why this goes through stoppedContainersFromError() -
+      // `finally` below has no `err` of its own, so the corrected state is captured into `stopped`
+      // here first.
+      stopped = stoppedContainersFromError(err, stopped);
       res.status(502).json({ error: (err as Error).message });
     } finally {
       // Always try to bring back whatever was stopped, regardless of whether the reload itself

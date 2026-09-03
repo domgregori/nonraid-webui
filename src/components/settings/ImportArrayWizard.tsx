@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { nmdApi } from '../../api/nmdApi';
 import type { DiskMatchStatus, ImportBrowseResult, ImportCommitResponse, ImportDefaultPath, ImportPreview } from '../../types/nmdApi';
 import { formatBytesHuman } from '../../utils/format';
+import { ArrayActionErrorBanner } from '../shared/ArrayActionErrorBanner';
 
 interface ImportArrayWizardProps {
   onClose: () => void;
@@ -61,6 +62,9 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
   const [committing, setCommitting] = useState(false);
   const [commitResult, setCommitResult] = useState<ImportCommitResponse | null>(null);
   const [commitError, setCommitError] = useState<string | null>(null);
+  // Only offered after a *first* failed attempt (see ArrayStatusProvider's toggleArray for the
+  // same reasoning) - a retry that already used stopContainers failing again is just a real error.
+  const [stopBlockedByContainers, setStopBlockedByContainers] = useState(false);
   const [showRawOutput, setShowRawOutput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -122,17 +126,19 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
     }
   };
 
-  const handleCommit = async () => {
+  const handleCommit = async (stopContainers = false) => {
     if (!preview) return;
     setCommitting(true);
     setCommitError(null);
+    setStopBlockedByContainers(false);
     try {
-      const result = await nmdApi.commitImport(preview.token);
+      const result = await nmdApi.commitImport(preview.token, stopContainers);
       setCommitResult(result);
       setStep('result');
       onImported?.();
     } catch (err) {
       setCommitError((err as Error).message);
+      if (!stopContainers) setStopBlockedByContainers(true);
     } finally {
       setCommitting(false);
     }
@@ -144,6 +150,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
     setAcknowledged(false);
     setCommitResult(null);
     setCommitError(null);
+    setStopBlockedByContainers(false);
     setShowRawOutput(false);
     setFileName(null);
     setSource('upload');
@@ -358,7 +365,14 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
 
               {preview.hasSizeMismatch && <div className="status-note status-note--error">{t('ImportArrayWizard.importBlocked')}</div>}
 
-              {commitError && <div className="status-note status-note--error">{commitError}</div>}
+              {commitError && (
+                <ArrayActionErrorBanner
+                  actionError={commitError}
+                  stopBlockedByContainers={stopBlockedByContainers}
+                  arrayPending={committing}
+                  onRetryWithStopContainers={() => handleCommit(true)}
+                />
+              )}
 
               <div className="dialog__actions">
                 <button type="button" className="btn" onClick={() => setStep('review')}>
@@ -368,7 +382,7 @@ export function ImportArrayWizard({ onClose, onImported }: ImportArrayWizardProp
                   type="button"
                   className="btn btn--danger"
                   disabled={!acknowledged || preview.hasSizeMismatch || committing}
-                  onClick={handleCommit}
+                  onClick={() => handleCommit()}
                 >
                   {committing ? t('ImportArrayWizard.importing') : t('ImportArrayWizard.importArray')}
                 </button>

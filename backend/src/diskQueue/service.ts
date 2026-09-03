@@ -9,6 +9,7 @@ import {
   mountArrayDisksBestEffort,
   restoreDockerAndAutostartLxc,
   restoreStoppedContainers,
+  stoppedContainersFromError,
   unmountArrayWithContainerRetry,
   type StoppedContainers,
 } from '../system/arrayLifecycle.js';
@@ -293,8 +294,9 @@ export class DiskQueueService {
         await this.nmd.stopArray();
       } catch (err) {
         // The stop attempt failed outright - restore whatever got stopped along the way, since
-        // the array is still running and there's no reason for Docker/LXC to stay down.
-        await restoreStoppedContainers(this.lxc, stoppedContainers);
+        // the array is still running and there's no reason for Docker/LXC to stay down. See
+        // /array/stop's own comment on why this goes through stoppedContainersFromError().
+        await restoreStoppedContainers(this.lxc, stoppedContainersFromError(err, stoppedContainers));
         throw err;
       }
     }

@@ -26,11 +26,11 @@ export const nmdApi = {
     form.append('file', file);
     return request<ImportPreview>('/api/array/import/preview', { method: 'POST', body: form });
   },
-  commitImport: (token: string) =>
+  commitImport: (token: string, stopContainers = false) =>
     request<ImportCommitResponse>('/api/array/import/commit', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({ token, stopContainers }),
     }),
   getImportDefaultPath: () => request<ImportDefaultPath>('/api/array/import/default-path'),
   browseImportRoot: (path = '/') => request<ImportBrowseResult>(`/api/array/import/browse-root?path=${encodeURIComponent(path)}`),

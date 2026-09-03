@@ -8,9 +8,11 @@ import type { ActivityStore } from '../activity/store.js';
 import { config } from '../config.js';
 import { DAEMON_JSON_PATH, getConfiguredDockerStorage } from '../docker/storagePath.js';
 import { HttpError } from '../httpError.js';
+import type { LxcClient } from '../lxc/index.js';
 import { NetRateTracker } from '../metrics/net.js';
 import type { NmdClient } from '../nmd/client.js';
 import type { MetricsService } from '../metrics/service.js';
+import type { ShareService } from '../shares/index.js';
 import { benchmarkRead, benchmarkWrite, resolveDurationMs } from '../system/benchmark.js';
 import { resolveConfigBackupPaths, streamBootDiskImage, streamConfigBackup } from '../system/backupStream.js';
 import type { BackupScheduler } from '../system/backupScheduler.js';
@@ -28,6 +30,12 @@ import {
   stageRestoreFile,
   sweepStagedRestores,
 } from '../system/configRestore.js';
+import {
+  restoreStoppedContainers,
+  stoppedContainersFromError,
+  unmountArrayWithContainerRetry,
+  type StoppedContainers,
+} from '../system/arrayLifecycle.js';
 import { listTimezones, rebootHost, setHostname, setTimezone } from '../system/hostConfig.js';
 import { runSudoMaybe } from '../system/procUtil.js';
 import type { SystemStatsService } from '../system/service.js';
@@ -52,6 +60,8 @@ export function systemRouter(
   settingsStore: SettingsStore,
   rclone: RcloneClient,
   users: UsersClient,
+  shares: ShareService,
+  lxc: LxcClient,
 ): Router {
   const router = Router();
 
@@ -319,10 +329,28 @@ export function systemRouter(
       const superblockRestored = toRestore.includes(superblockMember);
       let superblockReloadError: string | null = null;
       if (superblockRestored) {
+        // Defensive, not opt-in: the guard above already requires the array not be STARTED before
+        // this route can even run, so disk filesystems should already be unmounted in the normal
+        // case - but if something (e.g. Docker/LXC storage relocated onto an array disk, left
+        // mounted by an earlier stop that didn't go through the container-stop retry) is still
+        // holding one busy, this is a background step with no admin watching to ask, so it always
+        // stops what's in the way rather than leaving "make the restored superblock take effect"
+        // silently fail on a busy-disk error. Restored regardless of outcome below (same as
+        // /array/reload-driver) - there's nothing mounted for them to run against either way until
+        // a real array start, so there's no reason to leave them down on top of that.
+        let stopped: StoppedContainers = { dockerStopped: false, stoppedLxcNames: [] };
         try {
+          await shares.unmountAll().catch(() => {});
+          stopped = await unmountArrayWithContainerRetry({ nmd, shares, lxc, activity }, true);
           await nmd.reloadModuleAndImport();
         } catch (err) {
+          // See /array/stop's own comment on stoppedContainersFromError() - the retried unmount
+          // (after stopping containers) can be what actually threw, in which case `stopped` here
+          // is still the pre-call default and needs recovering from the error itself.
+          stopped = stoppedContainersFromError(err, stopped);
           superblockReloadError = (err as Error).message;
+        } finally {
+          await restoreStoppedContainers(lxc, stopped);
         }
       }
 
@@ -371,14 +399,25 @@ export function systemRouter(
   // where the superblock file on disk changed without the running module knowing, e.g. this route
   // itself only ever half-succeeding earlier) can be retried without redoing the whole restore.
   router.post('/system/reload-driver', async (_req, res) => {
+    // Same defensive, always-on container stop as the automatic reload above (this route exists
+    // specifically to retry that same operation by hand) - no request body/UI flag, since every
+    // caller of this route is already in the same "make the on-disk superblock take effect"
+    // situation that one is.
+    let stopped: StoppedContainers = { dockerStopped: false, stoppedLxcNames: [] };
     try {
+      await shares.unmountAll().catch(() => {});
+      stopped = await unmountArrayWithContainerRetry({ nmd, shares, lxc, activity }, true);
       const result = await nmd.reloadModuleAndImport();
       activity.log(`Driver reloaded, ${result.importedCount} disk(s) re-imported`, 'blue').catch(() => {});
       res.json({ result });
     } catch (err) {
+      // See /array/stop's own comment on stoppedContainersFromError().
+      stopped = stoppedContainersFromError(err, stopped);
       const message = (err as Error).message;
       activity.log(`Driver reload failed: ${message}`, 'red').catch(() => {});
       res.status(502).json({ error: message });
+    } finally {
+      await restoreStoppedContainers(lxc, stopped);
     }
   });
 
@@ -413,8 +452,23 @@ export function systemRouter(
       return 'NFS restarted';
     });
     const driverReload = await runStep('Driver reload', async () => {
-      const result = await nmd.reloadModuleAndImport();
-      return `Driver reloaded, ${result.importedCount} disk(s) re-imported`;
+      // Same defensive, always-on container stop as /system/reload-driver and the config-restore
+      // commit's own auto-reload - this step only ever runs from the post-restore "apply
+      // everything" screen, the same situation both of those cover.
+      let stopped: StoppedContainers = { dockerStopped: false, stoppedLxcNames: [] };
+      try {
+        await shares.unmountAll().catch(() => {});
+        stopped = await unmountArrayWithContainerRetry({ nmd, shares, lxc, activity }, true);
+        const result = await nmd.reloadModuleAndImport();
+        return `Driver reloaded, ${result.importedCount} disk(s) re-imported`;
+      } catch (err) {
+        // See /array/stop's own comment on stoppedContainersFromError() - runStep()'s own outer
+        // catch is what actually reports this failure, so it just needs rethrowing here.
+        stopped = stoppedContainersFromError(err, stopped);
+        throw err;
+      } finally {
+        await restoreStoppedContainers(lxc, stopped);
+      }
     });
     // rclone-rcd only reads rclone.conf at startup, so a freshly-restored one (see backupCatalog.ts's
     // 'remoteBackup' category) is inert until the daemon restarts - same category of problem as
