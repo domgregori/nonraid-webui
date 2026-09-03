@@ -21,6 +21,20 @@ const CONFIRM_TEXT_KEYS: Record<UpdateComponent, string> = {
   nonraidWebui: 'UpdateSection.confirmTextNonraidWebui',
 };
 
+/**
+ * `upToDate === false` (a real installed tag that isn't the latest one) is the obvious case, but
+ * `installed === null` with a real `latest` is just as actionable and shouldn't read as "unknown" -
+ * that's not "can't tell", it's "definitely not on a tagged release, and one exists". Confirmed
+ * live: a manually-built/dev install (installed stays null forever until an actual tagged
+ * install-webui.sh run sets it) otherwise never shows the update button at all, even once a real
+ * release it could move to exists. Genuinely unknown stays unknown: checkError, or latest === null
+ * (no releases published yet / couldn't reach GitHub) still fall through to that below.
+ */
+function hasUpdateAvailable(component: ComponentUpdateStatus): boolean {
+  if (component.upToDate === false) return true;
+  return component.upToDate === null && component.installed === null && component.latest !== null;
+}
+
 function StatusBadge({ component }: { component: ComponentUpdateStatus }) {
   const { t } = useTranslation('settings');
   if (component.checkError) {
@@ -29,7 +43,7 @@ function StatusBadge({ component }: { component: ComponentUpdateStatus }) {
   if (component.upToDate === true) {
     return <span className="job-badge job-badge--active">{t('UpdateSection.upToDate')}</span>;
   }
-  if (component.upToDate === false) {
+  if (hasUpdateAvailable(component)) {
     return <span className="job-badge job-badge--disabled">{t('UpdateSection.updateAvailable')}</span>;
   }
   return <span className="job-badge">{t('UpdateSection.unknown')}</span>;
@@ -186,7 +200,7 @@ export function UpdateSection() {
                 </span>
               </div>
               {component.checkError && <div className="status-note status-note--error">{component.checkError}</div>}
-              {component.upToDate === false && (
+              {hasUpdateAvailable(component) && (
                 <div className="settings-field__row" style={{ marginTop: 8 }}>
                   <button type="button" className="btn" disabled={restarting} onClick={() => setConfirming(key)}>
                     {t('UpdateSection.updateNow')}
