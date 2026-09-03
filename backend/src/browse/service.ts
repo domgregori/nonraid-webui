@@ -285,10 +285,15 @@ export class BrowseService {
    * project backup share should never silently hide files from search, and dotfiles are real
    * content here (list() itself never hides them either). `--` before the query stops a query that
    * happens to start with `-` from being parsed as another fdfind flag.
+   *
+   * `--ignore-case` is forced only for the plain (non-regex) case - a regex author expects their
+   * own pattern to control case (`[A-Z]`, an inline `(?i)`, ...), not have fdfind silently override
+   * it. Regex mode instead gets fdfind's own default, unforced behavior: smart case, insensitive
+   * unless the pattern itself contains an uppercase character.
    */
   searchProcess(root: string, query: string, useRegex: boolean): ChildProcessWithoutNullStreams {
-    const args = ['--ignore-case', '--hidden', '--no-ignore', '--absolute-path'];
-    if (!useRegex) args.push('--fixed-strings');
+    const args = ['--hidden', '--no-ignore', '--absolute-path'];
+    if (!useRegex) args.push('--ignore-case', '--fixed-strings');
     return spawn('fdfind', [...args, '--', query, root]);
   }
 
