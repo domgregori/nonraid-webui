@@ -45,8 +45,15 @@ export function deriveShareEndpoints(share: Pick<ShareWithStats, 'name' | 'proto
 
 /** Groups get Samba's own "@groupname" convention, matching how they're already written into
  *  smb.conf's valid/invalid/read lists elsewhere in this app. */
-export function deriveAccessLabel(share: Pick<ShareWithStats, 'access' | 'smb' | 'protocols'>): string {
-  if (!share.protocols.includes('smb')) return 'Not shared over SMB';
+export function deriveAccessLabel(share: Pick<ShareWithStats, 'access' | 'smb' | 'protocols' | 'nfs'>): string {
+  if (!share.protocols.includes('smb')) {
+    if (!share.protocols.includes('nfs')) return 'Not shared';
+    // NFS has no per-user/group access list the way SMB does - access is host-based only
+    // (allowedHosts), so "Not shared over SMB" here read like the share had no real access
+    // control at all, when it's actually fully readable/writable by every host on the list.
+    const hosts = share.nfs?.allowedHosts;
+    return hosts && hosts.length > 0 ? `NFS: ${hosts.join(', ')}` : 'NFS: any host';
+  }
   const principals = [
     ...Object.entries(share.access.users)
       .filter(([, p]) => p === 'read-write' || p === 'read-only')
