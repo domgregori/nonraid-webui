@@ -229,7 +229,7 @@ export function DiskDetailPanel() {
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">{t('DiskDetailPanel.used')}</span>
-                <span className="detail-row__value">{disk.role === 'parity' ? disk.usedLabel : t('DiskDetailPanel.usedWithFree', { used: disk.usedLabel, free: disk.freeLabel })}</span>
+                <span className="detail-row__value">{t('DiskDetailPanel.usedWithFree', { used: disk.usedLabel, free: disk.freeLabel })}</span>
               </div>
               <div className="detail-row">
                 <span className="detail-row__label">{t('DiskDetailPanel.filesystem')}</span>

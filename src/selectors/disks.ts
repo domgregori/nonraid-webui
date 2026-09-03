@@ -45,6 +45,8 @@ export function deriveDisk(
   isSSD: boolean | null | undefined,
   spinState: SmartSpinState | null | undefined,
   diskLabels: Record<string, string>,
+  // Only meaningful for a parity disk - see its own doc comment below. Data disks ignore this.
+  largestDataSizeGb = 0,
 ): DiskViewModel {
   const role: 'parity' | 'data' = disk.type === 'P' || disk.type === 'Q' ? 'parity' : 'data';
   const label = disk.type === 'P' ? 'Parity 1' : disk.type === 'Q' ? 'Parity 2' : `Disk ${disk.slot}`;
@@ -66,7 +68,20 @@ export function deriveDisk(
     statusColor = COLORS.red;
   }
 
-  const usedPct = role === 'data' ? parseUsagePct(disk.filesystem?.usage) : 0;
+  // Parity has no filesystem of its own, so "used" can't come from disk.filesystem the way a data
+  // disk's does. What actually happens on disk: every stripe up to the largest data disk's own
+  // size holds real parity information for it; anything beyond that on a bigger parity disk is
+  // physically present but never written to, since there's no data disk that size to protect yet
+  // (see backend/src/routes/array.ts's own largestDataKb/parityTooSmall check for the same
+  // relationship from the other direction - parity must be at least this big, not that it uses all
+  // of it). Clamped at 100% for the parityTooSmall case, where the parity disk is actually smaller
+  // than the largest data disk - a real, detectable misconfiguration, not just an edge case to hide.
+  const usedPct =
+    role === 'data'
+      ? parseUsagePct(disk.filesystem?.usage)
+      : disk.size_gb > 0
+        ? Math.min(100, Math.round((largestDataSizeGb / disk.size_gb) * 100))
+        : 0;
   const sizeTB = disk.size_gb / 1024;
   const tempColor = typeof tempC === 'number' && tempC >= 40 ? COLORS.amber : COLORS.textSecondary;
   // nmdctl only reports a disk's real filesystem type once the array is started and the disk is
@@ -89,8 +104,8 @@ export function deriveDisk(
     statusLabel,
     statusColor,
     sizeLabel: formatSize(disk.size_gb),
-    usedLabel: role === 'parity' ? '-' : `${usedPct}%`,
-    freeLabel: role === 'parity' ? '-' : formatSize(disk.size_gb * (1 - usedPct / 100)),
+    usedLabel: `${usedPct}%`,
+    freeLabel: formatSize(disk.size_gb * (1 - usedPct / 100)),
     fsType: role === 'parity' ? '-' : (disk.filesystem?.type ?? '-').toUpperCase(),
     mountpoint: role === 'parity' ? '-' : normalize(disk.filesystem?.mountpoint),
     tempLabel: typeof tempC === 'number' ? `${Math.round(tempC)}°C` : '-',
@@ -123,7 +138,10 @@ export function deriveDisks(
 ): { parity: DiskViewModel[]; data: DiskViewModel[]; all: DiskViewModel[] } {
   const arrayStarted = status.array.state === 'STARTED';
   const sorted = [...status.disks].sort((a, b) => a.slot - b.slot);
-  const all = sorted.map((d) => deriveDisk(d, arrayStarted, temps[d.device], diskHealths[d.device], diskTypes[d.device], spinStates[d.device], diskLabels));
+  const largestDataSizeGb = Math.max(0, ...status.disks.filter((d) => d.type !== 'P' && d.type !== 'Q').map((d) => d.size_gb));
+  const all = sorted.map((d) =>
+    deriveDisk(d, arrayStarted, temps[d.device], diskHealths[d.device], diskTypes[d.device], spinStates[d.device], diskLabels, largestDataSizeGb),
+  );
   return {
     parity: all.filter((d) => d.role === 'parity'),
     data: all.filter((d) => d.role === 'data'),
