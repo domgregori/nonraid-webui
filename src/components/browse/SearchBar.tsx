@@ -27,6 +27,10 @@ export function SearchBar({ search }: SearchBarProps) {
         <option value="here">{t('SearchBar.scopeHere')}</option>
         <option value="everywhere">{t('SearchBar.scopeEverywhere')}</option>
       </select>
+      <label className="browse-search-bar__regex">
+        <input type="checkbox" checked={search.regex} onChange={(e) => search.setRegex(e.target.checked)} />
+        {t('SearchBar.regex')}
+      </label>
       {search.searching ? (
         <button type="button" className="btn" onClick={search.cancel}>
           {t('SearchBar.cancel')}

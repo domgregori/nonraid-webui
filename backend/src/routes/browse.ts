@@ -218,21 +218,30 @@ export function browseRouter(browse: BrowseService): Router {
     const send = (event: object) => res.write(`${JSON.stringify(event)}\n`);
 
     try {
-      const { path: dirPath, query } = req.body as { path?: unknown; query?: unknown };
+      const { path: dirPath, query, regex } = req.body as { path?: unknown; query?: unknown; regex?: unknown };
       if (typeof query !== 'string' || !query.trim()) {
         throw new HttpError(400, 'query is required.');
       }
       const root = await browse.resolveSearchRoot(typeof dirPath === 'string' ? dirPath : '');
-      const child = browse.searchProcess(root, query.trim());
+      const child = browse.searchProcess(root, query.trim(), regex === true);
+      let killedForTruncation = false;
       req.on('close', () => child.kill());
 
       // fdfind failing to even start (not installed, not on PATH) surfaces as an 'error' event on
       // the child itself, not as readline output - captured here rather than thrown directly since
       // it can fire either before or interleaved with the loop below reading its (empty) stdout.
+      // A malformed regex (only reachable with regex:true) instead starts fine but exits non-zero
+      // with a real explanation on stderr - e.g. "unclosed character class" - captured the same way
+      // so that reads as a real error too, not a silent zero-result search.
       let spawnError: Error | null = null;
+      let stderr = '';
       child.on('error', (err) => {
         spawnError = err;
       });
+      child.stderr.on('data', (chunk: Buffer) => {
+        stderr += chunk.toString();
+      });
+      const exitCode = new Promise<number | null>((resolve) => child.on('close', resolve));
 
       const rl = readline.createInterface({ input: child.stdout });
       let count = 0;
@@ -241,6 +250,7 @@ export function browseRouter(browse: BrowseService): Router {
         if (!line) continue;
         if (count >= MAX_SEARCH_RESULTS) {
           truncated = true;
+          killedForTruncation = true;
           child.kill();
           rl.close();
           break;
@@ -255,6 +265,10 @@ export function browseRouter(browse: BrowseService): Router {
       }
 
       if (spawnError) throw new Error(`fdfind failed to start: ${(spawnError as Error).message}`);
+      // Only surfaced once results are exhausted, not raced against the loop above - a bad exit
+      // code after truncation (this route's own kill()) is expected, not a real failure to report.
+      const code = await exitCode;
+      if (code !== 0 && !killedForTruncation) throw new Error(stderr.trim() || `fdfind exited with code ${code}`);
       send({ type: 'done', result: { count, truncated } });
     } catch (err) {
       send({ type: 'error', message: err instanceof HttpError ? err.message : (err as Error).message });

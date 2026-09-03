@@ -275,16 +275,21 @@ export class BrowseService {
    * Spawns `fdfind` (Debian's package name for `fd` - a `find` alternative chosen for two real
    * wins over it here, not just speed: its default output already tags a directory match with a
    * trailing "/" - see the caller in routes/browse.ts, which reads that instead of a `stat()` per
-   * result - and `--fixed-strings` takes the query as a literal substring with zero escaping, where
-   * `find -iname` would need every glob metacharacter (`*`, `?`, `[`) hand-escaped first to stop an
-   * admin's own search text from being reinterpreted as a pattern. `--hidden --no-ignore` because
+   * result - and, in its default (non-regex) mode, `--fixed-strings` takes the query as a literal
+   * substring with zero escaping, where `find -iname` would need every glob metacharacter (`*`,
+   * `?`, `[`) hand-escaped first to stop an admin's own search text from being reinterpreted as a
+   * pattern. `useRegex` drops that flag, switching to fdfind's own (Rust-flavored) regex syntax -
+   * opt-in, since a plain filename search containing "." or "(" shouldn't silently start meaning
+   * "any character" or "group start" for anyone who didn't ask for regex. `--hidden --no-ignore` because
    * this is a general file share, not a git checkout - a stray `.gitignore`-named file in someone's
    * project backup share should never silently hide files from search, and dotfiles are real
    * content here (list() itself never hides them either). `--` before the query stops a query that
    * happens to start with `-` from being parsed as another fdfind flag.
    */
-  searchProcess(root: string, query: string): ChildProcessWithoutNullStreams {
-    return spawn('fdfind', ['--ignore-case', '--fixed-strings', '--hidden', '--no-ignore', '--absolute-path', '--', query, root]);
+  searchProcess(root: string, query: string, useRegex: boolean): ChildProcessWithoutNullStreams {
+    const args = ['--ignore-case', '--hidden', '--no-ignore', '--absolute-path'];
+    if (!useRegex) args.push('--fixed-strings');
+    return spawn('fdfind', [...args, '--', query, root]);
   }
 
   /** Loads a file's content for the Browse page's text editor - only text, and only up to

@@ -59,10 +59,10 @@ export const browseApi = {
   // Recursive filename search rooted at `path` (the current folder for "here", or omitted/'' for
   // "everywhere" - the backend already falls through to the default browse root exactly like list()
   // does for an empty path). Streamed/cancelable the same way bulk() is.
-  search: (path: string, query: string, onMatch: (m: SearchMatch) => void, signal: AbortSignal) =>
+  search: (path: string, query: string, regex: boolean, onMatch: (m: SearchMatch) => void, signal: AbortSignal) =>
     streamNdjson<{ match: SearchMatch }, SearchResult>(
       '/api/browse/search',
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, query }), signal },
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, query, regex }), signal },
       (p) => onMatch(p.match),
     ),
 

@@ -53,6 +53,15 @@
   margin-bottom: var(--space-lg);
 }
 
+.browse-search-bar__regex {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
 .browse-search-bar__status {
   font-size: 12px;
   color: var(--color-text-dim);

@@ -9,6 +9,11 @@ export interface UseBrowseSearch {
   setQuery: (q: string) => void;
   scope: SearchScope;
   setScope: (s: SearchScope) => void;
+  /** Off by default - a plain filename search containing "." or "(" shouldn't silently start
+   *  meaning "any character" or "group start" for anyone who didn't ask for fdfind's own
+   *  (Rust-flavored) regex syntax. */
+  regex: boolean;
+  setRegex: (r: boolean) => void;
   /** True once a search has actually been run - distinct from a non-empty query, since typing
    *  alone shouldn't replace the normal directory listing until Enter/Search is actually pressed
    *  (a recursive search, especially "everywhere", is real work worth an explicit trigger). */
@@ -30,6 +35,7 @@ export interface UseBrowseSearch {
 export function useBrowseSearch(currentPath: string): UseBrowseSearch {
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<SearchScope>('here');
+  const [regex, setRegex] = useState(false);
   const [active, setActive] = useState(false);
   const [results, setResults] = useState<SearchMatch[]>([]);
   const [searching, setSearching] = useState(false);
@@ -52,7 +58,7 @@ export function useBrowseSearch(currentPath: string): UseBrowseSearch {
     setError(null);
 
     browseApi
-      .search(scope === 'here' ? currentPath : '', q, (match) => setResults((prev) => [...prev, match]), controller.signal)
+      .search(scope === 'here' ? currentPath : '', q, regex, (match) => setResults((prev) => [...prev, match]), controller.signal)
       .then((result) => {
         setSearching(false);
         setTruncated(result.truncated);
@@ -62,7 +68,7 @@ export function useBrowseSearch(currentPath: string): UseBrowseSearch {
         setSearching(false);
         setError((err as Error).message);
       });
-  }, [query, scope, currentPath]);
+  }, [query, scope, regex, currentPath]);
 
   const cancel = useCallback(() => {
     controllerRef.current?.abort();
@@ -79,5 +85,5 @@ export function useBrowseSearch(currentPath: string): UseBrowseSearch {
     setError(null);
   }, []);
 
-  return { query, setQuery, scope, setScope, active, results, searching, truncated, error, run, cancel, clear };
+  return { query, setQuery, scope, setScope, regex, setRegex, active, results, searching, truncated, error, run, cancel, clear };
 }

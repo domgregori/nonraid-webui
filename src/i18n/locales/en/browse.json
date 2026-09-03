@@ -49,6 +49,7 @@
     "placeholder": "Search filenames…",
     "scopeHere": "This folder",
     "scopeEverywhere": "Everywhere",
+    "regex": "Regex",
     "search": "Search",
     "cancel": "Cancel",
     "clear": "Clear",
