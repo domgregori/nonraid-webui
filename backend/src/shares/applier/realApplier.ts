@@ -300,6 +300,10 @@ export class RealShareApplier implements ShareApplier {
     return { ok: true, message: `Share "${name}" unmounted` };
   }
 
+  async isShareMounted(name: string): Promise<boolean> {
+    return isMounted(userMountPath(name));
+  }
+
   async getStats(share: Share): Promise<ShareStats> {
     try {
       const { stdout } = await execFileAsync('df', ['-k', '--output=used,size', userMountPath(share.name)]);

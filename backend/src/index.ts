@@ -167,12 +167,13 @@ async function main() {
   // plan) sees it already mounted rather than racing it.
   await cache.remountIfConfigured();
 
-  // Share mounts live in the OS mount table, not shares.json, so they don't
-  // survive a backend restart/reboot on their own - reapply them now so
-  // /mnt/user/<name> reflects real disk data again instead of staying an
-  // empty leftover directory. Best-effort (see ShareService.remountAll):
+  // Share mounts live in the OS mount table, not shares.json, so a real reboot (or a genuine array
+  // stop/start) leaves /mnt/user/<name> an empty leftover directory until this reapplies them.
+  // skipAlreadyMounted leaves an already-mounted share alone rather than tearing it down and
+  // rebuilding it for nothing on a plain webui-only restart, where the mergerfs mount underneath
+  // it never actually went anywhere - see ShareService.remountAll's own doc comment. Best-effort:
   // never block startup on one share's mount failing.
-  await shares.remountAll();
+  await shares.remountAll({ skipAlreadyMounted: true });
 
   // docker.service/lxc.service are ordered (via a systemd drop-in install-webui.sh installs) to
   // start only after nonraid.service - which assembles/mounts the array at boot on its own,

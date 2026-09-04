@@ -13,6 +13,10 @@ export interface ShareApplier {
   /** Create or update the pooled mount for this share (idempotent - remounts if it already exists). */
   mountShare(share: Share, ctx: ApplyContext): Promise<ShareCommandResult>;
   unmountShare(name: string): Promise<ShareCommandResult>;
+  /** Whether this share's mountpoint is currently a live mount (bind or mergerfs) - lets a caller
+   *  decide whether mountShare()'s own unconditional unmount-then-remount is actually needed right
+   *  now, without having to call it and pay that cost just to find out. See ShareService.remountAll(). */
+  isShareMounted(name: string): Promise<boolean>;
   /**
    * Fully regenerates the SMB/NFS managed config from the complete current share list
    * plus each share's access list (keyed by share name), then reloads.
