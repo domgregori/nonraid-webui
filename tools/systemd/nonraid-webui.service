@@ -15,6 +15,21 @@ Environment=FRONTEND_DIST_PATH=/opt/nonraid-webui/frontend-dist
 ExecStart=/usr/bin/node /opt/nonraid-webui/backend/dist/index.js
 Restart=on-failure
 RestartSec=5
+# Default (control-group) sends the stop signal to every process in this unit's cgroup, not just
+# the main one - and every share's mergerfs mount is a long-lived process this backend spawns and
+# leaves running (see shares/applier/realApplier.ts's mountShare()), landing in that same cgroup by
+# plain fork/exec inheritance regardless of mergerfs daemonizing on its own. Confirmed live: that
+# killed every share's mergerfs process on every plain `systemctl restart` (an update, a settings
+# self-restart, Restart=on-failure above after a crash) - not just a real reboot - forcing a full
+# remount that disconnects every client and, for one that keeps a handle open across it (e.g. a
+# remote host's own /etc/fstab CIFS mount), leaves it seeing "Stale file handle" afterward. A
+# share's mount is logically owned by the array, not by this API process - restarting the one
+# shouldn't stop the other. `process` signals only the main PID here; a real host shutdown still
+# unmounts every share cleanly via this app's own shutdown hook (system/shutdownHook.ts) before
+# this process exits, which is what nonraid.service's own ExecStop actually depends on - this
+# setting only stops systemd's cgroup-wide kill from doing it a second time, redundantly, on every
+# plain restart too.
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target
