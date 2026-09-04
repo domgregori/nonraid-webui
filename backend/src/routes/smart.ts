@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { NmdClient } from '../nmd/index.js';
 import type { SmartService } from '../smart/index.js';
-import { getDiskType } from '../system/diskType.js';
+import { getDiskTransport, getDiskType } from '../system/diskType.js';
 import type { SystemStatsService } from '../system/service.js';
 
 export function smartRouter(nmd: NmdClient, smart: SmartService, system: SystemStatsService): Router {
@@ -37,14 +37,27 @@ export function smartRouter(nmd: NmdClient, smart: SmartService, system: SystemS
     }
   });
 
-  // isSSD never changes at runtime for a given device, so this is a plain per-request lsblk call
-  // (fast, no caching needed) rather than SmartService's stale-while-revalidate machinery, which
-  // exists specifically because smartctl reads are slow - lsblk isn't.
+  // isSSD never changes at runtime for a given device - getDiskType() itself caches permanently
+  // per process, so this stays cheap on every call after the first even though it can now shell
+  // out to smartctl (not just lsblk) for a USB-attached disk - see diskType.ts's own doc comment.
   router.get('/smart/disk-types', async (_req, res) => {
     try {
       const status = await nmd.getStatus();
       const devices = status.disks.map((d) => d.device).filter((d) => d && d !== 'none');
       const entries = await Promise.all(devices.map(async (d) => [d, await getDiskType(d)] as const));
+      res.json(Object.fromEntries(entries));
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  // Purely informational (see getDiskTransport()'s own doc comment) - same never-changes-at-
+  // runtime, fetch-once-not-polled shape as disk-types above.
+  router.get('/smart/disk-transports', async (_req, res) => {
+    try {
+      const status = await nmd.getStatus();
+      const devices = status.disks.map((d) => d.device).filter((d) => d && d !== 'none');
+      const entries = await Promise.all(devices.map(async (d) => [d, await getDiskTransport(d)] as const));
       res.json(Object.fromEntries(entries));
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });

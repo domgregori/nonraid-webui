@@ -117,6 +117,7 @@
     "info": "Info",
     "slot": "Slot",
     "device": "Device",
+    "transport": "Connection",
     "size": "Size",
     "used": "Used",
     "usedWithFree": "{{used}} ({{free}} free)",

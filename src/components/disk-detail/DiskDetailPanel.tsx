@@ -30,6 +30,7 @@ export function DiskDetailPanel() {
     temps,
     diskHealths,
     diskTypes,
+    diskTransports,
     spinStates,
     selectedDiskId,
     actionNote,
@@ -42,7 +43,9 @@ export function DiskDetailPanel() {
     restoreDisk,
   } = useArrayStatus();
   const { settings, update: updateSettings } = useSettings();
-  const { all } = status ? deriveDisks(status, temps, diskHealths, diskTypes, spinStates, settings?.diskLabels ?? {}) : { all: [] };
+  const { all } = status
+    ? deriveDisks(status, temps, diskHealths, diskTypes, diskTransports, spinStates, settings?.diskLabels ?? {})
+    : { all: [] };
   const disk = selectedDiskId ? all.find((d) => d.id === selectedDiskId) : undefined;
 
   const smartSlot = disk && disk.device && disk.device !== 'none' ? disk.slot : null;
@@ -223,6 +226,12 @@ export function DiskDetailPanel() {
                 <span className="detail-row__label">{t('DiskDetailPanel.device')}</span>
                 <span className="detail-row__value">{disk.device}</span>
               </div>
+              {disk.transport && (
+                <div className="detail-row">
+                  <span className="detail-row__label">{t('DiskDetailPanel.transport')}</span>
+                  <span className="detail-row__value">{disk.transport.toUpperCase()}</span>
+                </div>
+              )}
               <div className="detail-row">
                 <span className="detail-row__label">{t('DiskDetailPanel.size')}</span>
                 <span className="detail-row__value">{disk.sizeLabel}</span>

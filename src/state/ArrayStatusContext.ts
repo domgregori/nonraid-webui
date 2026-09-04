@@ -29,6 +29,8 @@ export interface ArrayStatusContextValue {
   /** SSD/HDD per array disk device - fetched once (not polled), since a disk's rotational type
    *  never changes at runtime. */
   diskTypes: Record<string, boolean | null>;
+  /** Transport per array disk device (usb/sata/nvme/...) - same fetch-once shape as diskTypes. */
+  diskTransports: Record<string, string | null>;
   selectedDiskId: string | null;
   actionNote: string | null;
   arrayPending: boolean;

@@ -12,11 +12,11 @@ interface ArrayDisksProps {
 
 export function ArrayDisks({ showManageLink }: ArrayDisksProps = {}) {
   const { t } = useTranslation('dashboard');
-  const { status, temps, diskHealths, diskTypes, spinStates, selectDisk, parityPending, parityAction } = useArrayStatus();
+  const { status, temps, diskHealths, diskTypes, diskTransports, spinStates, selectDisk, parityPending, parityAction } = useArrayStatus();
   const { settings } = useSettings();
   if (!status) return null;
 
-  const { parity, data } = deriveDisks(status, temps, diskHealths, diskTypes, spinStates, settings?.diskLabels ?? {});
+  const { parity, data } = deriveDisks(status, temps, diskHealths, diskTypes, diskTransports, spinStates, settings?.diskLabels ?? {});
   // A new-disk clear reuses the same resync status a parity check would - reuse the same view
   // model, just route it to the clearing disk's own card instead of the Parity Check card. Only
   // once the clear is actually running, though (see ParityCheckCard's own comment) - while it's

@@ -19,6 +19,7 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
   const [diskHealths, setDiskHealths] = useState<Record<string, 'passed' | 'failed' | null>>({});
   const [spinStates, setSpinStates] = useState<Record<string, SmartSpinState>>({});
   const [diskTypes, setDiskTypes] = useState<Record<string, boolean | null>>({});
+  const [diskTransports, setDiskTransports] = useState<Record<string, string | null>>({});
   const [selectedDiskId, setSelectedDiskId] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState<string | null>(null);
   const [arrayPending, setArrayPending] = useState(false);
@@ -86,6 +87,11 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
     smartApi
       .getDiskTypes()
       .then((t) => mounted.current && setDiskTypes(t))
+      .catch(() => {});
+    // Transport (usb/sata/nvme/...) never changes at runtime either.
+    smartApi
+      .getDiskTransports()
+      .then((t) => mounted.current && setDiskTransports(t))
       .catch(() => {});
     const statusId = setInterval(refreshStatus, STATUS_POLL_MS);
     const tempId = setInterval(refreshTemps, TEMP_POLL_MS);
@@ -198,6 +204,7 @@ export function ArrayStatusProvider({ children }: { children: ReactNode }) {
         diskHealths,
         spinStates,
         diskTypes,
+        diskTransports,
         selectedDiskId,
         actionNote,
         arrayPending,

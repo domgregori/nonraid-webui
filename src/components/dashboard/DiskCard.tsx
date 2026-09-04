@@ -18,7 +18,8 @@ function SpinIndicator({ disk }: { disk: DiskViewModel }) {
 }
 
 function DeviceLine({ disk }: { disk: DiskViewModel }) {
-  return <div className="disk-card__device">{disk.customLabel ? `${disk.customLabel} · ${disk.device}` : disk.device}</div>;
+  const base = disk.customLabel ? `${disk.customLabel} · ${disk.device}` : disk.device;
+  return <div className="disk-card__device">{disk.isUsb ? `${base} · USB` : base}</div>;
 }
 
 interface DiskCardProps {

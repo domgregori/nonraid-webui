@@ -40,6 +40,9 @@ export interface DiskViewModel extends DiskBase {
   healthLabel: string;
   isSSD: boolean | null;
   typeLabel: string;
+  /** lsblk's TRAN (e.g. "usb", "sata", "nvme") - purely informational. null if unknown. */
+  transport: string | null;
+  isUsb: boolean;
   /** null only before the first /smart/spin-states poll resolves - 'unknown' is a real value from
    *  that endpoint (e.g. smartctl unreachable for this device), distinct from "not fetched yet". */
   spinState: SmartSpinState | null;

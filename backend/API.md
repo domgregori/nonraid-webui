@@ -218,7 +218,8 @@ Operates over the whole `/mnt` tree (not scoped per-share) - paths are absolute 
 |---|---|---|---|
 | GET | `/smart/temperatures` | - | `{ [device]: number \| null }` for every disk currently in the array. |
 | GET | `/smart/health` | - | Pass/fail health status per array disk. |
-| GET | `/smart/disk-types` | - | `{ [device]: 'ssd' \| 'hdd' }` (plain `lsblk`, no caching - unlike temperature/health, this never changes at runtime). |
+| GET | `/smart/disk-types` | - | `{ [device]: boolean \| null }` (`true` = SSD, `false` = HDD, `null` = unknown) - `lsblk`'s ROTA, cross-checked against smartctl's own `rotation_rate` when a USB bridge reports HDD for a drive that's actually an SSD (a real, confirmed quirk - many USB-SATA bridges don't propagate the non-rotational bit). Cached permanently per process - unlike temperature/health, this never changes at runtime. |
+| GET | `/smart/disk-transports` | - | `{ [device]: string \| null }` - `lsblk`'s TRAN (`"sata"`, `"usb"`, `"nvme"`, `"sas"`, ...). Purely informational; same fetch-once, never-changes-at-runtime shape as disk-types. |
 | GET | `/smart/by-device` | `?device=` | Full attributes for a disk with no array slot (an unassigned device, or the boot disk). `device` must be a currently-available device or the detected boot device. |
 
 ## System

@@ -7,6 +7,7 @@ export const smartApi = {
   getHealthStatuses: () => request<Record<string, 'passed' | 'failed' | null>>('/api/smart/health'),
   getSpinStates: () => request<Record<string, SmartSpinState>>('/api/smart/spin-states'),
   getDiskTypes: () => request<Record<string, boolean | null>>('/api/smart/disk-types'),
+  getDiskTransports: () => request<Record<string, string | null>>('/api/smart/disk-transports'),
   getAttributes: (slot: number) => request<SmartAttributes | null>(`/api/disks/${slot}/smart`),
   getAttributesByDevice: (device: string) => request<SmartAttributes | null>(`/api/smart/by-device?device=${encodeURIComponent(device)}`),
   startSelfTest: (slot: number, type: SelfTestType) =>
