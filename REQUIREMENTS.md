@@ -32,10 +32,12 @@ Proxmox VE. Update this list as items change or new items appear.
 - `fd-find` (binary name `fdfind`, not `fd` — a Debian packaging naming conflict with an unrelated
   package) — used by the Browse page's search feature for a fast, parallel recursive filename
   search.
-- `hdparm` — used by the Disks page's spin-down/spin-up actions
-  (`backend/src/system/hdparm.ts`). Not installed by default; without it, the backend's own error
-  is clear rather than a crash, same graceful-failure treatment as `apprise`/`smartmontools`
-  above.
+- `hdparm` — used by the Disks page's manual spin-down/spin-up actions
+  (`backend/src/system/hdparm.ts`).
+- `hd-idle` — used by the *automatic* idle-timeout spin-down (`backend/src/system/hdIdle.ts`),
+  deliberately not hdparm's own ATA standby timer - see that file's own doc comment for why (this
+  app's background SMART polling would otherwise keep resetting a drive's own hardware idle
+  countdown before it ever reached standby). Only ever touches real HDDs, never an SSD.
 - `mergerfs`, version **2.42.0 or newer**. Older versions (such as 2.33.5) accept an invalid
   "High-water" policy setting and crash on the first write. Debian 13's repo package is only
   2.40.2 — install from the upstream GitHub release instead (a `debian-trixie_amd64.deb` asset

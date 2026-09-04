@@ -118,6 +118,11 @@ export const config = {
   // Spin up/down actions (backend/src/system/hdparm.ts) - not bundled with this project, same
   // "clear error if missing" treatment appriseBin/smartctlBin get rather than a hard crash.
   hdparmBin: str('HDPARM_BIN', 'hdparm'),
+  // Automatic idle-timeout spin-down (backend/src/system/hdIdle.ts) - deliberately not hdparm's
+  // own ATA standby timer, see that file's own doc comment for why. Debian's hd-idle package
+  // default paths/unit name - not bundled with this project either.
+  hdIdleConfigPath: str('HD_IDLE_CONFIG_PATH', '/etc/default/hd-idle'),
+  hdIdleServiceName: str('HD_IDLE_SERVICE_NAME', 'hd-idle'),
   sharesConfigPath: str('SHARES_CONFIG_PATH', path.join(process.cwd(), 'data', 'shares.json')),
   shareMountRoot,
   // The file Browse page's own ceiling/starting point - independent of

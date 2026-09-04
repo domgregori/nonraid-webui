@@ -21,7 +21,7 @@ import {
   unmountArrayWithContainerRetry,
   type StoppedContainers,
 } from '../system/arrayLifecycle.js';
-import { applySpinDownTimeout } from '../system/hdparm.js';
+import { applySpinDownTimeout } from '../system/hdIdle.js';
 
 // A superblock is always exactly 4096 bytes (see nmd/superblock.ts); this
 // limit is just generous headroom so a wrong/oversized file gets multer's

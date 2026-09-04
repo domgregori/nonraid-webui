@@ -217,7 +217,7 @@ install_system_packages() {
   # are just skipped.
   apt-get install -y \
     rsync openssl gpg dkms build-essential \
-    smartmontools hdparm \
+    smartmontools hdparm hd-idle \
     xfsprogs btrfs-progs parted acl \
     apprise \
     fd-find \

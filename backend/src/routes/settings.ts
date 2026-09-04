@@ -8,7 +8,7 @@ import { redactEncryption, resolveEncryptionPatch } from '../settings/backupEncr
 import { validateCronExpression } from '../settings/cronMatch.js';
 import { NOTIFICATION_EVENTS, sendAppriseNotification, type AppSettings, type SettingsStore } from '../settings/index.js';
 import type { ShareService } from '../shares/index.js';
-import { applySpinDownTimeout } from '../system/hdparm.js';
+import { applySpinDownTimeout } from '../system/hdIdle.js';
 
 const KNOWN_EVENT_TYPES = new Set<string>(NOTIFICATION_EVENTS.map((e) => e.id));
 

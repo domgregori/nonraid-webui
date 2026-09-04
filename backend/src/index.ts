@@ -61,7 +61,7 @@ import { createShareApplier, ShareAccessStore, ShareService, ShareStore } from '
 import { createSmartClient, SmartService } from './smart/index.js';
 import { BackupScheduler } from './system/backupScheduler.js';
 import { restoreDockerAndAutostartLxc } from './system/arrayLifecycle.js';
-import { applySpinDownTimeout } from './system/hdparm.js';
+import { applySpinDownTimeout } from './system/hdIdle.js';
 import { SystemStatsService } from './system/service.js';
 import { installShutdownHook } from './system/shutdownHook.js';
 import { createTailscaleClient } from './tailscale/index.js';
