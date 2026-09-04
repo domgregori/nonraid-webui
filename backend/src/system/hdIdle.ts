@@ -79,14 +79,23 @@ export async function applySpinDownTimeout(nmd: NmdClient, minutes: number): Pro
     return;
   }
 
+  // START_HD_IDLE=true is required here, confirmed live - despite the package's own default file
+  // implying it's only consulted by the legacy /etc/init.d/hd-idle script, the hd-idle *binary
+  // itself* reads it too (systemd's EnvironmentFile= exports every variable in this file into its
+  // environment either way) and exits immediately when it's false, which under this unit's
+  // Restart=always just burns through systemd's start-limit-burst and lands on 'start-limit-hit'.
   const contents =
     `# Managed by nonraid-webui - regenerated on every settings save, array start, and backend\n` +
     `# boot (see backend/src/system/hdIdle.ts). Don't edit by hand, it won't survive the next one.\n` +
-    `START_HD_IDLE=false\n` +
+    `START_HD_IDLE=true\n` +
     `HD_IDLE_OPTS="-i 0 ${entries.join(' ')}"\n`;
   await writeFile(config.hdIdleConfigPath, contents, 'utf8');
 
   await runSudoMaybe('systemctl', ['enable', config.hdIdleServiceName]).catch(() => {});
+  // Best-effort: clears a stale 'start-limit-hit' from an earlier bad config (e.g. the
+  // START_HD_IDLE=false bug this file used to have) so the restart below isn't blocked by
+  // systemd's own restart-rate limiter over something already fixed.
+  await runSudoMaybe('systemctl', ['reset-failed', config.hdIdleServiceName]).catch(() => {});
   // restart (not just enable --now) so an already-running instance actually picks up the new
   // config - systemd doesn't re-read an EnvironmentFile for a unit that's already up.
   await runSudoMaybe('systemctl', ['restart', config.hdIdleServiceName]);
