@@ -23,9 +23,10 @@ export interface UnlockAllResult {
  * mismatch.
  *
  * `unlockAll` takes the secret as a call argument rather than owning its own passphrase/keyfile
- * input state, so every caller (the dashboard's LuksLockedCard, the Disks page's UnlockAllDialog)
- * owns whatever input UI it needs on top of this one shared loop-and-track mechanism, instead of
- * each reimplementing it.
+ * input state, so the caller (the Disks page's UnlockAllDialog - the dashboard's own former
+ * passphrase-only shortcut, LuksLockedCard, was removed once this became the primary entry point)
+ * owns whatever input UI it needs on top of this one shared loop-and-track mechanism, rather than
+ * this hook dictating it.
  */
 export function useUnlockAllDisks(onAnyUnlocked: () => void) {
   const [pending, setPending] = useState(false);

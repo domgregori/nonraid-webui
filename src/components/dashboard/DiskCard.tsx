@@ -23,8 +23,8 @@ function SpinIndicator({ disk }: { disk: DiskViewModel }) {
  *  NotificationBell's bell icon already uses elsewhere in this app. Used as a flat "this disk is
  *  LUKS-encrypted" badge rather than a live lock/unlock indicator - one glyph, present or absent,
  *  not two different icons for the locked vs. open states (the live locked/unlocked state is
- *  already surfaced elsewhere: LuksLockedCard on the dashboard, and LuksSection in the disk detail
- *  panel). */
+ *  already surfaced elsewhere: the header's DEGRADED pill/dialog, the Disks page's own Unlock All,
+ *  and LuksSection in the disk detail panel). */
 function LockClosedIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -21,8 +21,8 @@ export function DisksPage() {
   const [showBootDisk, setShowBootDisk] = useState(false);
   const [showUnlockAll, setShowUnlockAll] = useState(false);
 
-  // Same diskLabels thread ArrayDisks/LuksLockedCard already pass through - see their own
-  // comments on why a locked disk's custom nickname matters here more than most places.
+  // Same diskLabels thread ArrayDisks already passes through - see its own comment on why a
+  // locked disk's custom nickname matters here more than most places.
   const locked = status ? deriveDisks(status, temps, {}, {}, {}, {}, settings?.diskLabels ?? {}).data.filter((d) => d.encryption === 'luks-locked') : [];
 
   return (

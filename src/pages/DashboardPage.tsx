@@ -5,7 +5,6 @@ import { CacheCard } from '../components/dashboard/CacheCard';
 import { CacheMoverProgressCard } from '../components/dashboard/CacheMoverProgressCard';
 import { DiskQueueCard } from '../components/dashboard/DiskQueueCard';
 import { DockerWidgetCard } from '../components/dashboard/DockerWidgetCard';
-import { LuksLockedCard } from '../components/dashboard/LuksLockedCard';
 import { LxcWidgetCard } from '../components/dashboard/LxcWidgetCard';
 import { ParityCheckCard } from '../components/dashboard/ParityCheckCard';
 import { SharesCard } from '../components/dashboard/SharesCard';
@@ -29,7 +28,6 @@ export function DashboardPage() {
         {status && (
           <>
             <StatCards />
-            <LuksLockedCard />
             <ArrayErrorCard />
             <ParityCheckCard />
             <DiskQueueCard />

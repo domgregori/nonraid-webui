@@ -29,6 +29,16 @@ const DISK_ISSUE_DETAIL: Partial<Record<string, { title: string; detail: string 
   DISK_DSBL_NEW: { title: 'New, disabled', detail: "Added but currently disabled. It needs to clear before it's fully in." },
 };
 
+// A locked LUKS data disk is fully present and DISK_OK from the array driver's own point of view
+// (LUKS lock state lives entirely at the OS/filesystem layer, which the kernel array driver has no
+// concept of) - `filesystem.type === 'luks'` is the only signal that data on it is actually
+// unreachable right now, mirroring selectors/disks.ts's own deriveEncryption() ("luks" = locked,
+// "luks+..." = open) so this file and that one never disagree about what the field means. Parity
+// never carries a filesystem at all, so it can never be "locked" in this sense.
+function isLockedDataDisk(disk: NmdDisk): boolean {
+  return disk.type !== 'P' && disk.type !== 'Q' && disk.filesystem?.type === 'luks';
+}
+
 export interface DegradedReason {
   key: string;
   title: string;
@@ -75,6 +85,18 @@ export function deriveDegradedReasons(status: NmdStatusResponse): DegradedReason
         key: `disk-${disk.slot}`,
         title: `${label}: ${known?.title ?? disk.status}`,
         detail: known?.detail ?? 'This disk is in an abnormal state.',
+        diskId: String(disk.slot),
+      });
+    } else if (isLockedDataDisk(disk)) {
+      // Same conceptual bucket as a missing/disabled disk - the physical disk is fine, but its
+      // data isn't actually reachable right now. See docs/luks-support-scope.md for the feature
+      // this reason surfaces; "View Disk" (diskId below) lands on that disk's own detail panel,
+      // which already has an unlock control (LuksSection) - the Disks page's own "Unlock All" is
+      // the other route to the same fix.
+      reasons.push({
+        key: `disk-locked-${disk.slot}`,
+        title: `${label}: Locked, needs unlocking`,
+        detail: "This disk's encryption is locked, so its data isn't accessible right now. Unlock it from this disk's own page, or use Unlock All on the Disks page.",
         diskId: String(disk.slot),
       });
     } else if (disk.errors > 0) {
@@ -140,6 +162,11 @@ function isPhantomDegradedGlitch(status: NmdStatusResponse): boolean {
 }
 
 export function isDegraded(status: NmdStatusResponse): boolean {
+  // Checked before (independent of) the driver's own health.status: a locked disk is a real
+  // problem this app itself created (LUKS is entirely software-layer, the driver has no concept
+  // of it - see isLockedDataDisk's own comment), so it can never be masked by the driver's own
+  // health field the way stale/phantom counter noise is below - it always wins.
+  if (status.disks.some(isLockedDataDisk)) return true;
   if (status.array.health.status !== 'DEGRADED') return false;
   return !isPhantomDegradedGlitch(status);
 }
@@ -205,13 +232,19 @@ export function deriveProtection(status: NmdStatusResponse | null) {
 
   if (isDegraded(status)) {
     const missing = status.array.counters.missing;
-    return {
-      short: 'Degraded',
-      color: COLORS.red,
-      text:
-        status.array.health.details ||
-        `${missing} disk${missing === 1 ? '' : 's'} missing. Data is emulated from parity - replace the disk to restore full protection.`,
-    };
+    const lockedCount = status.disks.filter(isLockedDataDisk).length;
+    // `health.details` is the driver's own message, which only ever means something for a real
+    // missing/invalid/disabled disk (`missing > 0`) - the driver has no concept of a LUKS lock at
+    // all (see isLockedDataDisk's own comment), so falling back to it for a locked-only cause
+    // would show stale/unrelated driver noise instead of the actual reason. Prefer a locked-aware
+    // message over the driver's own text whenever locking is what's actually degrading things.
+    let text: string;
+    if (missing === 0 && lockedCount > 0) {
+      text = `${lockedCount} disk${lockedCount === 1 ? '' : 's'} locked. Data isn't accessible until unlocked - see the Disks page.`;
+    } else {
+      text = status.array.health.details || `${missing} disk${missing === 1 ? '' : 's'} missing. Data is emulated from parity - replace the disk to restore full protection.`;
+    }
+    return { short: 'Degraded', color: COLORS.red, text };
   }
 
   const { has_parity, has_second_parity } = status.array.size;

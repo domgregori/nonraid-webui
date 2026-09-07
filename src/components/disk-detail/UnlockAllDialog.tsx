@@ -19,10 +19,11 @@ interface UnlockAllDialogProps {
  * mechanism a typed passphrase already uses (see backend/src/luks/cryptsetup.ts's luksOpen()) -
  * never a temp path.
  *
- * Shares useUnlockAllDisks with the dashboard's own LuksLockedCard "Unlock All" shortcut - this
- * dialog is the fuller, primary version (passphrase or keyfile); LuksLockedCard stays a
- * passphrase-only convenience for "I'm already looking at the dashboard, don't make me navigate."
- * Both drive the exact same per-disk loop underneath, not two diverging implementations.
+ * This is the one and only "Unlock All" implementation - a dashboard-level passphrase-only
+ * shortcut (LuksLockedCard) existed briefly during development but was removed once this became
+ * the primary entry point, rather than leaving two diverging code paths around. Every locked-disk
+ * indicator elsewhere (the header's DEGRADED pill/dialog, DiskCard's own lock icon) points here or
+ * at this same disk's own detail page, not at a second "Unlock All" surface.
  */
 export function UnlockAllDialog({ disks, onClose, onDone }: UnlockAllDialogProps) {
   const { t } = useTranslation('diskDetail');

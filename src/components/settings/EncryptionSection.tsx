@@ -38,7 +38,7 @@ export function EncryptionSection() {
   if (loadError) return <div className="status-note status-note--error">{loadError}</div>;
   if (!luksStatus) return <div className="status-note">{t('EncryptionSection.loading')}</div>;
 
-  // Same abbreviated deriveDisks() call StatCards/LuksLockedCard already use when only per-disk
+  // Same abbreviated deriveDisks() call StatCards/DisksPage already use when only per-disk
   // slot/label/encryption is needed, not the full health/SMART join DiskDetailPanel needs.
   const disks = arrayStatus ? deriveDisks(arrayStatus, temps, {}, {}, {}, {}, settings?.diskLabels ?? {}).data.filter((d) => d.encryption !== 'none') : [];
   const lockedCount = disks.filter((d) => d.encryption === 'luks-locked').length;
