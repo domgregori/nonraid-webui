@@ -47,6 +47,10 @@ export interface DegradedReason {
   diskId?: string;
   /** Set when the fix is a correcting parity check - the dialog offers a "Start" button for it. */
   startParityCheck?: boolean;
+  /** Set on the single consolidated locked-disks reason (see deriveDegradedReasons below) - the
+   *  dialog offers an "Unlock All" button that opens the same UnlockAllDialog the Disks page uses,
+   *  instead of the usual "View Disk" button. */
+  unlockAll?: boolean;
 }
 
 // resync.action is a raw driver token like "recon D1" (rebuilding data slot 1), "recon P"/"recon Q"
@@ -72,6 +76,7 @@ function isResyncTarget(status: NmdStatusResponse, disk: NmdDisk): boolean {
 export function deriveDegradedReasons(status: NmdStatusResponse): DegradedReason[] {
   const reasons: DegradedReason[] = [];
   let rebuildingLabel: string | null = null;
+  let lockedCount = 0;
 
   for (const disk of status.disks) {
     const label = disk.type === 'P' ? 'Parity 1' : disk.type === 'Q' ? 'Parity 2' : `Disk ${disk.slot}`;
@@ -90,15 +95,12 @@ export function deriveDegradedReasons(status: NmdStatusResponse): DegradedReason
     } else if (isLockedDataDisk(disk)) {
       // Same conceptual bucket as a missing/disabled disk - the physical disk is fine, but its
       // data isn't actually reachable right now. See docs/luks-support-scope.md for the feature
-      // this reason surfaces; "View Disk" (diskId below) lands on that disk's own detail panel,
-      // which already has an unlock control (LuksSection) - the Disks page's own "Unlock All" is
-      // the other route to the same fix.
-      reasons.push({
-        key: `disk-locked-${disk.slot}`,
-        title: `${label}: Locked, needs unlocking`,
-        detail: "This disk's encryption is locked, so its data isn't accessible right now. Unlock it from this disk's own page, or use Unlock All on the Disks page.",
-        diskId: String(disk.slot),
-      });
+      // this reason surfaces. Unlike every other per-disk reason above, locked disks are rolled
+      // into a single consolidated reason below (with an inline "Unlock All" button) rather than
+      // one card per disk - there's one shared secret for every locked disk (see
+      // docs/luks-support-scope.md's "one shared keyfile/passphrase" note), so a card per disk
+      // would just mean clicking the same fix N times.
+      lockedCount++;
     } else if (disk.errors > 0) {
       reasons.push({
         key: `disk-errors-${disk.slot}`,
@@ -107,6 +109,15 @@ export function deriveDegradedReasons(status: NmdStatusResponse): DegradedReason
         diskId: String(disk.slot),
       });
     }
+  }
+
+  if (lockedCount > 0) {
+    reasons.push({
+      key: 'disks-locked',
+      title: `${lockedCount} disk${lockedCount === 1 ? '' : 's'} need${lockedCount === 1 ? 's' : ''} to be unlocked`,
+      detail: "Locked disks can't serve data until unlocked. Unlock below with the shared passphrase or keyfile, or from the Disks page.",
+      unlockAll: true,
+    });
   }
 
   const { sync_errors } = status.array.counters;

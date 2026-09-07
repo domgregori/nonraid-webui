@@ -4,6 +4,7 @@
     "close": "Close",
     "noLongerDegraded": "The array is no longer degraded.",
     "viewDisk": "View Disk",
+    "unlockAll": "Unlock All",
     "parityCheckRunning": "A parity check is already running.",
     "starting": "Starting…",
     "startCorrectingParityCheck": "Start Correcting Parity Check"
