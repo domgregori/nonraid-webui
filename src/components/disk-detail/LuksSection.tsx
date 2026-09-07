@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { luksApi } from '../../api/luksApi';
 import { useSettings } from '../../hooks/useSettings';
+import { useUnlockDisk } from '../../hooks/useUnlockDisk';
 import { COLORS } from '../../styles/colors';
 import { LuksUnlockModeDialog } from './LuksUnlockModeDialog';
 import type { DiskViewModel } from '../../types';
@@ -34,38 +35,26 @@ export function LuksSection({ disk, onChanged }: LuksSectionProps) {
     if (settings?.luks) setUnlockMode(settings.luks.unlockMode);
   }, [settings]);
 
-  const [passphrase, setPassphrase] = useState('');
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showModeDialog, setShowModeDialog] = useState(false);
+
+  const [lockPending, setLockPending] = useState(false);
+  const [lockError, setLockError] = useState<string | null>(null);
+  // Shared with the dashboard's own per-disk unlock modal (DiskCard's lock icon) - see
+  // hooks/useUnlockDisk.ts's own doc comment for why this isn't duplicated inline here anymore.
+  const { passphrase, setPassphrase, pending: unlockPending, error: unlockError, unlock: handleUnlock } = useUnlockDisk(disk.slot, onChanged);
 
   if (disk.encryption === 'none') return null;
 
   const handleLock = async () => {
-    setPending(true);
-    setError(null);
+    setLockPending(true);
+    setLockError(null);
     try {
       await luksApi.lock(disk.slot);
       onChanged();
     } catch (err) {
-      setError((err as Error).message);
+      setLockError((err as Error).message);
     } finally {
-      setPending(false);
-    }
-  };
-
-  const handleUnlock = async () => {
-    if (!passphrase) return;
-    setPending(true);
-    setError(null);
-    try {
-      await luksApi.unlock(disk.slot, passphrase);
-      setPassphrase('');
-      onChanged();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setPending(false);
+      setLockPending(false);
     }
   };
 
@@ -88,18 +77,18 @@ export function LuksSection({ disk, onChanged }: LuksSectionProps) {
             value={passphrase}
             onChange={(e) => setPassphrase(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
-            disabled={pending}
+            disabled={unlockPending}
           />
-          <button type="button" className="btn" disabled={pending || !passphrase} onClick={handleUnlock}>
-            {pending ? t('LuksSection.unlocking') : t('LuksSection.unlock')}
+          <button type="button" className="btn" disabled={unlockPending || !passphrase} onClick={handleUnlock}>
+            {unlockPending ? t('LuksSection.unlocking') : t('LuksSection.unlock')}
           </button>
         </div>
       )}
 
       {disk.encryption === 'luks-open' && (
         <div className="detail-actions" style={{ marginTop: 8 }}>
-          <button type="button" className="btn btn--block" disabled={pending} onClick={handleLock}>
-            {pending ? t('LuksSection.locking') : t('LuksSection.lock')}
+          <button type="button" className="btn btn--block" disabled={lockPending} onClick={handleLock}>
+            {lockPending ? t('LuksSection.locking') : t('LuksSection.lock')}
           </button>
           {unlockMode && (
             <button type="button" className="btn btn--block" onClick={() => setShowModeDialog(true)}>
@@ -109,7 +98,7 @@ export function LuksSection({ disk, onChanged }: LuksSectionProps) {
         </div>
       )}
 
-      {error && <div className="status-note status-note--error">{error}</div>}
+      {(unlockError || lockError) && <div className="status-note status-note--error">{unlockError || lockError}</div>}
 
       {showModeDialog && unlockMode && (
         <LuksUnlockModeDialog

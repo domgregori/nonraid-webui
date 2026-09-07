@@ -1,6 +1,8 @@
-import type { MouseEvent } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useArrayStatus } from '../../state/useArrayStatus';
 import { COLORS } from '../../styles/colors';
+import { UnlockDiskModal } from './UnlockDiskModal';
 import type { ParityViewModel } from '../../types/parity';
 import type { DiskViewModel } from '../../types';
 
@@ -38,29 +40,39 @@ function LockClosedIcon() {
  *  or unlocked (see LockClosedIcon's own comment on why) - just red while actually locked, since
  *  that's the state where the disk can't serve data at all, matching the same "must reflect real
  *  state, not overstate what it protects against" care the rest of this feature's UI copy takes
- *  (see docs/luks-support-scope.md's "Stored" section). */
-function EncryptionIcon({ disk }: { disk: DiskViewModel }) {
+ *  (see docs/luks-support-scope.md's "Stored" section).
+ *
+ *  Clickable only while actually locked (`onUnlockClick` given) - opens the unlock modal right
+ *  from the dashboard. An already-unlocked disk has nothing for a click to do (it's either
+ *  auto-unlocked via the shared keyfile, or was already unlocked manually), so it stays a plain,
+ *  non-interactive status glyph rather than a button that would do nothing when pressed. */
+function EncryptionIcon({ disk, onUnlockClick }: { disk: DiskViewModel; onUnlockClick?: (e: MouseEvent) => void }) {
   const { t } = useTranslation('dashboard');
   if (disk.encryption === 'none') return null;
   const locked = disk.encryption === 'luks-locked';
+  const label = locked ? t('DiskCard.locked') : t('DiskCard.encrypted');
+  const style = { color: locked ? COLORS.red : COLORS.textDim };
+
+  if (locked && onUnlockClick) {
+    return (
+      <button type="button" className="disk-card__encryption disk-card__encryption--clickable" style={style} title={t('DiskCard.clickToUnlock')} aria-label={t('DiskCard.clickToUnlock')} onClick={onUnlockClick}>
+        <LockClosedIcon />
+      </button>
+    );
+  }
   return (
-    <span
-      className="disk-card__encryption"
-      style={{ color: locked ? COLORS.red : COLORS.textDim }}
-      title={locked ? t('DiskCard.locked') : t('DiskCard.encrypted')}
-      aria-label={locked ? t('DiskCard.locked') : t('DiskCard.encrypted')}
-    >
+    <span className="disk-card__encryption" style={style} title={label} aria-label={label}>
       <LockClosedIcon />
     </span>
   );
 }
 
-function DeviceLine({ disk }: { disk: DiskViewModel }) {
+function DeviceLine({ disk, onUnlockClick }: { disk: DiskViewModel; onUnlockClick?: (e: MouseEvent) => void }) {
   const base = disk.customLabel ? `${disk.customLabel} · ${disk.device}` : disk.device;
   return (
     <div className="disk-card__device">
       {disk.isUsb ? `${base} · USB` : base}
-      <EncryptionIcon disk={disk} />
+      <EncryptionIcon disk={disk} onUnlockClick={onUnlockClick} />
     </div>
   );
 }
@@ -111,6 +123,9 @@ export function ParityDiskCard({ disk, onClick }: DiskCardProps) {
 
 export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
   const { t } = useTranslation('dashboard');
+  const { refresh } = useArrayStatus();
+  const [showUnlock, setShowUnlock] = useState(false);
+
   if (clearing) {
     return (
       <div className="disk-card disk-card--data" style={{ borderColor: disk.borderColor }} onClick={onClick}>
@@ -141,41 +156,44 @@ export function DataDiskCard({ disk, onClick, clearing }: DataDiskCardProps) {
   }
 
   return (
-    <div className="disk-card disk-card--data" style={{ borderColor: disk.borderColor }} onClick={onClick}>
-      <div className="disk-card__head">
-        <span className="disk-card__label">{disk.label}</span>
-        <span className="disk-card__status" style={{ color: disk.statusColor }}>
-          <span className="disk-card__status-dot" style={{ background: disk.statusColor }} />
-          {disk.statusLabel}
-        </span>
-      </div>
-      <DeviceLine disk={disk} />
-      {disk.needsFormat && (
-        <div className="disk-card__row--sub" style={{ color: COLORS.amber }}>
-          {t('DiskCard.needsFormatting')}
+    <>
+      <div className="disk-card disk-card--data" style={{ borderColor: disk.borderColor }} onClick={onClick}>
+        <div className="disk-card__head">
+          <span className="disk-card__label">{disk.label}</span>
+          <span className="disk-card__status" style={{ color: disk.statusColor }}>
+            <span className="disk-card__status-dot" style={{ background: disk.statusColor }} />
+            {disk.statusLabel}
+          </span>
         </div>
-      )}
-      <div className="progress-track">
-        <div className="progress-track__fill" style={{ width: disk.barWidth, background: disk.barColor }} />
+        <DeviceLine disk={disk} onUnlockClick={disk.encryption === 'luks-locked' ? stopPropagation(() => setShowUnlock(true)) : undefined} />
+        {disk.needsFormat && (
+          <div className="disk-card__row--sub" style={{ color: COLORS.amber }}>
+            {t('DiskCard.needsFormatting')}
+          </div>
+        )}
+        <div className="progress-track">
+          <div className="progress-track__fill" style={{ width: disk.barWidth, background: disk.barColor }} />
+        </div>
+        <div className="disk-card__row">
+          <span>{disk.sizeLabel}</span>
+          <span>{disk.usedLabel}</span>
+        </div>
+        <div className="disk-card__row--sub">
+          <span>{t('DiskCard.free', { free: disk.freeLabel })}</span>
+          <span style={{ color: disk.tempColor }}>{disk.tempLabel}</span>
+        </div>
+        <div className="disk-card__row--sub">
+          <span>{disk.typeLabel}</span>
+          <SpinIndicator disk={disk} />
+        </div>
+        <div className="disk-card__row--sub">
+          <span className="disk-card__health" style={{ color: disk.healthColor }}>
+            <span className="disk-card__health-dot" style={{ background: disk.healthColor }} />
+            {disk.healthLabel}
+          </span>
+        </div>
       </div>
-      <div className="disk-card__row">
-        <span>{disk.sizeLabel}</span>
-        <span>{disk.usedLabel}</span>
-      </div>
-      <div className="disk-card__row--sub">
-        <span>{t('DiskCard.free', { free: disk.freeLabel })}</span>
-        <span style={{ color: disk.tempColor }}>{disk.tempLabel}</span>
-      </div>
-      <div className="disk-card__row--sub">
-        <span>{disk.typeLabel}</span>
-        <SpinIndicator disk={disk} />
-      </div>
-      <div className="disk-card__row--sub">
-        <span className="disk-card__health" style={{ color: disk.healthColor }}>
-          <span className="disk-card__health-dot" style={{ background: disk.healthColor }} />
-          {disk.healthLabel}
-        </span>
-      </div>
-    </div>
+      {showUnlock && <UnlockDiskModal slot={disk.slot} label={disk.label} onClose={() => setShowUnlock(false)} onUnlocked={refresh} />}
+    </>
   );
 }

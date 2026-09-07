@@ -48,7 +48,16 @@
     "spinActive": "Spinning",
     "spinStandby": "Standby",
     "locked": "Locked",
-    "encrypted": "Encrypted"
+    "encrypted": "Encrypted",
+    "clickToUnlock": "Locked - click to unlock"
+  },
+  "UnlockDiskModal": {
+    "title": "Unlock {{label}}",
+    "close": "Close",
+    "passphrasePlaceholder": "Passphrase",
+    "cancel": "Cancel",
+    "unlock": "Unlock",
+    "unlocking": "Unlocking…"
   },
   "LuksLockedCard": {
     "title": "{{count}} encrypted disk locked",

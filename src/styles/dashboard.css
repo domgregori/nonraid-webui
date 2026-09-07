@@ -290,6 +290,24 @@
   vertical-align: middle;
 }
 
+/* A locked disk's icon is a real <button> (opens UnlockDiskModal) rather than the plain <span>
+   every other encryption state uses - reset the default button chrome so it still reads as the
+   same inline glyph, then add just enough hover/focus feedback to signal it's clickable. */
+.disk-card__encryption--clickable {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.disk-card__encryption--clickable:hover,
+.disk-card__encryption--clickable:focus-visible {
+  opacity: 0.75;
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
+}
+
 .luks-locked-list {
   margin-top: var(--space-md);
   display: flex;
