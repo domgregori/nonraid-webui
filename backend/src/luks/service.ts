@@ -82,6 +82,33 @@ export class LuksService {
     return config.luksKeyfilePath;
   }
 
+  /**
+   * Runs nmdctl's own mount pass, then confirms `slot` specifically ended up mounted - never
+   * trusts mountDisks()'s own exit code for that. Confirmed live against the project's own test
+   * rig: nmdctl's unattended `mount` exits non-zero whenever it can't mount *every* currently-
+   * openable disk in one sweep, not just the one this call actually cares about - unlocking one
+   * disk while a *different* disk was still LUKS-locked made a plain `await this.nmd.mountDisks()`
+   * reject here, dumping the whole mount pass's stdout as its error message, even though the disk
+   * this call unlocked mounted successfully. The same class of "nmdctl's own exit code isn't
+   * authoritative" gap nmd/realClient.ts's runStatusJson() already documents and works around for
+   * `status -o json`'s exit code - mountDisks() just didn't have an equivalent yet. This matters a
+   * lot more once several disks can be unlocked back-to-back in one admin action (see
+   * useUnlockAllDisks.ts on the frontend) - every unlock but the last in a batch would otherwise
+   * see exactly this false failure, since every other disk in the batch is still locked at that
+   * point. A genuine failure to mount *this* slot specifically still surfaces as a clear, specific
+   * error rather than being silently swallowed - matching the pre-existing "Disk N still not
+   * mounted after mounting disks - try Mount Disk from the Disks page" activity-log warning this
+   * app already had for the equivalent gap elsewhere.
+   */
+  private async mountAndVerifySlot(slot: number): Promise<void> {
+    await this.nmd.mountDisks().catch(() => {});
+    const status = await this.nmd.getStatus();
+    const disk = status.disks.find((d) => d.slot === slot);
+    if (!disk || encryptionStateFor(disk) !== 'luks-open') {
+      throw new HttpError(502, `Slot ${slot} was unlocked but didn't mount - try Mount Disk from the Disks page.`);
+    }
+  }
+
   /** Best-effort, additive-only remount after a lock/unlock/format touches exactly one disk -
    *  deliberately `skipAlreadyMounted: true` (the same gentler mode plain backend startup uses),
    *  not the plain remountAll() every array-wide lifecycle event (start/stop/reload) calls. A
@@ -201,7 +228,7 @@ export class LuksService {
     // succeeded, until this was fixed to leave the mapping open. Leaving it open means nmdctl sees
     // an already-open "luks+xfs" filesystem and just mounts it directly, the same as any other
     // already-open LUKS disk it encounters.
-    await this.nmd.mountDisks();
+    await this.mountAndVerifySlot(slot);
     await this.remountGently();
     this.activity.log(`Disk ${slot} formatted as an encrypted (LUKS) XFS volume`, 'blue').catch(() => {});
 
@@ -294,7 +321,7 @@ export class LuksService {
       throw new HttpError(400, `Could not unlock slot ${slot}: ${(err as Error).message}`);
     }
 
-    await this.nmd.mountDisks();
+    await this.mountAndVerifySlot(slot);
     await this.remountGently();
     this.activity.log(`Disk ${slot} unlocked`, 'blue').catch(() => {});
   }
