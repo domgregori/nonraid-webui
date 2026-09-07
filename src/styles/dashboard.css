@@ -327,11 +327,6 @@
   min-width: 90px;
 }
 
-.luks-locked-row .history-input {
-  flex: 1;
-  min-width: 160px;
-}
-
 .luks-locked-row .status-note {
   flex-basis: 100%;
 }

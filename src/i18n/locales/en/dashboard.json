@@ -63,10 +63,11 @@
     "title": "{{count}} encrypted disk locked",
     "title_other": "{{count}} encrypted disks locked",
     "description": "This disk is present and healthy, but it can't serve any share until it's unlocked.",
-    "description_other": "These disks are present and healthy, but they can't serve any share until unlocked.",
+    "description_other": "These disks are present and healthy, but they can't serve any share until unlocked. They normally share one passphrase, so Unlock All below covers all of them at once.",
     "passphrasePlaceholder": "Passphrase",
-    "unlock": "Unlock",
-    "unlocking": "Unlocking..."
+    "unlockAll": "Unlock All",
+    "unlocking": "Unlocking…",
+    "someFailed": "{{count}} disk(s) didn't unlock with that passphrase - see above."
   },
   "DiskQueueCard": {
     "addParityDisk": "Add parity disk",
