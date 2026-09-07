@@ -140,6 +140,19 @@ export interface RemoteBackupSettings {
   enabled: boolean;
 }
 
+// Array-wide LUKS unlock preference - see backend/src/luks/. Deliberately minimal, same shape as
+// CacheSettings/TailscaleSettings above: whether a given disk is actually encrypted, and which key
+// slots it carries, are live properties of that disk's own LUKS header (read via cryptsetup, or via
+// nmdctl's own filesystem.type - see selectors/disks.ts's DiskViewModel.encryption), never
+// duplicated here. This only holds the one thing neither of those can tell you before any disk is
+// even locked: which mode day-to-day unlock is *supposed* to use going forward. Defaults to
+// 'manual' (no keyfile ever written) rather than 'stored' - the safer of the two to fall back to if
+// this file is ever missing/reset, matching this app's general "don't silently create key material
+// nobody asked for" posture.
+export interface LuksSettings {
+  unlockMode: 'stored' | 'manual';
+}
+
 // Tracks whether the first-run setup wizard (src/components/onboarding) has been dismissed or
 // completed - a single flag rather than a per-step record, since resume position is always
 // derived live from the array's actual state (see OnboardingWizard's deriveStartStep()), not
@@ -213,6 +226,7 @@ export interface AppSettings {
   tailscale: TailscaleSettings;
   remoteBackup: RemoteBackupSettings;
   onboarding: OnboardingSettings;
+  luks: LuksSettings;
 }
 
 export type AppSettingsUpdate = Partial<{
@@ -239,4 +253,12 @@ export type AppSettingsUpdate = Partial<{
   tailscale: Partial<TailscaleSettings>;
   remoteBackup: Partial<RemoteBackupSettings>;
   onboarding: Partial<OnboardingSettings>;
+  // Deliberately NOT settable via the generic PUT /settings route (see routes/settings.ts, which
+  // strips this key from any client-supplied patch before calling update()) - unlike every other
+  // field here, this one makes a real claim about security state (whether the shared keyfile is
+  // actually a valid key slot on every encrypted disk), not just a preference toggle, so only
+  // backend/src/luks/service.ts writes it, and only after actually performing the corresponding
+  // luksAddKeyfile/luksRemoveKey calls. Present in this type only so that internal call can use the
+  // same settingsStore.update() every other feature does, rather than a bespoke write path.
+  luks: Partial<LuksSettings>;
 }>;

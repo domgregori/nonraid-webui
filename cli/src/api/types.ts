@@ -67,6 +67,30 @@ export interface LxcContainerSummary {
   ips: string[];
 }
 
+// -- LUKS disk encryption - see backend/src/luks/types.ts --
+
+export type DiskEncryptionState = 'none' | 'luks-locked' | 'luks-open';
+export type LuksUnlockMode = 'stored' | 'manual';
+
+export interface LuksDiskStatus {
+  slot: number;
+  encryption: DiskEncryptionState;
+  device: string;
+  mapName: string;
+}
+
+export interface LuksStatusResponse {
+  unlockMode: LuksUnlockMode;
+  keyfileExists: boolean;
+  disks: LuksDiskStatus[];
+}
+
+export interface FormatAsLuksResult {
+  slot: number;
+  message: string;
+  recoveryPassphrase: string;
+}
+
 // -- Shares (Pools) - see backend/src/shares/types.ts --
 
 export type AllocationMethod = 'most-free' | 'fill-up' | 'high-water' | 'single-disk' | 'cache-only';

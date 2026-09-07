@@ -43,6 +43,48 @@ export function stoppedContainersFromError(err: unknown, fallback: StoppedContai
 }
 
 /**
+ * Shared retry core behind unmountArrayWithContainerRetry() and
+ * unmountMountpointWithContainerRetry() below: tries `attempt` once as-is; if it throws and
+ * `stopContainers` is true, stops Docker + every running LXC container and unmounts every share
+ * (the same blunt-but-safe "make everything let go" step the array-wide case always needed - a
+ * single busy mountpoint is just as likely to be held open by Docker's own data root or a mergerfs
+ * branch as the whole array is), then retries `attempt` exactly once more. Docker/LXC are never
+ * restarted here - see restoreStoppedContainers()/restoreDockerAndAutostartLxc() - left to the
+ * caller so one with more to do first (e.g. LUKS locking the now-freed disk) doesn't get containers
+ * back before that's actually safe.
+ */
+async function retryWithContainersStopped<T>(
+  deps: { shares: ShareService; lxc: LxcClient; activity: ActivityStore },
+  attempt: () => Promise<T>,
+  stopContainers: boolean,
+): Promise<{ result: T; stopped: StoppedContainers }> {
+  const stopped: StoppedContainers = { dockerStopped: false, stoppedLxcNames: [] };
+  try {
+    return { result: await attempt(), stopped };
+  } catch (err) {
+    if (!stopContainers) throw err;
+
+    deps.activity.log('Stopping Docker and running LXC containers to free a busy disk', 'amber').catch(() => {});
+    await runSudoMaybe('systemctl', ['stop', 'docker.socket', 'docker.service']).catch(() => {});
+    stopped.dockerStopped = true;
+
+    const containers = await deps.lxc.listContainers().catch(() => []);
+    for (const c of containers) {
+      if (c.state !== 'running') continue;
+      await deps.lxc.stopContainer(c.name).catch(() => {});
+      stopped.stoppedLxcNames.push(c.name);
+    }
+
+    await deps.shares.unmountAll().catch(() => {});
+    try {
+      return { result: await attempt(), stopped }; // still busy after stopping containers - let this one throw for real
+    } catch (retryErr) {
+      throw new ContainerRetryError((retryErr as Error).message, stopped);
+    }
+  }
+}
+
+/**
  * Unmounts the raw array disk filesystems, retrying once with Docker and every running LXC
  * container stopped if the plain attempt fails - the common case being Docker's own data root
  * relocated onto an array disk (see docker/storagePath.ts and lxc/storagePath.ts for the same
@@ -65,30 +107,58 @@ export async function unmountArrayWithContainerRetry(
   deps: { nmd: NmdClient; shares: ShareService; lxc: LxcClient; activity: ActivityStore },
   stopContainers: boolean,
 ): Promise<StoppedContainers> {
-  const stopped: StoppedContainers = { dockerStopped: false, stoppedLxcNames: [] };
-  try {
-    await deps.nmd.unmountDisks();
-  } catch (err) {
-    if (!stopContainers) throw err;
+  const { stopped } = await retryWithContainersStopped(deps, () => deps.nmd.unmountDisks(), stopContainers);
+  return stopped;
+}
 
-    deps.activity.log('Stopping Docker and running LXC containers to allow the array to stop', 'amber').catch(() => {});
-    await runSudoMaybe('systemctl', ['stop', 'docker.socket', 'docker.service']).catch(() => {});
-    stopped.dockerStopped = true;
-
-    const containers = await deps.lxc.listContainers().catch(() => []);
-    for (const c of containers) {
-      if (c.state !== 'running') continue;
-      await deps.lxc.stopContainer(c.name).catch(() => {});
-      stopped.stoppedLxcNames.push(c.name);
-    }
-
-    await deps.shares.unmountAll().catch(() => {});
-    try {
-      await deps.nmd.unmountDisks(); // still busy after stopping containers - let this one throw for real
-    } catch (retryErr) {
-      throw new ContainerRetryError((retryErr as Error).message, stopped);
-    }
-  }
+/**
+ * Same retry shape as unmountArrayWithContainerRetry(), for freeing one disk's own mountpoint
+ * rather than every array disk at once - `nmdctl unmount` has no per-disk form (confirmed against
+ * tools/nmdctl: "Unmount all active data disks"), so LUKS locking a single disk
+ * (luks/service.ts's lockDisk()) needs its own umount call, but hits the exact same "Docker's data
+ * root lives on this disk" failure mode confirmed live against the project's own test rig (a real
+ * Docker daemon rooted on an array disk held its mountpoint busy). Falls back to unmounting every
+ * share rather than only the ones covering this slot - blunter than strictly necessary, but the
+ * same trade-off unmountArrayWithContainerRetry() already makes, not a new risk.
+ *
+ * Unmounts every share *before* the disk's own mountpoint on every attempt (not just the
+ * Docker/LXC-stop retry) - a single-disk share mounts via a plain `mount --bind` of this exact
+ * mountpoint (see shares/applier/realApplier.ts's mountShare()), which is a second, independent
+ * reference into it. `umount <mountpoint>` alone happily succeeds while that bind mount is still
+ * up (bind mounts don't keep their source busy), so this attempt was reporting success while the
+ * disk's LUKS mapping was still held open by the surviving share mount one step later -
+ * cryptsetup's own luksClose then failed with "Device ... is still in use". Confirmed live against
+ * the project's own test rig: locking a disk backing a real share failed exactly this way until
+ * shares were unmounted unconditionally, up front, the same way /array/stop's own
+ * `shares.unmountAll()` call already has to run before `nmd.unmountDisks()` for the identical
+ * reason at the whole-array level.
+ */
+export async function unmountMountpointWithContainerRetry(
+  deps: { shares: ShareService; lxc: LxcClient; activity: ActivityStore },
+  mountpoint: string,
+  stopContainers: boolean,
+): Promise<StoppedContainers> {
+  const { stopped } = await retryWithContainersStopped(
+    deps,
+    async () => {
+      await deps.shares.unmountAll();
+      // A single-disk share's bind mount and nmdctl's own reported filesystem.mountpoint can
+      // legitimately end up pointing at the exact same path (confirmed live: after an earlier
+      // partial unmount left a disk's own /mnt/diskN mount gone but its share's bind mount still
+      // live, nmdctl's own mountpoint lookup started reporting the share's path as this disk's
+      // mountpoint) - shares.unmountAll() above would then have already taken this exact path
+      // down, and a plain `umount` here would fail on "not mounted" for a mountpoint that's
+      // already exactly as free as this call needs it to be. Tolerate that one specific failure
+      // rather than let it force a needless Docker/LXC-stop retry (or a false failure) over
+      // nothing actually still being busy.
+      try {
+        await runSudoMaybe('umount', [mountpoint]);
+      } catch (err) {
+        if (!/not mounted/i.test((err as Error).message)) throw err;
+      }
+    },
+    stopContainers,
+  );
   return stopped;
 }
 

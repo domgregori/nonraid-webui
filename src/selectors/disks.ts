@@ -29,6 +29,18 @@ function normalize(value: string | undefined): string {
   return value && value !== '-' ? value : '-';
 }
 
+/** Mirrors backend/src/luks/service.ts's encryptionStateFor() exactly, from the same raw
+ *  `filesystem.type` string nmdctl already reports ("luks" while locked, "luks+xfs" etc. once
+ *  opened) - no separate LUKS-specific status fetch needed, backend and frontend just agree on
+ *  what the one existing field means. Always 'none' for parity, which never carries a filesystem
+ *  at all (see docs/luks-support-scope.md's "Parity disk: not supported" section). */
+function deriveEncryption(role: 'parity' | 'data', fsType: string | undefined): DiskViewModel['encryption'] {
+  if (role === 'parity' || !fsType) return 'none';
+  if (fsType === 'luks') return 'luks-locked';
+  if (fsType.startsWith('luks+')) return 'luks-open';
+  return 'none';
+}
+
 /** True for a data disk that's DISK_OK (present, correctly identified, no redundancy problem)
  *  but has never been formatted - nmdctl's own "unknown" filesystem sentinel (see get_fs_type()
  *  in tools/nmdctl), not an error state. Parity never has a filesystem of its own by design.
@@ -113,6 +125,7 @@ export function deriveDisk(
     spinState: spinState ?? null,
     customLabel: diskLabels[disk.disk_id]?.trim() || null,
     needsFormat,
+    encryption: deriveEncryption(role, disk.filesystem?.type),
   };
 }
 

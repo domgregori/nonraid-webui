@@ -20,6 +20,7 @@ import { DockerUpdateScheduler } from './docker/updateScheduler.js';
 import { EmptyDiskService } from './emptyDisk/index.js';
 import { createLxcClient } from './lxc/index.js';
 import { resolveLxcPath } from './lxc/storagePath.js';
+import { LuksService } from './luks/index.js';
 import { MetricsSampler, MetricsService, openMetricsDb } from './metrics/index.js';
 import { createNmdClient } from './nmd/index.js';
 import { ParityScheduler } from './parity/index.js';
@@ -34,6 +35,7 @@ import { disksRouter } from './routes/disks.js';
 import { dockerRouter } from './routes/docker.js';
 import { emptyDiskRouter } from './routes/emptyDisk.js';
 import { logsRouter } from './routes/logs.js';
+import { luksRouter } from './routes/luks.js';
 import { lxcRouter } from './routes/lxc.js';
 import { metricsRouter } from './routes/metrics.js';
 import { parityRouter } from './routes/parity.js';
@@ -85,6 +87,7 @@ async function main() {
   const shareAccessStore = new ShareAccessStore();
   const shares = new ShareService(shareStore, shareApplier, nmd, shareAccessStore, activity, settingsStore, cache);
   const diskQueue = new DiskQueueService(nmd, cache, activity, shares, lxc);
+  const luks = new LuksService(nmd, shares, lxc, activity, settingsStore, diskQueue);
   new ActivityWatcher(nmd, smart, activity, settingsStore, cache);
   new ParityScheduler(nmd, settingsStore, activity);
   // Unmounts shares on SIGTERM/SIGINT so nonraid.service's own ExecStop (which only knows about
@@ -273,6 +276,7 @@ async function main() {
   app.use('/api', parityRouter(nmd, activity, settingsStore));
   app.use('/api', settingsRouter(settingsStore, nmd, activity, shares, app, rclone));
   app.use('/api', disksRouter(nmd, smart, activity, settingsStore, cache, diskQueue));
+  app.use('/api', luksRouter(luks, authService));
   app.use('/api', emptyDiskRouter(emptyDisk, activity));
   app.use('/api', cacheRouter(cache, cacheMover, settingsStore, activity, shares, diskQueue));
   app.use('/api', diskQueueRouter(diskQueue, nmd));

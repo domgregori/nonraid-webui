@@ -86,6 +86,7 @@ const DEFAULTS: AppSettings = {
   tailscale: { enabled: false, loginServer: '' },
   remoteBackup: { enabled: false },
   onboarding: { dismissed: false },
+  luks: { unlockMode: 'manual' },
 };
 
 /**
@@ -116,6 +117,7 @@ export class SettingsStore {
       tailscale: { ...settings.tailscale },
       remoteBackup: { ...settings.remoteBackup },
       onboarding: { ...settings.onboarding },
+      luks: { ...settings.luks },
     };
   }
 
@@ -146,6 +148,7 @@ export class SettingsStore {
         tailscale: { ...current.tailscale, ...patch.tailscale },
         remoteBackup: { ...current.remoteBackup, ...patch.remoteBackup },
         onboarding: { ...current.onboarding, ...patch.onboarding },
+        luks: { ...current.luks, ...patch.luks },
       };
       await this.persistAtomic(next);
     });
@@ -212,6 +215,7 @@ export class SettingsStore {
         tailscale: { ...DEFAULTS.tailscale, ...parsed.tailscale },
         remoteBackup: { ...DEFAULTS.remoteBackup, ...parsed.remoteBackup },
         onboarding: { ...DEFAULTS.onboarding, ...parsed.onboarding },
+        luks: { ...DEFAULTS.luks, ...parsed.luks },
       };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {

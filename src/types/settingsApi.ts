@@ -1,4 +1,5 @@
 // Mirrors backend/src/settings/types.ts. Keep in sync.
+import type { LuksUnlockMode } from './luksApi';
 import type { StorageLocation } from './storagePath';
 
 export type NotificationEventType =
@@ -112,6 +113,14 @@ export interface OnboardingSettings {
   dismissed: boolean;
 }
 
+// Mirrors backend/src/settings/types.ts's LuksSettings - read-only from here. Deliberately absent
+// from AppSettingsUpdate below: the backend strips a client-supplied `luks` patch from the generic
+// PUT /settings route unconditionally (see routes/settings.ts) - only the dedicated
+// /luks/unlock-mode/* routes (src/api/luksApi.ts) are ever allowed to change it.
+export interface LuksSettings {
+  unlockMode: LuksUnlockMode;
+}
+
 export interface AppSettings {
   timeFormat: '12h' | '24h';
   turboWrite: boolean;
@@ -133,6 +142,7 @@ export interface AppSettings {
   cache: CacheSettings;
   cacheSchedule: CacheSchedule;
   onboarding: OnboardingSettings;
+  luks: LuksSettings;
 }
 
 export type AppSettingsUpdate = Partial<{

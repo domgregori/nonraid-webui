@@ -54,4 +54,8 @@ export interface DiskViewModel extends DiskBase {
    *  store anything on yet either - surfaced separately so it doesn't get lost inside a plain
    *  green "Active" card. */
   needsFormat: boolean;
+  /** Derived purely from `fsType` ("LUKS" -> locked, "LUKS+*" -> open, anything else -> 'none') -
+   *  see selectors/disks.ts's deriveDisk(). Always 'none' for parity (encryption isn't supported
+   *  there - see docs/luks-support-scope.md). */
+  encryption: 'none' | 'luks-locked' | 'luks-open';
 }

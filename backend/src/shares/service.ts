@@ -55,20 +55,24 @@ export class ShareService {
    * growAllDisksShares()'s own doc comment for why growth belongs here
    * rather than hooked directly off Add/Replace Disk.
    *
-   * `skipAlreadyMounted: true` (only ever passed at plain backend startup - see index.ts) leaves a
-   * share alone if it's already mounted, instead of unconditionally tearing it down and rebuilding
-   * it via mountShare()'s own "idempotent" unmount-then-remount. A mergerfs mount is an independent
-   * process, not a child of this one - it survives this backend's own process exiting or restarting
-   * on its own (a plain `systemctl restart nonraid-webui`, an update, Restart=on-failure after a
-   * crash) *unless* something actually unmounts it, which the shutdown hook now only does for a
-   * real host shutdown (see shutdownHook.ts's own doc comment on why it used to do this on every
-   * restart). So at a plain startup, "already mounted" means exactly "the array/disks under it
-   * never actually went anywhere" - remounting it anyway would tear down a share's clients
-   * (closeSmbClients() inside mountShare()'s own unmount step) for nothing, which is exactly what
-   * was producing stale file handles on this app's own remote SMB clients (confirmed live: a
-   * Proxmox host with a share in /etc/fstab) on every routine webui restart. Every OTHER caller
-   * (array start, shrink, reload-driver, a settings/cache change that needs every share to actually
-   * pick it up) omits this - those really do need every share force-reapplied.
+   * `skipAlreadyMounted: true` leaves a share alone if it's already mounted, instead of
+   * unconditionally tearing it down and rebuilding it via mountShare()'s own "idempotent"
+   * unmount-then-remount. A mergerfs mount is an independent process, not a child of this one - it
+   * survives this backend's own process exiting or restarting on its own (a plain `systemctl
+   * restart nonraid-webui`, an update, Restart=on-failure after a crash) *unless* something
+   * actually unmounts it, which the shutdown hook now only does for a real host shutdown (see
+   * shutdownHook.ts's own doc comment on why it used to do this on every restart). So at a plain
+   * startup, "already mounted" means exactly "the array/disks under it never actually went
+   * anywhere" - remounting it anyway would tear down a share's clients (closeSmbClients() inside
+   * mountShare()'s own unmount step) for nothing, which is exactly what was producing stale file
+   * handles on this app's own remote SMB clients (confirmed live: a Proxmox host with a share in
+   * /etc/fstab) on every routine webui restart. Originally only ever passed at plain backend
+   * startup (see index.ts); luks/service.ts's remountGently() now passes it too, for the same
+   * reason at a smaller scale - a single lock/unlock/format touching one disk shouldn't force an
+   * unmount-then-remount (and the same client-disconnecting churn) of every *other*, unrelated
+   * share. Every OTHER caller (array start, shrink, reload-driver, a settings/cache change that
+   * needs every share to actually pick it up) omits this - those really do need every share
+   * force-reapplied.
    */
   async remountAll(opts?: { skipAlreadyMounted?: boolean }): Promise<void> {
     const shares = await this.store.list();

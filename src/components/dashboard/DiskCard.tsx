@@ -17,9 +17,52 @@ function SpinIndicator({ disk }: { disk: DiskViewModel }) {
   );
 }
 
+/** Closed-padlock glyph - feather-icons' own "lock" path, same stroke-based style/viewBox
+ *  NotificationBell's bell icon already uses elsewhere in this app. Used as a flat "this disk is
+ *  LUKS-encrypted" badge rather than a live lock/unlock indicator - one glyph, present or absent,
+ *  not two different icons for the locked vs. open states (the live locked/unlocked state is
+ *  already surfaced elsewhere: LuksLockedCard on the dashboard, and LuksSection in the disk detail
+ *  panel). */
+function LockClosedIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+/** "This disk is LUKS-encrypted" badge - an icon rather than a "· USB"-style text suffix
+ *  (DeviceLine's transport tag) since it's meant to read as a status indicator at a glance, not
+ *  another line of text. Same glyph and tooltip regardless of whether the disk is currently locked
+ *  or unlocked (see LockClosedIcon's own comment on why) - just red while actually locked, since
+ *  that's the state where the disk can't serve data at all, matching the same "must reflect real
+ *  state, not overstate what it protects against" care the rest of this feature's UI copy takes
+ *  (see docs/luks-support-scope.md's "Stored" section). */
+function EncryptionIcon({ disk }: { disk: DiskViewModel }) {
+  const { t } = useTranslation('dashboard');
+  if (disk.encryption === 'none') return null;
+  const locked = disk.encryption === 'luks-locked';
+  return (
+    <span
+      className="disk-card__encryption"
+      style={{ color: locked ? COLORS.red : COLORS.textDim }}
+      title={locked ? t('DiskCard.locked') : t('DiskCard.encrypted')}
+      aria-label={locked ? t('DiskCard.locked') : t('DiskCard.encrypted')}
+    >
+      <LockClosedIcon />
+    </span>
+  );
+}
+
 function DeviceLine({ disk }: { disk: DiskViewModel }) {
   const base = disk.customLabel ? `${disk.customLabel} · ${disk.device}` : disk.device;
-  return <div className="disk-card__device">{disk.isUsb ? `${base} · USB` : base}</div>;
+  return (
+    <div className="disk-card__device">
+      {disk.isUsb ? `${base} · USB` : base}
+      <EncryptionIcon disk={disk} />
+    </div>
+  );
 }
 
 interface DiskCardProps {

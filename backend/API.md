@@ -100,6 +100,23 @@ Serializes disk-add/parity/cache-mirror operations that can't safely run concurr
 | POST | `/disks/empty/cancel` | - | Cancels after finishing whatever file is currently mid-copy. |
 | GET | `/disks/empty/status` | - | Poll target for progress. |
 
+### LUKS disk encryption
+
+v1 scope: formatting a new/blank data disk as LUKS, and locking/unlocking/mode-switching an
+already-encrypted one. Converting an existing disk's data to LUKS in place is not supported - see
+`docs/luks-support-scope.md` for why (XFS can't shrink, which `cryptsetup reencrypt --encrypt`
+requires). Parity disks can never be encrypted (the driver only opens LUKS at the filesystem-mount
+step, which parity never goes through).
+
+| Method | Path | Body/Params | Response / Notes |
+|---|---|---|---|
+| GET | `/luks/status` | - | Current unlock mode, whether the shared keyfile exists, and per-data-disk encryption state. |
+| POST | `/disks/:slot/format-luks` | `{ passphrase, currentPassword, totpCode? }` | **Step-up gated.** `:slot` must be a blank data disk (same pre-checks as `/disks/:slot/format`). Formats a LUKS2 container + XFS filesystem, always adds a second server-generated recovery passphrase key slot (returned once in the response, never persisted in plaintext), and adds the shared keyfile too if the current unlock mode is `stored`. |
+| POST | `/luks/:slot/lock` | - | Not step-up gated (operational tier, like `/disks/:slot/unassign`). Unmounts and closes an unlocked LUKS data disk. |
+| POST | `/luks/:slot/unlock` | `{ passphrase? }` | Not step-up gated. Opens + mounts a locked LUKS data disk - via `passphrase`, or the shared keyfile if omitted. |
+| POST | `/luks/unlock-mode/to-stored` | `{ passphrase, currentPassword, totpCode? }` | **Step-up gated.** Adds the shared keyfile as a new key slot on every currently-unlocked encrypted disk, authorized by `passphrase`. Response includes `disksUpdated` and `skippedLocked` (encrypted disks that were locked, and so untouched, at the time of the call - not a failure, but they still need switching individually once unlocked). |
+| POST | `/luks/unlock-mode/to-manual` | `{ newPassphrase, currentPassword, totpCode? }` | **Step-up gated.** Adds `newPassphrase` as a new key slot (authorized by the keyfile) on every currently-unlocked encrypted disk, removes the keyfile's own key slot from each, then deletes the keyfile file. Response includes `disksUpdated` and `skippedLocked`, same meaning as above - a skipped disk keeps working via its original or recovery passphrase, but will carry an orphaned keyfile-derived key slot once next unlocked. |
+
 ## Cache
 
 | Method | Path | Body/Params | Response / Notes |

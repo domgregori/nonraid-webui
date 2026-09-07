@@ -10,6 +10,8 @@ import { ArrayActionErrorBanner } from '../shared/ArrayActionErrorBanner';
 import { ProgressBar } from '../shared/ProgressBar';
 import { BenchmarkSection } from './BenchmarkSection';
 import { EmptyDiskDialog } from './EmptyDiskDialog';
+import { FormatLuksDialog } from './FormatLuksDialog';
+import { LuksSection } from './LuksSection';
 import { ReplaceDiskDialog } from './ReplaceDiskDialog';
 import { ShrinkArrayDialog } from './ShrinkArrayDialog';
 import { SmartOverviewRows } from './SmartOverviewRows';
@@ -41,6 +43,7 @@ export function DiskDetailPanel() {
     closeDetail,
     unassignDisk,
     restoreDisk,
+    refresh,
   } = useArrayStatus();
   const { settings, update: updateSettings } = useSettings();
   const { all } = status
@@ -61,6 +64,7 @@ export function DiskDetailPanel() {
   const [showReplaceDialog, setShowReplaceDialog] = useState(false);
   const [showEmptyDialog, setShowEmptyDialog] = useState(false);
   const [showShrinkDialog, setShowShrinkDialog] = useState(false);
+  const [showFormatLuksDialog, setShowFormatLuksDialog] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState('');
   const [nicknameSaving, setNicknameSaving] = useState(false);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
@@ -256,6 +260,8 @@ export function DiskDetailPanel() {
               </div>
             </div>
           </div>
+
+          {disk.role === 'data' && <LuksSection disk={disk} onChanged={refresh} />}
 
           {smartSlot !== null && (
             <div className="detail-card">
@@ -490,6 +496,15 @@ export function DiskDetailPanel() {
               >
                 {formatPending ? t('DiskDetailPanel.formatting') : t('DiskDetailPanel.formatDiskXfs')}
               </button>
+              <button
+                type="button"
+                className="btn btn--block"
+                disabled={formatPending}
+                onClick={() => setShowFormatLuksDialog(true)}
+                title={t('LuksSection.formatAsLuks')}
+              >
+                {t('LuksSection.formatAsLuks')}
+              </button>
             </>
           )}
           {needsMount && (
@@ -584,6 +599,14 @@ export function DiskDetailPanel() {
       )}
       {showEmptyDialog && (
         <EmptyDiskDialog slot={disk.slot} label={disk.label} onClose={() => setShowEmptyDialog(false)} onStarted={() => {}} />
+      )}
+      {showFormatLuksDialog && (
+        <FormatLuksDialog
+          slot={disk.slot}
+          label={disk.label}
+          onClose={() => setShowFormatLuksDialog(false)}
+          onDone={refresh}
+        />
       )}
       {showShrinkDialog && (
         <ShrinkArrayDialog

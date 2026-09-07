@@ -94,6 +94,13 @@ export function settingsRouter(store: SettingsStore, nmd: NmdClient, activity: A
   router.put('/settings', async (req, res) => {
     try {
       const patch = req.body ?? {};
+      // luks.unlockMode makes a real claim about security state (whether the shared keyfile is
+      // actually a valid key slot on every encrypted disk), not just a preference - unlike every
+      // other field here, it must never be settable by just PUTting a raw patch. Only
+      // luks/service.ts writes it, via the dedicated /luks/unlock-mode/* routes, and only after
+      // actually performing the corresponding cryptsetup key-slot changes. Same reasoning
+      // /ssh/enabled lives outside this generic route entirely instead of trusting settings.json.
+      delete patch.luks;
       if (typeof patch.turboWrite === 'boolean') {
         await nmd.setWriteMethod(patch.turboWrite);
         activity.log(patch.turboWrite ? 'Turbo write enabled' : 'Turbo write disabled', 'blue').catch(() => {});

@@ -18,6 +18,7 @@ import { registerActivityCommand, registerLogsCommand, registerMetricsCommand } 
 import { registerCacheCommand } from './commands/cache.js';
 import { registerRcloneCommand } from './commands/rclone.js';
 import { registerDecryptBackupCommand } from './commands/decryptBackup.js';
+import { registerLuksCommand } from './commands/luks.js';
 import { runAction } from './output.js';
 
 // Read the version from package.json rather than hardcoding it a second time here - this file
@@ -56,6 +57,7 @@ registerDecryptBackupCommand(program);
 
 registerArrayCommand(program);
 registerDiskCommand(program);
+registerLuksCommand(program);
 registerParityCommand(program);
 registerDockerCommand(program);
 registerLxcCommand(program);

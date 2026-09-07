@@ -46,7 +46,18 @@
     "needsFormatting": "Needs formatting - no filesystem yet",
     "free": "{{free}} free",
     "spinActive": "Spinning",
-    "spinStandby": "Standby"
+    "spinStandby": "Standby",
+    "locked": "Locked",
+    "encrypted": "Encrypted"
+  },
+  "LuksLockedCard": {
+    "title": "{{count}} encrypted disk locked",
+    "title_other": "{{count}} encrypted disks locked",
+    "description": "This disk is present and healthy, but it can't serve any share until it's unlocked.",
+    "description_other": "These disks are present and healthy, but they can't serve any share until unlocked.",
+    "passphrasePlaceholder": "Passphrase",
+    "unlock": "Unlock",
+    "unlocking": "Unlocking..."
   },
   "DiskQueueCard": {
     "addParityDisk": "Add parity disk",

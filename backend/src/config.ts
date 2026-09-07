@@ -108,6 +108,14 @@ export const config = {
   // no unattended bypass, so unassign writes this driver command directly instead
   // (see docs/manual-management.md in the main nonraid repo).
   nmdCmdPath: str('NMD_CMD_PATH', '/proc/nmdcmd'),
+  // LUKS disk encryption (backend/src/luks/) - cryptsetup is not bundled with this project, same
+  // "clear error if missing" treatment as every other external binary here. luksKeyfilePath
+  // deliberately matches nmdctl's own hardcoded LUKS_KEYFILE default (tools/nmdctl) exactly, so a
+  // disk this app formats/keys via the "stored" unlock mode auto-opens through nmdctl's own
+  // mount-time logic with no -k/--keyfile override ever needed on either side.
+  cryptsetupBin: str('CRYPTSETUP_BIN', 'cryptsetup'),
+  luksKeyfilePath: str('LUKS_KEYFILE_PATH', '/etc/nonraid/luks-keyfile'),
+  luksTimeoutMs: num('LUKS_TIMEOUT_MS', 60_000),
   smartctlBin: str('SMARTCTL_BIN', 'smartctl'),
   smartTimeoutMs: num('SMART_TIMEOUT_MS', 10_000),
   smartCacheTtlMs: num('SMART_CACHE_TTL_MS', 60_000),
