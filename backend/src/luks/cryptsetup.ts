@@ -2,28 +2,39 @@ import { spawnWithPipedStdin } from '../system/procUtil.js';
 import { config } from '../config.js';
 
 /**
- * One secret, from exactly one of two sources - a typed passphrase (piped over stdin, never an
- * argv string so it's never visible in `ps`, never written to disk) or the shared array keyfile
- * (`--key-file <path>`, read directly by cryptsetup itself). Every function below that needs to
- * authenticate against an existing LUKS device takes this shape rather than two separate optional
- * parameters, so a caller can't accidentally supply both or neither.
+ * One secret, from exactly one of three sources: a typed passphrase (piped over stdin, never an
+ * argv string so it's never visible in `ps`, never written to disk), the shared array keyfile
+ * (`--key-file <path>`, read directly by cryptsetup itself off its own on-disk path), or an
+ * ad-hoc keyfile's raw bytes supplied for one call only (`--key-file -`, piped over stdin exactly
+ * like a passphrase is - see `keyfileContents`'s own doc comment for why this is never written to
+ * a temp path). Every function below that needs to authenticate against an existing LUKS device
+ * takes this shape rather than several separate optional parameters, so a caller can't
+ * accidentally supply more than one or none.
  */
-export type LuksSecret = { passphrase: string } | { keyfilePath: string };
+export type LuksSecret = { passphrase: string } | { keyfilePath: string } | { keyfileContents: Buffer };
 
-function isKeyfile(secret: LuksSecret): secret is { keyfilePath: string } {
+function isKeyfilePath(secret: LuksSecret): secret is { keyfilePath: string } {
   return 'keyfilePath' in secret;
 }
 
+function isKeyfileContents(secret: LuksSecret): secret is { keyfileContents: Buffer } {
+  return 'keyfileContents' in secret;
+}
+
 /**
- * Runs `cryptsetup <args>`, writing `stdinInput` (already newline-terminated, one line per prompt
- * cryptsetup will issue in order) to its stdin and closing it immediately after. This is the only
- * mechanism this module uses to hand cryptsetup a passphrase - verified live against the project's
- * own real-hardware rig (cryptsetup 2.7.5): luksFormat/luksOpen/luksAddKey/luksRemoveKey all read a
- * non-interactive passphrase this way with `--batch-mode` (where a new secret is being set) and no
- * confirmation re-prompt. Never pass a passphrase as an argv element - it would be visible to any
- * local user via `ps`.
+ * Runs `cryptsetup <args>`, writing `stdinInput` to its stdin and closing it immediately after -
+ * a newline-terminated string, one line per prompt cryptsetup will issue in order, for a typed
+ * passphrase; a raw `Buffer` for an ad-hoc keyfile's exact bytes (paired with `--key-file -` in
+ * the caller's own `args`, never line-terminated the way a passphrase is, since a real keyfile
+ * isn't newline-convention text - see `luksOpen()`'s own `keyfileContents` branch). This is the
+ * only mechanism this module uses to hand cryptsetup secret material - verified live against the
+ * project's own real-hardware rig (cryptsetup 2.7.5): luksFormat/luksOpen/luksAddKey/luksRemoveKey
+ * all read a non-interactive passphrase this way with `--batch-mode` (where a new secret is being
+ * set) and no confirmation re-prompt, and `luksOpen --key-file -` reads an uploaded keyfile's
+ * bytes the same way. Never pass secret material as an argv element - it would be visible to any
+ * local user via `ps` - and never write it to a file on disk first.
  */
-function runCryptsetup(args: string[], stdinInput: string, timeoutMs: number = config.luksTimeoutMs): Promise<{ stdout: string; stderr: string }> {
+function runCryptsetup(args: string[], stdinInput: string | Buffer, timeoutMs: number = config.luksTimeoutMs): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawnWithPipedStdin(config.cryptsetupBin, args);
     let stdout = '';
@@ -78,10 +89,19 @@ export async function luksFormat(device: string, passphrase: string): Promise<vo
 
 /** Opens `device`, mapping it to `/dev/mapper/<mapName>` - `mapName` should match nmdctl's own
  *  disk_name for the slot (e.g. `nmd1p1`) so a subsequent `nmdctl mount`/`status` sees the same
- *  mapping nmdctl's own keyfile-based open would have created. */
+ *  mapping nmdctl's own keyfile-based open would have created. The `keyfileContents` branch
+ *  (`--key-file -`) is how a one-off, admin-uploaded keyfile unlocks a disk - the caller (see
+ *  luks/service.ts's unlockDisk()) receives those bytes as a Buffer already held in memory (never
+ *  a path on disk) and hands them straight to this same stdin-piping mechanism a typed passphrase
+ *  already uses, exactly as instructed: pipe over stdin, don't stage a temp file. Verified live
+ *  against the rig's real cryptsetup (2.7.5): `luksOpen --key-file - <device> <name>` reads the
+ *  full, unmodified stdin buffer as key material with no line/newline handling (unlike passphrase
+ *  mode) and no default truncation observed for a realistic keyfile size. */
 export async function luksOpen(device: string, mapName: string, secret: LuksSecret): Promise<void> {
-  if (isKeyfile(secret)) {
+  if (isKeyfilePath(secret)) {
     await runCryptsetup(['luksOpen', '--key-file', secret.keyfilePath, device, mapName], '');
+  } else if (isKeyfileContents(secret)) {
+    await runCryptsetup(['luksOpen', '--key-file', '-', device, mapName], secret.keyfileContents);
   } else {
     await runCryptsetup(['luksOpen', device, mapName], `${secret.passphrase}\n`);
   }
@@ -97,8 +117,12 @@ export async function luksClose(mapName: string): Promise<void> {
  *  secret. Used for the mandatory recovery slot at format time, and for adding a new day-to-day
  *  passphrase when switching stored -> manual unlock mode. */
 export async function luksAddKey(device: string, existing: LuksSecret, newPassphrase: string): Promise<void> {
-  if (isKeyfile(existing)) {
+  if (isKeyfilePath(existing)) {
     await runCryptsetup(['luksAddKey', '--batch-mode', '--key-file', existing.keyfilePath, device], `${newPassphrase}\n`);
+  } else if (isKeyfileContents(existing)) {
+    // Not a real call path today (only luksOpen()'s one-off unlock accepts an ad-hoc keyfile's
+    // bytes) - a clear error here rather than silently misreading `existing` if that ever changes.
+    throw new Error('luksAddKey: an ad-hoc keyfile-contents secret is not supported here.');
   } else {
     await runCryptsetup(['luksAddKey', '--batch-mode', device], `${existing.passphrase}\n${newPassphrase}\n`);
   }
@@ -125,8 +149,11 @@ export async function luksAddKeyfile(device: string, existingPassphrase: string,
  * afterward) - each leaves every other slot intact.
  */
 export async function luksRemoveKey(device: string, secret: LuksSecret): Promise<void> {
-  if (isKeyfile(secret)) {
+  if (isKeyfilePath(secret)) {
     await runCryptsetup(['luksRemoveKey', device, '--key-file', secret.keyfilePath], '');
+  } else if (isKeyfileContents(secret)) {
+    // Not a real call path today - see luksAddKey()'s identical guard for why.
+    throw new Error('luksRemoveKey: an ad-hoc keyfile-contents secret is not supported here.');
   } else {
     await runCryptsetup(['luksRemoveKey', device], `${secret.passphrase}\n`);
   }

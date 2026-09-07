@@ -18,7 +18,7 @@ export function useUnlockDisk(slot: number, onUnlocked: () => void) {
     setPending(true);
     setError(null);
     try {
-      await luksApi.unlock(slot, passphrase);
+      await luksApi.unlock(slot, { passphrase });
       setPassphrase('');
       onUnlocked();
     } catch (err) {

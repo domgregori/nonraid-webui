@@ -66,6 +66,19 @@
     "skippedLockedNote": "{{count}} locked disk(s) were skipped - unlock them and switch each individually to bring them fully into the new mode.",
     "done": "Done"
   },
+  "UnlockAllDialog": {
+    "title": "Unlock {{count}} encrypted disk(s)",
+    "close": "Close",
+    "desc": "Every encrypted disk normally shares one passphrase or keyfile - enter it once below to unlock all of them.",
+    "passphraseTab": "Passphrase",
+    "keyfileTab": "Keyfile",
+    "passphrasePlaceholder": "Passphrase",
+    "keyfileDesc": "Select the keyfile that unlocks these disks - its contents are sent for this one unlock only, never saved anywhere.",
+    "unlockedOne": "Unlocked",
+    "allUnlocked": "All disks unlocked.",
+    "unlockAll": "Unlock All",
+    "unlocking": "Unlocking…"
+  },
   "LuksSection": {
     "title": "Encryption",
     "statusLocked": "Locked",

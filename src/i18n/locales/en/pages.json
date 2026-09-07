@@ -55,7 +55,10 @@
   "DisksPage": {
     "title": "Disks",
     "loadingArrayStatus": "Loading array status…",
-    "bootDisk": "Boot Disk"
+    "bootDisk": "Boot Disk",
+    "disksLocked": "{{count}} encrypted disk locked",
+    "disksLocked_other": "{{count}} encrypted disks locked",
+    "unlockAll": "Unlock All"
   },
   "DockerPage": {
     "title": "Docker Containers",

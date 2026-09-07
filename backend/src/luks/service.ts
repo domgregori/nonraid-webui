@@ -262,11 +262,14 @@ export class LuksService {
 
   /**
    * Unlocks one locked LUKS data disk and mounts it - via a supplied passphrase (manual mode, or
-   * the recovery passphrase), or the shared keyfile when none is given (stored mode). Runs
-   * `nmdctl mount` afterward exactly like formatDiskAsLuks() does: nmdctl's own mount pass skips
-   * any disk that's already mounted and only actually touches the one this just opened.
+   * the recovery passphrase), an ad-hoc keyfile's raw bytes uploaded for this one call
+   * (`keyfileContents` - never written to disk, piped straight to cryptsetup's own stdin exactly
+   * like a passphrase already is, see cryptsetup.ts's luksOpen()), or the shared stored keyfile
+   * when neither is given (stored mode). Runs `nmdctl mount` afterward exactly like
+   * formatDiskAsLuks() does: nmdctl's own mount pass skips any disk that's already mounted and
+   * only actually touches the one this just opened.
    */
-  async unlockDisk(slot: number, passphrase?: string): Promise<void> {
+  async unlockDisk(slot: number, passphrase?: string, keyfileContents?: Buffer): Promise<void> {
     const disk = this.requireDataDisk(await this.nmd.getStatus(), slot);
     if (encryptionStateFor(disk) !== 'luks-locked') {
       throw new HttpError(409, `Slot ${slot} isn't a locked LUKS disk.`);
@@ -274,11 +277,13 @@ export class LuksService {
     const device = devicePathForSlot(slot);
     const mapName = mapNameForSlot(slot);
     let secret: LuksSecret;
-    if (typeof passphrase === 'string' && passphrase.length > 0) {
+    if (keyfileContents && keyfileContents.length > 0) {
+      secret = { keyfileContents };
+    } else if (typeof passphrase === 'string' && passphrase.length > 0) {
       secret = { passphrase };
     } else {
       if (!(await this.keyfileExists())) {
-        throw new HttpError(400, 'No passphrase given and no stored keyfile is available - enter the passphrase to unlock this disk.');
+        throw new HttpError(400, 'No passphrase or keyfile given and no stored keyfile is available - enter the passphrase or upload a keyfile to unlock this disk.');
       }
       secret = { keyfilePath: config.luksKeyfilePath };
     }

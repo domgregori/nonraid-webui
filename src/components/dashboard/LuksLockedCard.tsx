@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSettings } from '../../hooks/useSettings';
 import { useUnlockAllDisks, type UnlockAllResult } from '../../hooks/useUnlockAllDisks';
@@ -43,7 +44,11 @@ export function LuksLockedCard() {
   const { t } = useTranslation('dashboard');
   const { status, temps, refresh } = useArrayStatus();
   const { settings } = useSettings();
-  const { passphrase, setPassphrase, pending, results, unlockAll } = useUnlockAllDisks(refresh);
+  const [passphrase, setPassphrase] = useState('');
+  const { pending, results, unlockAll } = useUnlockAllDisks(() => {
+    setPassphrase('');
+    refresh();
+  });
   if (!status) return null;
 
   // Same diskLabels thread ArrayDisks/DiskDetailPanel already pass through, so a locked disk with
@@ -56,7 +61,7 @@ export function LuksLockedCard() {
 
   const resultFor = (slot: number) => results?.find((r) => r.slot === slot);
   const failedCount = results?.filter((r) => !r.ok).length ?? 0;
-  const submit = () => unlockAll(locked.map((d) => d.slot));
+  const submit = () => unlockAll(locked.map((d) => d.slot), { passphrase });
 
   return (
     <Card className="parity-card">

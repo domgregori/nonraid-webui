@@ -8,13 +8,22 @@ import { ParityCheckCard } from '../components/dashboard/ParityCheckCard';
 import { BootDiskDetailPanel } from '../components/disk-detail/BootDiskDetailPanel';
 import { CacheSection } from '../components/disk-detail/CacheSection';
 import { UnassignedDevicesCard } from '../components/disk-detail/UnassignedDevicesCard';
+import { UnlockAllDialog } from '../components/disk-detail/UnlockAllDialog';
 import { ArrayActionErrorBanner } from '../components/shared/ArrayActionErrorBanner';
+import { useSettings } from '../hooks/useSettings';
+import { deriveDisks } from '../selectors/disks';
 import { useArrayStatus } from '../state/useArrayStatus';
 
 export function DisksPage() {
   const { t } = useTranslation('pages');
-  const { status, loadState, error, actionError, stopBlockedByContainers } = useArrayStatus();
+  const { status, temps, loadState, error, actionError, stopBlockedByContainers, refresh } = useArrayStatus();
+  const { settings } = useSettings();
   const [showBootDisk, setShowBootDisk] = useState(false);
+  const [showUnlockAll, setShowUnlockAll] = useState(false);
+
+  // Same diskLabels thread ArrayDisks/LuksLockedCard already pass through - see their own
+  // comments on why a locked disk's custom nickname matters here more than most places.
+  const locked = status ? deriveDisks(status, temps, {}, {}, {}, {}, settings?.diskLabels ?? {}).data.filter((d) => d.encryption === 'luks-locked') : [];
 
   return (
     <div className="page">
@@ -25,6 +34,15 @@ export function DisksPage() {
       {loadState === 'loading' && !status && <div className="status-note">{t('DisksPage.loadingArrayStatus')}</div>}
       {error && <div className="status-note status-note--error">{error}</div>}
       {actionError && <ArrayActionErrorBanner actionError={actionError} stopBlockedByContainers={stopBlockedByContainers} />}
+
+      {locked.length > 0 && (
+        <div className="status-note status-note--error" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <span>{t('DisksPage.disksLocked', { count: locked.length })}</span>
+          <button type="button" className="btn btn--primary" onClick={() => setShowUnlockAll(true)}>
+            {t('DisksPage.unlockAll')}
+          </button>
+        </div>
+      )}
 
       {status && (
         <div className="disks-page">
@@ -49,6 +67,7 @@ export function DisksPage() {
       )}
 
       {showBootDisk && <BootDiskDetailPanel onClose={() => setShowBootDisk(false)} />}
+      {showUnlockAll && <UnlockAllDialog disks={locked} onClose={() => setShowUnlockAll(false)} onDone={refresh} />}
     </div>
   );
 }

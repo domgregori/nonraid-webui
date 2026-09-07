@@ -78,7 +78,12 @@ export function luksRouter(luks: LuksService, auth: AuthService): Router {
   });
 
   // Same reasoning as lock above: unlocking uses an already-known secret, it doesn't mint one -
-  // day-to-day operational tier, not the step-up tier.
+  // day-to-day operational tier, not the step-up tier. `keyfileBase64` carries an admin-uploaded
+  // keyfile's exact bytes for this one call only - the client base64-encodes the file client-side
+  // (see src/api/luksApi.ts) rather than this route accepting a real multipart file upload, so the
+  // request stays plain JSON like every other route here; either way this only ever exists as an
+  // in-memory Buffer server-side (see luks/service.ts's unlockDisk()) - it's never staged to a
+  // temp path, matching how a typed passphrase is handled everywhere else in this feature.
   router.post('/luks/:slot/unlock', async (req, res) => {
     const slot = parseSlot(req.params.slot);
     if (slot === null) {
@@ -90,8 +95,21 @@ export function luksRouter(luks: LuksService, auth: AuthService): Router {
       res.status(400).json({ error: 'passphrase must be a string if given.' });
       return;
     }
+    const keyfileBase64 = req.body?.keyfileBase64;
+    if (keyfileBase64 !== undefined && typeof keyfileBase64 !== 'string') {
+      res.status(400).json({ error: 'keyfileBase64 must be a string if given.' });
+      return;
+    }
+    let keyfileContents: Buffer | undefined;
+    if (typeof keyfileBase64 === 'string' && keyfileBase64.length > 0) {
+      keyfileContents = Buffer.from(keyfileBase64, 'base64');
+      if (keyfileContents.length === 0) {
+        res.status(400).json({ error: 'keyfileBase64 did not decode to any bytes.' });
+        return;
+      }
+    }
     try {
-      await luks.unlockDisk(slot, passphrase);
+      await luks.unlockDisk(slot, passphrase, keyfileContents);
       res.json({ ok: true, message: `Disk ${slot} unlocked.` });
     } catch (err) {
       handleError(err, res);
