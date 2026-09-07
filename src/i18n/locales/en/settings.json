@@ -50,6 +50,22 @@
     "saving": "Saving…",
     "confirm": "Encrypt backups"
   },
+  "EncryptionSection": {
+    "loading": "Loading…",
+    "title": "Disk encryption (LUKS)",
+    "desc": "Array-wide unlock method and per-disk encryption status. Format a blank disk as encrypted from that disk's own detail page to add one.",
+    "noneDesc": "No encrypted disks yet. Format a blank disk as encrypted (LUKS) from that disk's own detail page to get started.",
+    "unlockMode": "Unlock method",
+    "modeStored": "Stored (auto-unlock)",
+    "modeManual": "Manual",
+    "keyfile": "Shared keyfile",
+    "keyfileYes": "Present",
+    "keyfileNo": "Not present",
+    "locked": "Locked",
+    "unlocked": "Unlocked",
+    "lockedNote": "{{count}} disk(s) are locked and can't serve data until unlocked.",
+    "changeUnlockMethod": "Change unlock method"
+  },
   "AppriseTargetsField": {
     "fieldsRequired": "{{fields}} required.",
     "sent": "Sent.",

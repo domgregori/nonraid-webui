@@ -203,6 +203,7 @@
       "backups": "Backups",
       "cache": "Cache",
       "docker-lxc": "Docker & LXC Storage",
+      "encryption": "Encryption",
       "network": "Network",
       "notifications": "Notifications",
       "parity": "Parity",

@@ -12,6 +12,7 @@ import { ApiTokensSection } from '../components/settings/ApiTokensSection';
 import { AppriseTargetsField } from '../components/settings/AppriseTargetsField';
 import { ConfigRestoreWizard } from '../components/settings/ConfigRestoreWizard';
 import { EncryptBackupModal } from '../components/settings/EncryptBackupModal';
+import { EncryptionSection } from '../components/settings/EncryptionSection';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
 import { ImportUnraidWizard } from '../components/settings/ImportUnraidWizard';
 import { LogsSection } from '../components/settings/LogsSection';
@@ -52,6 +53,7 @@ const SECTIONS = [
   { id: 'backups' },
   { id: 'cache' },
   { id: 'docker-lxc' },
+  { id: 'encryption' },
   { id: 'network' },
   { id: 'notifications' },
   { id: 'parity' },
@@ -992,6 +994,11 @@ export function SettingsPage() {
               {lxcPruneResult && <div className="status-note">{lxcPruneResult}</div>}
               {lxcPruneError && <div className="status-note status-note--error">{lxcPruneError}</div>}
             </div>
+          </div>
+
+          <div className={`settings-card${activeSection === 'encryption' ? '' : ' settings-hidden'}`} data-section-id="encryption">
+            <div className="settings-card__title">{t('SettingsPage.sections.encryption')}</div>
+            <EncryptionSection />
           </div>
 
           <div className={`settings-card${activeSection === 'services' ? '' : ' settings-hidden'}`} data-section-id="services">
