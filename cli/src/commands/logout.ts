@@ -22,15 +22,22 @@ export async function logoutCommand(opts: LogoutOptions): Promise<void> {
   }
 
   if (opts.revoke) {
-    // Revocation is session-gated only, not step-up (see routes/auth.ts) - removing access is
-    // strictly safety-positive, unlike minting a new token.
-    const { cookie } = await passwordLogin(config.host);
-    const res = await fetch(`${config.host}/api/auth/tokens/${config.tokenId}`, { method: 'DELETE', headers: { Cookie: cookie } });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new Error(body.error ?? `Could not revoke token (${res.status}).`);
+    if (!config.tokenId) {
+      // A `login --token` session - the CLI never learned this token's id (see login.ts), so it
+      // can't target it for revocation. Forget it locally and point at the web UI for the rest.
+      console.log('This session was created with `login --token`; the CLI cannot revoke it.');
+      console.log('Revoke it from Settings > API in the web UI, then it stops working everywhere.');
+    } else {
+      // Revocation is session-gated only, not step-up (see routes/auth.ts) - removing access is
+      // strictly safety-positive, unlike minting a new token.
+      const { cookie } = await passwordLogin(config.host);
+      const res = await fetch(`${config.host}/api/auth/tokens/${config.tokenId}`, { method: 'DELETE', headers: { Cookie: cookie } });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Could not revoke token (${res.status}).`);
+      }
+      console.log('Token revoked on the server.');
     }
-    console.log('Token revoked on the server.');
   }
 
   await clearConfig();

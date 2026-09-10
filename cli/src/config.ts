@@ -9,7 +9,8 @@ import path from 'node:path';
 export interface CliConfig {
   host: string; // e.g. "https://nonraid.lan" or "http://nonraid.lan:80" - includes protocol, no trailing slash
   token: string; // raw "nrd_..." bearer token, see backend/src/auth/crypto.ts's generateApiToken
-  tokenId: string; // so `nonraid-tool logout` can revoke the exact token server-side, not just forget it locally
+  tokenId?: string; // present for a username/password `login` so `logout --revoke` can revoke it server-side;
+  //                    absent for a `login --token` session (a bearer token can't discover its own id - see logout.ts)
   insecure?: boolean; // skip TLS certificate verification - for a self-signed cert host, see api/client.ts
 }
 

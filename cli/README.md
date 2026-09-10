@@ -38,6 +38,14 @@ Prompts for the backend URL, username, and password (plus a 2FA code if enrolled
 
 Tokens have a scope: `login` mints a full-access one by default, or add `--read-only` for a token that can only run `GET`-style commands (`ls`, `status`, `info`, ...) — anything that starts, stops, or changes something gets rejected server-side. Handy for monitoring scripts that shouldn't be able to touch anything.
 
+Already minted a token in the web UI (**Settings → API**)? Skip the username/password prompt entirely:
+
+```bash
+nonraid-tool login --token nrd_... --host http://nonraid.lan
+```
+
+It's verified against the backend before being saved to the same config file. The token keeps whatever scope it was created with (`--read-only` doesn't apply here). One caveat: a token supplied this way has no locally known ID, so `nonraid-tool logout --revoke` can't revoke it — do that from **Settings → API** in the web UI instead.
+
 `nonraid-tool logout` forgets the token locally. Add `--revoke` to also invalidate it on the server (re-prompts for the password, since revoking a token needs a real session). Tokens can also be created (with either scope), listed, and revoked from the web UI: **Settings → Security → API tokens**.
 
 Passkey-only accounts can't complete `login` from a terminal — enroll TOTP or a backup code as a fallback first.

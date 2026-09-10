@@ -7,6 +7,7 @@ interface LoginOptions {
   host?: string;
   insecure?: boolean;
   readOnly?: boolean;
+  token?: string;
 }
 
 interface CreateTokenResponse {
@@ -17,16 +18,46 @@ interface CreateTokenResponse {
   token: string;
 }
 
-export async function loginCommand(opts: LoginOptions): Promise<void> {
-  let host = opts.host ?? process.env.NONRAID_HOST;
+async function resolveHost(optHost?: string): Promise<string> {
+  let host = optHost ?? process.env.NONRAID_HOST;
   if (!host) {
     const answer = await prompts({ type: 'text', name: 'host', message: 'Backend URL', initial: 'http://nonraid.lan' }, { onCancel: () => process.exit(130) });
     host = answer.host;
   }
   if (!host) throw new Error('A backend URL is required.');
-  const base = host.replace(/\/+$/, '');
+  return host.replace(/\/+$/, '');
+}
+
+/**
+ * `--token` path: skip username/password entirely and save an API token that was already minted
+ * in the web UI (Settings > API). The token is verified against a real authenticated endpoint
+ * before being saved, so a typo fails loudly here instead of on the next command. No `tokenId` is
+ * stored - a bearer token can't look up its own id (the /auth/tokens endpoints are session-gated,
+ * not token-gated), so `nonraid-tool logout --revoke` can't revoke a `--token` session; revoke it
+ * from Settings > API in the web UI instead (see logout.ts).
+ */
+async function tokenLogin(base: string, token: string, insecure: boolean): Promise<void> {
+  const res = await fetch(`${base}/api/status`, { headers: { Authorization: `Bearer ${token}` } });
+  if (res.status === 401) throw new Error('That token was rejected (401). Check it was copied in full and has not been revoked.');
+  if (!res.ok) throw new Error(`Could not verify the token against ${base} (${res.status}).`);
+
+  await saveConfig({ host: base, token, insecure: insecure || undefined });
+  console.log(`Saved API token for ${base}. Future commands won't ask for a password.`);
+  console.log('Note: `nonraid-tool logout --revoke` cannot revoke this token - do that from Settings > API in the web UI.');
+}
+
+export async function loginCommand(opts: LoginOptions): Promise<void> {
+  if (opts.token && opts.readOnly) {
+    throw new Error('--read-only only applies when minting a new token; --token uses the scope the existing token already has.');
+  }
 
   if (opts.insecure) process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  const base = await resolveHost(opts.host);
+
+  if (opts.token) {
+    await tokenLogin(base, opts.token, !!opts.insecure);
+    return;
+  }
 
   const { cookie, password } = await passwordLogin(base);
 
@@ -39,5 +70,5 @@ export async function loginCommand(opts: LoginOptions): Promise<void> {
   const created = (await stepUpFetch(base, '/api/auth/tokens', 'POST', cookie, password, { name: tokenName || defaultName, scope })) as CreateTokenResponse;
 
   await saveConfig({ host: base, token: created.token, tokenId: created.id, insecure: !!opts.insecure });
-  console.log(`Logged in as ${host}. Token "${created.name}" (${created.scope}) saved - future commands won't ask for a password again.`);
+  console.log(`Logged in as ${base}. Token "${created.name}" (${created.scope}) saved - future commands won't ask for a password again.`);
 }

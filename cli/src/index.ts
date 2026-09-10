@@ -39,10 +39,11 @@ program
 
 program
   .command('login')
-  .description('log in with username/password and mint a local API token')
+  .description('save a local API token - minted from username/password, or supplied via --token')
   .option('--host <url>', 'backend URL, e.g. http://nonraid.lan')
   .option('--insecure', 'skip TLS certificate verification (self-signed cert)')
-  .option('--read-only', 'mint a read-only token instead of full access')
+  .option('--read-only', 'mint a read-only token instead of full access (username/password only)')
+  .option('--token <token>', 'save an existing API token (from Settings > API) instead of username/password')
   .action(runAction(loginCommand));
 
 program
