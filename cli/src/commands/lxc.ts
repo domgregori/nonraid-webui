@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { resolveClient } from '../context.js';
-import { printTable, runAction } from '../output.js';
+import { emit, printTable, runAction } from '../output.js';
 import type { CommandResult, LxcContainerSummary } from '../api/types.js';
 
 export function registerLxcCommand(program: Command): void {
@@ -13,9 +13,11 @@ export function registerLxcCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const containers = await client.get<LxcContainerSummary[]>('/lxc/containers');
-        printTable(
-          ['NAME', 'STATE', 'AUTOSTART', 'IPS'],
-          containers.map((c) => [c.name, c.state, c.autostart ? 'yes' : 'no', c.ips.join(', ') || '-']),
+        emit(containers, () =>
+          printTable(
+            ['NAME', 'STATE', 'AUTOSTART', 'IPS'],
+            containers.map((c) => [c.name, c.state, c.autostart ? 'yes' : 'no', c.ips.join(', ') || '-']),
+          ),
         );
       }),
     );
@@ -27,7 +29,7 @@ export function registerLxcCommand(program: Command): void {
       runAction(async (name: string) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>(`/lxc/containers/${encodeURIComponent(name)}/start`);
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -39,7 +41,7 @@ export function registerLxcCommand(program: Command): void {
       runAction(async (name: string, opts: { force?: boolean }) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>(`/lxc/containers/${encodeURIComponent(name)}/stop`, { force: !!opts.force });
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 }

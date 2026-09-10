@@ -18,7 +18,7 @@ import { registerActivityCommand, registerLogsCommand, registerMetricsCommand } 
 import { registerCacheCommand } from './commands/cache.js';
 import { registerRcloneCommand } from './commands/rclone.js';
 import { registerDecryptBackupCommand } from './commands/decryptBackup.js';
-import { runAction } from './output.js';
+import { runAction, setJsonMode } from './output.js';
 
 // Read the version from package.json rather than hardcoding it a second time here - this file
 // works the same way whether run compiled (dist/index.js) or straight from source via tsx
@@ -72,6 +72,19 @@ registerMetricsCommand(program);
 registerCacheCommand(program);
 registerRcloneCommand(program);
 registerTuiCommand(program);
+
+// `--json`: raw JSON instead of formatted text, for scripting. Added to every (sub)command so it
+// works in any position (`nonraid-tool --json array status` or `nonraid-tool array status --json`),
+// and read via optsWithGlobals() so a nested subcommand still sees it. Local-only commands
+// (version, decrypt-backup) ignore it - they have no API response to emit.
+function addJsonFlag(cmd: Command): void {
+  cmd.option('--json', 'output raw JSON instead of formatted text');
+  for (const sub of cmd.commands) addJsonFlag(sub);
+}
+addJsonFlag(program);
+program.hook('preAction', (_thisCommand, actionCommand) => {
+  setJsonMode(!!actionCommand.optsWithGlobals().json);
+});
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   console.error((err as Error).message ?? err);

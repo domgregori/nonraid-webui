@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { resolveClient } from '../context.js';
-import { printTable, runAction } from '../output.js';
+import { emit, printTable, runAction } from '../output.js';
 import type { CommandResult, DockerContainerSummary } from '../api/types.js';
 
 export function registerDockerCommand(program: Command): void {
@@ -13,9 +13,11 @@ export function registerDockerCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const containers = await client.get<DockerContainerSummary[]>('/docker/containers');
-        printTable(
-          ['NAME', 'STATE', 'STATUS', 'IMAGE'],
-          containers.map((c) => [c.name, c.state, c.status, c.image]),
+        emit(containers, () =>
+          printTable(
+            ['NAME', 'STATE', 'STATUS', 'IMAGE'],
+            containers.map((c) => [c.name, c.state, c.status, c.image]),
+          ),
         );
       }),
     );
@@ -27,7 +29,7 @@ export function registerDockerCommand(program: Command): void {
       runAction(async (name: string) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>(`/docker/containers/${encodeURIComponent(name)}/start`);
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -38,7 +40,7 @@ export function registerDockerCommand(program: Command): void {
       runAction(async (name: string) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>(`/docker/containers/${encodeURIComponent(name)}/stop`);
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 }

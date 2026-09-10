@@ -62,6 +62,18 @@ For scripting or CI, skip the saved config file entirely:
 
 These take priority over `~/.config/nonraid-tool/config.json` whenever set — there's no per-command `--host`/`--token` flag, only `login` itself takes `--host`.
 
+## JSON output
+
+Add `--json` to any command to get the backend's raw JSON response instead of the formatted table — works in either position:
+
+```bash
+nonraid-tool --json array status
+nonraid-tool disk ls --json
+nonraid-tool smart temps --json | jq '.[] | select(. > 45)'
+```
+
+For query commands it's the API response verbatim; for action commands (start/stop/create/…) it's a small `{ "ok": true, … }` object or the backend's own result body. Errors come back as `{ "error": "…", "status": 401 }` and the exit code is still non-zero. Local-only commands (`version`, `decrypt-backup`) ignore the flag.
+
 ## Commands
 
 Every group has its own `--help` with the full, current flag list — this table is just a map, not the authoritative reference.

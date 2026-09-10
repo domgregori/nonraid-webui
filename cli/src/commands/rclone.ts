@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { resolveClient } from '../context.js';
-import { printTable, runAction } from '../output.js';
+import { emit, printTable, runAction } from '../output.js';
 import type { CommandResult, RcloneDaemonStatus, RcloneRemote, RecurringSchedule, RemoteBackupEntry, SyncJobWithRuntime, SyncScope } from '../api/types.js';
 
 function collectParam(value: string, previous: string[]): string[] {
@@ -64,7 +64,7 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const s = await client.get<RcloneDaemonStatus>('/rclone/status');
-        console.log(`Installed: ${s.installed}  Running: ${s.running}  Feature enabled: ${s.featureEnabled}`);
+        emit(s, () => console.log(`Installed: ${s.installed}  Running: ${s.running}  Feature enabled: ${s.featureEnabled}`));
       }),
     );
 
@@ -75,7 +75,7 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         await client.put('/rclone/enabled', { enabled: true });
-        console.log('Remote Backup enabled.');
+        emit({ ok: true, enabled: true }, () => console.log('Remote Backup enabled.'));
       }),
     );
 
@@ -86,7 +86,7 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         await client.put('/rclone/enabled', { enabled: false });
-        console.log('Remote Backup disabled.');
+        emit({ ok: true, enabled: false }, () => console.log('Remote Backup disabled.'));
       }),
     );
 
@@ -97,9 +97,11 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const providers = await client.get<{ name: string; description: string; oauth: boolean }[]>('/rclone/providers');
-        printTable(
-          ['NAME', 'DESCRIPTION', 'OAUTH'],
-          providers.map((p) => [p.name, p.description, p.oauth ? 'yes' : 'no']),
+        emit(providers, () =>
+          printTable(
+            ['NAME', 'DESCRIPTION', 'OAUTH'],
+            providers.map((p) => [p.name, p.description, p.oauth ? 'yes' : 'no']),
+          ),
         );
       }),
     );
@@ -113,9 +115,11 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const remotes = await client.get<RcloneRemote[]>('/rclone/remotes');
-        printTable(
-          ['NAME', 'TYPE', 'STATUS', 'MESSAGE'],
-          remotes.map((r) => [r.name, r.type, r.status, r.statusMessage ?? '-']),
+        emit(remotes, () =>
+          printTable(
+            ['NAME', 'TYPE', 'STATUS', 'MESSAGE'],
+            remotes.map((r) => [r.name, r.type, r.status, r.statusMessage ?? '-']),
+          ),
         );
       }),
     );
@@ -128,7 +132,7 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async (name: string, type: string, opts: { param: string[] }) => {
         const client = await resolveClient();
         const result = await client.post<{ done: boolean }>('/rclone/remotes', { name, type, parameters: paramsToObject(opts.param) });
-        console.log(result.done ? `Remote "${name}" created.` : `Remote "${name}" needs further OAuth setup - use the web UI to finish it.`);
+        emit(result, () => console.log(result.done ? `Remote "${name}" created.` : `Remote "${name}" needs further OAuth setup - use the web UI to finish it.`));
       }),
     );
 
@@ -139,7 +143,7 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async (name: string) => {
         const client = await resolveClient();
         const config = await client.get(`/rclone/remotes/${encodeURIComponent(name)}`);
-        console.log(JSON.stringify(config, null, 2));
+        emit(config, () => console.log(JSON.stringify(config, null, 2)));
       }),
     );
 
@@ -151,7 +155,7 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async (name: string, opts: { param: string[] }) => {
         const client = await resolveClient();
         await client.put(`/rclone/remotes/${encodeURIComponent(name)}`, { parameters: paramsToObject(opts.param) });
-        console.log(`Remote "${name}" updated.`);
+        emit({ ok: true, name }, () => console.log(`Remote "${name}" updated.`));
       }),
     );
 
@@ -162,7 +166,7 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async (name: string) => {
         const client = await resolveClient();
         await client.delete(`/rclone/remotes/${encodeURIComponent(name)}`);
-        console.log(`Remote "${name}" deleted.`);
+        emit({ ok: true, name }, () => console.log(`Remote "${name}" deleted.`));
       }),
     );
 
@@ -175,9 +179,11 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const jobs = await client.get<SyncJobWithRuntime[]>('/rclone/jobs');
-        printTable(
-          ['ID', 'NAME', 'SCOPE', 'REMOTE', 'ENABLED', 'STATE', 'LAST SYNC'],
-          jobs.map((j) => [j.id, j.name, j.scope, `${j.remoteName}:${j.remotePath}`, j.enabled ? 'yes' : 'no', j.state, j.lastSyncedAt ? new Date(j.lastSyncedAt).toISOString() : '-']),
+        emit(jobs, () =>
+          printTable(
+            ['ID', 'NAME', 'SCOPE', 'REMOTE', 'ENABLED', 'STATE', 'LAST SYNC'],
+            jobs.map((j) => [j.id, j.name, j.scope, `${j.remoteName}:${j.remotePath}`, j.enabled ? 'yes' : 'no', j.state, j.lastSyncedAt ? new Date(j.lastSyncedAt).toISOString() : '-']),
+          ),
         );
       }),
     );
@@ -210,7 +216,7 @@ export function registerRcloneCommand(program: Command): void {
           encryption: { enabled: !!opts.encrypt, ...(opts.password ? { password: opts.password } : {}) },
         };
         const created = await client.post<SyncJobWithRuntime>('/rclone/jobs', body);
-        console.log(`Sync job "${name}" created (id ${created.id}).`);
+        emit(created, () => console.log(`Sync job "${name}" created (id ${created.id}).`));
       }),
     );
 
@@ -256,7 +262,7 @@ export function registerRcloneCommand(program: Command): void {
             body.encryption = { ...(opts.encrypt !== undefined ? { enabled: opts.encrypt } : {}), ...(opts.password !== undefined ? { password: opts.password } : {}) };
           }
           await client.put(`/rclone/jobs/${encodeURIComponent(id)}`, body);
-          console.log(`Sync job "${id}" updated.`);
+          emit({ ok: true, id }, () => console.log(`Sync job "${id}" updated.`));
         },
       ),
     );
@@ -268,7 +274,7 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async (id: string) => {
         const client = await resolveClient();
         await client.delete(`/rclone/jobs/${encodeURIComponent(id)}`);
-        console.log(`Sync job "${id}" deleted.`);
+        emit({ ok: true, id }, () => console.log(`Sync job "${id}" deleted.`));
       }),
     );
 
@@ -279,7 +285,7 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async (id: string) => {
         const client = await resolveClient();
         await client.put(`/rclone/jobs/${encodeURIComponent(id)}/enabled`, { enabled: true });
-        console.log(`Sync job "${id}" enabled.`);
+        emit({ ok: true, id, enabled: true }, () => console.log(`Sync job "${id}" enabled.`));
       }),
     );
 
@@ -290,7 +296,7 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async (id: string) => {
         const client = await resolveClient();
         await client.put(`/rclone/jobs/${encodeURIComponent(id)}/enabled`, { enabled: false });
-        console.log(`Sync job "${id}" disabled.`);
+        emit({ ok: true, id, enabled: false }, () => console.log(`Sync job "${id}" disabled.`));
       }),
     );
 
@@ -301,7 +307,7 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async (id: string) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>(`/rclone/jobs/${encodeURIComponent(id)}/sync`);
-        console.log(result.message ?? 'Sync finished.');
+        emit(result, () => console.log(result.message ?? 'Sync finished.'));
       }),
     );
 
@@ -312,7 +318,7 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async (id: string) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>(`/rclone/jobs/${encodeURIComponent(id)}/cancel`);
-        console.log(result.message ?? 'Cancelled.');
+        emit(result, () => console.log(result.message ?? 'Cancelled.'));
       }),
     );
 
@@ -323,9 +329,11 @@ export function registerRcloneCommand(program: Command): void {
       runAction(async (id: string) => {
         const client = await resolveClient();
         const backups = await client.get<RemoteBackupEntry[]>(`/rclone/jobs/${encodeURIComponent(id)}/backups`);
-        printTable(
-          ['NAME', 'SIZE(MB)', 'MODIFIED', 'ENCRYPTED'],
-          backups.map((b) => [b.name, (b.sizeBytes / 1e6).toFixed(1), b.modTime, b.encrypted ? 'yes' : 'no']),
+        emit(backups, () =>
+          printTable(
+            ['NAME', 'SIZE(MB)', 'MODIFIED', 'ENCRYPTED'],
+            backups.map((b) => [b.name, (b.sizeBytes / 1e6).toFixed(1), b.modTime, b.encrypted ? 'yes' : 'no']),
+          ),
         );
       }),
     );

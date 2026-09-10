@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { resolveClient } from '../context.js';
-import { printTable, runAction } from '../output.js';
+import { emit, printTable, runAction } from '../output.js';
 import type { BootSnapshotsResponse, CommandResult, RestartServicesResult, SystemStats } from '../api/types.js';
 
 function fmtBytes(n: number | null): string {
@@ -24,15 +24,17 @@ export function registerSystemCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const s = await client.get<SystemStats>('/system');
-        console.log(`Hostname: ${s.hostname}  Timezone: ${s.timezone}  Version: ${s.version}${s.buildVersion ? ` (${s.buildVersion})` : ''}`);
-        console.log(`Uptime: ${fmtUptime(s.uptimeSeconds)}`);
-        console.log(`CPU: ${s.cpuPercent.toFixed(1)}%${s.cpuTempCelsius !== null ? ` @ ${s.cpuTempCelsius}°C` : ''}  Mem: ${fmtBytes(s.memUsedBytes)} / ${fmtBytes(s.memTotalBytes)}`);
-        if (s.bootDisk) {
-          console.log(`Boot disk: ${s.bootDisk.device} (${s.bootDisk.model ?? 'unknown model'}) ${fmtBytes(s.bootDisk.usedBytes)} / ${fmtBytes(s.bootDisk.totalBytes)}`);
-        }
-        for (const iface of s.networkInterfaces) {
-          console.log(`  ${iface.name}: ${[...iface.ipv4, ...iface.ipv6].join(', ') || '(no address)'}`);
-        }
+        emit(s, () => {
+          console.log(`Hostname: ${s.hostname}  Timezone: ${s.timezone}  Version: ${s.version}${s.buildVersion ? ` (${s.buildVersion})` : ''}`);
+          console.log(`Uptime: ${fmtUptime(s.uptimeSeconds)}`);
+          console.log(`CPU: ${s.cpuPercent.toFixed(1)}%${s.cpuTempCelsius !== null ? ` @ ${s.cpuTempCelsius}°C` : ''}  Mem: ${fmtBytes(s.memUsedBytes)} / ${fmtBytes(s.memTotalBytes)}`);
+          if (s.bootDisk) {
+            console.log(`Boot disk: ${s.bootDisk.device} (${s.bootDisk.model ?? 'unknown model'}) ${fmtBytes(s.bootDisk.usedBytes)} / ${fmtBytes(s.bootDisk.totalBytes)}`);
+          }
+          for (const iface of s.networkInterfaces) {
+            console.log(`  ${iface.name}: ${[...iface.ipv4, ...iface.ipv6].join(', ') || '(no address)'}`);
+          }
+        });
       }),
     );
 
@@ -43,7 +45,7 @@ export function registerSystemCommand(program: Command): void {
       runAction(async (hostname: string) => {
         const client = await resolveClient();
         const result = await client.put<CommandResult>('/system/hostname', { hostname });
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -54,7 +56,9 @@ export function registerSystemCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const zones = await client.get<string[]>('/system/timezones');
-        for (const z of zones) console.log(z);
+        emit(zones, () => {
+          for (const z of zones) console.log(z);
+        });
       }),
     );
 
@@ -65,7 +69,7 @@ export function registerSystemCommand(program: Command): void {
       runAction(async (timezone: string) => {
         const client = await resolveClient();
         const result = await client.put<CommandResult>('/system/timezone', { timezone });
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -76,7 +80,7 @@ export function registerSystemCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>('/system/reboot');
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -87,7 +91,7 @@ export function registerSystemCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const result = await client.post<{ result: { importedCount: number } }>('/system/reload-driver');
-        console.log(`Driver reloaded, ${result.result.importedCount} disk(s) re-imported.`);
+        emit(result, () => console.log(`Driver reloaded, ${result.result.importedCount} disk(s) re-imported.`));
       }),
     );
 
@@ -99,12 +103,14 @@ export function registerSystemCommand(program: Command): void {
       runAction(async (opts: { restartDocker?: boolean }) => {
         const client = await resolveClient();
         const result = await client.post<RestartServicesResult>('/system/restart-services', { restartDocker: !!opts.restartDocker });
-        console.log(`SMB: ${result.smb.ok ? 'ok' : 'FAILED'} - ${result.smb.message}`);
-        console.log(`NFS: ${result.nfs.ok ? 'ok' : 'FAILED'} - ${result.nfs.message}`);
-        console.log(`Driver reload: ${result.driverReload.ok ? 'ok' : 'FAILED'} - ${result.driverReload.message}`);
-        console.log(`rclone-rcd: ${result.rcloneRcd.ok ? 'ok' : 'FAILED'} - ${result.rcloneRcd.message}`);
-        if (result.docker) console.log(`Docker: ${result.docker.ok ? 'ok' : 'FAILED'} - ${result.docker.message}`);
-        console.log(result.message);
+        emit(result, () => {
+          console.log(`SMB: ${result.smb.ok ? 'ok' : 'FAILED'} - ${result.smb.message}`);
+          console.log(`NFS: ${result.nfs.ok ? 'ok' : 'FAILED'} - ${result.nfs.message}`);
+          console.log(`Driver reload: ${result.driverReload.ok ? 'ok' : 'FAILED'} - ${result.driverReload.message}`);
+          console.log(`rclone-rcd: ${result.rcloneRcd.ok ? 'ok' : 'FAILED'} - ${result.rcloneRcd.message}`);
+          if (result.docker) console.log(`Docker: ${result.docker.ok ? 'ok' : 'FAILED'} - ${result.docker.message}`);
+          console.log(result.message);
+        });
       }),
     );
 
@@ -116,7 +122,7 @@ export function registerSystemCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const result = await client.post('/system/backup/run-now');
-        console.log(JSON.stringify(result, null, 2));
+        emit(result, () => console.log(JSON.stringify(result, null, 2)));
       }),
     );
 
@@ -127,15 +133,18 @@ export function registerSystemCommand(program: Command): void {
     .action(
       runAction(async () => {
         const client = await resolveClient();
-        const { btrfsRoot, snapshots } = await client.get<BootSnapshotsResponse>('/system/boot-snapshots');
-        if (!btrfsRoot) {
-          console.log('Root filesystem is not btrfs - snapshots are unavailable.');
-          return;
-        }
-        printTable(
-          ['NAME', 'KIND', 'LABEL', 'CREATED', 'GRUB', 'SIZE(GB)'],
-          snapshots.map((s) => [s.name, s.kind, s.label ?? '-', s.createdAtLocal, s.inGrubMenu ? 'yes' : 'no', s.size ? (s.size.exclusiveBytes / 1e9).toFixed(2) : '-']),
-        );
+        const response = await client.get<BootSnapshotsResponse>('/system/boot-snapshots');
+        emit(response, () => {
+          const { btrfsRoot, snapshots } = response;
+          if (!btrfsRoot) {
+            console.log('Root filesystem is not btrfs - snapshots are unavailable.');
+            return;
+          }
+          printTable(
+            ['NAME', 'KIND', 'LABEL', 'CREATED', 'GRUB', 'SIZE(GB)'],
+            snapshots.map((s) => [s.name, s.kind, s.label ?? '-', s.createdAtLocal, s.inGrubMenu ? 'yes' : 'no', s.size ? (s.size.exclusiveBytes / 1e9).toFixed(2) : '-']),
+          );
+        });
       }),
     );
 
@@ -147,7 +156,7 @@ export function registerSystemCommand(program: Command): void {
       runAction(async (opts: { label?: string }) => {
         const client = await resolveClient();
         const s = await client.post<{ name: string }>('/system/boot-snapshots', opts.label ? { label: opts.label } : {});
-        console.log(`Snapshot "${s.name}" created.`);
+        emit(s, () => console.log(`Snapshot "${s.name}" created.`));
       }),
     );
 
@@ -158,7 +167,7 @@ export function registerSystemCommand(program: Command): void {
       runAction(async (name: string) => {
         const client = await resolveClient();
         const result = await client.delete<CommandResult>(`/system/boot-snapshots/${encodeURIComponent(name)}`);
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 }

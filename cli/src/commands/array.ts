@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { resolveClient } from '../context.js';
-import { printTable, runAction } from '../output.js';
+import { emit, printTable, runAction } from '../output.js';
 import { printSmartAttributes } from './smart.js';
 import type { CommandResult, NmdStatusResponse, SmartAttributes } from '../api/types.js';
 
@@ -13,15 +13,18 @@ export function registerArrayCommand(program: Command): void {
     .action(
       runAction(async () => {
         const client = await resolveClient();
-        const { array: a, resync } = await client.get<NmdStatusResponse>('/status');
-        console.log(`State: ${a.state}  Label: ${a.label || '(none)'}`);
-        console.log(`Disks: ${a.disks_imported}/${a.total_slots} imported, ${a.disks_present} present, ${a.disks_unassigned} unassigned`);
-        if (a.health.missing || a.health.disabled || a.health.disk_errors || a.health.sync_errors) {
-          console.log(`Health: missing=${a.health.missing} disabled=${a.health.disabled} disk_errors=${a.health.disk_errors} sync_errors=${a.health.sync_errors}`);
-        }
-        if (resync.active || resync.pending) {
-          console.log(`Parity ${resync.action}: ${resync.progress_percent}% @ ${resync.rate_mb_s} MB/s, ETA ${resync.eta_seconds}s${resync.paused ? ' (paused)' : ''}`);
-        }
+        const status = await client.get<NmdStatusResponse>('/status');
+        emit(status, () => {
+          const { array: a, resync } = status;
+          console.log(`State: ${a.state}  Label: ${a.label || '(none)'}`);
+          console.log(`Disks: ${a.disks_imported}/${a.total_slots} imported, ${a.disks_present} present, ${a.disks_unassigned} unassigned`);
+          if (a.health.missing || a.health.disabled || a.health.disk_errors || a.health.sync_errors) {
+            console.log(`Health: missing=${a.health.missing} disabled=${a.health.disabled} disk_errors=${a.health.disk_errors} sync_errors=${a.health.sync_errors}`);
+          }
+          if (resync.active || resync.pending) {
+            console.log(`Parity ${resync.action}: ${resync.progress_percent}% @ ${resync.rate_mb_s} MB/s, ETA ${resync.eta_seconds}s${resync.paused ? ' (paused)' : ''}`);
+          }
+        });
       }),
     );
 
@@ -32,7 +35,7 @@ export function registerArrayCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>('/array/start');
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -43,7 +46,7 @@ export function registerArrayCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>('/array/stop');
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 }
@@ -58,9 +61,11 @@ export function registerDiskCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const { disks } = await client.get<NmdStatusResponse>('/status');
-        printTable(
-          ['SLOT', 'TYPE', 'DEVICE', 'NAME', 'SIZE(GB)', 'STATUS'],
-          disks.map((d) => [String(d.slot), d.type, d.device || '-', d.disk_name || '-', String(d.size_gb), d.status]),
+        emit(disks, () =>
+          printTable(
+            ['SLOT', 'TYPE', 'DEVICE', 'NAME', 'SIZE(GB)', 'STATUS'],
+            disks.map((d) => [String(d.slot), d.type, d.device || '-', d.disk_name || '-', String(d.size_gb), d.status]),
+          ),
         );
       }),
     );
@@ -72,7 +77,7 @@ export function registerDiskCommand(program: Command): void {
       runAction(async (slot: string) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>(`/disks/${slot}/spin-down`);
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -83,7 +88,7 @@ export function registerDiskCommand(program: Command): void {
       runAction(async (slot: string) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>(`/disks/${slot}/spin-up`);
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -94,7 +99,7 @@ export function registerDiskCommand(program: Command): void {
       runAction(async (slot: string) => {
         const client = await resolveClient();
         const attrs = await client.get<SmartAttributes>(`/disks/${slot}/smart`);
-        printSmartAttributes(attrs);
+        emit(attrs, () => printSmartAttributes(attrs));
       }),
     );
 
@@ -105,7 +110,7 @@ export function registerDiskCommand(program: Command): void {
       runAction(async (slot: string, type: string) => {
         const client = await resolveClient();
         await client.post(`/disks/${slot}/smart/self-test`, { type });
-        console.log(`${type} self-test started on slot ${slot}.`);
+        emit({ ok: true, slot: Number(slot), type }, () => console.log(`${type} self-test started on slot ${slot}.`));
       }),
     );
 }
@@ -120,11 +125,13 @@ export function registerParityCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const { resync } = await client.get<NmdStatusResponse>('/status');
-        if (!resync.active && !resync.pending) {
-          console.log('No parity check in progress.');
-          return;
-        }
-        console.log(`${resync.action}: ${resync.progress_percent}% @ ${resync.rate_mb_s} MB/s, ETA ${resync.eta_seconds}s${resync.paused ? ' (paused)' : ''}`);
+        emit(resync, () => {
+          if (!resync.active && !resync.pending) {
+            console.log('No parity check in progress.');
+            return;
+          }
+          console.log(`${resync.action}: ${resync.progress_percent}% @ ${resync.rate_mb_s} MB/s, ETA ${resync.eta_seconds}s${resync.paused ? ' (paused)' : ''}`);
+        });
       }),
     );
 
@@ -135,7 +142,7 @@ export function registerParityCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>('/parity/CORRECT');
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 }

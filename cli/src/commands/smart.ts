@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { resolveClient } from '../context.js';
-import { printTable, runAction } from '../output.js';
+import { emit, printTable, runAction } from '../output.js';
 import type { SmartAttributes, SmartHealth, SmartSpinState } from '../api/types.js';
 
 export function registerSmartCommand(program: Command): void {
@@ -13,9 +13,11 @@ export function registerSmartCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const temps = await client.get<Record<string, number | null>>('/smart/temperatures');
-        printTable(
-          ['DEVICE', 'TEMP(C)'],
-          Object.entries(temps).map(([device, t]) => [device, t === null ? '-' : String(t)]),
+        emit(temps, () =>
+          printTable(
+            ['DEVICE', 'TEMP(C)'],
+            Object.entries(temps).map(([device, t]) => [device, t === null ? '-' : String(t)]),
+          ),
         );
       }),
     );
@@ -27,9 +29,11 @@ export function registerSmartCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const states = await client.get<Record<string, SmartSpinState>>('/smart/spin-states');
-        printTable(
-          ['DEVICE', 'STATE'],
-          Object.entries(states).map(([device, s]) => [device, s]),
+        emit(states, () =>
+          printTable(
+            ['DEVICE', 'STATE'],
+            Object.entries(states).map(([device, s]) => [device, s]),
+          ),
         );
       }),
     );
@@ -41,9 +45,11 @@ export function registerSmartCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const health = await client.get<Record<string, SmartHealth | null>>('/smart/health');
-        printTable(
-          ['DEVICE', 'HEALTH'],
-          Object.entries(health).map(([device, h]) => [device, h ?? 'unknown']),
+        emit(health, () =>
+          printTable(
+            ['DEVICE', 'HEALTH'],
+            Object.entries(health).map(([device, h]) => [device, h ?? 'unknown']),
+          ),
         );
       }),
     );
@@ -58,9 +64,11 @@ export function registerSmartCommand(program: Command): void {
         // lsblk's ROTA flag) actually returns boolean | null (true = SSD) - matched against the
         // real rig, not the doc.
         const types = await client.get<Record<string, boolean | null>>('/smart/disk-types');
-        printTable(
-          ['DEVICE', 'TYPE'],
-          Object.entries(types).map(([device, isSsd]) => [device, isSsd === null ? 'unknown' : isSsd ? 'ssd' : 'hdd']),
+        emit(types, () =>
+          printTable(
+            ['DEVICE', 'TYPE'],
+            Object.entries(types).map(([device, isSsd]) => [device, isSsd === null ? 'unknown' : isSsd ? 'ssd' : 'hdd']),
+          ),
         );
       }),
     );
@@ -72,11 +80,13 @@ export function registerSmartCommand(program: Command): void {
       runAction(async (device: string) => {
         const client = await resolveClient();
         const a = await client.get<SmartAttributes | null>(`/smart/by-device?device=${encodeURIComponent(device)}`);
-        if (!a) {
-          console.log(`No SMART data available for ${device}.`);
-          return;
-        }
-        printAttributes(a);
+        emit(a, () => {
+          if (!a) {
+            console.log(`No SMART data available for ${device}.`);
+            return;
+          }
+          printAttributes(a);
+        });
       }),
     );
 }

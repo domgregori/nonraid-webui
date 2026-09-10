@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { resolveClient } from '../context.js';
-import { printTable, runAction } from '../output.js';
+import { emit, printTable, runAction } from '../output.js';
 import type { NrGroup, NrUser, ShareAccessEntry, SharePermission } from '../api/types.js';
 
 function splitList(v?: string): string[] {
@@ -20,9 +20,11 @@ export function registerUserCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const users = await client.get<NrUser[]>('/users');
-        printTable(
-          ['USERNAME', 'UID', 'GROUPS'],
-          users.map((u) => [u.username, String(u.uid), u.groups.join(',') || '-']),
+        emit(users, () =>
+          printTable(
+            ['USERNAME', 'UID', 'GROUPS'],
+            users.map((u) => [u.username, String(u.uid), u.groups.join(',') || '-']),
+          ),
         );
       }),
     );
@@ -35,8 +37,8 @@ export function registerUserCommand(program: Command): void {
     .action(
       runAction(async (username: string, opts: { password: string; groups?: string }) => {
         const client = await resolveClient();
-        await client.post<NrUser>('/users', { username, password: opts.password, groups: splitList(opts.groups) });
-        console.log(`User "${username}" created.`);
+        const created = await client.post<NrUser>('/users', { username, password: opts.password, groups: splitList(opts.groups) });
+        emit(created, () => console.log(`User "${username}" created.`));
       }),
     );
 
@@ -51,8 +53,8 @@ export function registerUserCommand(program: Command): void {
         const body: { password?: string; groups?: string[] } = {};
         if (opts.password !== undefined) body.password = opts.password;
         if (opts.groups !== undefined) body.groups = splitList(opts.groups);
-        await client.put<NrUser>(`/users/${encodeURIComponent(username)}`, body);
-        console.log(`User "${username}" updated.`);
+        const updated = await client.put<NrUser>(`/users/${encodeURIComponent(username)}`, body);
+        emit(updated, () => console.log(`User "${username}" updated.`));
       }),
     );
 
@@ -63,7 +65,7 @@ export function registerUserCommand(program: Command): void {
       runAction(async (username: string) => {
         const client = await resolveClient();
         await client.delete(`/users/${encodeURIComponent(username)}`);
-        console.log(`User "${username}" deleted.`);
+        emit({ ok: true, username }, () => console.log(`User "${username}" deleted.`));
       }),
     );
 
@@ -74,9 +76,11 @@ export function registerUserCommand(program: Command): void {
       runAction(async (username: string) => {
         const client = await resolveClient();
         const rows = await client.get<ShareAccessEntry[]>(`/users/${encodeURIComponent(username)}/access`);
-        printTable(
-          ['SHARE', 'PERMISSION'],
-          rows.map((r) => [r.shareName, r.permission]),
+        emit(rows, () =>
+          printTable(
+            ['SHARE', 'PERMISSION'],
+            rows.map((r) => [r.shareName, r.permission]),
+          ),
         );
       }),
     );
@@ -90,7 +94,7 @@ export function registerUserCommand(program: Command): void {
         await client.put(`/users/${encodeURIComponent(username)}/access/${encodeURIComponent(shareName)}`, {
           permission: permission as SharePermission,
         });
-        console.log(`"${username}" set to "${permission}" on share "${shareName}".`);
+        emit({ ok: true, username, shareName, permission }, () => console.log(`"${username}" set to "${permission}" on share "${shareName}".`));
       }),
     );
 }
@@ -105,9 +109,11 @@ export function registerGroupCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const groups = await client.get<NrGroup[]>('/groups');
-        printTable(
-          ['NAME', 'GID'],
-          groups.map((g) => [g.name, String(g.gid)]),
+        emit(groups, () =>
+          printTable(
+            ['NAME', 'GID'],
+            groups.map((g) => [g.name, String(g.gid)]),
+          ),
         );
       }),
     );
@@ -118,8 +124,8 @@ export function registerGroupCommand(program: Command): void {
     .action(
       runAction(async (name: string) => {
         const client = await resolveClient();
-        await client.post<NrGroup>('/groups', { name });
-        console.log(`Group "${name}" created.`);
+        const created = await client.post<NrGroup>('/groups', { name });
+        emit(created, () => console.log(`Group "${name}" created.`));
       }),
     );
 
@@ -130,7 +136,7 @@ export function registerGroupCommand(program: Command): void {
       runAction(async (name: string) => {
         const client = await resolveClient();
         await client.delete(`/groups/${encodeURIComponent(name)}`);
-        console.log(`Group "${name}" deleted.`);
+        emit({ ok: true, name }, () => console.log(`Group "${name}" deleted.`));
       }),
     );
 
@@ -141,9 +147,11 @@ export function registerGroupCommand(program: Command): void {
       runAction(async (name: string) => {
         const client = await resolveClient();
         const rows = await client.get<ShareAccessEntry[]>(`/groups/${encodeURIComponent(name)}/access`);
-        printTable(
-          ['SHARE', 'PERMISSION'],
-          rows.map((r) => [r.shareName, r.permission]),
+        emit(rows, () =>
+          printTable(
+            ['SHARE', 'PERMISSION'],
+            rows.map((r) => [r.shareName, r.permission]),
+          ),
         );
       }),
     );
@@ -157,7 +165,7 @@ export function registerGroupCommand(program: Command): void {
         await client.put(`/groups/${encodeURIComponent(name)}/access/${encodeURIComponent(shareName)}`, {
           permission: permission as SharePermission,
         });
-        console.log(`"${name}" set to "${permission}" on share "${shareName}".`);
+        emit({ ok: true, name, shareName, permission }, () => console.log(`"${name}" set to "${permission}" on share "${shareName}".`));
       }),
     );
 }

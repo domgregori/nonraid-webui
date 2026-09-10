@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { resolveClient } from '../context.js';
-import { printTable, runAction } from '../output.js';
+import { emit, printTable, runAction } from '../output.js';
 import type { ShareInput, ShareWithStats } from '../api/types.js';
 
 interface ShareOpts {
@@ -68,13 +68,15 @@ export function registerShareCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const shares = await client.get<ShareWithStats[]>('/shares');
-        printTable(
-          ['NAME', 'ALLOCATION', 'PROTOCOLS', 'DISKS', 'USED/TOTAL(GB)', 'CONNS'],
-          shares.map((s) => {
-            const used = s.stats.usedBytes !== null ? (s.stats.usedBytes / 1e9).toFixed(1) : '-';
-            const total = s.stats.totalBytes !== null ? (s.stats.totalBytes / 1e9).toFixed(1) : '-';
-            return [s.name, s.allocationMethod, s.protocols.join(','), s.allDisks ? 'all' : s.disks.join(','), `${used}/${total}`, String(s.activeConnections)];
-          }),
+        emit(shares, () =>
+          printTable(
+            ['NAME', 'ALLOCATION', 'PROTOCOLS', 'DISKS', 'USED/TOTAL(GB)', 'CONNS'],
+            shares.map((s) => {
+              const used = s.stats.usedBytes !== null ? (s.stats.usedBytes / 1e9).toFixed(1) : '-';
+              const total = s.stats.totalBytes !== null ? (s.stats.totalBytes / 1e9).toFixed(1) : '-';
+              return [s.name, s.allocationMethod, s.protocols.join(','), s.allDisks ? 'all' : s.disks.join(','), `${used}/${total}`, String(s.activeConnections)];
+            }),
+          ),
         );
       }),
     );
@@ -84,8 +86,8 @@ export function registerShareCommand(program: Command): void {
     .action(
       runAction(async (name: string, opts: ShareOpts) => {
         const client = await resolveClient();
-        await client.post<ShareWithStats>('/shares', buildBody(name, opts));
-        console.log(`Share "${name}" created.`);
+        const created = await client.post<ShareWithStats>('/shares', buildBody(name, opts));
+        emit(created, () => console.log(`Share "${name}" created.`));
       }),
     );
 
@@ -96,8 +98,8 @@ export function registerShareCommand(program: Command): void {
       runAction(async (name: string, opts: ShareOpts & { rename?: string }) => {
         const client = await resolveClient();
         const body = buildBody(opts.rename ?? name, opts);
-        await client.put<ShareWithStats>(`/shares/${encodeURIComponent(name)}`, body);
-        console.log(`Share "${name}" updated${opts.rename ? ` (renamed to "${opts.rename}")` : ''}.`);
+        const updated = await client.put<ShareWithStats>(`/shares/${encodeURIComponent(name)}`, body);
+        emit(updated, () => console.log(`Share "${name}" updated${opts.rename ? ` (renamed to "${opts.rename}")` : ''}.`));
       }),
     );
 
@@ -108,7 +110,7 @@ export function registerShareCommand(program: Command): void {
       runAction(async (name: string) => {
         const client = await resolveClient();
         await client.delete(`/shares/${encodeURIComponent(name)}`);
-        console.log(`Share "${name}" deleted.`);
+        emit({ ok: true, name }, () => console.log(`Share "${name}" deleted.`));
       }),
     );
 }

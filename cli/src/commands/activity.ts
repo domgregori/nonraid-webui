@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { resolveClient } from '../context.js';
-import { printTable, runAction } from '../output.js';
+import { emit, printTable, runAction } from '../output.js';
 import type { ActivityEntry, LogQueryResult, LogSourceRow, MetricSeries } from '../api/types.js';
 
 export function registerActivityCommand(program: Command): void {
@@ -13,9 +13,11 @@ export function registerActivityCommand(program: Command): void {
         const client = await resolveClient();
         const query = opts.limit ? `?limit=${encodeURIComponent(opts.limit)}` : '';
         const entries = await client.get<ActivityEntry[]>(`/activity${query}`);
-        printTable(
-          ['TIME', 'TEXT'],
-          entries.map((e) => [new Date(e.timestamp).toISOString(), e.text]),
+        emit(entries, () =>
+          printTable(
+            ['TIME', 'TEXT'],
+            entries.map((e) => [new Date(e.timestamp).toISOString(), e.text]),
+          ),
         );
       }),
     );
@@ -31,9 +33,11 @@ export function registerLogsCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const sources = await client.get<LogSourceRow[]>('/logs/sources');
-        printTable(
-          ['ID', 'LABEL'],
-          sources.map((s) => [s.id, s.label]),
+        emit(sources, () =>
+          printTable(
+            ['ID', 'LABEL'],
+            sources.map((s) => [s.id, s.label]),
+          ),
         );
       }),
     );
@@ -53,8 +57,10 @@ export function registerLogsCommand(program: Command): void {
         else if (opts.window) params.set('window', opts.window);
         const qs = params.toString();
         const result = await client.get<LogQueryResult>(`/logs/${encodeURIComponent(sourceId)}${qs ? `?${qs}` : ''}`);
-        process.stdout.write(result.logs);
-        if (!result.logs.endsWith('\n')) process.stdout.write('\n');
+        emit(result, () => {
+          process.stdout.write(result.logs);
+          if (!result.logs.endsWith('\n')) process.stdout.write('\n');
+        });
       }),
     );
 }
@@ -68,11 +74,13 @@ export function registerMetricsCommand(program: Command): void {
       runAction(async (metrics: string, opts: { range: string }) => {
         const client = await resolveClient();
         const { series } = await client.get<{ series: MetricSeries[] }>(`/metrics?metrics=${encodeURIComponent(metrics)}&range=${encodeURIComponent(opts.range)}`);
-        for (const s of series) {
-          console.log(`${s.metric} [${s.key}] - ${s.points.length} point(s)`);
-          const last = s.points[s.points.length - 1];
-          if (last) console.log(`  latest: ${new Date(last.ts).toISOString()} = ${last.value}`);
-        }
+        emit(series, () => {
+          for (const s of series) {
+            console.log(`${s.metric} [${s.key}] - ${s.points.length} point(s)`);
+            const last = s.points[s.points.length - 1];
+            if (last) console.log(`  latest: ${new Date(last.ts).toISOString()} = ${last.value}`);
+          }
+        });
       }),
     );
 }

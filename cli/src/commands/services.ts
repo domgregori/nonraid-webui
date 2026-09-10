@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { resolveClient } from '../context.js';
-import { printTable, runAction } from '../output.js';
+import { emit, printTable, runAction } from '../output.js';
 import type { CommandResult, ServiceRow } from '../api/types.js';
 
 export function registerServiceCommand(program: Command): void {
@@ -13,9 +13,11 @@ export function registerServiceCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const rows = await client.get<ServiceRow[]>('/services');
-        printTable(
-          ['ID', 'LABEL', 'STATE'],
-          rows.map((r) => [r.id, r.label, r.state]),
+        emit(rows, () =>
+          printTable(
+            ['ID', 'LABEL', 'STATE'],
+            rows.map((r) => [r.id, r.label, r.state]),
+          ),
         );
       }),
     );
@@ -27,7 +29,7 @@ export function registerServiceCommand(program: Command): void {
       runAction(async (id: string) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>(`/services/${encodeURIComponent(id)}/start`);
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -38,7 +40,7 @@ export function registerServiceCommand(program: Command): void {
       runAction(async (id: string) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>(`/services/${encodeURIComponent(id)}/stop`);
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -49,7 +51,7 @@ export function registerServiceCommand(program: Command): void {
       runAction(async (id: string) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>(`/services/${encodeURIComponent(id)}/restart`);
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 }

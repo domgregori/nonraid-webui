@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { resolveClient } from '../context.js';
-import { runAction } from '../output.js';
+import { emit, runAction } from '../output.js';
 import type { CacheMoverStatus, CacheReplaceStatus, CacheStatus, CommandResult } from '../api/types.js';
 
 export function registerCacheCommand(program: Command): void {
@@ -13,13 +13,15 @@ export function registerCacheCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const s = await client.get<CacheStatus>('/cache/status');
-        console.log(`Health: ${s.health}  Enabled: ${s.enabled}  fsUuid: ${s.fsUuid ?? '-'}`);
-        if (s.usedBytes !== null && s.totalBytes !== null) {
-          console.log(`Used: ${(s.usedBytes / 1e9).toFixed(1)} GB / ${(s.totalBytes / 1e9).toFixed(1)} GB`);
-        }
-        for (const d of s.devices) {
-          console.log(`  devid ${d.devid}: ${d.path ?? '(missing)'} ${d.model ?? ''} health=${d.smartHealth ?? 'unknown'}${d.missing ? ' MISSING' : ''}`);
-        }
+        emit(s, () => {
+          console.log(`Health: ${s.health}  Enabled: ${s.enabled}  fsUuid: ${s.fsUuid ?? '-'}`);
+          if (s.usedBytes !== null && s.totalBytes !== null) {
+            console.log(`Used: ${(s.usedBytes / 1e9).toFixed(1)} GB / ${(s.totalBytes / 1e9).toFixed(1)} GB`);
+          }
+          for (const d of s.devices) {
+            console.log(`  devid ${d.devid}: ${d.path ?? '(missing)'} ${d.model ?? ''} health=${d.smartHealth ?? 'unknown'}${d.missing ? ' MISSING' : ''}`);
+          }
+        });
       }),
     );
 
@@ -33,7 +35,7 @@ export function registerCacheCommand(program: Command): void {
       runAction(async (opts: { deviceA: string; deviceB: string; force?: boolean }) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>('/cache/setup', { deviceA: opts.deviceA, deviceB: opts.deviceB, force: !!opts.force });
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -45,7 +47,7 @@ export function registerCacheCommand(program: Command): void {
       runAction(async (opts: { device: string }) => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>('/cache/replace', { device: opts.device });
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -56,7 +58,7 @@ export function registerCacheCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const s = await client.get<CacheReplaceStatus>('/cache/replace/status');
-        console.log(`Running: ${s.running}${s.progressPercent !== null ? `  ${s.progressPercent}%` : ''}${s.message ? `  ${s.message}` : ''}`);
+        emit(s, () => console.log(`Running: ${s.running}${s.progressPercent !== null ? `  ${s.progressPercent}%` : ''}${s.message ? `  ${s.message}` : ''}`));
       }),
     );
 
@@ -67,7 +69,7 @@ export function registerCacheCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const result = await client.put<CommandResult>('/cache/enabled', { enabled: true });
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -78,7 +80,7 @@ export function registerCacheCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const result = await client.put<CommandResult>('/cache/enabled', { enabled: false });
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -90,7 +92,7 @@ export function registerCacheCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>('/cache/mover/run');
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 
@@ -101,7 +103,7 @@ export function registerCacheCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const s = await client.get<CacheMoverStatus>('/cache/mover/status');
-        console.log(JSON.stringify(s, null, 2));
+        emit(s, () => console.log(JSON.stringify(s, null, 2)));
       }),
     );
 
@@ -112,7 +114,7 @@ export function registerCacheCommand(program: Command): void {
       runAction(async () => {
         const client = await resolveClient();
         const result = await client.post<CommandResult>('/cache/mover/cancel');
-        console.log(result.message);
+        emit(result, () => console.log(result.message));
       }),
     );
 }
