@@ -134,7 +134,8 @@ backend/                 Express API wrapping nmdctl, Docker, lxc-*, smartctl, s
                    backupScheduler/backupStream/backupCrypto/backupMeta/configRestore) + boot disk
                    snapshots (bootSnapshots.ts, btrfs + GRUB rescue menu) + hostConfig (hostname/
                    timezone/reboot) + hdparm (spin-down timers) + services.ts (managed systemd
-                   units) + logs.ts (journalctl tailing) + benchmark.ts
+                   units, including the sshd toggle) + sshKeys.ts (authorized_keys management) +
+                   logs.ts (journalctl tailing) + benchmark.ts
   src/rclone/      RcloneClient interface + RealRcloneClient (talks to rclone's own `rclone-rcd` RC
                    daemon over HTTP - no local copy of remote definitions) + RcloneService (sync
                    job scheduling/retention/restore) + syncJobStore.ts (this app's own sync-job
@@ -142,9 +143,11 @@ backend/                 Express API wrapping nmdctl, Docker, lxc-*, smartctl, s
   src/settings/    app settings store (settings.json), notification catalog/dispatch (Apprise),
                    schedule matching, backup-encryption password handling
   src/update/      UpdateScheduler - checks for and applies nonraid-webui/driver updates
-  src/routes/      /api/status, /api/array/*, /api/parity/*, /api/docker/*, /api/lxc/*,
-                   /api/smart/*, /api/shares/*, /api/users/*, /api/groups/*, /api/system,
-                   /api/rclone/*, /api/settings, /api/tls/*, /api/auth/*
+  src/unraidImport/ parser.ts/cfgParser.ts/dockerTemplateParser.ts/archive.ts - reads an Unraid
+                   config backup archive (users/shares/Docker CA apps) for the Import wizard
+  src/routes/      one file per resource group - see backend/API.md for the full, current route
+                   reference; this list goes stale the moment a route file is added and isn't worth
+                   duplicating by hand
   src/auth/        session cookies, password hashing, login rate limiting, request-origin
                    detection (for the Secure cookie flag and passkey RP ID)
   src/tls/         built-in HTTPS: self-signed cert generation, imported cert inspection, TLS
@@ -154,7 +157,6 @@ backend/                 Express API wrapping nmdctl, Docker, lxc-*, smartctl, s
   src/cache/       cache pool mount, and the scheduled mover that drains cache onto the array
   src/metrics/     CPU/memory/disk/network sampling + the SQLite store behind the History graphs
   src/parity/      scheduled parity check trigger
-  src/settings/    app settings store, notification catalog/dispatch (Apprise), schedule matching
   src/activity/    the Dashboard/History activity log (event store + file watcher)
   src/diskQueue/   the disk add/clear queue (sequences array stop/start around a disk operation)
   src/emptyDisk/   the "Empty Disk" data-eviction flow ahead of removing a disk

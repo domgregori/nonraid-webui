@@ -40,7 +40,7 @@ backend module owns which subsystem.
 | GET | `/status` | - | Full `nmdctl status -o json` passthrough (`NmdStatus`). `404` with `code: "ARRAY_NOT_CONFIGURED"` on a fresh install with no array ever created (not a `502`) - the frontend uses this to route into onboarding. |
 | POST | `/array/start` | - | Starts the array, mounts every disk's filesystem, remounts shares. Reapplies the persisted turbo-write preference (the driver forgets it across stop/start). |
 | POST | `/array/stop` | - | Unmounts every share, then every disk, then stops the array (in that order - a share's mergerfs/bind mount holds a live reference nmdctl has no idea about). |
-| POST | `/array/shrink` | `{ dropSlots: number[] }` | Unmounts, drops the listed slots, remounts. |
+| POST | `/array/shrink` | `{ dropSlots: number[], stopContainers?: boolean }` | Unmounts, drops the listed slots, remounts. Same opt-in `stopContainers` precedent as `/array/stop` - only needed when Docker/LXC storage lives on a disk *not* being dropped and would otherwise hold the unmount busy. |
 | POST | `/array/reload-driver` | `{ stopContainers?: boolean }` | Recovery action for a stuck/error array state. `stopContainers: true` opts into stopping Docker + running LXC containers first if something has a file open on an array disk; they're restarted afterward regardless of outcome. |
 | PUT | `/array/label` | `{ label: string }` | Sets/clears the array's display label. |
 | POST | `/parity/:action` | `:action` = `CORRECT` \| `NOCORRECT` \| `PAUSE` \| `RESUME` \| `CANCEL` | `nmdctl check <action>`. `400` on an invalid action. |
@@ -309,6 +309,23 @@ or a fresh install from before this app tracked its own version.
 | POST | `/update/check` | - | Live check against GitHub (`git ls-remote --tags`) for both components. `UpdateStatus`: `{ nonraid, nonraidWebui, cliTool, checkedAt }`, each component `{ installed, latest, upToDate, checkError, runningMatchesInstalled }` - `upToDate`/`runningMatchesInstalled` are `null` (not `false`) when it can't be determined, not just "no". An update is available whenever `upToDate === false`, *or* `installed === null` with a real `latest` (not built from a tagged release at all, but a release still exists to move to) - see `hasUpdateAvailable()` in `backend/src/update/service.ts`. |
 | GET | `/update/changelog` | `?component=nonraid\|nonraidWebui&tag=` | `{ tag, body }` - the GitHub Release body for `tag` on that component's repo, `body: null` when that tag has no Release object (a plain pushed tag with nothing published). |
 | POST | `/update/apply` | `{ component: 'nonraid'\|'nonraidWebui' }` | Re-checks live first; `409` if no update is available (same `hasUpdateAvailable()` gate as above). Runs `install-webui.sh` on the host. `nonraid`: rebuilds/reinstalls the kernel module via DKMS only - never touches the *live* loaded module (reload that separately via Settings > Services). `nonraidWebui`: builds + stages only, then this backend restarts itself in place on success (response still returns first: `{ ok, message: "...restarting now...", output }` - the client reconnects automatically). `ApplyResult`: `{ ok, message, output }` - `output` is the last 200 lines of the install script's combined stdout+stderr. |
+
+## SSH
+
+Enabling SSH or adding a trusted key grants full root shell access to the host - both mutations
+are step-up gated (`requireStepUp`, same class of risk `POST /auth/tokens` above already
+cross-references) and rate-limited the same way a session-gated TOTP re-check is. Removing a key
+is step-up gated too - it's just as much a real access-control change as adding one, especially if
+it's the only trusted key left. Keys are never echoed back with their raw public-key material, only
+`{ type, comment, fingerprint }` - enough for the UI to tell entries apart and target one for
+removal.
+
+| Method | Path | Body/Params | Response / Notes |
+|---|---|---|---|
+| GET | `/ssh/status` | - | `{ enabled, keys: [{ type, comment, fingerprint }] }`. `enabled` reads systemd's own sshd unit state directly - there's no separate settings.json flag to go stale. |
+| PUT | `/ssh/enabled` | `{ enabled: boolean }` | Enables/disables the sshd systemd unit to match. |
+| POST | `/ssh/keys` | `{ key: string }` | Step-up gated. Appends an authorized public key. `400` if `key` is missing/blank. |
+| DELETE | `/ssh/keys/:fingerprint` | - | Step-up gated. Removes the key with that fingerprint. |
 
 ## Tailscale
 
