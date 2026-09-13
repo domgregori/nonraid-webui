@@ -1,7 +1,7 @@
 {
   "name": "nonraid-tool",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Command-line client for nonraid-webui's REST API - plain CLI by default, `nonraid-tool tui` for an interactive Ink-based dashboard.",
   "bin": {
