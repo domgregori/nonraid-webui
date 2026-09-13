@@ -43,6 +43,36 @@ export function deriveShareEndpoints(share: Pick<ShareWithStats, 'name' | 'proto
   return endpoints;
 }
 
+/** Every user/group entry actually granted `read-write` or `read-only` on the share - `'none'`/
+ *  `'hidden'` entries (an explicit block, or hidden-but-not-blocked) don't count as real access. */
+function accessPrincipals(share: Pick<ShareWithStats, 'access'>): string[] {
+  return [
+    ...Object.entries(share.access.users)
+      .filter(([, p]) => p === 'read-write' || p === 'read-only')
+      .map(([name]) => name),
+    ...Object.entries(share.access.groups)
+      .filter(([, p]) => p === 'read-write' || p === 'read-only')
+      .map(([name]) => `@${name}`),
+  ];
+}
+
+/**
+ * True when *someone* can actually connect - as opposed to merely having a protocol enabled.
+ * NFS is host-based (no per-user list), and an empty/unset `allowedHosts` means "any host" (see
+ * deriveAccessLabel's own comment on that), so an NFS-enabled share is always reachable. SMB needs
+ * either `public: true` or at least one real user/group grant - a share with SMB enabled but zero
+ * of either (the common state right after `share create` with no access configured yet) has no
+ * valid Samba credentials at all, and is exactly as unreachable as one with no protocol enabled -
+ * see SharesCard.tsx, the one place this currently matters.
+ */
+export function isShareReachable(share: Pick<ShareWithStats, 'access' | 'smb' | 'protocols'>): boolean {
+  if (share.protocols.includes('nfs')) return true;
+  if (share.protocols.includes('smb')) {
+    return share.smb?.public === true || accessPrincipals(share).length > 0;
+  }
+  return false;
+}
+
 /** Groups get Samba's own "@groupname" convention, matching how they're already written into
  *  smb.conf's valid/invalid/read lists elsewhere in this app. */
 export function deriveAccessLabel(share: Pick<ShareWithStats, 'access' | 'smb' | 'protocols' | 'nfs'>): string {
@@ -54,14 +84,7 @@ export function deriveAccessLabel(share: Pick<ShareWithStats, 'access' | 'smb' |
     const hosts = share.nfs?.allowedHosts;
     return hosts && hosts.length > 0 ? `NFS: ${hosts.join(', ')}` : 'NFS: any host';
   }
-  const principals = [
-    ...Object.entries(share.access.users)
-      .filter(([, p]) => p === 'read-write' || p === 'read-only')
-      .map(([name]) => name),
-    ...Object.entries(share.access.groups)
-      .filter(([, p]) => p === 'read-write' || p === 'read-only')
-      .map(([name]) => `@${name}`),
-  ];
+  const principals = accessPrincipals(share);
   if (principals.length > 0) return principals.join(', ');
   if (share.smb?.public === true) return 'Public';
   return 'No access configured';

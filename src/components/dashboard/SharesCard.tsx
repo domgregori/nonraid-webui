@@ -1,18 +1,19 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useShares } from '../../hooks/useShares';
-import { deriveShareViewModel } from '../../selectors/shares';
+import { deriveShareViewModel, isShareReachable } from '../../selectors/shares';
 import { Card } from '../shared/Card';
 
 export function SharesCard() {
   const { t } = useTranslation('dashboard');
   const { shares } = useShares();
-  // A share with no protocols enabled isn't exported over SMB/NFS at all - a pool that exists
-  // purely as array-backed storage for something else (a Docker/LXC bind mount, for instance),
-  // never meant to be connected to. The dashboard card is for shares people actually reach over
-  // the network, so those don't belong here (they're still fully visible and manageable on the
-  // Shares page itself).
-  const views = shares.filter((s) => s.protocols.length > 0).map(deriveShareViewModel);
+  // A share nobody can actually connect to doesn't belong here - either no protocol is enabled at
+  // all (a pool that exists purely as array-backed storage for something else, e.g. a Docker/LXC
+  // bind mount), or SMB is enabled but has neither `public` nor any real user/group grant, which is
+  // just as unreachable in practice (no valid Samba credentials exist for it). The dashboard card
+  // is for shares people actually reach over the network, so neither case belongs here - both stay
+  // fully visible and manageable on the Shares page itself.
+  const views = shares.filter(isShareReachable).map(deriveShareViewModel);
 
   return (
     <Card>
