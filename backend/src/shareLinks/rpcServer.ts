@@ -157,11 +157,14 @@ export class ShareLinkRpcServer {
 
   private async unlockShare({ tokenHash, password }: UnlockShareParams): Promise<UnlockShareResult> {
     const record = this.store.getByTokenHash(tokenHash);
-    if (!record) return { ok: false };
-    if (record.revokedAt !== null) return { ok: false };
-    if (record.expiresAt !== null && record.expiresAt < Date.now()) return { ok: false };
+    // A nonexistent, revoked, or expired token all collapse to the same generic failure - nothing
+    // distinguishes "this token never existed" from "it did, but is gone now" to an outside caller.
+    if (!record || record.revokedAt !== null || (record.expiresAt !== null && record.expiresAt < Date.now())) {
+      return { ok: false, reason: 'not_found' };
+    }
     if (record.passwordHash !== null) {
-      if (!password || !(await verifySecret(password, record.passwordHash))) return { ok: false };
+      if (!password) return { ok: false, reason: 'password_required', label: record.label, mode: record.mode };
+      if (!(await verifySecret(password, record.passwordHash))) return { ok: false, reason: 'wrong_password' };
     }
     this.store.touchLastAccessed(record.id);
     return {
@@ -170,6 +173,7 @@ export class ShareLinkRpcServer {
       mode: record.mode,
       allowDelete: record.allowDelete,
       rootPath: record.rootPath,
+      label: record.label,
       uploadQuotaBytes: record.uploadQuotaBytes,
       maxFileSizeBytes: record.maxFileSizeBytes,
       uploadUsedBytes: record.uploadUsedBytes,

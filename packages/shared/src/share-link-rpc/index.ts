@@ -23,14 +23,26 @@ export interface UnlockShareParams {
   password?: string;
 }
 
+// Deliberate small addition over the plan's original binary {ok:false}|{ok:true,...} sketch: a
+// public "what is this link" landing page (GET /api/shares/:token on share-server) needs to show
+// a share's label/mode and whether a password is needed *before* a password has been supplied, so
+// the unlock form can render something more useful than a blind text box - see the spec's own
+// documented `GET /api/shares/:token -> { label, mode, requiresPassword }` contract, which the
+// original literal RPC signature had no way to satisfy. `reason` distinguishes "this token is
+// valid but needs a password" (safe to reveal label/mode for) from every other failure - an
+// unknown/revoked/expired token, or a wrong password actively submitted - which reveals nothing
+// at all, not even whether the token itself exists. rootPath/quota/allowDelete - everything
+// operationally sensitive - still requires a genuine successful unlock either way.
 export type UnlockShareResult =
-  | { ok: false }
+  | { ok: false; reason: 'not_found' | 'wrong_password' }
+  | { ok: false; reason: 'password_required'; label: string | null; mode: ShareMode }
   | {
       ok: true;
       shareId: string;
       mode: ShareMode;
       allowDelete: boolean;
       rootPath: string;
+      label: string | null;
       uploadQuotaBytes: number | null;
       maxFileSizeBytes: number | null;
       uploadUsedBytes: number;
