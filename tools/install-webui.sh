@@ -41,6 +41,24 @@ ARRAY_DATA_GROUP=users
 ARRAY_DATA_GID=100
 ARRAY_DATA_USER=user
 ARRAY_DATA_UID=99
+# Share Links (packages/shared, backend/src/shareLinks/, share-server/, public-share/) - internet
+# file sharing via a Cloudflare Tunnel. share-server runs as its own dedicated, unprivileged
+# account (no fixed uid/gid needed - unlike ARRAY_DATA_USER above, nothing needs to reference this
+# one by number) with SupplementaryGroups=users for real /mnt access - see
+# tools/systemd/nonraid-share-server.service.
+SHARE_SERVER_USER=nonraid-share
+SHARE_SERVER_GROUP=nonraid-share
+SHARED_PKG_DIR="$REPO_ROOT/packages/shared"
+SHARE_SERVER_DIR="$REPO_ROOT/share-server"
+PUBLIC_SHARE_DIR="$REPO_ROOT/public-share"
+# Root-owned, 0700 - share-server never touches this directory at all under the RPC redesign (it
+# has zero filesystem access to share_link.db, the admin backend's sole responsibility - see
+# backend/src/shareLinks/store.ts). Reserved for the admin backend's own state under this feature,
+# should anything ever need it beyond share_link.db itself (which lives under the existing
+# StateDirectory=nonraid-webui, /var/lib/nonraid-webui, same as everything else the backend owns).
+SHARE_LINKS_STATE_DIR=/var/lib/nonraid-webui/share-links
+SHARE_SERVER_ENV_FILE=/etc/default/nonraid-share-server
+CLOUDFLARED_TOKEN_ENV_FILE=/etc/default/nonraid-cloudflared
 NFSD_THREADS=32
 LOG_DIR=/var/log/nonraid-webui
 LOG_FILE="$LOG_DIR/install-$(date +%Y%m%d-%H%M%S).log"
@@ -199,6 +217,26 @@ ensure_array_data_account() {
   else
     existing_uid="$(id -u "$ARRAY_DATA_USER")"
     [ "$existing_uid" = "$ARRAY_DATA_UID" ] || fail "user '$ARRAY_DATA_USER' already exists with uid $existing_uid, not the expected $ARRAY_DATA_UID."
+  fi
+}
+
+# share-server's own dedicated, unprivileged account - the whole point of this feature's
+# architecture (see the "as secure as possible" requirement in the feature's plan) is that this
+# process, the one an anonymous internet visitor's request actually lands on, runs as neither root
+# nor the array-data account, with no filesystem access to share_link.db at all. No fixed uid/gid
+# (unlike ensure_array_data_account() above) - nothing else in this app needs to reference this
+# account by number, only by name (SupplementaryGroups=users in the systemd unit, and the RPC
+# socket's own group ownership - see backend/src/shareLinks/rpcServer.ts). `-G "$ARRAY_DATA_GROUP"`
+# grants real /mnt read/write the same way the systemd unit's own SupplementaryGroups= would - set
+# both here and in tools/systemd/nonraid-share-server.service so a manual `sudo -u nonraid-share`
+# invocation (debugging, not the normal path) still has it too.
+ensure_share_server_account() {
+  log "Checking for the $SHARE_SERVER_USER:$SHARE_SERVER_GROUP account"
+  if ! getent group "$SHARE_SERVER_GROUP" >/dev/null 2>&1; then
+    groupadd --system "$SHARE_SERVER_GROUP"
+  fi
+  if ! id "$SHARE_SERVER_USER" >/dev/null 2>&1; then
+    useradd --system -M -s /usr/sbin/nologin -g "$SHARE_SERVER_GROUP" -G "$ARRAY_DATA_GROUP" "$SHARE_SERVER_USER"
   fi
 }
 
@@ -376,6 +414,29 @@ ensure_tailscale() {
   apt-get update
   apt-get install -y tailscale
   systemctl disable --now tailscaled >/dev/null 2>&1 || true
+}
+
+# cloudflared - the public transport for Share Links (see backend/src/cloudflared/,
+# tools/systemd/cloudflared-tunnel.service). Same apt-repo-add shape as ensure_tailscale() above,
+# just Cloudflare's own repo instead - their `cloudflared` package isn't in Debian/Ubuntu's own
+# repos either. Cloudflare publishes one universal repo (suite "any", not per-codename like
+# Tailscale's), so unlike ensure_tailscale() this doesn't need to know the host's Debian/Ubuntu
+# codename at all. Installed but never enabled here - PUT /cloudflared/enabled is what actually
+# starts cloudflared-tunnel.service, once a real tunnel token has been saved via PUT
+# /cloudflared/token (there's nothing useful for this unit to do before that - see its own
+# EnvironmentFile= doc comment).
+ensure_cloudflared() {
+  log "Checking cloudflared"
+  if command -v cloudflared >/dev/null 2>&1; then
+    log "cloudflared already installed"
+    return
+  fi
+  log "Adding Cloudflare's apt repo and installing cloudflared"
+  install -d -m 0755 /usr/share/keyrings
+  curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg -o /usr/share/keyrings/cloudflare-main.gpg
+  echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' >/etc/apt/sources.list.d/cloudflared.list
+  apt-get update
+  apt-get install -y cloudflared
 }
 
 # rclone, for the optional Remote Backup settings section - Debian 13's own repo package is stale
@@ -574,7 +635,20 @@ check_required_tools() {
   done
 }
 
+# @nonraid/shared (packages/shared/) - path-sandbox/signed-payload/text-file-guard/share-link-rpc,
+# consumed by both the backend and share-server as `file:` deps (see NOTE below - this repo has no
+# workspace tooling, so a `file:` dep's `npm ci` just copies whatever's currently built into
+# node_modules, meaning this must run, freshly, before either consumer's own npm ci or they'd pick
+# up a stale or missing dist/). Called from both build_backend() and build_share_server() rather
+# than being its own top-level STEPS entry, so there's no ordering footgun where someone runs
+# --step build_backend alone and gets a stale shared package silently baked in.
+build_shared_package() {
+  log "Building @nonraid/shared"
+  (cd "$SHARED_PKG_DIR" && npm ci && npm run build)
+}
+
 build_backend() {
+  build_shared_package
   log "Building backend"
   (cd "$BACKEND_DIR" && npm ci && npm run build)
 }
@@ -587,6 +661,21 @@ build_frontend() {
 build_cli() {
   log "Building the nonraid-tool CLI"
   (cd "$CLI_DIR" && npm ci && npm run build)
+}
+
+# share-server (share-server/) - the separate, unprivileged public-facing process. No
+# better-sqlite3 or any other database dependency at all, by design - see its own package.json.
+build_share_server() {
+  build_shared_package
+  log "Building share-server"
+  (cd "$SHARE_SERVER_DIR" && npm ci && npm run build)
+}
+
+# public-share (public-share/) - the minimal visitor-facing frontend share-server serves directly,
+# a separate build from the main admin SPA (build_frontend above).
+build_public_share_frontend() {
+  log "Building public-share frontend"
+  (cd "$PUBLIC_SHARE_DIR" && npm ci && npm run build)
 }
 
 # Symlinked (not copied like nmdctl above) straight into the dev checkout's own cli/dist +
@@ -624,6 +713,54 @@ stage_install() {
   stage_frontend
 }
 
+# Mirrors stage_backend() exactly - same rsync dist+node_modules, same prune-the-staged-copy-only
+# shape. Ownership of the staged tree itself stays root (install-webui.sh always runs as root and
+# never chowns /opt) - tools/systemd/nonraid-share-server.service's User=/Group= only affects what
+# the *running process* can do, not who owns the files on disk, same as every other User=-scoped
+# unit anywhere else in this OS.
+stage_share_server() {
+  log "Staging share-server into $INSTALL_ROOT/share-server"
+  mkdir -p "$INSTALL_ROOT/share-server"
+  rsync -a --delete "$SHARE_SERVER_DIR/dist/" "$INSTALL_ROOT/share-server/dist/"
+  rsync -a --delete "$SHARE_SERVER_DIR/node_modules/" "$INSTALL_ROOT/share-server/node_modules/"
+  cp "$SHARE_SERVER_DIR/package.json" "$SHARE_SERVER_DIR/package-lock.json" "$INSTALL_ROOT/share-server/"
+  (cd "$INSTALL_ROOT/share-server" && npm prune --omit=dev)
+}
+
+stage_public_share_frontend() {
+  log "Staging public-share frontend into $INSTALL_ROOT/public-share-dist"
+  mkdir -p "$INSTALL_ROOT/public-share-dist"
+  rsync -a --delete "$PUBLIC_SHARE_DIR/dist/" "$INSTALL_ROOT/public-share-dist/"
+}
+
+# Root-owned state directory + the share-server unit's own EnvironmentFile (SHARE_UNLOCK_SECRET) -
+# generated once, left alone on every re-run (a fresh secret on every update would invalidate
+# every visitor's unlock cookie for no reason - see share-server/src/config.ts's own doc comment
+# on why a *stable* secret matters). Idempotent: skips straight past the openssl rand line if the
+# env file already has a real value in it.
+provision_share_server_state() {
+  log "Provisioning Share Links state directory and share-server's unlock secret"
+  install -d -m 0700 -o root -g root "$SHARE_LINKS_STATE_DIR"
+
+  if [ -f "$SHARE_SERVER_ENV_FILE" ] && grep -q '^SHARE_UNLOCK_SECRET=.' "$SHARE_SERVER_ENV_FILE" 2>/dev/null; then
+    log "SHARE_UNLOCK_SECRET already set - leaving it alone"
+  else
+    log "Generating SHARE_UNLOCK_SECRET"
+    printf 'SHARE_UNLOCK_SECRET=%s\n' "$(openssl rand -hex 32)" >"$SHARE_SERVER_ENV_FILE"
+  fi
+  chown "$SHARE_SERVER_USER:$SHARE_SERVER_GROUP" "$SHARE_SERVER_ENV_FILE"
+  chmod 0600 "$SHARE_SERVER_ENV_FILE"
+
+  # The Cloudflare Tunnel token env file (see backend/src/cloudflared/tokenStore.ts) - created
+  # empty here so the file exists with the right permissions from the very first boot; PUT
+  # /cloudflared/token (run as this backend's own root process) overwrites it once a real token is
+  # set. Owned root (not $SHARE_SERVER_USER) since only the admin backend and cloudflared-tunnel's
+  # own root-run unit ever need to read it - share-server itself has no reason to.
+  if [ ! -f "$CLOUDFLARED_TOKEN_ENV_FILE" ]; then
+    install -m 0600 -o root -g root /dev/null "$CLOUDFLARED_TOKEN_ENV_FILE"
+  fi
+}
+
 install_webui_systemd_unit() {
   log "Installing systemd unit"
   install -m 644 "$REPO_ROOT/tools/systemd/nonraid-webui.service" /etc/systemd/system/nonraid-webui.service
@@ -642,6 +779,28 @@ install_rclone_systemd_unit() {
   install -m 644 "$REPO_ROOT/tools/systemd/rclone-rcd.service" /etc/systemd/system/rclone-rcd.service
   systemctl daemon-reload
   systemctl disable --now rclone-rcd >/dev/null 2>&1 || true
+}
+
+# share-server's own unit - installed-but-off by default, same as rclone-rcd/tailscaled. The
+# webui's own enable toggle (`PUT /cloudflared/enabled`) starts this and cloudflared-tunnel
+# together once someone turns Share Links' internet access on (see routes/cloudflared.ts).
+install_share_server_systemd_unit() {
+  log "Installing nonraid-share-server systemd unit"
+  install -m 644 "$REPO_ROOT/tools/systemd/nonraid-share-server.service" /etc/systemd/system/nonraid-share-server.service
+  systemctl daemon-reload
+  systemctl disable --now nonraid-share-server >/dev/null 2>&1 || true
+}
+
+# The Cloudflare Tunnel client itself - same installed-but-off default as everything else here.
+# Genuinely does nothing useful until a real tunnel token has been saved (PUT
+# /cloudflared/token) - the EnvironmentFile it reads is provisioned empty by
+# provision_share_server_state() above, so a start attempt with no token set just fails cleanly
+# and restarts (Restart=on-failure) rather than doing anything harmful.
+install_cloudflared_tunnel_systemd_unit() {
+  log "Installing cloudflared-tunnel systemd unit"
+  install -m 644 "$REPO_ROOT/tools/systemd/cloudflared-tunnel.service" /etc/systemd/system/cloudflared-tunnel.service
+  systemctl daemon-reload
+  systemctl disable --now cloudflared-tunnel >/dev/null 2>&1 || true
 }
 
 # Orders docker.service/lxc.service to start only after nonraid.service (which assembles/mounts
@@ -827,6 +986,22 @@ update_frontend() {
   restart_webui
 }
 
+# restart_webui here too, not a share-server-specific restart - the shared package it depends on
+# just rebuilt (build_share_server calls build_shared_package), and re-linking that into the admin
+# backend's own node_modules only actually happens on the backend's next `npm ci`/restart. In
+# practice this only matters if @nonraid/shared itself changed; harmless otherwise.
+update_share_server() {
+  build_share_server
+  stage_share_server
+  systemctl restart nonraid-share-server >/dev/null 2>&1 || true
+}
+
+update_public_share_frontend() {
+  build_public_share_frontend
+  stage_public_share_frontend
+  systemctl restart nonraid-share-server >/dev/null 2>&1 || true
+}
+
 # No restart_webui here - the CLI is a standalone binary, not part of the nonraid-webui service.
 update_cli() {
   build_cli
@@ -886,12 +1061,14 @@ update_packages() {
 STEPS=(
   snapshot_before_update
   ensure_array_data_account
+  ensure_share_server_account
   install_system_packages
   pin_kernel_minor
   install_smb_conf
   configure_nfs_threads
   ensure_mergerfs
   ensure_tailscale
+  ensure_cloudflared
   ensure_rclone
   ensure_node
   install_nonraid_driver
@@ -900,9 +1077,16 @@ STEPS=(
   build_backend
   build_frontend
   build_cli
+  build_share_server
+  build_public_share_frontend
   stage_install
+  stage_share_server
+  stage_public_share_frontend
+  provision_share_server_state
   install_webui_systemd_unit
   install_rclone_systemd_unit
+  install_share_server_systemd_unit
+  install_cloudflared_tunnel_systemd_unit
   install_docker_lxc_array_ordering
   ensure_lxc_bridge
   install_cli
@@ -917,6 +1101,8 @@ SHORTCUTS=(
   update_backend
   update_frontend
   update_cli
+  update_share_server
+  update_public_share_frontend
   update_driver
   update_script
   update_packages

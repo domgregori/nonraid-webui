@@ -1,0 +1,20 @@
+[Unit]
+Description=Cloudflare Tunnel (public transport for nonraid-webui share links)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/default/nonraid-cloudflared
+# Token-based tunnel (dashboard-managed, not a local cert.pem) - the token lives in the
+# EnvironmentFile above (set via PUT /cloudflared/token, see backend/src/cloudflared/tokenStore.ts),
+# not passed on the command line, so it never appears in `ps`/systemd's own command-line logging.
+# The tunnel's ingress rule (configured in the Cloudflare dashboard, not here) should point only at
+# 127.0.0.1:8877 - share-server's own loopback-only port - never at this backend's admin port.
+ExecStart=/usr/bin/cloudflared tunnel run --token ${CLOUDFLARED_TUNNEL_TOKEN}
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

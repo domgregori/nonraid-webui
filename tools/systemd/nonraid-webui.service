@@ -5,6 +5,17 @@ After=network.target nonraid.service
 [Service]
 Type=simple
 StateDirectory=nonraid-webui
+# Creates /run/nonraid-webui (tmpfs, mode 0750 below) fresh on every start/restart - the parent
+# directory for the share-link RPC Unix socket (see backend/src/shareLinks/rpcServer.ts and
+# config.ts's shareRpcSocketPath). Simpler and more robust than the backend doing its own
+# mkdir/chmod/chown dance in application code for the directory itself - this unit owns creating
+# it, the app just binds a socket inside it and (best-effort) chowns that socket plus this
+# directory to root:nonraid-share so share-server's own dedicated account can reach it. Since this
+# unit has no User=/Group= override (runs as root), systemd creates the directory as root:root -
+# rpcServer.ts's own chown of the directory afterward is what actually makes it traversable by the
+# nonraid-share group; RuntimeDirectoryMode= only sets the initial, pre-chown permissions.
+RuntimeDirectory=nonraid-webui
+RuntimeDirectoryMode=0750
 WorkingDirectory=/var/lib/nonraid-webui
 # Production shape: this same process also serves the built frontend (see config.ts's
 # serveFrontend doc comment) - previously set via the auto-installed /etc/nonraid/config.toml,

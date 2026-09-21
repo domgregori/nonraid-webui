@@ -1,0 +1,43 @@
+[Unit]
+Description=nonraid-share-server (public-facing file sharing, behind a Cloudflare Tunnel)
+After=network.target nonraid-webui.service
+# Ordering only, deliberately not Requires= - share-server is designed to survive a brief admin
+# backend restart (TLS/timezone changes, self-updates) on its own, returning clean 503s and
+# reconnecting automatically once the RPC socket reappears (see
+# share-server/src/shareLinkRpcClient.ts). A hard Requires= would have systemd tear this unit down
+# every time nonraid-webui.service restarts, defeating that resilience entirely. After= just
+# ensures this starts *after* the RPC socket has had its first chance to exist, for a clean boot.
+
+[Service]
+Type=simple
+# First unit in this repo to use User=/Group= - every other unit here runs as root. This one
+# genuinely shouldn't: it's the public-facing process a Cloudflare Tunnel visitor's request lands
+# on, and the whole point of this feature's architecture is that even a fully compromised
+# share-server process has no filesystem access to share_link.db, no route to the admin API, and
+# only the narrow RPC calls backend/src/shareLinks/rpcServer.ts exposes.
+User=nonraid-share
+Group=nonraid-share
+# Real /mnt read/write for the actual file I/O - the classic nobody:users (99:100) convention this
+# app already uses everywhere else (see backend/src/config.ts's arrayDataGroup doc comment).
+# Uploaded/edited files land owned by nonraid-share, not uid 99 - this account has no way to chown
+# to an arbitrary uid without root, unlike the admin backend's own chownArrayOwner().
+SupplementaryGroups=users
+EnvironmentFile=/etc/default/nonraid-share-server
+Environment=SHARE_SERVER_PORT=8877
+Environment=SHARE_SERVER_HOST=127.0.0.1
+Environment=SHARE_RPC_SOCKET_PATH=/run/nonraid-webui/share-rpc.sock
+Environment=PUBLIC_SHARE_DIST_PATH=/opt/nonraid-webui/public-share-dist
+Environment=SHARE_UPLOAD_TMP_DIR=/tmp/nonraid-share-uploads
+WorkingDirectory=/opt/nonraid-webui/share-server
+ExecStart=/usr/bin/node /opt/nonraid-webui/share-server/dist/index.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+# Private, not shared with the host's real /tmp or any other service's - uploads stream here
+# before being validated and renamed into their real destination (see
+# share-server/src/uploadStorage.ts), same temp-then-rename shape the admin backend's own
+# saveUpload() uses.
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
