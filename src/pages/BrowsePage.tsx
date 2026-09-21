@@ -6,6 +6,7 @@ import { Breadcrumbs } from '../components/browse/Breadcrumbs';
 import { NewFolderModal } from '../components/browse/NewFolderModal';
 import { RenameModal } from '../components/browse/RenameModal';
 import { SearchBar } from '../components/browse/SearchBar';
+import { ShareLinkModal } from '../components/browse/ShareLinkModal';
 import { TransferModal } from '../components/browse/TransferModal';
 import { useBrowse } from '../hooks/useBrowse';
 import { useBrowseSearch } from '../hooks/useBrowseSearch';
@@ -44,6 +45,7 @@ export function BrowsePage() {
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [calculating, setCalculating] = useState<Set<string>>(new Set());
   const [editingEntry, setEditingEntry] = useState<{ path: string; name: string } | null>(null);
+  const [sharingPath, setSharingPath] = useState<{ path: string; label: string } | null>(null);
 
   const ready = browse.status === 'ready';
   const entries = browse.listing?.entries ?? [];
@@ -102,6 +104,14 @@ export function BrowsePage() {
           <div className="browse-toolbar">
             <button type="button" className="btn" disabled={!ready} onClick={() => setCreatingFolder(true)}>
               {t('BrowsePage.newFolder')}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={!ready}
+              onClick={() => setSharingPath({ path: browse.path, label: browse.path.split('/').filter(Boolean).pop() ?? '' })}
+            >
+              {t('BrowsePage.shareLink')}
             </button>
             <button type="button" className="btn--primary" disabled={!ready} onClick={() => fileInputRef.current?.click()}>
               {t('BrowsePage.upload')}
@@ -273,6 +283,9 @@ export function BrowsePage() {
                     {t('BrowsePage.downloadArchive')}
                   </a>
                 )}
+                <button type="button" className="btn" onClick={() => setSharingPath({ path: absPath, label: entry.name })}>
+                  {t('BrowsePage.shareLink')}
+                </button>
                 <button type="button" className="btn" onClick={() => setRenamingEntry(entry)}>
                   {t('BrowsePage.rename')}
                 </button>
@@ -340,6 +353,8 @@ export function BrowsePage() {
           <EditFileDialog path={editingEntry.path} fileName={editingEntry.name} onClose={() => setEditingEntry(null)} />
         </Suspense>
       )}
+
+      {sharingPath && <ShareLinkModal rootPath={sharingPath.path} defaultLabel={sharingPath.label} onClose={() => setSharingPath(null)} />}
     </div>
   );
 }

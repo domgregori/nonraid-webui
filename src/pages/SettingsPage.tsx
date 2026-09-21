@@ -10,6 +10,7 @@ import { settingsApi } from '../api/settingsApi';
 import { systemApi } from '../api/systemApi';
 import { ApiTokensSection } from '../components/settings/ApiTokensSection';
 import { AppriseTargetsField } from '../components/settings/AppriseTargetsField';
+import { CloudflaredSection } from '../components/settings/CloudflaredSection';
 import { ConfigRestoreWizard } from '../components/settings/ConfigRestoreWizard';
 import { EncryptBackupModal } from '../components/settings/EncryptBackupModal';
 import { ImportArrayWizard } from '../components/settings/ImportArrayWizard';
@@ -23,6 +24,7 @@ import { RestoreFromLocalWizard } from '../components/settings/RestoreFromLocalW
 import { RestoreFromRemoteWizard } from '../components/settings/RestoreFromRemoteWizard';
 import { ScheduleFields } from '../components/settings/ScheduleFields';
 import { ServicesSection } from '../components/settings/ServicesSection';
+import { ShareLinksSection } from '../components/settings/ShareLinksSection';
 import { SshKeysSection } from '../components/settings/SshKeysSection';
 import { StorageLocationField } from '../components/settings/StorageLocationField';
 import { TailscaleSection } from '../components/settings/TailscaleSection';
@@ -61,6 +63,8 @@ const SECTIONS = [
   { id: 'services' },
   { id: 'logs' },
   { id: 'tailscale' },
+  { id: 'shareLinks' },
+  { id: 'cloudflared' },
   { id: 'update' },
 ] as const;
 
@@ -1414,6 +1418,16 @@ export function SettingsPage() {
           <div className={`settings-card${activeSection === 'tailscale' ? '' : ' settings-hidden'}`} data-section-id="tailscale">
             <div className="settings-card__title">{t('SettingsPage.tailscale.title')}</div>
             <TailscaleSection />
+          </div>
+
+          <div className={`settings-card${activeSection === 'shareLinks' ? '' : ' settings-hidden'}`} data-section-id="shareLinks">
+            <div className="settings-card__title">{t('SettingsPage.shareLinks.title')}</div>
+            <ShareLinksSection />
+          </div>
+
+          <div className={`settings-card${activeSection === 'cloudflared' ? '' : ' settings-hidden'}`} data-section-id="cloudflared">
+            <div className="settings-card__title">{t('SettingsPage.cloudflared.title')}</div>
+            <CloudflaredSection />
           </div>
 
           <div className={`settings-card${activeSection === 'update' ? '' : ' settings-hidden'}`} data-section-id="update">

@@ -28,6 +28,7 @@
   "BrowsePage": {
     "title": "Browse",
     "newFolder": "New Folder",
+    "shareLink": "Share Link",
     "upload": "Upload",
     "fileConflictLegend": "File exists on multiple disks - please fix",
     "loading": "Loading…",
@@ -212,6 +213,8 @@
       "services": "Services",
       "logs": "System Logs",
       "tailscale": "Tailscale",
+      "shareLinks": "Share Links",
+      "cloudflared": "Internet Access",
       "update": "Update"
     },
     "about": {
@@ -415,6 +418,12 @@
     },
     "tailscale": {
       "title": "Tailscale"
+    },
+    "shareLinks": {
+      "title": "Share Links"
+    },
+    "cloudflared": {
+      "title": "Internet Access"
     },
     "update": {
       "title": "Update"
