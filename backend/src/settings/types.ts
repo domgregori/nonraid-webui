@@ -140,6 +140,20 @@ export interface RemoteBackupSettings {
   enabled: boolean;
 }
 
+// Cloudflare Tunnel - the public transport share links go out over (see
+// backend/src/cloudflared/, backend/src/shareLinks/). Deliberately minimal, same shape as
+// TailscaleSettings/RemoteBackupSettings above: everything cloudflared itself can report (binary
+// installed, systemd unit active) is read live (GET /cloudflared/status), and the tunnel token
+// itself is a generated secret that never belongs in settings.json (see
+// cloudflared/tokenStore.ts) - this only holds what neither of those can tell you. `publicUrl` is
+// the tunnel's own Public Hostname as configured in the Cloudflare dashboard (this app has no way
+// to discover it on its own) - used to build a share link's actual shareable URL once a share is
+// created.
+export interface CloudflaredSettings {
+  enabled: boolean;
+  publicUrl: string; // '' until set, e.g. "https://share.example.com"
+}
+
 // Tracks whether the first-run setup wizard (src/components/onboarding) has been dismissed or
 // completed - a single flag rather than a per-step record, since resume position is always
 // derived live from the array's actual state (see OnboardingWizard's deriveStartStep()), not
@@ -212,6 +226,7 @@ export interface AppSettings {
   cacheSchedule: CacheSchedule;
   tailscale: TailscaleSettings;
   remoteBackup: RemoteBackupSettings;
+  cloudflared: CloudflaredSettings;
   onboarding: OnboardingSettings;
 }
 
@@ -238,5 +253,6 @@ export type AppSettingsUpdate = Partial<{
   cacheSchedule: Partial<CacheSchedule>;
   tailscale: Partial<TailscaleSettings>;
   remoteBackup: Partial<RemoteBackupSettings>;
+  cloudflared: Partial<CloudflaredSettings>;
   onboarding: Partial<OnboardingSettings>;
 }>;

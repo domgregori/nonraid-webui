@@ -297,4 +297,15 @@ export const config = {
   // a host where this group doesn't exist yet (e.g. local dev, or before install-webui.sh has run)
   // just leaves the socket root-owned rather than failing startup - see rpcServer.ts.
   shareServerGroup: str('SHARE_SERVER_GROUP', 'nonraid-share'),
+  // Cloudflare Tunnel (backend/src/cloudflared/) - the public transport share links go out over.
+  // The tunnel token is a real bearer credential (equivalent to a root SSH key for whatever
+  // ingress rule it's configured with), so it never lives in settings.json alongside plain
+  // preferences - same EnvironmentFile-outside-settings.json precedent as rcloneRcEnvFilePath,
+  // except this one this backend also writes to (via PUT /cloudflared/token), not just reads -
+  // see cloudflared/tokenStore.ts. Must match tools/systemd/cloudflared-tunnel.service's own
+  // EnvironmentFile= path.
+  cloudflaredTokenEnvFilePath: str('CLOUDFLARED_TOKEN_ENV_FILE_PATH', '/etc/default/nonraid-cloudflared'),
+  cloudflaredBin: str('CLOUDFLARED_BIN', 'cloudflared'),
+  cloudflaredServiceName: str('CLOUDFLARED_SERVICE_NAME', 'cloudflared-tunnel'),
+  shareServerServiceName: str('SHARE_SERVER_SERVICE_NAME', 'nonraid-share-server'),
 };

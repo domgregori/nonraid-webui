@@ -85,6 +85,7 @@ const DEFAULTS: AppSettings = {
   cacheSchedule: { enabled: false, frequency: 'weekly', dayOfWeek: 0, dayOfMonth: 1, hour: 3, cronExpression: '' },
   tailscale: { enabled: false, loginServer: '' },
   remoteBackup: { enabled: false },
+  cloudflared: { enabled: false, publicUrl: '' },
   onboarding: { dismissed: false },
 };
 
@@ -115,6 +116,7 @@ export class SettingsStore {
       cacheSchedule: { ...settings.cacheSchedule },
       tailscale: { ...settings.tailscale },
       remoteBackup: { ...settings.remoteBackup },
+      cloudflared: { ...settings.cloudflared },
       onboarding: { ...settings.onboarding },
     };
   }
@@ -145,6 +147,7 @@ export class SettingsStore {
         cacheSchedule: { ...current.cacheSchedule, ...patch.cacheSchedule },
         tailscale: { ...current.tailscale, ...patch.tailscale },
         remoteBackup: { ...current.remoteBackup, ...patch.remoteBackup },
+        cloudflared: { ...current.cloudflared, ...patch.cloudflared },
         onboarding: { ...current.onboarding, ...patch.onboarding },
       };
       await this.persistAtomic(next);
@@ -211,6 +214,7 @@ export class SettingsStore {
         cacheSchedule: { ...DEFAULTS.cacheSchedule, ...parsed.cacheSchedule },
         tailscale: { ...DEFAULTS.tailscale, ...parsed.tailscale },
         remoteBackup: { ...DEFAULTS.remoteBackup, ...parsed.remoteBackup },
+        cloudflared: { ...DEFAULTS.cloudflared, ...parsed.cloudflared },
         onboarding: { ...DEFAULTS.onboarding, ...parsed.onboarding },
       };
     } catch (err) {

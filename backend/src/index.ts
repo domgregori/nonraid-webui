@@ -29,6 +29,7 @@ import { arrayRouter } from './routes/array.js';
 import { authRouter } from './routes/auth.js';
 import { browseRouter } from './routes/browse.js';
 import { cacheRouter } from './routes/cache.js';
+import { cloudflaredRouter } from './routes/cloudflared.js';
 import { diskQueueRouter } from './routes/diskQueue.js';
 import { disksRouter } from './routes/disks.js';
 import { dockerRouter } from './routes/docker.js';
@@ -67,6 +68,7 @@ import { applySpinDownTimeout } from './system/hdIdle.js';
 import { SystemStatsService } from './system/service.js';
 import { installShutdownHook } from './system/shutdownHook.js';
 import { createTailscaleClient } from './tailscale/index.js';
+import { createCloudflaredClient } from './cloudflared/index.js';
 import { TlsStore } from './tls/index.js';
 import { createUsersClient, PendingImportUsersStore, UsersService } from './users/index.js';
 
@@ -111,6 +113,7 @@ async function main() {
   await authStore.get(); // fail fast at boot on a corrupt auth.json
   const tlsStore = new TlsStore();
   const tailscale = createTailscaleClient();
+  const cloudflared = createCloudflaredClient();
   const rcloneService = new RcloneService(rclone, nmd, activity, settingsStore, usersClient);
   new RcloneSyncScheduler(rcloneService, settingsStore);
   new UpdateScheduler(activity, settingsStore);
@@ -311,6 +314,7 @@ async function main() {
   app.use('/api', activityRouter(activity));
   app.use('/api', tlsRouter(tlsStore, activity, authService));
   app.use('/api', tailscaleRouter(tailscale, settingsStore, activity));
+  app.use('/api', cloudflaredRouter(cloudflared, settingsStore, activity, authService));
   app.use('/api', rcloneRouter(rclone, rcloneService, settingsStore, activity));
 
   // Protocol is chosen once at boot from the persisted TLS config, same "config changes need a
