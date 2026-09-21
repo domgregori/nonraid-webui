@@ -341,6 +341,73 @@ here is only meaningful once the feature's switched on.
 | POST | `/tailscale/logout` | - | `tailscale logout`. |
 | PUT | `/tailscale/options` | `{ hostname?, ssh?, acceptDns?, advertiseRoutes?: string[], acceptRoutes? }` | `tailscale set` with only the given fields. `advertiseRoutes` replaces the full set (`[]` clears it); advertised routes still need approving in the Tailscale/Headscale admin console before they take effect - this app can't do that part. |
 
+## Share Links
+
+Shares a folder or file over the internet via a random, unguessable link, through a Cloudflare
+Tunnel. Deliberately named "share link"/`ShareLink` everywhere, never "share"/`Share` - that name
+already means this app's own SMB/NFS share feature (`backend/src/shares/`), an unrelated concept.
+The header requirement shaping this feature's architecture is "as secure as possible": the
+public-facing process (`share-server`, a separate, unprivileged OS process - see the root README's
+Project layout section) has **zero filesystem access** to `share_link.db`, the SQLite file this
+backend (`backend/src/shareLinks/store.ts`) is the sole owner of. share-server instead talks to a
+narrow Unix-socket RPC server (`backend/src/shareLinks/rpcServer.ts`) that reveals only one already-
+identified share at a time and never sends `password_hash` across the wire - a fully compromised
+share-server process still can't read another share's `root_path`, list the share table, or forge a
+password check. See `backend/src/shareLinks/` and `share-server/` for the full design.
+
+Three access modes, replacing a plain allow-download/allow-upload boolean pair: `read-only`
+(browse/view/download, no writes), `upload-only` (blind drop-box - accepts new files, can't see
+what's already there), `editable` (browse/view/download/upload, plus editing existing text files in
+place). Delete/rename are out of v1 on the public side even under `editable` - `allow_delete` is
+stored on creation but nothing acts on it yet, reserved for a later release. `POST
+/api/share-links` is step-up gated (`requireStepUp`, same class of risk `POST /ssh/keys` already
+cross-references) - once a Cloudflare Tunnel is enabled, a share link is real, internet-reachable
+access to array data.
+
+| Method | Path | Body/Params | Response / Notes |
+|---|---|---|---|
+| POST | `/share-links` | `{ rootPath, mode, label?, allowDelete?, password?, uploadQuotaBytes?, maxFileSizeBytes?, expiresAt? }` | Step-up gated. `rootPath` is validated via this backend's own `resolveExisting()` (the same browse-root traversal ceiling `GET /browse` uses). `uploadQuotaBytes` (cumulative across every upload) and `maxFileSizeBytes` (per-file cap) are independent, both optional, `null`/omitted meaning unlimited. Returns the created record plus the raw bearer `token` - shown exactly once, never retrievable again (only its SHA-256 hash is persisted). |
+| GET | `/share-links` | - | Every share link (no `tokenHash`/`passwordHash` - `hasPassword: boolean` instead). |
+| PATCH | `/share-links/:id` | `{ label?, expiresAt?, revoked? }` | Not step-up gated - only ever narrows access (same reasoning `DELETE /auth/tokens` gets). `revoked: true` sets `revokedAt` to now; `false` clears it. |
+| GET | `/share-links/:id/activity` | - | Up to 200 most recent rows from `share_link_access_log` (`list`\|`download`\|`upload`\|`edit`\|`unlock` events), newest first. |
+
+### share-server's public API (separate process, separate port)
+
+Not part of this backend's `/api` surface at all - served by `share-server` on its own port
+(default `127.0.0.1:8877`, reachable from the internet only through the Cloudflare Tunnel in front
+of it), documented here for completeness since it's the other half of this feature. No session
+cookie/bearer token auth - the `:token` in each path *is* the credential, plus an optional
+per-share password. An httpOnly `su_<shareId>` cookie (signed with share-server's own independent
+`SHARE_UNLOCK_SECRET`, never the admin session secret) proves a successful unlock for later
+requests; it's self-contained (carries the share id and the token hash it was issued for), so
+share-server needs no server-side session store to validate it.
+
+| Method | Path | Body/Params | Response / Notes |
+|---|---|---|---|
+| GET | `/api/shares/:token` | - | `{ label, mode, requiresPassword }`. Auto-unlocks (sets the cookie) when the share has no password - there's no meaningful difference between "peek" and "unlock" in that case. `404` for an unknown/revoked/expired token. |
+| POST | `/api/shares/:token/unlock` | `{ password? }` | Rate-limited per (ip, token). Sets the unlock cookie on success. `401` on a wrong/missing password, `404` for an unknown/revoked/expired token - the two are deliberately indistinguishable from the response alone. |
+| GET | `/api/shares/:token/browse` | `?path=` | `read-only`/`editable` only - `404`s outright for `upload-only` (no listing surface at all, by design - not a `403`, which would confirm something's there). Requires the unlock cookie. |
+| GET | `/api/shares/:token/download` | `?path=` | `read-only`/`editable` only. Single-file download - no folder-as-zip in v1. |
+| GET | `/api/shares/:token/read` | `?path=` | `editable` only. Same `MAX_EDIT_BYTES`/binary-sniff rules as this backend's own `GET /browse/read` (shared via `@nonraid/shared/text-file-guard`). |
+| POST | `/api/shares/:token/write` | `{ path, content }` | `editable` only. No ownership chown afterward (unlike this backend's own `POST /browse/write`) - share-server runs unprivileged and can't chown to the array-data uid without root; the file keeps whatever owner it already had. |
+| POST | `/api/shares/:token/upload` | multipart `files`, `?path=` | `upload-only`/`editable` only. **NDJSON** progress. Cumulative quota is reserved atomically over the RPC socket before any bytes are written and trued-up once the real size is known; the per-file cap is checked twice - against the request's declared `Content-Length` before parsing starts, and again as a hard ceiling mid-stream. |
+
+## Cloudflared
+
+The public transport Share Links go out over - Cloudflare's edge terminates TLS and forwards
+traffic to `share-server`'s loopback-only port. Disabled by default (`settings.cloudflared.enabled`)
+- `GET /cloudflared/status` still works either way. The tunnel token itself never lives in
+settings.json (it's a real bearer credential, equivalent in sensitivity to a trusted SSH key) - it's
+persisted to a 0600 systemd `EnvironmentFile` (`backend/src/cloudflared/tokenStore.ts`) that
+`cloudflared-tunnel.service`'s own `ExecStart` also reads, so both sides always agree.
+
+| Method | Path | Body/Params | Response / Notes |
+|---|---|---|---|
+| GET | `/cloudflared/status` | - | `{ installed, version, running, hasToken, featureEnabled, publicUrl }`. `installed: false` (not an error) when the `cloudflared` binary isn't on PATH; `running` reflects `systemctl is-active cloudflared-tunnel`. |
+| PUT | `/cloudflared/enabled` | `{ enabled: boolean }` | Persists the toggle and best-effort starts/stops **both** `nonraid-share-server` and `cloudflared-tunnel` systemd units together - the tunnel is useless without share-server listening behind it, and share-server has no reason to run with no public transport in front of it. |
+| PUT | `/cloudflared/token` | `{ token: string }` | Step-up gated - the tunnel token is a real bearer credential for whatever ingress rule the Cloudflare dashboard has configured for it. Overwrites the saved token; the running tunnel picks it up on its next restart (toggling `enabled` off/on, or a plain `systemctl restart cloudflared-tunnel`). |
+| PUT | `/cloudflared/public-url` | `{ publicUrl: string }` | Not step-up gated - just a display preference (the tunnel's own Public Hostname, as configured in the Cloudflare dashboard) used to build each share link's actual shareable URL in the admin UI. Not otherwise used server-side. |
+
 ## Rclone (Remote Backup)
 
 Disabled by default (`settings.remoteBackup.enabled`) - `GET /rclone/status` still works either

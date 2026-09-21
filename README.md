@@ -164,4 +164,37 @@ backend/                 Express API wrapping nmdctl, Docker, lxc-*, smartctl, s
   src/tailscale/   TailscaleClient interface + RealTailscaleClient (shells out to `tailscale`) -
                     status/login/logout/set, including capturing the login URL live from `tailscale
                     up`'s output for the interactive login flow
+  src/shareLinks/  ShareLinkStore (sole owner of share_link.db) + ShareLinkService (creation,
+                    token/password hashing) + ShareLinkRpcServer - the narrow Unix-socket RPC
+                    boundary share-server (below) talks to instead of ever opening that database
+                    file itself; see backend/API.md's "Share Links" section for the full design
+  src/cloudflared/ CloudflaredClient interface + RealCloudflaredClient (shells out to `cloudflared`)
+                    + tokenStore.ts (the tunnel token's own 0600 EnvironmentFile, never
+                    settings.json) - status/enable/token for the public transport share links go
+                    out over
+
+packages/shared/         `@nonraid/shared` - path-sandbox (the traversal/symlink-escape sandboxing
+                          extracted out of backend/src/browse/paths.ts, which is now a thin wrapper
+                          over it), signed-payload (the generic signing core behind backend/src/
+                          auth/crypto.ts's session/2FA cookies, reused by share-server's own
+                          independently-secreted unlock cookie), text-file-guard (the size cap/
+                          binary-detection rules backend/src/browse/service.ts's text editor
+                          enforces, now shared so share-server's editable-mode editor can't drift
+                          from them), and share-link-rpc (typed request/response shapes only, no
+                          runtime logic) for the RPC protocol between backend/src/shareLinks/ and
+                          share-server below. Consumed as a `file:` dependency - this repo has no
+                          workspace tooling.
+
+share-server/            The Share Links feature's own public-facing process, deliberately separate
+                          from backend/ above - runs as its own unprivileged OS account with zero
+                          filesystem access to share_link.db, reachable from the internet only
+                          through a Cloudflare Tunnel in front of it. Talks to backend/src/
+                          shareLinks/'s RPC server over a local Unix socket for share metadata
+                          instead - see backend/API.md's "Share Links" section for the full design
+                          and this process's own public route reference.
+
+public-share/            The minimal frontend share-server serves to a share link's visitors - a
+                          separate, much smaller Vite+React build from src/ above (no react-router,
+                          no i18next), so there's no admin route or secret to audit out of what a
+                          visitor's browser actually loads.
 ```
