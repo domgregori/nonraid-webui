@@ -52,8 +52,17 @@ export class ShareLinkRpcServer {
   }
 
   /**
-   * Binds the Unix socket and locks its permissions down to root + the share-server group only.
-   * Best-effort on the permission-tightening steps (not the bind itself) - a host where
+   * Binds the Unix socket and locks its permissions - and its parent directory's - down to root +
+   * the share-server group only. The directory chown matters just as much as the socket's own:
+   * tools/systemd/nonraid-webui.service's RuntimeDirectory=nonraid-webui directive creates
+   * /run/nonraid-webui owned root:root (this unit has no Group= override, it runs as root) with
+   * mode 0750 - a root:root 0750 directory has no execute bit for anyone outside the root group,
+   * so the nonraid-share user couldn't even traverse into it to reach a perfectly-permissioned
+   * socket file inside. Chowning the directory itself to root:<shareServerGroup> is what actually
+   * makes it enterable by that account - the socket file's own 0660/root:<shareServerGroup> only
+   * matters once you can already get to it.
+   *
+   * Best-effort on every permission-tightening step (not the bind itself) - a host where
    * `shareServerGroup` doesn't exist yet (local dev, or install-webui.sh hasn't provisioned the
    * account yet) still gets a working socket, just root-owned only, rather than failing backend
    * startup entirely over it. Production always has the account (see
@@ -61,7 +70,8 @@ export class ShareLinkRpcServer {
    */
   async start(socketPath: string = config.shareRpcSocketPath): Promise<void> {
     this.socketPath = socketPath;
-    await mkdir(path.dirname(socketPath), { recursive: true, mode: 0o750 }).catch((err) => {
+    const socketDir = path.dirname(socketPath);
+    await mkdir(socketDir, { recursive: true, mode: 0o750 }).catch((err) => {
       console.error(`Could not create the share RPC socket's parent directory (${(err as Error).message}) - share-server will not be able to connect.`);
     });
     await rm(socketPath, { force: true });
@@ -85,11 +95,17 @@ export class ShareLinkRpcServer {
     });
     const gid = await resolveGid(config.shareServerGroup);
     if (gid !== null) {
-      await chown(socketPath, 0, gid).catch((err) => {
-        console.error(`Could not chown the share RPC socket to group "${config.shareServerGroup}" (${(err as Error).message}) - share-server may not be able to connect.`);
-      });
+      await chmod(socketDir, 0o750).catch(() => {});
+      await Promise.all([
+        chown(socketDir, 0, gid).catch((err) => {
+          console.error(`Could not chown ${socketDir} to group "${config.shareServerGroup}" (${(err as Error).message}) - share-server may not be able to reach the socket even though it exists.`);
+        }),
+        chown(socketPath, 0, gid).catch((err) => {
+          console.error(`Could not chown the share RPC socket to group "${config.shareServerGroup}" (${(err as Error).message}) - share-server may not be able to connect.`);
+        }),
+      ]);
     } else {
-      console.error(`Group "${config.shareServerGroup}" does not exist yet - the share RPC socket is root-owned only until it does. Run tools/install-webui.sh to provision it.`);
+      console.error(`Group "${config.shareServerGroup}" does not exist yet - the share RPC socket (and its directory) are root-owned only until it does. Run tools/install-webui.sh to provision it.`);
     }
   }
 
