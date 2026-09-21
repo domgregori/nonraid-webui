@@ -41,6 +41,7 @@ import { rcloneRouter } from './routes/rclone.js';
 import { servicesRouter } from './routes/services.js';
 import { settingsRouter } from './routes/settings.js';
 import { sharesRouter } from './routes/shares.js';
+import { shareLinksRouter } from './routes/shareLinks.js';
 import { smartRouter } from './routes/smart.js';
 import { sshRouter } from './routes/ssh.js';
 import { statusRouter } from './routes/status.js';
@@ -58,6 +59,7 @@ import { RcloneSyncScheduler } from './rclone/syncScheduler.js';
 import { SettingsStore } from './settings/index.js';
 import { notifyEvent } from './settings/notify.js';
 import { createShareApplier, ShareAccessStore, ShareService, ShareStore } from './shares/index.js';
+import { ShareLinkRpcServer, ShareLinkService, ShareLinkStore } from './shareLinks/index.js';
 import { createSmartClient, SmartService } from './smart/index.js';
 import { BackupScheduler } from './system/backupScheduler.js';
 import { restoreDockerAndAutostartLxc } from './system/arrayLifecycle.js';
@@ -114,6 +116,20 @@ async function main() {
   new UpdateScheduler(activity, settingsStore);
   new DockerUpdateScheduler(docker, activity, settingsStore);
   const tlsRecord = await tlsStore.get(); // fail fast at boot on a corrupt tls.json
+  // Share Links - own SQLite file (share_link.db, sole owner, see shareLinks/store.ts), and the
+  // narrow Unix-socket RPC boundary share-server (the separate, unprivileged public-facing
+  // process) talks to instead of ever touching that file directly. Started here, ahead of the
+  // HTTP server below, so the socket already exists by the time share-server's own systemd unit
+  // (After=nonraid-webui.service) comes up. Best-effort: a bind failure (e.g. /run/nonraid-webui
+  // not writable in a dev environment without RuntimeDirectory=) logs and continues rather than
+  // crashing boot - the admin UI's own share-link management still works via the plain HTTP
+  // routes below either way, only the public-facing side is affected.
+  const shareLinkStore = new ShareLinkStore();
+  const shareLinkService = new ShareLinkService(shareLinkStore);
+  const shareLinkRpcServer = new ShareLinkRpcServer(shareLinkStore);
+  await shareLinkRpcServer.start().catch((err) => {
+    console.error(`Share RPC socket failed to start (${(err as Error).message}) - share-server will not be able to reach this backend.`);
+  });
   if (config.serveFrontend && !existsSync(path.join(config.frontendDistPath, 'index.html'))) {
     throw new Error(`serveFrontend is true but no index.html at ${config.frontendDistPath} - did the frontend build run?`);
   }
@@ -288,6 +304,7 @@ async function main() {
   app.use('/api', updateRouter(activity));
   app.use('/api', servicesRouter(activity));
   app.use('/api', sshRouter(activity, authService));
+  app.use('/api', shareLinksRouter(shareLinkService, activity, authService));
   app.use('/api', usersRouter(users));
   app.use('/api', unraidImportRouter(nmd, shares, pendingImportUsers, docker, config.appsBindRoots, activity, apps));
   app.use('/api', appsRouter(apps));

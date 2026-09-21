@@ -281,4 +281,20 @@ export const config = {
   // (see docker/updateCheck.ts) - a real registry hit per container, so daily by default like the
   // update scheduler above, not the minute-granularity schedulers.
   dockerUpdateSchedulerTickIntervalMs: num('DOCKER_UPDATE_SCHEDULER_TICK_INTERVAL_MS', 24 * 60 * 60 * 1000),
+  // Share Links (backend/src/shareLinks/) - the *only* database this backend keeps that
+  // share-server (the separate, unprivileged public-facing process) never touches directly. See
+  // shareLinks/store.ts's own doc comment for the WAL-mode precedent this follows.
+  shareLinksDbPath: str('SHARE_LINKS_DB_PATH', path.join(process.cwd(), 'data', 'share-links.db')),
+  // The narrow Unix-socket RPC boundary share-server talks to instead - see
+  // shareLinks/rpcServer.ts. /run is tmpfs; tools/systemd/nonraid-webui.service's
+  // RuntimeDirectory=nonraid-webui creates this directory (root:nonraid-share, 0750) on every
+  // start/restart. Overridable so local dev (unprivileged, no real /run/nonraid-webui) can point
+  // this at a writable path instead - production always uses the real default.
+  shareRpcSocketPath: str('SHARE_RPC_SOCKET_PATH', '/run/nonraid-webui/share-rpc.sock'),
+  // The dedicated OS group share-server's systemd unit runs as (see tools/install-webui.sh's
+  // ensure_share_server_account()) - the RPC socket is chown'd root:<this> after listen() so only
+  // that account (via group membership) can connect at all, alongside root itself. Best-effort:
+  // a host where this group doesn't exist yet (e.g. local dev, or before install-webui.sh has run)
+  // just leaves the socket root-owned rather than failing startup - see rpcServer.ts.
+  shareServerGroup: str('SHARE_SERVER_GROUP', 'nonraid-share'),
 };
