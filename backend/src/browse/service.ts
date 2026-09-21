@@ -1,17 +1,15 @@
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { copyFile, cp, mkdir, open, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import * as tar from 'tar';
 import type { Pack } from 'tar';
+import { MAX_EDIT_BYTES, looksBinary } from '@nonraid/shared/text-file-guard';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { ShareService } from '../shares/index.js';
 import { assertValidSegmentName, isMountPoint, resolveExisting, resolveForCreate } from './paths.js';
 import type { BrowseCommandResult, BrowseEntry, BrowseFileContent, BrowseListing } from './types.js';
-
-// Generous for text/config files, protects against loading something huge into a browser editor.
-const MAX_EDIT_BYTES = 2 * 1024 * 1024;
 
 const execFileAsync = promisify(execFile);
 
@@ -36,21 +34,6 @@ function throttledFilter(onFile: FileProgressCallback | undefined): ((src: strin
     if (filesDone % PROGRESS_EVERY_N_FILES === 0) onFile(path.basename(src), filesDone);
     return true;
   };
-}
-
-/** Same simple heuristic git/`file` use - a NUL byte in the first 8KB means binary, not text.
- *  Reads only that first chunk via a file handle rather than the whole file, so it's cheap enough
- *  to run per-entry while listing a directory (unlike readFile(), which needs the full content
- *  anyway and so checks the buffer it already has to read). */
-async function looksBinary(absPath: string): Promise<boolean> {
-  const fh = await open(absPath, 'r');
-  try {
-    const buf = Buffer.alloc(8000);
-    const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
-    return buf.subarray(0, bytesRead).includes(0);
-  } finally {
-    await fh.close();
-  }
 }
 
 /**

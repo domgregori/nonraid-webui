@@ -1,5 +1,6 @@
-import { randomBytes, createHmac, timingSafeEqual, scrypt } from 'node:crypto';
+import { randomBytes, timingSafeEqual, scrypt } from 'node:crypto';
 import { promisify } from 'node:util';
+import { signPayload, verifyPayload } from '@nonraid/shared/signed-payload';
 import type { SessionPayload, TwoFactorPendingPayload } from './types.js';
 
 const scryptAsync = promisify(scrypt);
@@ -57,53 +58,29 @@ export function generateApiToken(): string {
   return `nrd_${randomBytes(24).toString('base64url')}`;
 }
 
-/**
- * Shared signing/verification core for every cookie this app issues - session and 2FA-pending
- * cookies alike are both "signed {purpose, issuedAt, expiresAt}", just with a different `purpose`.
- * Token format: "<base64url payload>.<base64url HMAC-SHA256 signature>". Not exported directly -
- * signSession/verifySession/signTwoFactorPending/verifyTwoFactorPending below are the real public
- * surface, each fixing `purpose` so a caller can never accidentally sign or accept the wrong kind.
- */
-function signPayload<T extends { purpose: string }>(secret: string, payload: T): string {
-  const payloadPart = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = createHmac('sha256', secret).update(payloadPart).digest('base64url');
-  return `${payloadPart}.${signature}`;
+// Share-link bearer tokens (backend/src/shareLinks/) - same shape as generateApiToken above, just
+// a distinct "shl_" prefix so one glance at a leaked value (shell history, a log line) says which
+// kind of credential it is. Hashed at rest with SHA-256, not hashSecret/scrypt (see
+// shareLinks/service.ts for why - it's a high-entropy bearer credential looked up on every
+// anonymous request, where scrypt's per-lookup cost would be a real DoS vector for no benefit).
+export function generateShareToken(): string {
+  return `shl_${randomBytes(24).toString('base64url')}`;
 }
 
-/**
- * Never throws - a malformed, unsigned, expired, or wrong-purpose token is just an unauthenticated
- * request, not a server error. requireAuth() and every 2FA-pending check rely on this.
- *
- * The `purpose` check is not incidental: session and 2FA-pending tokens are both signed with the
- * same account sessionSecret (deliberately - see TwoFactorPendingPayload's doc comment), so without
- * a discriminator baked into the signed payload itself, a pending-2FA token would carry a valid
- * signature under the exact same key a real session cookie does. Pasting one into the other
- * cookie's name would then verify as a fully authenticated session, skipping the second factor
- * entirely. The discriminator, not the cookie name, is what actually prevents that.
- */
-function verifyPayload<T extends { purpose: string }>(secret: string, token: string | undefined, purpose: T['purpose']): T | null {
-  if (!token) return null;
-  const dotIndex = token.indexOf('.');
-  if (dotIndex < 0) return null;
-  const payloadPart = token.slice(0, dotIndex);
-  const signaturePart = token.slice(dotIndex + 1);
-
-  try {
-    const expectedSignature = createHmac('sha256', secret).update(payloadPart).digest();
-    const actualSignature = Buffer.from(signaturePart, 'base64url');
-    if (actualSignature.length !== expectedSignature.length) return null;
-    if (!timingSafeEqual(actualSignature, expectedSignature)) return null;
-
-    const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString('utf8')) as T;
-    if (payload.purpose !== purpose) return null;
-    if (typeof (payload as unknown as { expiresAt?: unknown }).expiresAt !== 'number' || (payload as unknown as { expiresAt: number }).expiresAt < Date.now()) {
-      return null;
-    }
-    return payload;
-  } catch {
-    return null;
-  }
-}
+// signPayload/verifyPayload (the generic "signed {purpose, issuedAt, expiresAt}" core every cookie
+// this app issues is built on - session and 2FA-pending cookies here, share-server's own unlock
+// cookie with its own independent secret) now live in @nonraid/shared/signed-payload, imported
+// above - share-server needs the identical primitive and has no dependency on this file. Not
+// re-exported from here: signSession/verifySession/signTwoFactorPending/verifyTwoFactorPending
+// below are this app's own real public surface, each fixing `purpose` so a caller can never
+// accidentally sign or accept the wrong kind.
+//
+// The `purpose` check is not incidental: session and 2FA-pending tokens are both signed with the
+// same account sessionSecret (deliberately - see TwoFactorPendingPayload's doc comment), so without
+// a discriminator baked into the signed payload itself, a pending-2FA token would carry a valid
+// signature under the exact same key a real session cookie does. Pasting one into the other
+// cookie's name would then verify as a fully authenticated session, skipping the second factor
+// entirely. The discriminator, not the cookie name, is what actually prevents that.
 
 export function signSession(secret: string, ttlMs: number): string {
   const now = Date.now();
