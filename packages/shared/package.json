@@ -1,0 +1,21 @@
+{
+  "name": "@nonraid/shared",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/**/*.test.js"
+  },
+  "exports": {
+    "./path-sandbox": "./dist/path-sandbox/index.js",
+    "./signed-payload": "./dist/signed-payload/index.js",
+    "./text-file-guard": "./dist/text-file-guard/index.js",
+    "./share-link-rpc": "./dist/share-link-rpc/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "typescript": "~5.7.2"
+  }
+}
