@@ -25,6 +25,49 @@ function isLiveShare(s: ShareLink): boolean {
   return s.revokedAt === null && (s.expiresAt === null || s.expiresAt > Date.now());
 }
 
+function isUnderOrEqual(rootPath: string, path: string): boolean {
+  if (rootPath === path) return true;
+  const prefix = rootPath.endsWith('/') ? rootPath : `${rootPath}/`;
+  return path.startsWith(prefix);
+}
+
+/** The most specific live, browsable share that makes `path` reachable from the internet - either
+ *  a share rooted at `path` itself, or the closest shared ancestor folder. Upload-only shares are
+ *  excluded: by design they're a blind drop-box (share-server refuses /browse, /download, /read
+ *  and /view for that mode), so an existing file sitting under one is never actually exposed. */
+function findGoverningShare(shareLinks: ShareLink[], path: string): ShareLink | null {
+  let best: ShareLink | null = null;
+  for (const s of shareLinks) {
+    if (!isLiveShare(s) || s.mode === 'upload-only' || !isUnderOrEqual(s.rootPath, path)) continue;
+    if (!best || s.rootPath.length > best.rootPath.length) best = s;
+  }
+  return best;
+}
+
+/** Feather-style link icon flagging a publicly-reachable file/folder - amber like the rest of the
+ *  share-link UI (btn--warning, the Edit Link amber tint). */
+function PublicShareIcon({ title }: { title: string }) {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="browse-share-icon"
+      aria-hidden={false}
+      role="img"
+    >
+      <title>{title}</title>
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
 /** The folder a search match should land on when clicked - itself for a directory match, its
  *  parent for a file match (there's no single-file view, so landing in the listing that contains
  *  it is the closest equivalent to "reveal this file"). */
@@ -74,6 +117,10 @@ export function BrowsePage() {
 
   // The current folder's own live share, if any - drives the toolbar button's Share/Edit swap.
   const currentFolderShare = shareLinks.find((s) => s.rootPath === browse.path && isLiveShare(s)) ?? null;
+  // The share (own or an ancestor's) that actually exposes the current folder publicly, if any -
+  // distinct from currentFolderShare above, which only tells you it has its own share link (which
+  // could itself be upload-only, and so not actually browsable/exposed at all).
+  const folderGoverningShare = findGoverningShare(shareLinks, browse.path);
 
   const ready = browse.status === 'ready';
   const entries = browse.listing?.entries ?? [];
@@ -162,6 +209,29 @@ export function BrowsePage() {
 
       <Breadcrumbs path={browse.path} onNavigate={browse.navigate} />
 
+      {folderGoverningShare && (
+        <div className="browse-share-banner">
+          <PublicShareIcon title={t('BrowsePage.sharedDirectTooltip')} />
+          <span>
+            {folderGoverningShare.rootPath === browse.path
+              ? t('BrowsePage.folderSharedDirect')
+              : t('BrowsePage.folderSharedInherited', { path: folderGoverningShare.rootPath })}
+          </span>
+          <button
+            type="button"
+            className="btn btn--warning browse-share-banner__action"
+            onClick={() =>
+              setSharingPath({
+                path: folderGoverningShare.rootPath,
+                label: folderGoverningShare.rootPath.split('/').filter(Boolean).pop() ?? '',
+              })
+            }
+          >
+            {t('BrowsePage.manageShare')}
+          </button>
+        </div>
+      )}
+
       {(presentLocationTypes.length > 0 || hasFileConflicts) && (
         <div className="browse-legend">
           {presentLocationTypes.map((t) => (
@@ -244,6 +314,7 @@ export function BrowsePage() {
         {entries.map((entry) => {
           const absPath = browse.path.endsWith('/') ? `${browse.path}${entry.name}` : `${browse.path}/${entry.name}`;
           const entryShare = shareLinks.find((s) => s.rootPath === absPath && isLiveShare(s)) ?? null;
+          const rowGoverningShare = findGoverningShare(shareLinks, absPath);
           const knownSize = browse.sizes[absPath];
           return (
             <div
@@ -286,6 +357,27 @@ export function BrowsePage() {
                   </button>
                 ) : (
                   <span className={`browse-row__name-text--${entry.type}`}>{entry.name}</span>
+                )}
+                {rowGoverningShare && (
+                  <button
+                    type="button"
+                    className="browse-share-icon-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSharingPath({
+                        path: rowGoverningShare.rootPath,
+                        label: rowGoverningShare.rootPath.split('/').filter(Boolean).pop() ?? '',
+                      });
+                    }}
+                  >
+                    <PublicShareIcon
+                      title={
+                        rowGoverningShare.rootPath === absPath
+                          ? t('BrowsePage.sharedDirectTooltip')
+                          : t('BrowsePage.sharedInheritedTooltip', { path: rowGoverningShare.rootPath })
+                      }
+                    />
+                  </button>
                 )}
                 {isFileConflict(entry) && (
                   <span

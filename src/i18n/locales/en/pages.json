@@ -49,7 +49,12 @@
     "confirmQuestion": "Confirm?",
     "delete": "Delete",
     "emptyFolder": "Folder is empty. Drag files here, or use Upload.",
-    "noSearchResults": "No matches."
+    "noSearchResults": "No matches.",
+    "sharedDirectTooltip": "Publicly shared - anyone with the link can reach this",
+    "sharedInheritedTooltip": "Publicly reachable via the share on {{path}}",
+    "folderSharedDirect": "This folder is publicly shared.",
+    "folderSharedInherited": "This folder is publicly reachable via the share on {{path}}.",
+    "manageShare": "Manage share"
   },
   "DashboardPage": {
     "loadingArrayStatus": "Loading array status…"
