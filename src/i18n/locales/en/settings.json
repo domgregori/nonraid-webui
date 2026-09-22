@@ -364,6 +364,8 @@
     "passwordProtected": "Password-protected",
     "used": "Used",
     "expires": "Expires",
+    "copy": "Copy link",
+    "copied": "Copied!",
     "revoke": "Revoke",
     "unrevoke": "Un-revoke"
   },

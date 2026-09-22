@@ -158,6 +158,15 @@ button {
   color: var(--color-red);
 }
 
+/* An existing share link's toolbar button (Browse's "Edit Link", once a share exists for the
+   current folder) - a yellow/amber tint flags "this is already shared," distinct from the plain
+   .btn used for a brand-new "Share Link" action. */
+.btn--warning {
+  border-color: var(--color-amber);
+  color: var(--color-amber);
+  background: color-mix(in oklch, var(--color-amber) 10%, transparent);
+}
+
 .btn--primary {
   cursor: pointer;
   border-radius: var(--radius-btn);

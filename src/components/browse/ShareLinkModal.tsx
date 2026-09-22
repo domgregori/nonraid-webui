@@ -2,13 +2,19 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cloudflaredApi } from '../../api/cloudflaredApi';
 import { shareLinksApi } from '../../api/shareLinksApi';
-import type { CreatedShareLink, ShareMode } from '../../types/shareLinksApi';
-import { StepUpModal } from '../shared/StepUpModal';
+import type { ShareLink, ShareMode } from '../../types/shareLinksApi';
 
 interface ShareLinkModalProps {
   rootPath: string;
   defaultLabel: string;
+  // null = creating a brand-new share for rootPath; a record = editing/managing an existing one
+  // (Browse only ever passes a non-revoked, non-expired match for this exact path - see
+  // BrowsePage.tsx's own lookup).
+  existing: ShareLink | null;
   onClose: () => void;
+  // Called after a create/update/revoke actually lands, so Browse's own "does a share already
+  // exist for this path" list is fresh the next time this modal (or the toolbar button) reads it.
+  onChanged: () => void;
 }
 
 function mbToBytes(mb: string): number | null {
@@ -16,33 +22,46 @@ function mbToBytes(mb: string): number | null {
   return mb.trim() && Number.isFinite(n) && n > 0 ? Math.round(n * 1024 * 1024) : null;
 }
 
+function bytesToMb(bytes: number | null): string {
+  return bytes === null ? '' : String(bytes / (1024 * 1024));
+}
+
 function shareUrl(publicUrl: string, token: string): string {
   const base = publicUrl.trim().replace(/\/+$/, '');
   return base ? `${base}/${token}` : token;
 }
 
+function toDatetimeLocal(ts: number | null): string {
+  if (ts === null) return '';
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /**
- * Create-a-share-link form, opened from the Browse page for whatever file/folder the admin is
- * already looking at (rootPath). Mode picker drives which of the two follow-on field groups show
- * (allow_delete only under editable; the two upload-limit fields - cumulative quota vs. per-file
- * cap, independently optional - only under upload-only/editable), matching the plan's explicit
- * "not bundled into one setting" requirement. Submission itself goes through the shared
- * StepUpModal (same shell SshKeysSection.tsx's add-key flow uses), since POST /api/share-links is
- * requireStepUp-gated server-side.
+ * Create-or-edit form for a share link, opened from the Browse page for whatever file/folder the
+ * admin is already looking at. No step-up here (see routes/shareLinks.ts) - a normal session is
+ * enough, same as every other mutating action in this app. The share's own URL is always visible
+ * and copyable, not a one-time reveal - see types/shareLinksApi.ts's ShareLink.token doc comment
+ * for why that's fine (the token's own entropy is what resists guessing, not a hash's
+ * irreversibility, so there's no reason to hide it from the admin who created it).
  */
-export function ShareLinkModal({ rootPath, defaultLabel, onClose }: ShareLinkModalProps) {
+export function ShareLinkModal({ rootPath, defaultLabel, existing, onClose, onChanged }: ShareLinkModalProps) {
   const { t } = useTranslation('browse');
-  const [label, setLabel] = useState(defaultLabel);
-  const [mode, setMode] = useState<ShareMode>('read-only');
-  const [allowDelete, setAllowDelete] = useState(false);
-  const [password, setPassword] = useState('');
-  const [expiresAtDraft, setExpiresAtDraft] = useState('');
-  const [uploadQuotaMb, setUploadQuotaMb] = useState('');
-  const [maxFileSizeMb, setMaxFileSizeMb] = useState('');
-  const [confirming, setConfirming] = useState(false);
-  const [created, setCreated] = useState<CreatedShareLink | null>(null);
+  const [record, setRecord] = useState<ShareLink | null>(existing);
+  const [label, setLabel] = useState(existing?.label ?? defaultLabel);
+  const [mode, setMode] = useState<ShareMode>(existing?.mode ?? 'read-only');
+  const [allowDelete, setAllowDelete] = useState(existing?.allowDelete ?? false);
+  const [passwordDraft, setPasswordDraft] = useState('');
+  const [clearPassword, setClearPassword] = useState(false);
+  const [expiresAtDraft, setExpiresAtDraft] = useState(toDatetimeLocal(existing?.expiresAt ?? null));
+  const [uploadQuotaMb, setUploadQuotaMb] = useState(bytesToMb(existing?.uploadQuotaBytes ?? null));
+  const [maxFileSizeMb, setMaxFileSizeMb] = useState(bytesToMb(existing?.maxFileSizeBytes ?? null));
   const [publicUrl, setPublicUrl] = useState('');
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [confirmingUnshare, setConfirmingUnshare] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     cloudflaredApi
@@ -58,50 +77,83 @@ export function ShareLinkModal({ rootPath, defaultLabel, onClose }: ShareLinkMod
     });
   };
 
-  if (created) {
-    const url = shareUrl(publicUrl, created.token);
-    return (
-      <>
-        <div className="detail-overlay" onClick={onClose} />
-        <div className="dialog">
-          <div className="dialog__head">
-            <div className="dialog__title">{t('ShareLinkModal.createdTitle')}</div>
-            <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('ShareLinkModal.close')}>
-              &#10005;
-            </button>
-          </div>
-          <div className="dialog__body">
-            <div className="status-note status-note--error">{t('ShareLinkModal.tokenWarning')}</div>
-            <div className="settings-field__row" style={{ marginTop: 12 }}>
-              <input className="history-input" style={{ width: '100%' }} readOnly value={url} onFocus={(e) => e.target.select()} />
-              <button type="button" className="btn" onClick={() => copy(url)}>
-                {copied ? t('ShareLinkModal.copied') : t('ShareLinkModal.copy')}
-              </button>
-            </div>
-            {!publicUrl && <div className="status-note">{t('ShareLinkModal.noPublicUrlHint')}</div>}
-            <div className="dialog__actions">
-              <button type="button" className="btn btn--primary" onClick={onClose}>
-                {t('ShareLinkModal.done')}
-              </button>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
+  const submit = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const expiresAt = expiresAtDraft ? new Date(expiresAtDraft).getTime() : null;
+      const uploadQuotaBytes = mbToBytes(uploadQuotaMb);
+      const maxFileSizeBytes = mbToBytes(maxFileSizeMb);
+      if (record) {
+        const updated = await shareLinksApi.update(record.id, {
+          label: label.trim() || null,
+          mode,
+          allowDelete,
+          expiresAt,
+          uploadQuotaBytes,
+          maxFileSizeBytes,
+          password: clearPassword ? null : passwordDraft ? passwordDraft : undefined,
+        });
+        setRecord(updated);
+        setPasswordDraft('');
+        setClearPassword(false);
+      } else {
+        const created = await shareLinksApi.create({
+          rootPath,
+          mode,
+          label: label.trim() || undefined,
+          allowDelete,
+          password: passwordDraft || undefined,
+          expiresAt,
+          uploadQuotaBytes,
+          maxFileSizeBytes,
+        });
+        setRecord(created);
+      }
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const unshare = async () => {
+    if (!record) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await shareLinksApi.update(record.id, { revoked: true });
+      onChanged();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setSaving(false);
+    }
+  };
 
   return (
     <>
       <div className="detail-overlay" onClick={onClose} />
       <div className="dialog">
         <div className="dialog__head">
-          <div className="dialog__title">{t('ShareLinkModal.title')}</div>
+          <div className="dialog__title">{record ? t('ShareLinkModal.editTitle') : t('ShareLinkModal.title')}</div>
           <button type="button" className="detail-panel__close" onClick={onClose} aria-label={t('ShareLinkModal.close')}>
             &#10005;
           </button>
         </div>
         <div className="dialog__body">
           <div className="status-note">{rootPath}</div>
+
+          {record && (
+            <div className="settings-field__row" style={{ marginTop: 12 }}>
+              <input className="history-input" style={{ width: '100%' }} readOnly value={shareUrl(publicUrl, record.token)} onFocus={(e) => e.target.select()} />
+              <button type="button" className="btn" onClick={() => copy(shareUrl(publicUrl, record.token))}>
+                {copied ? t('ShareLinkModal.copied') : t('ShareLinkModal.copy')}
+              </button>
+            </div>
+          )}
+          {record && !publicUrl && <div className="status-note">{t('ShareLinkModal.noPublicUrlHint')}</div>}
 
           <label className="ps-field settings-field__row" style={{ display: 'block', marginTop: 12 }}>
             <div className="toggle-row__title">{t('ShareLinkModal.label')}</div>
@@ -137,17 +189,31 @@ export function ShareLinkModal({ rootPath, defaultLabel, onClose }: ShareLinkMod
           <div className="toggle-row__title" style={{ marginTop: 12 }}>
             {t('ShareLinkModal.password')}
           </div>
-          <div className="toggle-row__desc">{t('ShareLinkModal.passwordDesc')}</div>
+          <div className="toggle-row__desc">{record ? t('ShareLinkModal.passwordEditDesc') : t('ShareLinkModal.passwordDesc')}</div>
           <div className="settings-field__row">
             <input
               className="history-input"
               style={{ width: '100%' }}
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t('ShareLinkModal.passwordPlaceholder')}
+              value={passwordDraft}
+              disabled={clearPassword}
+              onChange={(e) => setPasswordDraft(e.target.value)}
+              placeholder={record ? (record.hasPassword ? t('ShareLinkModal.passwordKeepCurrent') : t('ShareLinkModal.passwordPlaceholder')) : t('ShareLinkModal.passwordPlaceholder')}
             />
           </div>
+          {record && record.hasPassword && (
+            <label className="toggle-row" style={{ marginTop: 4 }}>
+              <div className="toggle-row__desc">{t('ShareLinkModal.removePassword')}</div>
+              <input
+                type="checkbox"
+                checked={clearPassword}
+                onChange={(e) => {
+                  setClearPassword(e.target.checked);
+                  if (e.target.checked) setPasswordDraft('');
+                }}
+              />
+            </label>
+          )}
 
           <div className="toggle-row__title" style={{ marginTop: 12 }}>
             {t('ShareLinkModal.expires')}
@@ -192,42 +258,37 @@ export function ShareLinkModal({ rootPath, defaultLabel, onClose }: ShareLinkMod
             </>
           )}
 
+          {error && <div className="status-note status-note--error" style={{ marginTop: 12 }}>{error}</div>}
+
           <div className="dialog__actions">
-            <button type="button" className="btn" onClick={onClose}>
-              {t('ShareLinkModal.cancel')}
-            </button>
-            <button type="button" className="btn btn--primary" onClick={() => setConfirming(true)}>
-              {t('ShareLinkModal.create')}
-            </button>
+            {record &&
+              (confirmingUnshare ? (
+                <>
+                  <button type="button" className="btn" onClick={() => setConfirmingUnshare(false)} disabled={saving}>
+                    {t('ShareLinkModal.cancel')}
+                  </button>
+                  <button type="button" className="btn btn--danger" onClick={unshare} disabled={saving}>
+                    {t('ShareLinkModal.confirmUnshare')}
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="btn btn--danger" onClick={() => setConfirmingUnshare(true)} disabled={saving} style={{ marginRight: 'auto' }}>
+                  {t('ShareLinkModal.unshare')}
+                </button>
+              ))}
+            {!confirmingUnshare && (
+              <>
+                <button type="button" className="btn" onClick={onClose} disabled={saving}>
+                  {t('ShareLinkModal.cancel')}
+                </button>
+                <button type="button" className="btn btn--primary" onClick={submit} disabled={saving}>
+                  {record ? t('ShareLinkModal.saveChanges') : t('ShareLinkModal.create')}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
-
-      {confirming && (
-        <StepUpModal
-          title={t('ShareLinkModal.confirmItsYou')}
-          description={t('ShareLinkModal.confirmDesc')}
-          confirmLabel={t('ShareLinkModal.create')}
-          onClose={() => setConfirming(false)}
-          onConfirm={async (currentPassword, totpCode) => {
-            const result = await shareLinksApi.create(
-              {
-                rootPath,
-                mode,
-                label: label.trim() || undefined,
-                allowDelete,
-                password: password || undefined,
-                expiresAt: expiresAtDraft ? new Date(expiresAtDraft).getTime() : null,
-                uploadQuotaBytes: mbToBytes(uploadQuotaMb),
-                maxFileSizeBytes: mbToBytes(maxFileSizeMb),
-              },
-              currentPassword,
-              totpCode,
-            );
-            setCreated(result);
-          }}
-        />
-      )}
     </>
   );
 }

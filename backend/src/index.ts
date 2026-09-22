@@ -307,7 +307,7 @@ async function main() {
   app.use('/api', updateRouter(activity));
   app.use('/api', servicesRouter(activity));
   app.use('/api', sshRouter(activity, authService));
-  app.use('/api', shareLinksRouter(shareLinkService, activity, authService));
+  app.use('/api', shareLinksRouter(shareLinkService, activity));
   app.use('/api', usersRouter(users));
   app.use('/api', unraidImportRouter(nmd, shares, pendingImportUsers, docker, config.appsBindRoots, activity, apps));
   app.use('/api', appsRouter(apps));

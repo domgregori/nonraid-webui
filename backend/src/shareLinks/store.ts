@@ -8,6 +8,7 @@ export type ShareMode = 'read-only' | 'upload-only' | 'editable';
 export interface ShareLinkRecord {
   id: string;
   tokenHash: string;
+  tokenEncrypted: string;
   passwordHash: string | null;
   rootPath: string;
   label: string | null;
@@ -27,6 +28,7 @@ export interface ShareLinkRecord {
 export interface CreateShareLinkInput {
   id: string;
   tokenHash: string;
+  tokenEncrypted: string;
   passwordHash: string | null;
   rootPath: string;
   label: string | null;
@@ -42,6 +44,14 @@ export interface UpdateShareLinkInput {
   label?: string | null;
   expiresAt?: number | null;
   revoked?: boolean;
+  mode?: ShareMode;
+  allowDelete?: boolean;
+  // undefined = leave the password as-is; null = clear it (share becomes passwordless);
+  // a string = the new plaintext password to hash and set (service.ts does the hashing before
+  // this reaches the store - this field is passwordHash, already hashed, by the time it gets here).
+  passwordHash?: string | null;
+  uploadQuotaBytes?: number | null;
+  maxFileSizeBytes?: number | null;
 }
 
 export interface ShareLinkAccessLogEntry {
@@ -56,6 +66,7 @@ export interface ShareLinkAccessLogEntry {
 interface ShareLinkRow {
   id: string;
   token_hash: string;
+  token_encrypted: string;
   password_hash: string | null;
   root_path: string;
   label: string | null;
@@ -76,6 +87,7 @@ function rowToRecord(row: ShareLinkRow): ShareLinkRecord {
   return {
     id: row.id,
     tokenHash: row.token_hash,
+    tokenEncrypted: row.token_encrypted,
     passwordHash: row.password_hash,
     rootPath: row.root_path,
     label: row.label,
@@ -116,6 +128,7 @@ export class ShareLinkStore {
       CREATE TABLE IF NOT EXISTS share_link (
         id                 TEXT PRIMARY KEY,
         token_hash         TEXT NOT NULL UNIQUE,
+        token_encrypted    TEXT NOT NULL,
         password_hash      TEXT,
         root_path          TEXT NOT NULL,
         label              TEXT,
@@ -148,12 +161,13 @@ export class ShareLinkStore {
     this.db
       .prepare(
         `INSERT INTO share_link
-          (id, token_hash, password_hash, root_path, label, mode, allow_delete, upload_quota_bytes, max_file_size_bytes, upload_used_bytes, download_count, expires_at, revoked_at, last_accessed_at, created_at, created_by)
-         VALUES (@id, @tokenHash, @passwordHash, @rootPath, @label, @mode, @allowDelete, @uploadQuotaBytes, @maxFileSizeBytes, 0, 0, @expiresAt, NULL, NULL, @createdAt, @createdBy)`,
+          (id, token_hash, token_encrypted, password_hash, root_path, label, mode, allow_delete, upload_quota_bytes, max_file_size_bytes, upload_used_bytes, download_count, expires_at, revoked_at, last_accessed_at, created_at, created_by)
+         VALUES (@id, @tokenHash, @tokenEncrypted, @passwordHash, @rootPath, @label, @mode, @allowDelete, @uploadQuotaBytes, @maxFileSizeBytes, 0, 0, @expiresAt, NULL, NULL, @createdAt, @createdBy)`,
       )
       .run({
         id: input.id,
         tokenHash: input.tokenHash,
+        tokenEncrypted: input.tokenEncrypted,
         passwordHash: input.passwordHash,
         rootPath: input.rootPath,
         label: input.label,
@@ -200,6 +214,26 @@ export class ShareLinkStore {
     if (patch.revoked !== undefined) {
       sets.push('revoked_at = @revokedAt');
       params.revokedAt = patch.revoked ? Date.now() : null;
+    }
+    if (patch.mode !== undefined) {
+      sets.push('mode = @mode');
+      params.mode = patch.mode;
+    }
+    if (patch.allowDelete !== undefined) {
+      sets.push('allow_delete = @allowDelete');
+      params.allowDelete = patch.allowDelete ? 1 : 0;
+    }
+    if (patch.passwordHash !== undefined) {
+      sets.push('password_hash = @passwordHash');
+      params.passwordHash = patch.passwordHash;
+    }
+    if (patch.uploadQuotaBytes !== undefined) {
+      sets.push('upload_quota_bytes = @uploadQuotaBytes');
+      params.uploadQuotaBytes = patch.uploadQuotaBytes;
+    }
+    if (patch.maxFileSizeBytes !== undefined) {
+      sets.push('max_file_size_bytes = @maxFileSizeBytes');
+      params.maxFileSizeBytes = patch.maxFileSizeBytes;
     }
     if (sets.length === 0) return this.getById(id);
     this.db.prepare(`UPDATE share_link SET ${sets.join(', ')} WHERE id = @id`).run(params);

@@ -29,6 +29,7 @@
     "title": "Browse",
     "newFolder": "New Folder",
     "shareLink": "Share Link",
+    "editLink": "Edit Link",
     "upload": "Upload",
     "fileConflictLegend": "File exists on multiple disks - please fix",
     "loading": "Loading…",

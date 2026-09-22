@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { cloudflaredApi } from '../../api/cloudflaredApi';
 import { shareLinksApi } from '../../api/shareLinksApi';
 import type { ShareLink, ShareMode } from '../../types/shareLinksApi';
+
+function shareUrl(publicUrl: string, token: string): string {
+  const base = publicUrl.trim().replace(/\/+$/, '');
+  return base ? `${base}/${token}` : token;
+}
 
 const MODE_LABEL_KEY: Record<ShareMode, string> = {
   'read-only': 'modeReadOnly',
@@ -32,6 +38,22 @@ export function ShareLinksSection() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [publicUrl, setPublicUrl] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    cloudflaredApi
+      .getStatus()
+      .then((s) => setPublicUrl(s.publicUrl))
+      .catch(() => {});
+  }, []);
+
+  const copy = (link: ShareLink) => {
+    navigator.clipboard?.writeText(shareUrl(publicUrl, link.token)).then(() => {
+      setCopiedId(link.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
 
   const load = () =>
     shareLinksApi
@@ -88,6 +110,11 @@ export function ShareLinksSection() {
                   </div>
                 </div>
                 <div className="remote-row__actions">
+                  {!inactive && (
+                    <button type="button" className="btn" onClick={() => copy(link)}>
+                      {copiedId === link.id ? t('ShareLinksSection.copied') : t('ShareLinksSection.copy')}
+                    </button>
+                  )}
                   <button type="button" className={`btn${link.revokedAt ? '' : ' btn--danger'}`} disabled={busyId === link.id} onClick={() => revoke(link)}>
                     {link.revokedAt ? t('ShareLinksSection.unrevoke') : t('ShareLinksSection.revoke')}
                   </button>

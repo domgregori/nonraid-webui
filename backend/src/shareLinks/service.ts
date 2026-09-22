@@ -1,8 +1,23 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { generateShareToken, hashSecret } from '../auth/crypto.js';
 import { resolveExisting } from '../browse/paths.js';
+import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
+import { decryptToken, encryptToken } from './tokenCrypto.js';
 import { ShareLinkStore, type ShareLinkAccessLogEntry, type ShareLinkRecord, type ShareMode, type UpdateShareLinkInput } from './store.js';
+
+// Admin-facing update shape, mirroring CreateShareLinkOptions below - `password` is plaintext
+// (hashed here, same as create()), unlike the store-level UpdateShareLinkInput's `passwordHash`.
+export interface UpdateShareLinkOptions {
+  label?: string | null;
+  expiresAt?: number | null;
+  revoked?: boolean;
+  mode?: ShareMode;
+  allowDelete?: boolean;
+  password?: string | null;
+  uploadQuotaBytes?: number | null;
+  maxFileSizeBytes?: number | null;
+}
 
 export interface CreateShareLinkOptions {
   rootPath: string;
@@ -16,19 +31,21 @@ export interface CreateShareLinkOptions {
   createdBy: string;
 }
 
-// The admin-facing shape of a share link - never includes tokenHash or passwordHash. `hasPassword`
-// tells the UI whether a password was set, without ever exposing the hash (or the password itself,
-// which this app never keeps past the one hashSecret() call at creation time).
-export type PublicShareLink = Omit<ShareLinkRecord, 'tokenHash' | 'passwordHash'> & { hasPassword: boolean };
+// The admin-facing shape of a share link - never includes tokenHash or passwordHash (the
+// password itself is never kept past the one hashSecret() call at creation time; `hasPassword`
+// tells the UI whether one was set, without exposing the hash). `token` IS included, and stays
+// retrievable for the life of the share (see tokenCrypto.ts's doc comment for why a reversible
+// encryption-at-rest, not a one-way hash, is the right call for this particular credential) - the
+// admin can view/copy the link again anytime from the Edit Link view, not just once at creation.
+export type PublicShareLink = Omit<ShareLinkRecord, 'tokenHash' | 'tokenEncrypted' | 'passwordHash'> & { hasPassword: boolean; token: string };
 
-// Returned exactly once, right after creation - same "raw secret shown once, hash persisted from
-// then on" precedent as AuthService.createApiToken(). token is never retrievable again afterward;
-// losing it means creating a new share link.
-export type CreatedShareLink = PublicShareLink & { token: string };
+// Kept as an alias so existing call sites/imports don't need to change - creation and every other
+// read now return the identical shape, there's no more "only returned once" special case.
+export type CreatedShareLink = PublicShareLink;
 
 function toPublic(record: ShareLinkRecord): PublicShareLink {
-  const { tokenHash: _tokenHash, passwordHash, ...rest } = record;
-  return { ...rest, hasPassword: passwordHash !== null };
+  const { tokenHash: _tokenHash, tokenEncrypted, passwordHash, ...rest } = record;
+  return { ...rest, hasPassword: passwordHash !== null, token: decryptToken(tokenEncrypted, config.shareTokenKeyPath) };
 }
 
 function sha256Hex(input: string): string {
@@ -56,12 +73,14 @@ export class ShareLinkService {
 
     const token = generateShareToken();
     const tokenHash = sha256Hex(token);
+    const tokenEncrypted = encryptToken(token, config.shareTokenKeyPath);
     const passwordHash = opts.password ? await hashSecret(opts.password) : null;
     const id = randomUUID();
 
     const record = this.store.create({
       id,
       tokenHash,
+      tokenEncrypted,
       passwordHash,
       rootPath: absPath,
       label: opts.label?.trim() || null,
@@ -75,16 +94,34 @@ export class ShareLinkService {
       createdBy: opts.createdBy,
     });
 
-    return { ...toPublic(record), token };
+    return toPublic(record);
   }
 
   list(): PublicShareLink[] {
     return this.store.list().map(toPublic);
   }
 
-  update(id: string, patch: UpdateShareLinkInput): PublicShareLink {
+  async update(id: string, patch: UpdateShareLinkOptions): Promise<PublicShareLink> {
     if (!this.store.getById(id)) throw new HttpError(404, 'Share link not found.');
-    const updated = this.store.update(id, patch);
+    if (patch.mode !== undefined && patch.mode !== 'read-only' && patch.mode !== 'upload-only' && patch.mode !== 'editable') {
+      throw new HttpError(400, 'mode must be "read-only", "upload-only", or "editable".');
+    }
+    const storePatch: UpdateShareLinkInput = {
+      label: patch.label,
+      expiresAt: patch.expiresAt,
+      revoked: patch.revoked,
+      mode: patch.mode,
+      allowDelete: patch.allowDelete,
+      uploadQuotaBytes: patch.uploadQuotaBytes,
+      maxFileSizeBytes: patch.maxFileSizeBytes,
+    };
+    // undefined = leave as-is; null = clear the password (share becomes passwordless); a non-empty
+    // string = hash it as the new password - same three-way distinction create() draws, just at
+    // update time instead of creation time.
+    if (patch.password !== undefined) {
+      storePatch.passwordHash = patch.password === null || patch.password === '' ? null : await hashSecret(patch.password);
+    }
+    const updated = this.store.update(id, storePatch);
     if (!updated) throw new HttpError(404, 'Share link not found.');
     return toPublic(updated);
   }

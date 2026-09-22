@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BulkActionBar } from '../components/browse/BulkActionBar';
 import { BulkProgressDialog } from '../components/browse/BulkProgressDialog';
@@ -10,9 +10,18 @@ import { ShareLinkModal } from '../components/browse/ShareLinkModal';
 import { TransferModal } from '../components/browse/TransferModal';
 import { useBrowse } from '../hooks/useBrowse';
 import { useBrowseSearch } from '../hooks/useBrowseSearch';
+import { shareLinksApi } from '../api/shareLinksApi';
 import { LOCATION_TYPE_COLOR, LOCATION_TYPE_LABEL } from '../selectors/browse';
 import type { BrowseEntry, BrowseLocationType, SearchMatch } from '../types/browseApi';
+import type { ShareLink } from '../types/shareLinksApi';
 import { formatFileSize } from '../utils/format';
+
+/** True for a share that's still real/usable - a revoked or expired one shouldn't count as "this
+ *  folder is already shared" (Browse should offer plain "Share Link" again in that case, not
+ *  "Edit Link" pointing at something dead). */
+function isLiveShare(s: ShareLink): boolean {
+  return s.revokedAt === null && (s.expiresAt === null || s.expiresAt > Date.now());
+}
 
 /** The folder a search match should land on when clicked - itself for a directory match, its
  *  parent for a file match (there's no single-file view, so landing in the listing that contains
@@ -46,6 +55,21 @@ export function BrowsePage() {
   const [calculating, setCalculating] = useState<Set<string>>(new Set());
   const [editingEntry, setEditingEntry] = useState<{ path: string; name: string } | null>(null);
   const [sharingPath, setSharingPath] = useState<{ path: string; label: string } | null>(null);
+  const [shareLinks, setShareLinks] = useState<ShareLink[]>([]);
+
+  const refreshShareLinks = useCallback(() => {
+    shareLinksApi
+      .list()
+      .then(setShareLinks)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshShareLinks();
+  }, [refreshShareLinks]);
+
+  // The current folder's own live share, if any - drives the toolbar button's Share/Edit swap.
+  const currentFolderShare = shareLinks.find((s) => s.rootPath === browse.path && isLiveShare(s)) ?? null;
 
   const ready = browse.status === 'ready';
   const entries = browse.listing?.entries ?? [];
@@ -107,11 +131,11 @@ export function BrowsePage() {
             </button>
             <button
               type="button"
-              className="btn"
+              className={currentFolderShare ? 'btn btn--warning' : 'btn'}
               disabled={!ready}
               onClick={() => setSharingPath({ path: browse.path, label: browse.path.split('/').filter(Boolean).pop() ?? '' })}
             >
-              {t('BrowsePage.shareLink')}
+              {currentFolderShare ? t('BrowsePage.editLink') : t('BrowsePage.shareLink')}
             </button>
             <button type="button" className="btn--primary" disabled={!ready} onClick={() => fileInputRef.current?.click()}>
               {t('BrowsePage.upload')}
@@ -354,7 +378,15 @@ export function BrowsePage() {
         </Suspense>
       )}
 
-      {sharingPath && <ShareLinkModal rootPath={sharingPath.path} defaultLabel={sharingPath.label} onClose={() => setSharingPath(null)} />}
+      {sharingPath && (
+        <ShareLinkModal
+          rootPath={sharingPath.path}
+          defaultLabel={sharingPath.label}
+          existing={shareLinks.find((s) => s.rootPath === sharingPath.path && isLiveShare(s)) ?? null}
+          onClose={() => setSharingPath(null)}
+          onChanged={refreshShareLinks}
+        />
+      )}
     </div>
   );
 }

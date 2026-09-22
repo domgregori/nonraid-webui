@@ -1,9 +1,8 @@
 import { Router, type Response } from 'express';
 import type { ActivityStore } from '../activity/index.js';
-import { requireStepUp, totpVerifyRateLimiter, type AuthService } from '../auth/index.js';
 import { HttpError } from '../httpError.js';
-import type { ShareLinkService } from '../shareLinks/index.js';
-import type { ShareMode, UpdateShareLinkInput } from '../shareLinks/index.js';
+import type { ShareLinkService, UpdateShareLinkOptions } from '../shareLinks/index.js';
+import type { ShareMode } from '../shareLinks/index.js';
 
 function handleError(err: unknown, res: Response) {
   if (err instanceof HttpError) {
@@ -29,14 +28,14 @@ function optionalNumber(value: unknown, label: string): number | null | undefine
   throw new HttpError(400, `${label} must be a non-negative number or null.`);
 }
 
-export function shareLinksRouter(shareLinks: ShareLinkService, activity: ActivityStore, auth: AuthService): Router {
+export function shareLinksRouter(shareLinks: ShareLinkService, activity: ActivityStore): Router {
   const router = Router();
 
-  // Step-up gated the same way POST /ssh/keys is: once a Cloudflare Tunnel is enabled, a share
-  // link is real, internet-reachable access to array data - a valid session cookie alone isn't
-  // enough (someone at an unlocked, already-logged-in browser shouldn't be able to silently mint
-  // one). Rate-limited the same way every other TOTP re-check is.
-  router.post('/share-links', totpVerifyRateLimiter, requireStepUp(auth), async (req, res) => {
+  // Session-gated only, same as every other mutating route in this app (Tailscale, rclone, ...) -
+  // not step-up gated. Creating a share link is scoped to one specific path (never full API/root
+  // access the way an SSH key grant is), and the earlier stricter treatment made routine sharing
+  // annoyingly slow for what is, day to day, an ordinary admin action.
+  router.post('/share-links', async (req, res) => {
     try {
       const body = req.body ?? {};
       const mode = validateMode(body.mode);
@@ -74,12 +73,13 @@ export function shareLinksRouter(shareLinks: ShareLinkService, activity: Activit
     }
   });
 
-  // Not step-up gated: revoking (or editing the label/expiry of) an already-created share link
-  // only ever narrows access, same "safety-positive action" reasoning DELETE /auth/tokens gets.
-  router.patch('/share-links/:id', (req, res) => {
+  // Not step-up gated: same reasoning as create() above, plus revoking (or narrowing) an
+  // already-created share link is itself a "safety-positive action" the way DELETE /auth/tokens
+  // is - either way, ordinary session auth is enough.
+  router.patch('/share-links/:id', async (req, res) => {
     try {
       const body = req.body ?? {};
-      const patch: UpdateShareLinkInput = {};
+      const patch: UpdateShareLinkOptions = {};
       if (body.label !== undefined) {
         if (body.label !== null && typeof body.label !== 'string') {
           res.status(400).json({ error: 'label must be a string or null.' });
@@ -97,9 +97,34 @@ export function shareLinksRouter(shareLinks: ShareLinkService, activity: Activit
         }
         patch.revoked = body.revoked;
       }
-      const updated = shareLinks.update(req.params.id, patch);
+      if (body.mode !== undefined) {
+        patch.mode = validateMode(body.mode);
+      }
+      if (body.allowDelete !== undefined) {
+        if (typeof body.allowDelete !== 'boolean') {
+          res.status(400).json({ error: 'allowDelete must be a boolean.' });
+          return;
+        }
+        patch.allowDelete = body.allowDelete;
+      }
+      if (body.password !== undefined) {
+        if (body.password !== null && typeof body.password !== 'string') {
+          res.status(400).json({ error: 'password must be a string or null.' });
+          return;
+        }
+        patch.password = body.password;
+      }
+      if (body.uploadQuotaBytes !== undefined) {
+        patch.uploadQuotaBytes = optionalNumber(body.uploadQuotaBytes, 'uploadQuotaBytes');
+      }
+      if (body.maxFileSizeBytes !== undefined) {
+        patch.maxFileSizeBytes = optionalNumber(body.maxFileSizeBytes, 'maxFileSizeBytes');
+      }
+      const updated = await shareLinks.update(req.params.id, patch);
       if (patch.revoked !== undefined) {
         activity.log(patch.revoked ? 'Share link revoked' : 'Share link un-revoked', patch.revoked ? 'amber' : 'blue').catch(() => {});
+      } else {
+        activity.log(`Share link updated${updated.label ? ` "${updated.label}"` : ''}`, 'blue').catch(() => {});
       }
       res.json(updated);
     } catch (err) {

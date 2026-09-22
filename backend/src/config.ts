@@ -285,6 +285,13 @@ export const config = {
   // share-server (the separate, unprivileged public-facing process) never touches directly. See
   // shareLinks/store.ts's own doc comment for the WAL-mode precedent this follows.
   shareLinksDbPath: str('SHARE_LINKS_DB_PATH', path.join(process.cwd(), 'data', 'share-links.db')),
+  // AES-256-GCM key protecting each share link's token at rest (shareLinks/tokenCrypto.ts) -
+  // reversible by design (the admin can view/copy a link again later, not just at creation), which
+  // is fine here: the token's own 192 bits of randomBytes() entropy (generateShareToken) is what
+  // actually resists guessing/fuzzing, same as generateApiToken's - encryption at rest only raises
+  // the bar against a raw SQLite file read, it was never the thing making the token unguessable.
+  // Generated once on first use if missing (0600) - see tokenCrypto.ts's getOrCreateKey().
+  shareTokenKeyPath: str('SHARE_TOKEN_KEY_PATH', path.join(process.cwd(), 'data', 'share-token.key')),
   // The narrow Unix-socket RPC boundary share-server talks to instead - see
   // shareLinks/rpcServer.ts. /run is tmpfs; tools/systemd/nonraid-webui.service's
   // RuntimeDirectory=nonraid-webui creates this directory (root:nonraid-share, 0750) on every
