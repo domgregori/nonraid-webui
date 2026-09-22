@@ -10,11 +10,13 @@ import { ShareLinkModal } from '../components/browse/ShareLinkModal';
 import { TransferModal } from '../components/browse/TransferModal';
 import { useBrowse } from '../hooks/useBrowse';
 import { useBrowseSearch } from '../hooks/useBrowseSearch';
+import { browseApi } from '../api/browseApi';
 import { shareLinksApi } from '../api/shareLinksApi';
 import { LOCATION_TYPE_COLOR, LOCATION_TYPE_LABEL } from '../selectors/browse';
 import type { BrowseEntry, BrowseLocationType, SearchMatch } from '../types/browseApi';
 import type { ShareLink } from '../types/shareLinksApi';
 import { formatFileSize } from '../utils/format';
+import { mediaKind } from '../utils/mediaKind';
 
 /** True for a share that's still real/usable - a revoked or expired one shouldn't count as "this
  *  folder is already shared" (Browse should offer plain "Share Link" again in that case, not
@@ -36,6 +38,7 @@ function targetFolderFor(match: SearchMatch): string {
 // own) is real weight, and this app has no other route-level code-splitting today. Loading it
 // only when someone actually opens a file keeps it out of every other page's shared bundle.
 const EditFileDialog = lazy(() => import('../components/browse/EditFileDialog').then((m) => ({ default: m.EditFileDialog })));
+const MediaViewer = lazy(() => import('../components/browse/MediaViewer').then((m) => ({ default: m.MediaViewer })));
 
 function formatModified(iso: string): string {
   const d = new Date(iso);
@@ -54,6 +57,7 @@ export function BrowsePage() {
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [calculating, setCalculating] = useState<Set<string>>(new Set());
   const [editingEntry, setEditingEntry] = useState<{ path: string; name: string } | null>(null);
+  const [viewingMedia, setViewingMedia] = useState<{ path: string; name: string } | null>(null);
   const [sharingPath, setSharingPath] = useState<{ path: string; label: string } | null>(null);
   const [shareLinks, setShareLinks] = useState<ShareLink[]>([]);
 
@@ -258,7 +262,18 @@ export function BrowsePage() {
                     title={LOCATION_TYPE_LABEL[entry.locationType]}
                   />
                 )}
-                {entry.type === 'file' && entry.editable ? (
+                {entry.type === 'file' && mediaKind(entry.name) ? (
+                  <button
+                    type="button"
+                    className="browse-row__name-text--file browse-row__name-text--editable"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setViewingMedia({ path: absPath, name: entry.name });
+                    }}
+                  >
+                    {entry.name}
+                  </button>
+                ) : entry.type === 'file' && entry.editable ? (
                   <button
                     type="button"
                     className="browse-row__name-text--file browse-row__name-text--editable"
@@ -376,6 +391,17 @@ export function BrowsePage() {
       {editingEntry && (
         <Suspense fallback={<div className="detail-overlay" />}>
           <EditFileDialog path={editingEntry.path} fileName={editingEntry.name} onClose={() => setEditingEntry(null)} />
+        </Suspense>
+      )}
+
+      {viewingMedia && (
+        <Suspense fallback={<div className="detail-overlay" />}>
+          <MediaViewer
+            url={browseApi.viewUrl(viewingMedia.path)}
+            fileName={viewingMedia.name}
+            kind={mediaKind(viewingMedia.name)!}
+            onClose={() => setViewingMedia(null)}
+          />
         </Suspense>
       )}
 

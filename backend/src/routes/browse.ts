@@ -4,6 +4,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { Router, type Response } from 'express';
 import multer from 'multer';
+import { resolveInlineMedia } from '@nonraid/shared/media-kind';
 import { suggestDirectories } from '../browse/suggest.js';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
@@ -72,6 +73,28 @@ export function browseRouter(browse: BrowseService): Router {
     try {
       const { absPath, name } = await browse.resolveDownload(queryPath(req));
       res.download(absPath, name);
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
+  // Inline media/PDF viewing - same shape and same reasoning as share-server's own
+  // GET /api/shares/:token/view (see that route's doc comment and @nonraid/shared/media-kind's):
+  // no Content-Disposition: attachment, Content-Type set explicitly from the shared allowlist
+  // rather than trusted from the extension via a generic res.sendFile() default, nosniff header
+  // set alongside it. Anything not on the allowlist 404s - the frontend falls back to the
+  // existing Download button for those.
+  router.get('/browse/view', async (req, res) => {
+    try {
+      const { absPath, name } = await browse.resolveDownload(queryPath(req));
+      const media = resolveInlineMedia(name);
+      if (!media) {
+        res.status(404).json({ error: 'Not viewable inline.' });
+        return;
+      }
+      res.sendFile(absPath, {
+        headers: { 'Content-Type': media.contentType, 'X-Content-Type-Options': 'nosniff' },
+      });
     } catch (err) {
       handleError(err, res);
     }

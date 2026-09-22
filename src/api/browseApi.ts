@@ -31,6 +31,11 @@ export const browseApi = {
 
   downloadUrl: (path: string) => `${API_BASE_URL}${withPath('/api/browse/download', path)}`,
 
+  // Inline media/PDF viewing - no Content-Disposition: attachment, meant as an <img>/<video>/
+  // <audio>/<iframe> src. See routes/browse.ts's own /view route and @nonraid/shared/media-kind
+  // for the server-side allowlist that actually decides what this can serve inline.
+  viewUrl: (path: string) => `${API_BASE_URL}${withPath('/api/browse/view', path)}`,
+
   // A folder, or several selected entries within one folder - `dir` is their shared parent (the
   // Browse page's selection is always siblings), `names` their basenames. Kept short even for a
   // large selection since only the names travel in the URL, not each one's full path.

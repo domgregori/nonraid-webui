@@ -1,4 +1,5 @@
 import type { ShareEntry, ShareMode } from '../api';
+import { mediaKind } from '../mediaKind';
 
 interface FileBrowserProps {
   path: string;
@@ -82,6 +83,14 @@ export function FileBrowser({ path, entries, mode, loading, error, onNavigate, o
                   {entry.viewable && (
                     <button type="button" className="ps-btn ps-btn--small" onClick={() => onOpenFile(entry)}>
                       {mode === 'editable' ? 'Edit' : 'View'}
+                    </button>
+                  )}
+                  {/* Media/PDF viewing is always read-only (no such thing as "editing" an image),
+                      so this never shows an "Edit" label the way the text button above can - and
+                      it's independent of entry.viewable, which is text-file-specific. */}
+                  {!entry.viewable && mediaKind(entry.name) && (
+                    <button type="button" className="ps-btn ps-btn--small" onClick={() => onOpenFile(entry)}>
+                      View
                     </button>
                   )}
                 </span>

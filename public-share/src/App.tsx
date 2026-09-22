@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { currentToken, shareApi, type BrowseResult, type ShareEntry, type ShareInfo } from './api';
 import { FileBrowser } from './components/FileBrowser';
+import { MediaViewer } from './components/MediaViewer';
 import { TextEditor } from './components/TextEditor';
 import { UnlockForm } from './components/UnlockForm';
 import { UploadForm } from './components/UploadForm';
+import { mediaKind } from './mediaKind';
 
 function pathFromLocation(): string {
   return new URLSearchParams(window.location.search).get('path') ?? '';
@@ -123,18 +125,26 @@ export function App() {
         />
       )}
 
-      {editing && (
-        <TextEditor
-          token={token}
-          path={path ? `${path}/${editing.name}` : editing.name}
-          fileName={editing.name}
-          readOnly={info.mode !== 'editable'}
-          onClose={() => {
-            setEditing(null);
-            loadFolder(path);
-          }}
-        />
-      )}
+      {editing &&
+        (mediaKind(editing.name) ? (
+          <MediaViewer
+            url={shareApi.viewUrl(token, path ? `${path}/${editing.name}` : editing.name)}
+            fileName={editing.name}
+            kind={mediaKind(editing.name)!}
+            onClose={() => setEditing(null)}
+          />
+        ) : (
+          <TextEditor
+            token={token}
+            path={path ? `${path}/${editing.name}` : editing.name}
+            fileName={editing.name}
+            readOnly={info.mode !== 'editable'}
+            onClose={() => {
+              setEditing(null);
+              loadFolder(path);
+            }}
+          />
+        ))}
     </div>
   );
 }

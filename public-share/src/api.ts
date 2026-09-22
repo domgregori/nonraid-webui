@@ -62,6 +62,15 @@ export const shareApi = {
     return `/api/shares/${token}/download?path=${encodeURIComponent(path)}`;
   },
 
+  // Inline media/PDF viewing - no Content-Disposition: attachment, meant as an <img>/<video>/
+  // <audio>/<iframe> src, not a link to click. See routes/shares.ts's own /view route and
+  // @nonraid/shared/media-kind for the server-side allowlist that actually decides what this can
+  // serve inline - mediaKind.ts's client-side guess is just UI (which button to show), not a
+  // security boundary.
+  viewUrl(token: string, path: string): string {
+    return `/api/shares/${token}/view?path=${encodeURIComponent(path)}`;
+  },
+
   readFile(token: string, path: string): Promise<{ content: string }> {
     return fetch(`/api/shares/${token}/read?path=${encodeURIComponent(path)}`, { credentials: 'include' }).then((res) => asJson(res));
   },

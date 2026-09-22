@@ -5,6 +5,7 @@ import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import { SandboxError } from '@nonraid/shared/path-sandbox';
 import { looksBinary, MAX_EDIT_BYTES } from '@nonraid/shared/text-file-guard';
+import { resolveInlineMedia } from '@nonraid/shared/media-kind';
 import type { ShareMode } from '@nonraid/shared/share-link-rpc';
 import { config } from '../config.js';
 import { parseCookies, serializeClearCookie, serializeCookie } from '../cookies.js';
@@ -189,8 +190,16 @@ export function sharesRouter(rpc: ShareLinkRpcClient): Router {
           // share.mode on the frontend (App.tsx passes readOnly={mode !== 'editable'} down) and
           // enforced again server-side by POST /write's own mode check below - this flag only
           // ever gates whether the "View"/"Edit" button appears at all.
+          // Known media/PDF extensions are excluded up front, same as the admin browse listing -
+          // a small hand-authored PDF or similar can contain zero NUL bytes in its first 8000,
+          // which would otherwise make looksBinary() call it "text" and route it to the text
+          // viewer instead of the inline media viewer.
           const viewable =
-            share.mode !== 'upload-only' && type === 'file' && entryStat !== null && entryStat.size <= MAX_EDIT_BYTES
+            share.mode !== 'upload-only' &&
+            type === 'file' &&
+            entryStat !== null &&
+            entryStat.size <= MAX_EDIT_BYTES &&
+            resolveInlineMedia(d.name) === null
               ? entryStat.size === 0 || !(await looksBinary(entryAbsPath).catch(() => true))
               : undefined;
           return {
@@ -236,6 +245,47 @@ export function sharesRouter(rpc: ShareLinkRpcClient): Router {
           rpc.recordDownload({ shareId: share.shareId });
           rpc.logAccess({ shareId: share.shareId, kind: 'download', ip: clientIp(req), detail: path.basename(absPath) });
         }
+      });
+    } catch (err) {
+      handleUnexpected(err, res);
+    }
+  });
+
+  // Inline media/PDF viewing (image/video/audio/pdf) - unlike /download, no
+  // Content-Disposition: attachment, so the browser renders it in an <img>/<video>/<audio>/<iframe>
+  // instead of prompting to save. Same read-only-safe mode gate as /download and /read (allowed
+  // for read-only and editable, refused for upload-only). Content-Type is set explicitly from
+  // resolveInlineMedia's own allowlist, never trusted from the file's own extension via a generic
+  // res.sendFile() default - see that module's doc comment for exactly why (an uploaded/shared
+  // .svg or .html served with a browser-executable Content-Type would be a same-origin XSS vector
+  // this app has no business risking). Anything not on the allowlist 404s here - the frontend
+  // falls back to a plain Download link for those, never trying to render them inline.
+  router.get('/api/shares/:token/view', async (req, res) => {
+    try {
+      const share = await requireUnlocked(req, rpc, requireToken(req));
+      if (!share) {
+        sendError(res, 401, 'Unlock this share first.');
+        return;
+      }
+      if (share.mode === 'upload-only') {
+        sendError(res, 404, 'Not found.');
+        return;
+      }
+      const sandbox = getPathSandbox(share.shareId, share.rootPath);
+      const { absPath } = await sandbox.resolveExisting(queryPath(req));
+      const st = await stat(absPath);
+      if (!st.isFile()) {
+        sendError(res, 400, 'Not a file.');
+        return;
+      }
+      const media = resolveInlineMedia(path.basename(absPath));
+      if (!media) {
+        sendError(res, 404, 'Not viewable inline.');
+        return;
+      }
+      rpc.logAccess({ shareId: share.shareId, kind: 'view', ip: clientIp(req), detail: path.basename(absPath) });
+      res.sendFile(absPath, {
+        headers: { 'Content-Type': media.contentType, 'X-Content-Type-Options': 'nosniff' },
       });
     } catch (err) {
       handleUnexpected(err, res);

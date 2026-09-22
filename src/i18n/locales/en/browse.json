@@ -60,6 +60,11 @@
     "succeededOnly": "{{count}} succeeded.",
     "succeededWithFailed": "{{succeededCount}} succeeded, {{failedCount}} failed."
   },
+  "MediaViewer": {
+    "close": "Close",
+    "videoUnsupported": "Your browser can't play this video.",
+    "audioUnsupported": "Your browser can't play this audio."
+  },
   "EditFileDialog": {
     "editTitle": "Edit: {{fileName}}",
     "unsavedChanges": "Unsaved changes",

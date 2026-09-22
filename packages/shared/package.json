@@ -12,6 +12,7 @@
     "./path-sandbox": "./dist/path-sandbox/index.js",
     "./signed-payload": "./dist/signed-payload/index.js",
     "./text-file-guard": "./dist/text-file-guard/index.js",
+    "./media-kind": "./dist/media-kind/index.js",
     "./share-link-rpc": "./dist/share-link-rpc/index.js"
   },
   "devDependencies": {

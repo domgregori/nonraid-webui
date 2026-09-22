@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import * as tar from 'tar';
 import type { Pack } from 'tar';
 import { MAX_EDIT_BYTES, looksBinary } from '@nonraid/shared/text-file-guard';
+import { resolveInlineMedia } from '@nonraid/shared/media-kind';
 import { config } from '../config.js';
 import { HttpError } from '../httpError.js';
 import type { ShareService } from '../shares/index.js';
@@ -92,9 +93,16 @@ export class BrowseService {
         const entryStat = await stat(entryAbsPath).catch(() => null);
         const type = d.isSymbolicLink() ? 'symlink' : d.isDirectory() ? 'directory' : 'file';
         // Only sniff files small enough to actually edit - skips the read entirely for huge files
-        // (videos, disk images, archives), which the size cap alone already disqualifies.
+        // (videos, disk images, archives), which the size cap alone already disqualifies. Known
+        // media/PDF extensions are excluded up front rather than left to the binary sniff: a
+        // small hand-authored PDF or an SVG-adjacent file can contain zero NUL bytes in its first
+        // 8000, which would otherwise make looksBinary() call it "text" and route it into the
+        // text editor instead of the media viewer.
         const editable =
-          type === 'file' && entryStat !== null && entryStat.size <= MAX_EDIT_BYTES
+          type === 'file' &&
+          entryStat !== null &&
+          entryStat.size <= MAX_EDIT_BYTES &&
+          resolveInlineMedia(d.name) === null
             ? entryStat.size === 0 || !(await looksBinary(entryAbsPath).catch(() => true))
             : undefined;
         return {

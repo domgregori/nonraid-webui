@@ -99,7 +99,7 @@ export interface TrueUpUploadBytesParams {
 }
 export type TrueUpUploadBytesResult = { ok: true };
 
-export type AccessLogKind = 'list' | 'download' | 'upload' | 'edit' | 'unlock';
+export type AccessLogKind = 'list' | 'download' | 'view' | 'upload' | 'edit' | 'unlock';
 
 export interface LogAccessParams {
   shareId: string;
