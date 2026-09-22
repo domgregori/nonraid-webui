@@ -61,6 +61,7 @@ export function ShareLinkModal({ rootPath, defaultLabel, existing, onClose, onCh
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmingUnshare, setConfirmingUnshare] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -97,6 +98,13 @@ export function ShareLinkModal({ rootPath, defaultLabel, existing, onClose, onCh
         setRecord(updated);
         setPasswordDraft('');
         setClearPassword(false);
+        // The PATCH genuinely succeeds with nothing else in this dialog visibly changing (same
+        // field values you just typed, still on screen) - without this, "Save changes" looked
+        // like it did nothing at all. Same transient-message pattern as the Copy button's
+        // "Copied!" swap, not a toast/close, since the admin may still want to keep editing or
+        // copy the link right after.
+        setJustSaved(true);
+        setTimeout(() => setJustSaved(false), 2000);
       } else {
         const created = await shareLinksApi.create({
           rootPath,
@@ -282,7 +290,7 @@ export function ShareLinkModal({ rootPath, defaultLabel, existing, onClose, onCh
                   {t('ShareLinkModal.cancel')}
                 </button>
                 <button type="button" className="btn btn--primary" onClick={submit} disabled={saving}>
-                  {record ? t('ShareLinkModal.saveChanges') : t('ShareLinkModal.create')}
+                  {record ? (justSaved ? t('ShareLinkModal.saved') : t('ShareLinkModal.saveChanges')) : t('ShareLinkModal.create')}
                 </button>
               </>
             )}

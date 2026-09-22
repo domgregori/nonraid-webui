@@ -239,6 +239,7 @@ export function BrowsePage() {
 
         {entries.map((entry) => {
           const absPath = browse.path.endsWith('/') ? `${browse.path}${entry.name}` : `${browse.path}/${entry.name}`;
+          const entryShare = shareLinks.find((s) => s.rootPath === absPath && isLiveShare(s)) ?? null;
           const knownSize = browse.sizes[absPath];
           return (
             <div
@@ -307,8 +308,8 @@ export function BrowsePage() {
                     {t('BrowsePage.downloadArchive')}
                   </a>
                 )}
-                <button type="button" className="btn" onClick={() => setSharingPath({ path: absPath, label: entry.name })}>
-                  {t('BrowsePage.shareLink')}
+                <button type="button" className={entryShare ? 'btn btn--warning' : 'btn'} onClick={() => setSharingPath({ path: absPath, label: entry.name })}>
+                  {entryShare ? t('BrowsePage.editLink') : t('BrowsePage.shareLink')}
                 </button>
                 <button type="button" className="btn" onClick={() => setRenamingEntry(entry)}>
                   {t('BrowsePage.rename')}
