@@ -6,6 +6,7 @@ const TABS = [
   { to: '/disks', labelKey: 'NavTabs.disks' },
   { to: '/shares', labelKey: 'NavTabs.pools' },
   { to: '/browse', labelKey: 'NavTabs.browse' },
+  { to: '/links', labelKey: 'NavTabs.links' },
   { to: '/users', labelKey: 'NavTabs.sharing' },
   { to: '/docker', labelKey: 'NavTabs.docker' },
   { to: '/lxc', labelKey: 'NavTabs.lxc' },

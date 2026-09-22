@@ -56,6 +56,28 @@
     "folderSharedInherited": "This folder is publicly reachable via the share on {{path}}.",
     "manageShare": "Manage share"
   },
+  "LinksPage": {
+    "title": "Links",
+    "desc": "Every share link across the array, in one place - manage access, copy the URL, or unshare, no matter which folder it's rooted at.",
+    "loading": "Loading…",
+    "none": "No share links yet. Create one from a folder's \"Share Link\" button in Browse.",
+    "untitled": "Untitled",
+    "revoked": "Revoked",
+    "expired": "Expired",
+    "modeReadOnly": "Read-only",
+    "modeUploadOnly": "Upload-only",
+    "modeEditable": "Editable",
+    "passwordProtected": "Password-protected",
+    "downloadCount": "{{count}} download",
+    "downloadCount_other": "{{count}} downloads",
+    "used": "Used",
+    "expires": "Expires",
+    "openInBrowse": "Open in Browse",
+    "copy": "Copy link",
+    "copied": "Copied!",
+    "manage": "Manage",
+    "reactivate": "Reactivate"
+  },
   "DashboardPage": {
     "loadingArrayStatus": "Loading array status…"
   },

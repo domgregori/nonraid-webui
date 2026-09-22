@@ -167,6 +167,22 @@ button {
   background: color-mix(in oklch, var(--color-amber) 10%, transparent);
 }
 
+/* Plain text that acts like a link (e.g. the Links page's rootPath, jumping into Browse at that
+   folder) - no border/background of its own, so it reads as part of the surrounding text line. */
+.link-button {
+  font: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-blue);
+  cursor: pointer;
+  text-align: left;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
 .btn--primary {
   cursor: pointer;
   border-radius: var(--radius-btn);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { browseApi } from '../api/browseApi';
 import type { BrowseEntry, BrowseListing, BulkOp, BulkOpProgress, BulkOpResult } from '../types/browseApi';
 
@@ -67,7 +68,11 @@ export interface UseBrowse {
  * /mnt tree. Starts at /mnt/user; "up" stops working once `listing.path`
  * reaches `listing.root` ("/mnt", the highest directory the server allows). */
 export function useBrowse(): UseBrowse {
-  const [path, setPath] = useState(DEFAULT_PATH);
+  // Lets another page (the Links page's "Open in Browse") land here at a specific folder instead
+  // of always the default - read once at mount via router state, not a URL query param, since
+  // nothing else in this app deep-links into Browse yet.
+  const location = useLocation();
+  const [path, setPath] = useState(() => (location.state as { path?: string } | null)?.path ?? DEFAULT_PATH);
   const [listing, setListing] = useState<BrowseListing | null>(null);
   const [status, setStatus] = useState<BrowseLoadStatus>('loading');
   const [error, setError] = useState<string | null>(null);
