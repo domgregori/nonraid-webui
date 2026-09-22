@@ -50,9 +50,13 @@ export const config = {
   uploadRateLimitMax: num('SHARE_UPLOAD_RATE_LIMIT_MAX', 30),
   // Built public-share bundle this process serves directly (static + SPA fallback, scoped to skip
   // /api/*) - see tools/install-webui.sh's stage_public_share_frontend().
-  publicShareDistPath: str('PUBLIC_SHARE_DIST_PATH', path.join(process.cwd(), '..', 'public-share', 'dist')),
+  // path.resolve (not just str()) so a relative PUBLIC_SHARE_DIST_PATH override - easy to type by
+  // accident during local dev, e.g. "../public-share/dist" - still ends up absolute. res.sendFile()
+  // (used to serve index.html below) throws "path must be absolute or specify root" otherwise;
+  // confirmed live against a real browser request, not just reasoned about.
+  publicShareDistPath: path.resolve(str('PUBLIC_SHARE_DIST_PATH', path.join(process.cwd(), '..', 'public-share', 'dist'))),
   serveFrontend: str('SERVE_PUBLIC_SHARE_FRONTEND', 'true') !== 'false',
   // Where uploads land before the destination path is validated and they're renamed into place -
   // same temp-then-rename shape backend/src/browse/service.ts's saveUpload() uses.
-  uploadTmpDir: str('SHARE_UPLOAD_TMP_DIR', path.join(process.cwd(), 'tmp', 'uploads')),
+  uploadTmpDir: path.resolve(str('SHARE_UPLOAD_TMP_DIR', path.join(process.cwd(), 'tmp', 'uploads'))),
 };
