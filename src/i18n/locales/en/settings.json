@@ -350,25 +350,6 @@
     "saved": "Saved.",
     "savedAdvertiseRoutes": "Saved. Advertised routes may need approval in your Tailscale/Headscale admin console before they take effect."
   },
-  "ShareLinksSection": {
-    "loading": "Loading…",
-    "title": "Share Links",
-    "desc": "Links that share a folder or file over the internet through a Cloudflare Tunnel. Create one from the Browse page.",
-    "none": "No share links yet.",
-    "untitled": "Untitled",
-    "modeReadOnly": "Read-only",
-    "modeUploadOnly": "Upload-only",
-    "modeEditable": "Editable",
-    "revoked": "Revoked",
-    "expired": "Expired",
-    "passwordProtected": "Password-protected",
-    "used": "Used",
-    "expires": "Expires",
-    "copy": "Copy link",
-    "copied": "Copied!",
-    "revoke": "Revoke",
-    "unrevoke": "Un-revoke"
-  },
   "CloudflaredSection": {
     "loading": "Loading…",
     "title": "Internet Access (Cloudflare Tunnel)",

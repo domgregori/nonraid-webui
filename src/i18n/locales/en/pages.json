@@ -244,7 +244,6 @@
       "services": "Services",
       "logs": "System Logs",
       "tailscale": "Tailscale",
-      "shareLinks": "Share Links",
       "cloudflared": "Internet Access",
       "update": "Update"
     },
@@ -449,9 +448,6 @@
     },
     "tailscale": {
       "title": "Tailscale"
-    },
-    "shareLinks": {
-      "title": "Share Links"
     },
     "cloudflared": {
       "title": "Internet Access"
