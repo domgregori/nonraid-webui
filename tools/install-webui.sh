@@ -687,7 +687,30 @@ install_cli() {
   ln -sf "$CLI_DIR/dist/index.js" /usr/local/bin/nonraid-tool
 }
 
+# @nonraid/shared's staged counterpart to build_shared_package() above - needed because rsync -a
+# preserves node_modules/@nonraid/shared as the symlink npm's `file:` dependency actually is
+# (../../../packages/shared, relative to wherever it physically sits) rather than copying its
+# contents. That relative target resolves fine inside the dev checkout, but once backend/'s or
+# share-server/'s node_modules gets rsynced into $INSTALL_ROOT on its own, the same "../../../"
+# from $INSTALL_ROOT/backend/node_modules/@nonraid/shared now points at $INSTALL_ROOT/packages/
+# shared - a directory nothing ever created, so the symlink dangles and the staged backend fails
+# to boot at all (`ERR_MODULE_NOT_FOUND: Cannot find package '@nonraid/shared'`). This just gives
+# that path something real to resolve to, at the exact depth both consumers' symlinks already
+# expect - no change needed to the symlinks themselves. dist + package.json only: see
+# packages/shared/package.json, it has zero runtime dependencies of its own.
+#
+# Called from both stage_backend() and stage_share_server() below rather than being its own
+# top-level STEPS entry - same reasoning build_shared_package() above already documents (no
+# ordering footgun where a lone --step stage_backend leaves this out).
+stage_shared_package() {
+  log "Staging @nonraid/shared into $INSTALL_ROOT/packages/shared"
+  mkdir -p "$INSTALL_ROOT/packages/shared"
+  rsync -a --delete "$SHARED_PKG_DIR/dist/" "$INSTALL_ROOT/packages/shared/dist/"
+  cp "$SHARED_PKG_DIR/package.json" "$INSTALL_ROOT/packages/shared/"
+}
+
 stage_backend() {
+  stage_shared_package
   log "Staging backend into $INSTALL_ROOT/backend"
   mkdir -p "$INSTALL_ROOT/backend"
   rsync -a --delete "$BACKEND_DIR/dist/" "$INSTALL_ROOT/backend/dist/"
@@ -719,6 +742,7 @@ stage_install() {
 # the *running process* can do, not who owns the files on disk, same as every other User=-scoped
 # unit anywhere else in this OS.
 stage_share_server() {
+  stage_shared_package
   log "Staging share-server into $INSTALL_ROOT/share-server"
   mkdir -p "$INSTALL_ROOT/share-server"
   rsync -a --delete "$SHARE_SERVER_DIR/dist/" "$INSTALL_ROOT/share-server/dist/"
