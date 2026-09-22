@@ -381,6 +381,7 @@
     "notRunning": "Not running",
     "tokenSet": "token set",
     "tokenNotSet": "no token set",
+    "serviceUrlHint": "Setting up the tunnel in Cloudflare's dashboard: under Public Hostname, set Service to http://127.0.0.1:8877 - that's share-server, not the admin app you're using right now. Pointing it anywhere else exposes the full admin UI to the internet.",
     "tunnelToken": "Tunnel token",
     "tunnelTokenHint": "The token from your Cloudflare Tunnel's dashboard (Zero Trust > Networks > Tunnels). Never shown again after saving.",
     "tunnelTokenPlaceholder": "Paste your tunnel token",

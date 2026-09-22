@@ -109,6 +109,10 @@ export function CloudflaredSection() {
             {status.version && ` (${status.version})`} · {status.hasToken ? t('CloudflaredSection.tokenSet') : t('CloudflaredSection.tokenNotSet')}
           </div>
 
+          <div className="status-note" style={{ marginTop: 12 }}>
+            {t('CloudflaredSection.serviceUrlHint')}
+          </div>
+
           <div className="toggle-row__title" style={{ marginTop: 12 }}>
             {t('CloudflaredSection.tunnelToken')}
           </div>
