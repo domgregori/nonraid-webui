@@ -20,4 +20,7 @@ export const shareLinksApi = {
     }),
 
   activity: (id: string) => request<ShareLinkAccessLogEntry[]>(`/api/share-links/${encodeURIComponent(id)}/activity`),
+
+  // 409s if the share is still live (not revoked, not expired) - see routes/shareLinks.ts.
+  remove: (id: string) => request<{ ok: true }>(`/api/share-links/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };

@@ -50,6 +50,7 @@ export function LinksPage() {
   const [publicUrl, setPublicUrl] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [managing, setManaging] = useState<ShareLink | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     shareLinksApi
@@ -81,6 +82,22 @@ export function LinksPage() {
     setActionError(null);
     try {
       await shareLinksApi.update(link.id, { revoked: false });
+      load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // Backend refuses (409) to delete a share that's still live - revoke() above is the only way
+  // to get here, so this never needs its own live/inactive check beyond that.
+  const remove = async (link: ShareLink) => {
+    setBusyId(link.id);
+    setActionError(null);
+    try {
+      await shareLinksApi.remove(link.id);
+      setConfirmingDeleteId(null);
       load();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
@@ -144,11 +161,26 @@ export function LinksPage() {
                   <button type="button" className="btn" onClick={() => setManaging(link)}>
                     {t('LinksPage.manage')}
                   </button>
-                  {revoked && (
+                  {revoked && confirmingDeleteId !== link.id && (
                     <button type="button" className="btn" disabled={busyId === link.id} onClick={() => reactivate(link)}>
                       {t('LinksPage.reactivate')}
                     </button>
                   )}
+                  {revoked &&
+                    (confirmingDeleteId === link.id ? (
+                      <>
+                        <button type="button" className="btn" disabled={busyId === link.id} onClick={() => setConfirmingDeleteId(null)}>
+                          {t('LinksPage.cancel')}
+                        </button>
+                        <button type="button" className="btn btn--danger" disabled={busyId === link.id} onClick={() => remove(link)}>
+                          {t('LinksPage.confirmDelete')}
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" className="btn btn--danger" onClick={() => setConfirmingDeleteId(link.id)}>
+                        {t('LinksPage.delete')}
+                      </button>
+                    ))}
                 </div>
               </div>
             );

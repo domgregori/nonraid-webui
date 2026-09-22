@@ -240,6 +240,17 @@ export class ShareLinkStore {
     return this.getById(id);
   }
 
+  // Access log rows are cleaned up alongside the share itself - nothing else ever reads a log
+  // entry once its own share_id can't resolve to a real share anymore (getActivity() 404s first),
+  // so leaving them behind would just be an ever-growing orphaned table with no purpose.
+  remove(id: string): void {
+    const del = this.db.transaction((shareId: string) => {
+      this.db.prepare('DELETE FROM share_link_access_log WHERE share_id = ?').run(shareId);
+      this.db.prepare('DELETE FROM share_link WHERE id = ?').run(shareId);
+    });
+    del(id);
+  }
+
   touchLastAccessed(id: string): void {
     this.db.prepare('UPDATE share_link SET last_accessed_at = ? WHERE id = ?').run(Date.now(), id);
   }

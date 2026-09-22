@@ -76,7 +76,10 @@
     "copy": "Copy link",
     "copied": "Copied!",
     "manage": "Manage",
-    "reactivate": "Reactivate"
+    "reactivate": "Reactivate",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "confirmDelete": "Confirm delete"
   },
   "DashboardPage": {
     "loadingArrayStatus": "Loading array status…"

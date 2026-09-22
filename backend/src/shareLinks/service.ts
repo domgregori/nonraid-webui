@@ -126,6 +126,19 @@ export class ShareLinkService {
     return toPublic(updated);
   }
 
+  // Permanently forgets a share link, not just marks it revoked - only ever allowed once the
+  // share is already unreachable (revoked, or past its own expiresAt), same "narrows/tidies up
+  // access, never grants it" reasoning update()'s own step-up exemption rests on. A live share
+  // must be revoked first - this refuses rather than silently revoking-then-deleting on the
+  // caller's behalf, so a delete always means exactly what it says.
+  remove(id: string): void {
+    const record = this.store.getById(id);
+    if (!record) throw new HttpError(404, 'Share link not found.');
+    const live = record.revokedAt === null && (record.expiresAt === null || record.expiresAt > Date.now());
+    if (live) throw new HttpError(409, 'Revoke this share link before deleting it.');
+    this.store.remove(id);
+  }
+
   getActivity(id: string, limit?: number): ShareLinkAccessLogEntry[] {
     if (!this.store.getById(id)) throw new HttpError(404, 'Share link not found.');
     return this.store.getAccessLog(id, limit);

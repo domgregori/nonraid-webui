@@ -132,6 +132,19 @@ export function shareLinksRouter(shareLinks: ShareLinkService, activity: Activit
     }
   });
 
+  // Not step-up gated: same reasoning as PATCH above, plus the service itself refuses to delete a
+  // share that's still live (409) - by the time this can succeed at all, the share was already
+  // revoked (or expired) through a prior, already-unprivileged action.
+  router.delete('/share-links/:id', (req, res) => {
+    try {
+      shareLinks.remove(req.params.id);
+      activity.log('Share link deleted', 'amber').catch(() => {});
+      res.json({ ok: true });
+    } catch (err) {
+      handleError(err, res);
+    }
+  });
+
   router.get('/share-links/:id/activity', (req, res) => {
     try {
       res.json(shareLinks.getActivity(req.params.id));

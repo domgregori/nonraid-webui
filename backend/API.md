@@ -379,6 +379,7 @@ lets a share be reopened later to view/copy the same link rather than only ever 
 | POST | `/share-links` | `{ rootPath, mode, label?, allowDelete?, password?, uploadQuotaBytes?, maxFileSizeBytes?, expiresAt? }` | `rootPath` is validated via this backend's own `resolveExisting()` (the same browse-root traversal ceiling `GET /browse` uses). `uploadQuotaBytes` (cumulative across every upload) and `maxFileSizeBytes` (per-file cap) are independent, both optional, `null`/omitted meaning unlimited. Returns the created record, including `token`. |
 | GET | `/share-links` | - | Every share link, including `token` (no `tokenHash`/`passwordHash` - `hasPassword: boolean` instead). |
 | PATCH | `/share-links/:id` | `{ label?, expiresAt?, revoked?, mode?, allowDelete?, password?, uploadQuotaBytes?, maxFileSizeBytes? }` | Every field is optional and independent - omit a field to leave it as-is. `revoked: true` sets `revokedAt` to now; `false` clears it (reactivates the share). `password: null` clears the password; a string sets a new one; omitted leaves the current one (if any) untouched. |
+| DELETE | `/share-links/:id` | - | Permanently forgets the share link and its access log - `409` if it's still live (not revoked and not past its own `expiresAt`); revoke it first via `PATCH` above. `{ ok: true }` on success. |
 | GET | `/share-links/:id/activity` | - | Up to 200 most recent rows from `share_link_access_log` (`list`\|`download`\|`upload`\|`edit`\|`unlock`\|`view` events), newest first. |
 
 ### share-server's public API (separate process, separate port)
