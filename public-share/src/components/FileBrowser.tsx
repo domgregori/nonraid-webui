@@ -79,9 +79,9 @@ export function FileBrowser({ path, entries, mode, loading, error, onNavigate, o
                   <a className="ps-btn ps-btn--small" href={downloadHref(entryPath)}>
                     Download
                   </a>
-                  {mode === 'editable' && entry.editable && (
+                  {entry.viewable && (
                     <button type="button" className="ps-btn ps-btn--small" onClick={() => onOpenFile(entry)}>
-                      Edit
+                      {mode === 'editable' ? 'Edit' : 'View'}
                     </button>
                   )}
                 </span>

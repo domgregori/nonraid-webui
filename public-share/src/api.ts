@@ -11,7 +11,10 @@ export interface ShareEntry {
   type: 'file' | 'directory' | 'symlink';
   size: number;
   modifiedAt: string;
-  editable?: boolean;
+  // Can be opened in the text viewer at all (read-only and editable shares both set this) -
+  // whether it can also be *saved* is a separate question, answered by ShareInfo.mode, not this
+  // flag. See share-server/src/routes/shares.ts's own doc comment on the matching backend field.
+  viewable?: boolean;
 }
 
 export interface BrowseResult {

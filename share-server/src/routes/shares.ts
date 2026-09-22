@@ -183,8 +183,14 @@ export function sharesRouter(rpc: ShareLinkRpcClient): Router {
           const entryAbsPath = path.join(absPath, d.name);
           const entryStat = await stat(entryAbsPath).catch(() => null);
           const type = d.isSymbolicLink() ? 'symlink' : d.isDirectory() ? 'directory' : 'file';
-          const editable =
-            share.mode === 'editable' && type === 'file' && entryStat !== null && entryStat.size <= MAX_EDIT_BYTES
+          // Viewable in the text viewer/editor for BOTH read-only and editable shares - viewing
+          // content is a read, no different in risk from the Download button read-only already
+          // has. Whether the viewer also lets you save is a separate question, answered purely by
+          // share.mode on the frontend (App.tsx passes readOnly={mode !== 'editable'} down) and
+          // enforced again server-side by POST /write's own mode check below - this flag only
+          // ever gates whether the "View"/"Edit" button appears at all.
+          const viewable =
+            share.mode !== 'upload-only' && type === 'file' && entryStat !== null && entryStat.size <= MAX_EDIT_BYTES
               ? entryStat.size === 0 || !(await looksBinary(entryAbsPath).catch(() => true))
               : undefined;
           return {
@@ -192,7 +198,7 @@ export function sharesRouter(rpc: ShareLinkRpcClient): Router {
             type,
             size: entryStat?.size ?? 0,
             modifiedAt: (entryStat?.mtime ?? new Date(0)).toISOString(),
-            ...(editable !== undefined && { editable }),
+            ...(viewable !== undefined && { viewable }),
           };
         }),
       );
@@ -243,7 +249,9 @@ export function sharesRouter(rpc: ShareLinkRpcClient): Router {
         sendError(res, 401, 'Unlock this share first.');
         return;
       }
-      if (share.mode !== 'editable') {
+      // Reading content is view-only - allowed for read-only shares too, same as /browse and
+      // /download. Only POST /write (below) stays restricted to editable.
+      if (share.mode === 'upload-only') {
         sendError(res, 404, 'Not found.');
         return;
       }
@@ -276,6 +284,8 @@ export function sharesRouter(rpc: ShareLinkRpcClient): Router {
         sendError(res, 401, 'Unlock this share first.');
         return;
       }
+      // Unlike /read just above, this one genuinely stays editable-only - viewing content is a
+      // read, saving it is a write, and read-only means read-only.
       if (share.mode !== 'editable') {
         sendError(res, 404, 'Not found.');
         return;

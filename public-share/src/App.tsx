@@ -128,6 +128,7 @@ export function App() {
           token={token}
           path={path ? `${path}/${editing.name}` : editing.name}
           fileName={editing.name}
+          readOnly={info.mode !== 'editable'}
           onClose={() => {
             setEditing(null);
             loadFolder(path);

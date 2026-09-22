@@ -9,6 +9,11 @@ interface TextEditorProps {
   token: string;
   path: string;
   fileName: string;
+  // Read-only shares can view file content (GET /read allows it) but never save (POST /write
+  // stays editable-only server-side regardless of what this prop does) - this just drives the UI
+  // to match: no Save button, no dirty-tracking/close-confirmation (nothing can become dirty),
+  // and CodeMirror itself refuses input rather than silently discarding it on close.
+  readOnly: boolean;
   onClose: () => void;
 }
 
@@ -17,7 +22,7 @@ interface TextEditorProps {
 // editing experience here doesn't feel like a different, hastily-built tool.
 const monoFont = EditorView.theme({ '.cm-content': { fontFamily: 'ui-monospace, "JetBrains Mono", monospace', fontSize: '13px' } });
 
-export function TextEditor({ token, path, fileName, onClose }: TextEditorProps) {
+export function TextEditor({ token, path, fileName, readOnly, onClose }: TextEditorProps) {
   const [content, setContent] = useState<string | null>(null);
   const [original, setOriginal] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,7 +34,7 @@ export function TextEditor({ token, path, fileName, onClose }: TextEditorProps) 
   const [confirmingClose, setConfirmingClose] = useState(false);
   const [dark, setDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
 
-  const dirty = content !== null && content !== original;
+  const dirty = !readOnly && content !== null && content !== original;
 
   useEffect(() => {
     setLoading(true);
@@ -89,6 +94,7 @@ export function TextEditor({ token, path, fileName, onClose }: TextEditorProps) 
         <div className="ps-editor__head">
           <div className="ps-editor__title">
             {fileName}
+            {readOnly && <span className="ps-note" style={{ marginLeft: 8 }}>(view only)</span>}
             {dirty && <span className="ps-dirty-dot" title="Unsaved changes" />}
           </div>
           <div className="ps-editor__actions">
@@ -110,8 +116,10 @@ export function TextEditor({ token, path, fileName, onClose }: TextEditorProps) 
               value={content}
               height="60vh"
               theme="none"
+              readOnly={readOnly}
               extensions={extensions}
               onChange={(value) => {
+                if (readOnly) return;
                 setContent(value);
                 setConfirmingClose(false);
                 setSavedNote(false);
@@ -126,9 +134,11 @@ export function TextEditor({ token, path, fileName, onClose }: TextEditorProps) 
             <button type="button" className="ps-btn" disabled={saving} onClick={handleClose}>
               {confirmingClose ? 'Discard changes' : 'Close'}
             </button>
-            <button type="button" className="ps-btn ps-btn--primary" disabled={saving || content === null || !dirty} onClick={handleSave}>
-              {saving ? 'Saving…' : 'Save'}
-            </button>
+            {!readOnly && (
+              <button type="button" className="ps-btn ps-btn--primary" disabled={saving || content === null || !dirty} onClick={handleSave}>
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            )}
           </div>
         </div>
       </div>
