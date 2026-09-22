@@ -316,17 +316,15 @@ export function sharesRouter(rpc: ShareLinkRpcClient): Router {
         return;
       }
 
-      // First half of the two-part per-file size check: reject before any parsing starts if the
-      // request's own declared Content-Length already exceeds the per-file cap. (This is only a
-      // meaningful pre-filter for a single-file request - Content-Length covers the whole
-      // multipart body - the real, always-correct enforcement is the per-chunk ceiling inside
-      // ProgressDiskStorage, which applies per file regardless of how many are in the request.)
-      const declaredLength = Number(req.headers['content-length'] ?? NaN);
-      if (share.maxFileSizeBytes !== null && Number.isFinite(declaredLength) && declaredLength > share.maxFileSizeBytes) {
-        sendError(res, 413, `Upload exceeds this share's ${share.maxFileSizeBytes}-byte per-file limit.`);
-        return;
-      }
-
+      // No whole-request Content-Length pre-check here (there used to be one) - for a
+      // multipart/form-data request, Content-Length covers the *entire body* (MIME boundaries,
+      // per-part headers, filenames, ...), not any one file's own content size. Comparing that
+      // total against a per-file limit rejects small, perfectly valid uploads whenever the limit
+      // is anywhere near typical multipart overhead (confirmed live: a 4-byte file with a 203-byte
+      // request against a 10-byte limit). The per-chunk ceiling inside ProgressDiskStorage's
+      // _handleFile (see maxFileSizeBytes there) is the real, always-correct enforcement - it
+      // tracks actual bytes written per file, not the request's declared total - so it alone is
+      // sufficient; this route doesn't need its own approximate fast-path.
       const remainingQuota = share.uploadQuotaBytes !== null ? Math.max(0, share.uploadQuotaBytes - share.uploadUsedBytes) : null;
       const reserveHintBytes = share.maxFileSizeBytes ?? (remainingQuota !== null ? Math.min(remainingQuota, DEFAULT_UPLOAD_RESERVE_BYTES) : DEFAULT_UPLOAD_RESERVE_BYTES);
 
