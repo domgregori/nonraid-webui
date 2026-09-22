@@ -144,10 +144,11 @@ Operates over the whole `/mnt` tree (not scoped per-share) - paths are absolute 
 
 | Method | Path | Body/Params | Response / Notes |
 |---|---|---|---|
-| GET | `/browse` | `?path=` | Directory listing; entries under a share are annotated with which physical disk(s) they're really on. |
+| GET | `/browse` | `?path=` | Directory listing; entries under a share are annotated with which physical disk(s) they're really on. Small text files get `editable: true` (open the in-app text editor); a known image/video/audio/PDF extension is excluded from that check up front rather than left to the binary-content sniff, so it can't be misclassified as editable text. |
 | GET | `/browse/suggest` | `?path=&scope=binds\|browse` | Directory-name autocomplete. `binds` scopes to Docker/Apps bind-mount roots, `browse` to the file-browser root. |
 | GET | `/browse/size` | `?path=` | `{ bytes }` - on-demand recursive size (`du`), not part of `list()`. |
 | GET | `/browse/download` | `?path=` | Streams the file. |
+| GET | `/browse/view` | `?path=` | Inline (non-attachment) view of an image/video/audio/PDF - `Content-Type` is set from `@nonraid/shared/media-kind`'s own extension allowlist (never trusted from the file's actual bytes or a generic MIME guess) plus `X-Content-Type-Options: nosniff`. `404`s for anything not on that allowlist (SVG/HTML-adjacent formats deliberately excluded) - the frontend falls back to Download for those. |
 | GET | `/browse/download-archive` | `?path=&names=` | Streams a `.tar.gz` of a folder, or several selected entries within one folder - `path` is their shared parent, `names` a JSON-encoded array of basenames. Built with the `tar` package's own streaming Pack (never buffered server-side). |
 | POST | `/browse/mkdir` | `{ path, name }` | `201` on success. |
 | POST | `/browse/rename` | `{ path, newName }` | |
@@ -359,17 +360,26 @@ Three access modes, replacing a plain allow-download/allow-upload boolean pair: 
 (browse/view/download, no writes), `upload-only` (blind drop-box - accepts new files, can't see
 what's already there), `editable` (browse/view/download/upload, plus editing existing text files in
 place). Delete/rename are out of v1 on the public side even under `editable` - `allow_delete` is
-stored on creation but nothing acts on it yet, reserved for a later release. `POST
-/api/share-links` is step-up gated (`requireStepUp`, same class of risk `POST /ssh/keys` already
-cross-references) - once a Cloudflare Tunnel is enabled, a share link is real, internet-reachable
-access to array data.
+stored on creation but nothing acts on it yet, reserved for a later release. Neither `POST
+/api/share-links` nor `PATCH /api/share-links/:id` is step-up gated - session auth is enough, same
+as every other mutating route in this app (creation is scoped to one specific path, never
+full API/root access the way an SSH key grant is, and a PATCH either narrows access or is a plain
+settings edit).
+
+The bearer `token` is retrievable for the life of the share, not shown once at creation and then
+discarded - it's encrypted at rest with AES-256-GCM (`backend/src/shareLinks/tokenCrypto.ts`,
+key auto-generated once at `config.shareTokenKeyPath`, 0600) rather than hashed one-way, alongside
+the pre-existing SHA-256 hash kept for fast RPC lookup. This is safe because the token's own
+entropy (192 bits, `randomBytes(24)`) is what resists guessing/fuzzing, not a hash's
+irreversibility - there's no reason to hide it from the admin who created it, and the admin UI
+lets a share be reopened later to view/copy the same link rather than only ever seeing it once.
 
 | Method | Path | Body/Params | Response / Notes |
 |---|---|---|---|
-| POST | `/share-links` | `{ rootPath, mode, label?, allowDelete?, password?, uploadQuotaBytes?, maxFileSizeBytes?, expiresAt? }` | Step-up gated. `rootPath` is validated via this backend's own `resolveExisting()` (the same browse-root traversal ceiling `GET /browse` uses). `uploadQuotaBytes` (cumulative across every upload) and `maxFileSizeBytes` (per-file cap) are independent, both optional, `null`/omitted meaning unlimited. Returns the created record plus the raw bearer `token` - shown exactly once, never retrievable again (only its SHA-256 hash is persisted). |
-| GET | `/share-links` | - | Every share link (no `tokenHash`/`passwordHash` - `hasPassword: boolean` instead). |
-| PATCH | `/share-links/:id` | `{ label?, expiresAt?, revoked? }` | Not step-up gated - only ever narrows access (same reasoning `DELETE /auth/tokens` gets). `revoked: true` sets `revokedAt` to now; `false` clears it. |
-| GET | `/share-links/:id/activity` | - | Up to 200 most recent rows from `share_link_access_log` (`list`\|`download`\|`upload`\|`edit`\|`unlock` events), newest first. |
+| POST | `/share-links` | `{ rootPath, mode, label?, allowDelete?, password?, uploadQuotaBytes?, maxFileSizeBytes?, expiresAt? }` | `rootPath` is validated via this backend's own `resolveExisting()` (the same browse-root traversal ceiling `GET /browse` uses). `uploadQuotaBytes` (cumulative across every upload) and `maxFileSizeBytes` (per-file cap) are independent, both optional, `null`/omitted meaning unlimited. Returns the created record, including `token`. |
+| GET | `/share-links` | - | Every share link, including `token` (no `tokenHash`/`passwordHash` - `hasPassword: boolean` instead). |
+| PATCH | `/share-links/:id` | `{ label?, expiresAt?, revoked?, mode?, allowDelete?, password?, uploadQuotaBytes?, maxFileSizeBytes? }` | Every field is optional and independent - omit a field to leave it as-is. `revoked: true` sets `revokedAt` to now; `false` clears it (reactivates the share). `password: null` clears the password; a string sets a new one; omitted leaves the current one (if any) untouched. |
+| GET | `/share-links/:id/activity` | - | Up to 200 most recent rows from `share_link_access_log` (`list`\|`download`\|`upload`\|`edit`\|`unlock`\|`view` events), newest first. |
 
 ### share-server's public API (separate process, separate port)
 
@@ -386,11 +396,12 @@ share-server needs no server-side session store to validate it.
 |---|---|---|---|
 | GET | `/api/shares/:token` | - | `{ label, mode, requiresPassword }`. Auto-unlocks (sets the cookie) when the share has no password - there's no meaningful difference between "peek" and "unlock" in that case. `404` for an unknown/revoked/expired token. |
 | POST | `/api/shares/:token/unlock` | `{ password? }` | Rate-limited per (ip, token). Sets the unlock cookie on success. `401` on a wrong/missing password, `404` for an unknown/revoked/expired token - the two are deliberately indistinguishable from the response alone. |
-| GET | `/api/shares/:token/browse` | `?path=` | `read-only`/`editable` only - `404`s outright for `upload-only` (no listing surface at all, by design - not a `403`, which would confirm something's there). Requires the unlock cookie. |
+| GET | `/api/shares/:token/browse` | `?path=` | `read-only`/`editable` only - `404`s outright for `upload-only` (no listing surface at all, by design - not a `403`, which would confirm something's there). Requires the unlock cookie. Entries carry `viewable: true` for a small enough text file (readable/editable in-place under `editable`, read-only under `read-only`) and, independently, are matched client-side against `@nonraid/shared/media-kind`'s extension list to offer inline viewing via `GET .../view` below. |
 | GET | `/api/shares/:token/download` | `?path=` | `read-only`/`editable` only. Single-file download - no folder-as-zip in v1. |
-| GET | `/api/shares/:token/read` | `?path=` | `editable` only. Same `MAX_EDIT_BYTES`/binary-sniff rules as this backend's own `GET /browse/read` (shared via `@nonraid/shared/text-file-guard`). |
+| GET | `/api/shares/:token/view` | `?path=` | `read-only`/`editable` only. Same inline-view behavior as this backend's own `GET /browse/view` (`Content-Type` from `@nonraid/shared/media-kind`'s allowlist, `X-Content-Type-Options: nosniff`, `404` for anything not on it). |
+| GET | `/api/shares/:token/read` | `?path=` | `read-only`/`editable` only - viewing content is a read, no different in risk from `download` above; whether the viewer also lets you save is answered separately by `mode` on the frontend and enforced again by `write` below. Same `MAX_EDIT_BYTES`/binary-sniff rules as this backend's own `GET /browse/read` (shared via `@nonraid/shared/text-file-guard`), with the same media/PDF-extension exclusion `GET /browse` above has. |
 | POST | `/api/shares/:token/write` | `{ path, content }` | `editable` only. No ownership chown afterward (unlike this backend's own `POST /browse/write`) - share-server runs unprivileged and can't chown to the array-data uid without root; the file keeps whatever owner it already had. |
-| POST | `/api/shares/:token/upload` | multipart `files`, `?path=` | `upload-only`/`editable` only. **NDJSON** progress. Cumulative quota is reserved atomically over the RPC socket before any bytes are written and trued-up once the real size is known; the per-file cap is checked twice - against the request's declared `Content-Length` before parsing starts, and again as a hard ceiling mid-stream. |
+| POST | `/api/shares/:token/upload` | multipart `files`, `?path=` | `upload-only`/`editable` only. **NDJSON** progress. Cumulative quota is reserved atomically over the RPC socket before any bytes are written and trued-up once the real size is known; the per-file cap is enforced as a hard ceiling mid-stream by `ProgressDiskStorage`'s own byte counting (not a `Content-Length` pre-check - the whole multipart request's declared length includes MIME boundary overhead, so it doesn't equal any one file's real size). |
 
 ## Cloudflared
 

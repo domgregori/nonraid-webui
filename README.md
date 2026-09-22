@@ -180,10 +180,14 @@ packages/shared/         `@nonraid/shared` - path-sandbox (the traversal/symlink
                           independently-secreted unlock cookie), text-file-guard (the size cap/
                           binary-detection rules backend/src/browse/service.ts's text editor
                           enforces, now shared so share-server's editable-mode editor can't drift
-                          from them), and share-link-rpc (typed request/response shapes only, no
-                          runtime logic) for the RPC protocol between backend/src/shareLinks/ and
-                          share-server below. Consumed as a `file:` dependency - this repo has no
-                          workspace tooling.
+                          from them), media-kind (the image/video/audio/PDF extension allowlist
+                          behind both backend's and share-server's `GET .../view` - the
+                          authoritative Content-Type decision, deliberately excluding SVG/HTML-
+                          adjacent formats so a maliciously named file can't be served inline as
+                          same-origin HTML), and share-link-rpc (typed request/response shapes
+                          only, no runtime logic) for the RPC protocol between backend/src/
+                          shareLinks/ and share-server below. Consumed as a `file:` dependency -
+                          this repo has no workspace tooling.
 
 share-server/            The Share Links feature's own public-facing process, deliberately separate
                           from backend/ above - runs as its own unprivileged OS account with zero
