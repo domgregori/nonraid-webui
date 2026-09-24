@@ -105,6 +105,16 @@ setup_logging() {
 # Silently skips (doesn't fail the run) on a non-btrfs root - this script is also documented to
 # work on plain Debian/Ubuntu installs that predate nonraid-os's btrfs-by-default preseed, and a
 # missing rescue snapshot on those is a shrug, not a reason to abort an otherwise-normal update.
+#
+# Boot-style-agnostic by construction, not by detecting BIOS vs UEFI: the rescue menuentries below
+# resolve $root purely via `search --fs-uuid`, which works identically either way, so there's
+# nothing here that needs to know which one it's on. An earlier version also tried to compute a
+# literal `set root='(hd0,gpt2)'`-style hint by grepping the live grub.cfg for a `set root=` line -
+# harmless on BIOS, but UEFI's own grub.cfg never contains one (it's `search --fs-uuid` there too,
+# from the start), so that grep matched nothing, and its failure under `pipefail` crashed this
+# entire function - and therefore the whole install - on every single UEFI host, before anything
+# else ever ran. Confirmed live on a UEFI/OVMF boot. Fixed by simply not computing it at all: it
+# was always redundant with the `search` line already here, on both boot styles.
 snapshot_before_update() {
   if [ "$(findmnt -no FSTYPE /)" != "btrfs" ]; then
     log "Root filesystem isn't btrfs - skipping pre-update snapshot/GRUB rescue entry"
@@ -115,14 +125,13 @@ snapshot_before_update() {
     return 0
   }
 
-  local root_src root_dev fs_uuid kver grub_root_hint stamp snap_name
+  local root_src root_dev fs_uuid kver stamp snap_name
   root_src="$(findmnt -no SOURCE /)"
   root_dev="${root_src%%[*}"
   fs_uuid="$(findmnt -no UUID /)"
   kver="$(uname -r)"
-  grub_root_hint="$(grep -m1 "set root=" /boot/grub/grub.cfg | sed -n "s/.*set root='\([^']*\)'.*/\1/p")"
-  [ -n "$root_dev" ] && [ -n "$fs_uuid" ] && [ -n "$grub_root_hint" ] || {
-    log "WARNING: could not determine root device/uuid/GRUB root hint - skipping pre-update snapshot/GRUB rescue entry"
+  [ -n "$root_dev" ] && [ -n "$fs_uuid" ] || {
+    log "WARNING: could not determine root device/uuid - skipping pre-update snapshot/GRUB rescue entry"
     return 0
   }
 
@@ -177,8 +186,8 @@ snapshot_before_update() {
       cat <<EOF
   menuentry 'NonRAID rescue: $snap (Linux $snap_kver)' {
     insmod part_msdos
+    insmod part_gpt
     insmod btrfs
-    set root='$grub_root_hint'
     search --no-floppy --fs-uuid --set=root $fs_uuid
     echo 'Loading Linux $snap_kver from $snap ...'
     linux /$snap/boot/vmlinuz-$snap_kver root=UUID=$fs_uuid ro rootflags=subvol=$snap
