@@ -79,6 +79,8 @@ cd nonraid-webui
 sudo bash tools/install-webui.sh
 ```
 
+Or get the NonRAID OS iso at [domgregori/nonraid-os releases](https://github.com/domgregori/nonraid-os/releases) and run as a fresh install.
+
 ## Development
 
 ### Frontend
