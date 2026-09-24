@@ -860,6 +860,13 @@ install_docker_lxc_array_ordering() {
 # doesn't match the plain-DHCP default this expects to find — never re-runs on a repeat
 # install/update, and never touches a deliberately customized network config.
 #
+# NOT part of the default STEPS run (see SHORTCUTS's own comment below for why) - only reachable
+# via `--step ensure_lxc_bridge`, invoked explicitly by nonraid-os's own first-boot flow. Those
+# idempotency checks guard against re-running on an already-migrated host, not against running on
+# a host nobody asked to have its networking touched at all - this function has no way to tell a
+# fresh appliance apart from someone's already-in-use Debian box that just hasn't customized its
+# networking yet, so that call is left to whoever actually knows which one it is.
+#
 # The actual interface flap (ifdown/ifup) is genuinely disruptive for the length of one DHCP
 # negotiation on whatever interface currently carries the host's default route — including, on a
 # remote install, the very SSH connection running this script. A detached watchdog is written and
@@ -1126,15 +1133,24 @@ STEPS=(
   install_share_server_systemd_unit
   install_cloudflared_tunnel_systemd_unit
   install_docker_lxc_array_ordering
-  ensure_lxc_bridge
   install_cli
   start_services
   print_summary
 )
 
-# Update-one-thing shortcuts - valid --step targets, but deliberately excluded from STEPS: running
-# these as part of a full install/update would be redundant with (and land in a nonsensical spot
-# relative to) the canonical steps above, which already do everything these call.
+# Valid --step targets deliberately excluded from the canonical STEPS run above, for two different
+# reasons:
+#   - update_backend/update_frontend/update_cli/update_share_server/update_public_share_frontend/
+#     update_driver/update_script/update_packages: running these as part of a full install/update
+#     would be redundant with (and land in a nonsensical spot relative to) the canonical steps
+#     above, which already do everything these call.
+#   - ensure_lxc_bridge: the opposite reason - not redundant, just not safe to run unprompted.
+#     Bridging the primary NIC is a real (if usually brief) network interruption, and the
+#     "does this look untouched" heuristic it uses can't actually tell "a fresh nonraid-os
+#     appliance nobody depends on yet" apart from "someone's already-running Debian box that just
+#     happens to still have plain default networking" - only the former should ever get this done
+#     to it without being asked. nonraid-os's own first-boot flow is expected to invoke this
+#     explicitly (`--step ensure_lxc_bridge`) exactly once, when it actually knows which case it is.
 SHORTCUTS=(
   update_backend
   update_frontend
@@ -1144,6 +1160,7 @@ SHORTCUTS=(
   update_driver
   update_script
   update_packages
+  ensure_lxc_bridge
 )
 
 usage() {
@@ -1164,8 +1181,8 @@ With no arguments, runs the full install/update end to end.
 Steps, in the order a full run executes them:
 $(printf '  %s\n' "${STEPS[@]}")
 
-Shortcuts for updating one already-installed piece (never run as part of a
-full install/update - only reachable via --step):
+Shortcuts - never run as part of a full install/update, only reachable via --step
+(updating one already-installed piece, or an explicit opt-in action like ensure_lxc_bridge):
 $(printf '  %s\n' "${SHORTCUTS[@]}")
 EOF
 }
