@@ -69,6 +69,13 @@ Proxmox VE. Update this list as items change or new items appear.
   systemd unit and immediately disables+stops it, same as `tailscaled` above. The webui's own
   enable toggle (`PUT /rclone/enabled`) starts it back up when someone actually turns Remote Backup
   on.
+- `cloudflared` — the public transport for the Share Links feature (Settings → Internet Access),
+  disabled by default. Not in Debian's own repos; `tools/install-webui.sh`'s `ensure_cloudflared()`
+  adds Cloudflare's own apt repo first (one universal repo, unlike Tailscale's per-codename ones -
+  no distro-codename detection needed), then installs it but never enables it - it genuinely has
+  nothing useful to do until a real tunnel token is saved. The webui's own enable toggle
+  (`PUT /cloudflared/enabled`) starts it, alongside `nonraid-share-server` below, once a token is
+  set (`PUT /cloudflared/token`).
 - `docker.io` — Docker Engine, for the Docker tab. `nonraid-webui` talks to `/var/run/docker.sock`
   directly (`dockerode`); no separate install step exists for this anywhere else, so it must be
   installed explicitly.
@@ -100,3 +107,11 @@ mirroring nonraid's own `tools/systemd/nonraid.service` pattern. Persistent stat
 `/opt` code tree so re-running the install script for an update never touches it. Safe to re-run:
 preserves an already-customized `/etc/default/nonraid-webui`, always ends with `systemctl
 restart` so first-install and updates take the same path.
+
+The Share Links feature runs a second, separate process for the same reason: `share-server`
+(`tools/systemd/nonraid-share-server.service`) is the actual public-facing surface a Cloudflare
+Tunnel visitor's request lands on, so it runs as its own dedicated, unprivileged system account
+(`nonraid-share`, `install-webui.sh`'s `ensure_share_server_account()`) rather than as root like
+`nonraid-webui.service` - see `backend/API.md`'s "Share Links" section for why. Installed but
+disabled by default, same as `cloudflared-tunnel.service` above, until a tunnel is actually turned
+on.

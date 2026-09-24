@@ -6,11 +6,13 @@
 
 ### Disclaimer: **$\color{red}{\textsf{EXPERIMENTAL!}}$ HAVE ANOTHER BACKUP OF YOUR DATA!**
 
-**Not responsible for lost of data!**
+**Not responsible for loss of data!**
+
+**Also backup your superblock dat file beforehand!**
 
 ## Notes
 
-- **This webui was AI coded.**
+- **This webui was AI coded.** There's no way I would have had the time to code this by hand.
 - The backbone nonraid kernel driver from [qvr/nonraid](https://github.com/qvr/nonraid) is based on the unraid kernel driver, not AI coded.
 - The nonraid tool (nmdctl) was written by [qvr](https://github.com/qvr/nonraid)
 - I am using my own [fork](https://github.com/domgregori/nonraid) of nonraid that has fixes to the nmdctl tool, the service files, and to the driver.
@@ -18,7 +20,7 @@
 - I have been testing this on a real metal rig at every step.
 
 This is a web dashboard for [NonRAID](https://github.com/qvr/nonraid) - an alternative to Unraid NAS. Surfaces array status, parity protection, per-disk detail, shares, users, Docker
-containers, LXC containers, historical metrics, and array management.
+containers, LXC containers, historical metrics, and array management. It also builds and installs a forked nonraid 
 
 ## Features
 
@@ -31,14 +33,14 @@ containers, LXC containers, historical metrics, and array management.
 - Create pools for storage and sharing
 - Users for sharing shares via samba/nfs
   - Groups are supported
-- A file browser to interact with shares
+- A file browser to browse, search, upload, edit, view
 - Docker template **Apps** from [Community Applications](https://github.com/Squidly271/community.applications)
 - Custom docker containers
 - LXC containers with snapshot support
 - Choose where to store containers
 - History graphs of Temps, CPU, RAM, I/O, Net, Usage
 - Import an Unraid array or a previous NonRAID array/config
-- Service management
+- Services management
 - System log viewer
 - Schedule automatic parity checks
 - Scheduled local and remote backups with rclone
@@ -46,15 +48,26 @@ containers, LXC containers, historical metrics, and array management.
 - http, https self signed, or import cert/key
 - Tailscale service. Can use custom login-server such as Headscale
 - 2FA: TOTP, Passkey when using https
+- Home Assistant addon via HAKS. Found [here](https://github.com/domgregori/nonraid-ha)
+- Public share links to dirs/files via cloudflare tunnel
+    * Safety measures taken can be read about [here](SHARE-SERVER-SAFETY.md)
+- Update via webui from github releases
+- *If boot disk is btrfs*, automatic system snapshot before update and added to grub menu for recovery
+- `nwctl` nonraid-webui cli/tui
 - No telemetry!
+
+## TODO
+- Adding disk operations to a queue currently has bugs
+- Removing a disk, i.e. shrinking the array disk number has bugs
+- LUKS support is being worked on on the [luks branch](https://github.com/domgregori/nonraid-webui/tree/luks-support)
 
 ## Requirements
 
 - Debian 13 new install
-  - Boot disk needs to be btrfs
-  - NonRAID has specific kernel needs.
-  - Not tested on other distros.
-  - **Not meant to install alongside anything else.**
+  - Boot disk should be btrfs
+  - NonRAID driver has specific kernel needs.
+  - Not tested on other distros. Install script won't work.
+  - **Not meant to install alongside anything else.** Although the install script should work on an already existing debian 13 system, it hasn't been tested
 - Install script installs the other requirements. Read [REQUIREMENTS.md](REQUIREMENTS.md) and [install-webui.sh](tools/install-webui.sh)
 
 ## Installing
@@ -62,6 +75,7 @@ containers, LXC containers, historical metrics, and array management.
 ```
 git clone https://github.com/domgregori/nonraid-webui
 cd nonraid-webui
+# please give the script a read before running
 sudo bash tools/install-webui.sh
 ```
 
@@ -87,6 +101,23 @@ Run both, then open the frontend. The backend runs as root (`nmdctl`/Docker/`sma
 end-to-end test environment (real kernel driver, real array, real Samba/NFS), use a VM — see the main
 `nonraid` repo's development docs.
 
+### Share Links stack
+
+Only needed if you're working on the Share Links feature (internet file sharing via a Cloudflare
+Tunnel) - the two commands above are enough for everything else. Three more independently-runnable
+pieces:
+
+```bash
+cd packages/shared && npm install && npm run build   # build first - see below
+cd share-server && npm install && npm run dev
+cd public-share && npm install && npm run dev
+```
+
+`packages/shared` (`@nonraid/shared`) has to be built *before* the backend or `share-server` can
+resolve it - both consume it as a `file:` dependency pointing at its compiled `dist/`, not its
+source, so skipping this build step surfaces as an unresolved-module error in either process
+instead. Rebuild it again after pulling in any change to `packages/shared` itself.
+
 See `backend/API.md` for the full API reference; config is plain environment variables, see each
 module's own `str(...)`/`num(...)` calls in `backend/src/config.ts`.
 
@@ -108,12 +139,15 @@ src/
   components/  layout, dashboard, disk-detail, shares (create/edit form), users (add-user modal,
                groups modal, per-user detail panel with share-access grid), settings (backup/
                recovery/rclone remote forms, boot snapshots, notifications, TLS, ...),
+               browse (ShareLinkModal, MediaViewer, EditFileDialog, bulk copy/move/delete, ...),
                shared UI primitives
   pages/       one component per route
   styles/      CSS token file + per-area stylesheets
   i18n/        react-i18next setup + per-namespace locale JSON (src/i18n/locales/en/*.json) - every
                piece of UI text goes through t(), not a literal string
   utils/       format.ts (units/dates for display) + webauthnSupport.ts (passkey capability checks)
+               + mediaKind.ts (client-side image/video/audio/PDF hint for Browse's inline viewer)
+               + notificationLinks.ts + simpleMarkdown.tsx
   assets/      static images (logo, etc.)
 
 backend/                 Express API wrapping nmdctl, Docker, lxc-*, smartctl, shares, users, and
