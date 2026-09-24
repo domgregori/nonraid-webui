@@ -10,6 +10,8 @@
 
 **Also backup your superblock dat file beforehand!**
 
+**This will overwrite node/npm, samba, nfs, and pin your kernel. Recommended to have a fresh install or NonRAID OS**
+
 ## Notes
 
 - **This webui was AI coded.** There's no way I would have had the time to code this by hand.
