@@ -24,8 +24,22 @@ export class CaFeedStore {
     private refreshIntervalMs: number = config.appsFeedRefreshIntervalMs,
   ) {}
 
+  // The feed is entirely optional - AppsService/routes/apps.ts already turn a failed getFeed()
+  // into a normal 502 (same as any other external dependency failing elsewhere in this app), so
+  // there's nothing here that needs the whole backend to refuse to start over it. A crash here
+  // used to propagate straight through main()'s own catch-all into `process.exit(1)` - identical
+  // treatment to a genuinely fatal error like failing to bind the HTTP port - which turned a
+  // transient DNS hiccup at boot (confirmed live: `getaddrinfo EAI_AGAIN` before the network was
+  // fully up) into a permanent crash-loop that took down array management, shares, settings,
+  // everything, not just the Apps tab this feed actually belongs to. The background refresh
+  // below (already its own .catch()) keeps retrying on its normal schedule regardless, so a
+  // failed initial load just means the feed shows up a bit later instead of never.
   async start(): Promise<void> {
-    await this.load();
+    try {
+      await this.load();
+    } catch (err) {
+      console.error('CA feed unavailable at startup, will keep retrying in the background:', (err as Error).message);
+    }
     this.refreshTimer = setInterval(() => {
       this.refresh().catch((err) => console.error('CA feed background refresh failed:', (err as Error).message));
     }, this.refreshIntervalMs);
