@@ -20,7 +20,7 @@ async function load(client: ApiClient): Promise<{ status: RcloneDaemonStatus; re
   return { status, remotes, jobs };
 }
 
-// Remotes are view-only (adding one is several provider-specific fields - `nonraid-tool rclone
+// Remotes are view-only (adding one is several provider-specific fields - `nwctl rclone
 // remote add`'s flags fit that better). Jobs get one action: sync now if idle, cancel if already
 // syncing - creating/editing a job's schedule/retention stays CLI-only for the same reason.
 export function RcloneScreen({ client }: Props) {

@@ -1,11 +1,11 @@
 {
-  "name": "nonraid-tool",
+  "name": "nwctl",
   "private": true,
   "version": "0.1.1",
   "type": "module",
-  "description": "Command-line client for nonraid-webui's REST API - plain CLI by default, `nonraid-tool tui` for an interactive Ink-based dashboard.",
+  "description": "Command-line client for nonraid-webui's REST API - plain CLI by default, `nwctl tui` for an interactive Ink-based dashboard.",
   "bin": {
-    "nonraid-tool": "dist/index.js"
+    "nwctl": "dist/index.js"
   },
   "engines": {
     "node": ">=22"

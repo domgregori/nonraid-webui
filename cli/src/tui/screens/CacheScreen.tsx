@@ -15,7 +15,7 @@ async function load(client: ApiClient): Promise<{ cache: CacheStatus; mover: Cac
   return { cache, mover };
 }
 
-// Setup/replace (reassigning real disks to the cache pool) stay CLI-only - `nonraid-tool cache
+// Setup/replace (reassigning real disks to the cache pool) stay CLI-only - `nwctl cache
 // setup/replace` - too consequential and multi-field for a single keypress. The mover is a safe
 // single toggle action: run it if idle, cancel if it's already running.
 export function CacheScreen({ client }: Props) {

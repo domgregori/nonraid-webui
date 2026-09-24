@@ -1201,7 +1201,7 @@ export function SettingsPage() {
                 </button>
               </div>
               <div className="toggle-row__desc" style={{ marginTop: 6 }}>
-                {t('SettingsPage.recovery.cliDecryptPrefix')} <code>nonraid-tool decrypt-backup</code> {t('SettingsPage.recovery.cliDecryptSuffix')}
+                {t('SettingsPage.recovery.cliDecryptPrefix')} <code>nwctl decrypt-backup</code> {t('SettingsPage.recovery.cliDecryptSuffix')}
               </div>
             </div>
 

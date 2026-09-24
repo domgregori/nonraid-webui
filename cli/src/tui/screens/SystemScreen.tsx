@@ -18,9 +18,9 @@ async function load(client: ApiClient): Promise<{ stats: SystemStats; services: 
 
 const STATE_COLOR: Record<ServiceRow['state'], string | undefined> = { active: 'green', inactive: undefined, failed: 'red', mixed: 'yellow' };
 
-// Host info is read-only here (reboot/hostname/timezone changes stay CLI-only, `nonraid-tool
+// Host info is read-only here (reboot/hostname/timezone changes stay CLI-only, `nwctl
 // system ...` - too disruptive/multi-step for a single keypress). Services get the same
-// start/stop-toggle action pattern as Docker/LXC; `restart` stays CLI-only (`nonraid-tool service
+// start/stop-toggle action pattern as Docker/LXC; `restart` stays CLI-only (`nwctl service
 // restart <id>`) since one key can't cleanly express three actions.
 export function SystemScreen({ client }: Props) {
   const { data, error, refresh } = usePolling(() => load(client));

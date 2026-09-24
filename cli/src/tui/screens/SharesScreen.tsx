@@ -10,7 +10,7 @@ interface Props {
 }
 
 // View-only, deliberately - creating/editing a share is several fields (disks, allocation,
-// protocols, ...) that fit `nonraid-tool share create`'s flags much better than a TUI form. See
+// protocols, ...) that fit `nwctl share create`'s flags much better than a TUI form. See
 // this file's sibling screens for the same call on Users/Groups/Rclone remotes.
 export function SharesScreen({ client }: Props) {
   const { data: shares, error, refresh } = usePolling(() => client.get<ShareWithStats[]>('/shares'));
@@ -21,7 +21,7 @@ export function SharesScreen({ client }: Props) {
 
   return (
     <Box flexDirection="column">
-      <Text underline>Shares ({shares?.length ?? 0}) — r refresh (view-only; use `nonraid-tool share` to change)</Text>
+      <Text underline>Shares ({shares?.length ?? 0}) — r refresh (view-only; use `nwctl share` to change)</Text>
       {shares?.length === 0 && <Text dimColor>none</Text>}
       {shares?.map((s) => (
         <Text key={s.name}>

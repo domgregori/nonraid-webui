@@ -1,20 +1,20 @@
-# nonraid-tool
+# nwctl
 
-A command-line client for the nonraid-webui backend API. Runs as a plain CLI by default; `nonraid-tool tui` opens an interactive dashboard instead.
+A command-line client for the nonraid-webui backend API. Runs as a plain CLI by default; `nwctl tui` opens an interactive dashboard instead.
 
 ```bash
-nonraid-tool --version   # or: nonraid-tool version, or: nonraid-tool -V
+nwctl --version   # or: nwctl version, or: nwctl -V
 ```
 
 ## Install
 
-`nonraid-tool` is built and installed by the webui's own install script, as part of a normal install or update:
+`nwctl` is built and installed by the webui's own install script, as part of a normal install or update:
 
 ```bash
 sudo bash tools/install-webui.sh
 ```
 
-This puts a `nonraid-tool` command on `PATH` (a symlink to `cli/dist/index.js`). To rebuild and reinstall just the CLI later, without touching anything else:
+This puts a `nwctl` command on `PATH` (a symlink to `cli/dist/index.js`). To rebuild and reinstall just the CLI later, without touching anything else:
 
 ```bash
 sudo bash tools/install-webui.sh --step update_cli
@@ -31,22 +31,22 @@ npm run dev -- <command>   # tsx, no build step
 ## Log in
 
 ```bash
-nonraid-tool login
+nwctl login
 ```
 
-Prompts for the backend URL, username, and password (plus a 2FA code if enrolled), then mints a long-lived API token and saves it to `~/.config/nonraid-tool/config.json` (mode `0600`). Every later command reads that file automatically — no need to log in again.
+Prompts for the backend URL, username, and password (plus a 2FA code if enrolled), then mints a long-lived API token and saves it to `~/.config/nwctl/config.json` (mode `0600`). Every later command reads that file automatically — no need to log in again.
 
 Tokens have a scope: `login` mints a full-access one by default, or add `--read-only` for a token that can only run `GET`-style commands (`ls`, `status`, `info`, ...) — anything that starts, stops, or changes something gets rejected server-side. Handy for monitoring scripts that shouldn't be able to touch anything.
 
 Already minted a token in the web UI (**Settings → API**)? Skip the username/password prompt entirely:
 
 ```bash
-nonraid-tool login --token nrd_... --host http://nonraid.lan
+nwctl login --token nrd_... --host http://nonraid.lan
 ```
 
-It's verified against the backend before being saved to the same config file. The token keeps whatever scope it was created with (`--read-only` doesn't apply here). One caveat: a token supplied this way has no locally known ID, so `nonraid-tool logout --revoke` can't revoke it — do that from **Settings → API** in the web UI instead.
+It's verified against the backend before being saved to the same config file. The token keeps whatever scope it was created with (`--read-only` doesn't apply here). One caveat: a token supplied this way has no locally known ID, so `nwctl logout --revoke` can't revoke it — do that from **Settings → API** in the web UI instead.
 
-`nonraid-tool logout` forgets the token locally. Add `--revoke` to also invalidate it on the server (re-prompts for the password, since revoking a token needs a real session). Tokens can also be created (with either scope), listed, and revoked from the web UI: **Settings → Security → API tokens**.
+`nwctl logout` forgets the token locally. Add `--revoke` to also invalidate it on the server (re-prompts for the password, since revoking a token needs a real session). Tokens can also be created (with either scope), listed, and revoked from the web UI: **Settings → Security → API tokens**.
 
 Passkey-only accounts can't complete `login` from a terminal — enroll TOTP or a backup code as a fallback first.
 
@@ -60,16 +60,16 @@ For scripting or CI, skip the saved config file entirely:
 | `NONRAID_TOKEN` | Bearer token. Overrides the saved config. |
 | `NONRAID_INSECURE` | Set to `1` to skip TLS certificate verification (self-signed cert). |
 
-These take priority over `~/.config/nonraid-tool/config.json` whenever set — there's no per-command `--host`/`--token` flag, only `login` itself takes `--host`.
+These take priority over `~/.config/nwctl/config.json` whenever set — there's no per-command `--host`/`--token` flag, only `login` itself takes `--host`.
 
 ## JSON output
 
 Add `--json` to any command to get the backend's raw JSON response instead of the formatted table — works in either position:
 
 ```bash
-nonraid-tool --json array status
-nonraid-tool disk ls --json
-nonraid-tool smart temps --json | jq '.[] | select(. > 45)'
+nwctl --json array status
+nwctl disk ls --json
+nwctl smart temps --json | jq '.[] | select(. > 45)'
 ```
 
 For query commands it's the API response verbatim; for action commands (start/stop/create/…) it's a small `{ "ok": true, … }` object or the backend's own result body. Errors come back as `{ "error": "…", "status": 401 }` and the exit code is still non-zero. Local-only commands (`version`, `decrypt-backup`) ignore the flag.
@@ -108,14 +108,14 @@ Every group has its own `--help` with the full, current flag list — this table
 Examples:
 
 ```bash
-nonraid-tool array status
-nonraid-tool disk spin-down 3
-nonraid-tool docker stop jellyfin
-nonraid-tool share create media --disks 1,2,3 --protocols smb,nfs
-nonraid-tool user grant alice media read-write
-nonraid-tool metrics cpu_percent,mem_used_bytes --range 7d
-nonraid-tool rclone job sync <id>   # id from `rclone job ls`, not the job's --name
-nonraid-tool decrypt-backup nonraid-config-backup-1234567890.nrb
+nwctl array status
+nwctl disk spin-down 3
+nwctl docker stop jellyfin
+nwctl share create media --disks 1,2,3 --protocols smb,nfs
+nwctl user grant alice media read-write
+nwctl metrics cpu_percent,mem_used_bytes --range 7d
+nwctl rclone job sync <id>   # id from `rclone job ls`, not the job's --name
+nwctl decrypt-backup nonraid-config-backup-1234567890.nrb
 ```
 
 A few operations are disruptive or long-running by nature and worth knowing about before running them: `disk self-test` starts a real SMART test that can take hours; `system reboot` and `system set-hostname`/`set-timezone` affect the whole host; `cache setup`/`replace` reassign real disks.
@@ -123,7 +123,7 @@ A few operations are disruptive or long-running by nature and worth knowing abou
 ## Interactive mode (TUI)
 
 ```bash
-nonraid-tool tui
+nwctl tui
 ```
 
 An Ink-based dashboard: array summary plus a selectable Docker/LXC container list. ↑/↓ to move the selection, `s` to start/stop it, `r` to refresh, `q` or Esc to quit. Everything else in the table above is plain-CLI only for now.

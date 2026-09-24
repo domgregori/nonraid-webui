@@ -28,7 +28,7 @@ const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version: string };
 
 const program = new Command();
 
-program.name('nonraid-tool').description("Command-line client for nonraid-webui's REST API.").version(pkg.version);
+program.name('nwctl').description("Command-line client for nonraid-webui's REST API.").version(pkg.version);
 
 // A `version` subcommand alongside the standard -V/--version flag - some scripts/muscle memory
 // reach for one or the other. Same output as --version, not a separate "richer" report.
@@ -74,7 +74,7 @@ registerRcloneCommand(program);
 registerTuiCommand(program);
 
 // `--json`: raw JSON instead of formatted text, for scripting. Added to every (sub)command so it
-// works in any position (`nonraid-tool --json array status` or `nonraid-tool array status --json`),
+// works in any position (`nwctl --json array status` or `nwctl array status --json`),
 // and read via optsWithGlobals() so a nested subcommand still sees it. Local-only commands
 // (version, decrypt-backup) ignore it - they have no API response to emit.
 function addJsonFlag(cmd: Command): void {

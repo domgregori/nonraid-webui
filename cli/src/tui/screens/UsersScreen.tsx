@@ -16,7 +16,7 @@ async function load(client: ApiClient): Promise<{ users: NrUser[]; groups: NrGro
 // View-only - see SharesScreen's comment on why creation stays a CLI-flag operation, not a TUI
 // form. Users and groups share a screen since both are small, simple lists most naturally read
 // together (a group's own row doesn't say who's in it - cross-reference against the users list
-// above it, same as scanning `nonraid-tool user ls` next to `nonraid-tool group ls` would).
+// above it, same as scanning `nwctl user ls` next to `nwctl group ls` would).
 export function UsersScreen({ client }: Props) {
   const { data, error, refresh } = usePolling(() => load(client));
 
@@ -26,7 +26,7 @@ export function UsersScreen({ client }: Props) {
 
   return (
     <Box flexDirection="column">
-      <Text underline>Users & Groups — r refresh (view-only; use `nonraid-tool user`/`group` to change)</Text>
+      <Text underline>Users & Groups — r refresh (view-only; use `nwctl user`/`group` to change)</Text>
       <Box marginTop={1} flexDirection="column">
         <Text bold>Users ({data?.users.length ?? 0})</Text>
         {data?.users.length === 0 && <Text dimColor>none</Text>}

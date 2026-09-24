@@ -659,7 +659,7 @@ build_frontend() {
 }
 
 build_cli() {
-  log "Building the nonraid-tool CLI"
+  log "Building the nwctl CLI"
   (cd "$CLI_DIR" && npm ci && npm run build)
 }
 
@@ -683,8 +683,13 @@ build_public_share_frontend() {
 # node's module resolution needs those to stay right where npm put them. dist/index.js already has
 # its own #!/usr/bin/env node shebang and is chmod +x'd by cli's own build script.
 install_cli() {
-  log "Installing the nonraid-tool CLI to /usr/local/bin/nonraid-tool"
-  ln -sf "$CLI_DIR/dist/index.js" /usr/local/bin/nonraid-tool
+  log "Installing the nwctl CLI to /usr/local/bin/nwctl"
+  ln -sf "$CLI_DIR/dist/index.js" /usr/local/bin/nwctl
+  # This CLI used to be called nonraid-tool - drop the old symlink on an upgrade rather than
+  # leaving a stale, identically-functional binary sitting under its pre-rename name forever.
+  # config.ts's own loadConfig() separately migrates an existing ~/.config/nonraid-tool/
+  # config.json forward, so removing just this symlink doesn't strand anyone's saved login.
+  rm -f /usr/local/bin/nonraid-tool
 }
 
 # @nonraid/shared's staged counterpart to build_shared_package() above - needed because rsync -a

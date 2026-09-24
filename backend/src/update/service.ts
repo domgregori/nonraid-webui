@@ -56,7 +56,7 @@ export interface ComponentUpdateStatus {
 export interface UpdateStatus {
   nonraid: ComponentUpdateStatus;
   nonraidWebui: ComponentUpdateStatus;
-  /** The installed `nonraid-tool` CLI's own version (e.g. "0.1.0"), or null if it isn't installed.
+  /** The installed `nwctl` CLI's own version (e.g. "0.1.0"), or null if it isn't installed.
    *  No latest/upToDate/update-button of its own here - it ships from the same repo/release as
    *  nonraidWebui and is rebuilt+reinstalled as part of that same update (see
    *  update/apply.ts's applyWebuiUpdate), never independently. */
@@ -76,7 +76,7 @@ async function readInstalledDriverTag(): Promise<string | null> {
 // Shells out to the real installed binary rather than reading cli/package.json off disk - this
 // process (running staged in $INSTALL_ROOT/backend) has no fixed relative path back to the dev
 // checkout's cli/ directory the way the CLI itself does (see cli/src/index.ts's own version
-// lookup), but /usr/local/bin/nonraid-tool is always the actual thing a user would run. Null (not
+// lookup), but /usr/local/bin/nwctl is always the actual thing a user would run. Null (not
 // a throw) covers "not installed yet" - a normal state before the first build_cli/install_cli run.
 async function readCliToolVersion(): Promise<string | null> {
   try {

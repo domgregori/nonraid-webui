@@ -56,7 +56,7 @@ export function App({ client, host }: Props) {
       <Box borderStyle="single" borderColor="cyan" flexDirection="column" paddingX={1}>
         <Box justifyContent="space-between">
           <Text bold color="cyan">
-            nonraid-tool — {host}
+            nwctl — {host}
           </Text>
           <Text dimColor>1-9 / Tab switch · q quit</Text>
         </Box>

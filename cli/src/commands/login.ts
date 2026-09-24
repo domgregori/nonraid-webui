@@ -33,7 +33,7 @@ async function resolveHost(optHost?: string): Promise<string> {
  * in the web UI (Settings > API). The token is verified against a real authenticated endpoint
  * before being saved, so a typo fails loudly here instead of on the next command. No `tokenId` is
  * stored - a bearer token can't look up its own id (the /auth/tokens endpoints are session-gated,
- * not token-gated), so `nonraid-tool logout --revoke` can't revoke a `--token` session; revoke it
+ * not token-gated), so `nwctl logout --revoke` can't revoke a `--token` session; revoke it
  * from Settings > API in the web UI instead (see logout.ts).
  */
 async function tokenLogin(base: string, token: string, insecure: boolean): Promise<void> {
@@ -43,7 +43,7 @@ async function tokenLogin(base: string, token: string, insecure: boolean): Promi
 
   await saveConfig({ host: base, token, insecure: insecure || undefined });
   console.log(`Saved API token for ${base}. Future commands won't ask for a password.`);
-  console.log('Note: `nonraid-tool logout --revoke` cannot revoke this token - do that from Settings > API in the web UI.');
+  console.log('Note: `nwctl logout --revoke` cannot revoke this token - do that from Settings > API in the web UI.');
 }
 
 export async function loginCommand(opts: LoginOptions): Promise<void> {
@@ -61,7 +61,7 @@ export async function loginCommand(opts: LoginOptions): Promise<void> {
 
   const { cookie, password } = await passwordLogin(base);
 
-  const defaultName = `nonraid-tool@${os.hostname()}`;
+  const defaultName = `nwctl@${os.hostname()}`;
   const { tokenName } = await prompts({ type: 'text', name: 'tokenName', message: 'Name for this token', initial: defaultName }, { onCancel: () => process.exit(130) });
 
   // POST /auth/tokens is step-up gated (same class of risk as adding a trusted SSH key) -

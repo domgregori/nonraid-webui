@@ -11,7 +11,7 @@ interface Props {
 }
 
 // Array start/stop is deliberately not an action here - too large a blast radius (unmounts every
-// share) for a single keypress on a status screen; `nonraid-tool array start/stop` covers it.
+// share) for a single keypress on a status screen; `nwctl array start/stop` covers it.
 // Starting a parity check is the one action this screen offers, matching the web Dashboard's own
 // pairing of array health with parity status.
 export function ArrayScreen({ client }: Props) {
