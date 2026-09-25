@@ -22,7 +22,7 @@
 - I have been testing this on a real metal rig at every step.
 
 This is a web dashboard for [NonRAID](https://github.com/qvr/nonraid) - an alternative to Unraid NAS. Surfaces array status, parity protection, per-disk detail, shares, users, Docker
-containers, LXC containers, historical metrics, and array management. It also builds and installs a forked nonraid 
+containers, LXC containers, historical metrics, and array management. It also builds and installs a forked nonraid
 
 ## Features
 
@@ -52,13 +52,14 @@ containers, LXC containers, historical metrics, and array management. It also bu
 - 2FA: TOTP, Passkey when using https
 - Home Assistant addon via HAKS. Found [here](https://github.com/domgregori/nonraid-ha)
 - Public share links to dirs/files via cloudflare tunnel
-    * Safety measures taken can be read about [here](SHARE-SERVER-SAFETY.md)
+  - Safety measures taken can be read about [here](SHARE-SERVER-SAFETY.md)
 - Update via webui from github releases
-- *If boot disk is btrfs*, automatic system snapshot before update and added to grub menu for recovery
+- _If boot disk is btrfs_, automatic system snapshot before update and added to grub menu for recovery
 - `nwctl` nonraid-webui cli/tui
 - No telemetry!
 
 ## TODO
+
 - Adding disk operations to a queue currently has bugs
 - Removing a disk, i.e. shrinking the array disk number has bugs
 - LUKS support is being worked on on the [luks branch](https://github.com/domgregori/nonraid-webui/tree/luks-support)
@@ -118,7 +119,7 @@ cd share-server && npm install && npm run dev
 cd public-share && npm install && npm run dev
 ```
 
-`packages/shared` (`@nonraid/shared`) has to be built *before* the backend or `share-server` can
+`packages/shared` (`@nonraid/shared`) has to be built _before_ the backend or `share-server` can
 resolve it - both consume it as a `file:` dependency pointing at its compiled `dist/`, not its
 source, so skipping this build step surfaces as an unresolved-module error in either process
 instead. Rebuild it again after pulling in any change to `packages/shared` itself.
@@ -241,3 +242,5 @@ public-share/            The minimal frontend share-server serves to a share lin
                           no i18next), so there's no admin route or secret to audit out of what a
                           visitor's browser actually loads.
 ```
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/L3N727MAJ3)
