@@ -62,6 +62,7 @@ containers, LXC containers, historical metrics, and array management. It also bu
 - Adding disk operations to a queue currently has bugs
 - Removing a disk, i.e. shrinking the array disk number has bugs
 - LUKS support is being worked on on the [luks branch](https://github.com/domgregori/nonraid-webui/tree/luks-support)
+- Translations to more languages
 
 ## Requirements
 
