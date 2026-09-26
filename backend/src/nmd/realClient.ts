@@ -274,16 +274,21 @@ export class RealNmdClient implements NmdClient {
    * actual device path is re-located fresh via disk_id, the same approach
    * restoreUnassignedDisk() uses.
    */
-  async reloadDriver(): Promise<NmdCommandResult> {
-    const before = await this.getStatus();
-    // Validated, not before.array.superblock directly - see resolveSuperblockPath's doc comment.
-    const superblockPath = this.resolveSuperblockPath(before.array.superblock);
-
-    const known = before.disks.filter((d) => d.disk_id && d.disk_id !== 'none');
-    if (known.length === 0) {
-      throw new Error('No disks with a known identity to re-import - nothing to safely recover.');
-    }
-
+  /**
+   * Resolves each given slot's *current* physical device by its recorded disk_id
+   * (findDeviceByDiskId(), which already falls back to the whole disk when there's no partition -
+   * see that method's doc comment) and re-imports it with a direct `import` write to
+   * /proc/nmdcmd - the same explicit-import primitive reloadDriver() has always used, now shared
+   * with startArray()'s narrower recovery (see #10 in the driver-fork-removal handoff: dropping
+   * the `nonraid` fork means nmdctl's own import_disks() rescan can no longer fall back to a raw,
+   * unpartitioned whole disk on its own - every disk this app ever provisions - so this app has to
+   * do that fallback itself). Throws if any given disk's current device can't be located -
+   * deliberately not skipped, since an incomplete re-import is worse than a clear failure for
+   * every current caller (reloadDriver() already required this; startArray() only ever calls this
+   * for slots it just confirmed are missing *because of* the whole-disk gap, so a location failure
+   * there is a genuinely new problem worth surfacing, not something to silently paper over).
+   */
+  private async reimportKnownDisks(known: { slot: number; disk_id: string; size_kb: number }[]): Promise<{ slot: number; device: string }[]> {
     const located: { slot: number; device: string; diskId: string; sizeKb: number }[] = [];
     for (const d of known) {
       const found = await this.findDeviceByDiskId(d.disk_id);
@@ -293,6 +298,21 @@ export class RealNmdClient implements NmdClient {
         );
       }
       located.push({ slot: d.slot, device: found.partition ?? found.device, diskId: d.disk_id, sizeKb: d.size_kb });
+    }
+    for (const d of located) {
+      await this.writeNmdCmd(`import ${d.slot} ${basename(d.device)} 0 ${d.sizeKb} 0 ${d.diskId}`);
+    }
+    return located.map((d) => ({ slot: d.slot, device: d.device }));
+  }
+
+  async reloadDriver(): Promise<NmdCommandResult> {
+    const before = await this.getStatus();
+    // Validated, not before.array.superblock directly - see resolveSuperblockPath's doc comment.
+    const superblockPath = this.resolveSuperblockPath(before.array.superblock);
+
+    const known = before.disks.filter((d) => d.disk_id && d.disk_id !== 'none');
+    if (known.length === 0) {
+      throw new Error('No disks with a known identity to re-import - nothing to safely recover.');
     }
 
     await this.run(['stop']);
@@ -313,9 +333,7 @@ export class RealNmdClient implements NmdClient {
       );
     }
 
-    for (const d of located) {
-      await this.writeNmdCmd(`import ${d.slot} ${basename(d.device)} 0 ${d.sizeKb} 0 ${d.diskId}`);
-    }
+    const located = await this.reimportKnownDisks(known);
 
     await this.startArray();
     return {
@@ -490,12 +508,36 @@ export class RealNmdClient implements NmdClient {
    * activity feed or a dialog. Falls back to that raw text for anything not
    * in the table, since it's still the best information available then.
    */
+  /**
+   * #10 (see the driver-fork-removal handoff): a slot with a recorded identity (disk_id set) but
+   * no live device (device missing/"none") that ISN'T one of the two intentional-unassign
+   * statuses (DISK_NP_MISSING - uncommitted, DISK_NP_DSBL - committed; both legitimately read
+   * "none" by design, see unassignDisk()/restoreUnassignedDisk()) is exactly the signature
+   * nmdctl's own import_disks() rescan leaves behind for a raw, unpartitioned whole-disk array
+   * member - every disk this app ever provisions (commitNewDisk()/addDisk()/shrinkArray() never
+   * create a partition table). Confirmed directly against tools/nmdctl and the kernel driver this
+   * session: import_disks()'s find_partition() call has no fallback for "no partition table, but
+   * the whole device itself is the intended slot content" once the fork's own fix for this
+   * (commit 7148a18) is gone, so it just fails to re-find the disk and skips the slot - and
+   * import_slot() (the C side) refuses outright once the array is actually started, so this only
+   * ever matters here, before that point. The same two statuses are exactly what nmdctl's own
+   * import_disks() itself already skips for the same reason (unassigned-on-purpose), matched here
+   * verbatim rather than re-derived.
+   */
+  private staleWholeDiskSlots(status: NmdStatusResponse): { slot: number; disk_id: string; size_kb: number }[] {
+    return status.disks
+      .filter((d) => d.disk_id && d.disk_id !== 'none')
+      .filter((d) => !d.device || d.device === 'none')
+      .filter((d) => d.status !== 'DISK_NP_MISSING' && d.status !== 'DISK_NP_DSBL')
+      .map((d) => ({ slot: d.slot, disk_id: d.disk_id, size_kb: d.size_kb }));
+  }
+
   async startArray(): Promise<NmdCommandResult> {
     try {
       const { stdout } = await this.run(['start']);
       return { ok: true, message: stdout.trim() };
     } catch (err) {
-      const status = await this.getStatus();
+      let status = await this.getStatus();
       if (status.array.state === 'STARTED') {
         throw err;
       }
@@ -503,6 +545,26 @@ export class RealNmdClient implements NmdClient {
         const known = ARRAY_ERROR_DESCRIPTIONS[status.array.state];
         throw known ? new Error(`${known} (${status.array.state})`) : err;
       }
+
+      // #10: `start` failed and the array isn't in a recognized ERROR:* state - check for the
+      // raw-whole-disk re-import gap before falling back to the generic explicit-state retry
+      // below (which alone can't fix this: nmdctl would just fail import_disks() the same way on
+      // a second attempt). Explicitly re-import exactly the affected slots, using the same by-ID
+      // lookup reloadDriver() relies on, then retry `start` once - importing a slot only updates
+      // its recorded device, it doesn't itself start the array (confirmed against the kernel
+      // driver's import_slot()/start_array() split), so a fresh `start` call is genuinely required
+      // afterward, not just a courtesy re-check.
+      const stale = this.staleWholeDiskSlots(status);
+      if (stale.length > 0) {
+        await this.reimportKnownDisks(stale);
+        try {
+          const { stdout } = await this.run(['start']);
+          return { ok: true, message: stdout.trim() };
+        } catch {
+          status = await this.getStatus(); // refresh - state may have changed since the repair
+        }
+      }
+
       const { stdout } = await this.run(['start', status.array.state]);
       return { ok: true, message: stdout.trim() };
     }
