@@ -28,6 +28,10 @@ const ARRAY_ERROR_DESCRIPTIONS: Record<string, string> = {
   'ERROR:NEW_DISK_TOO_SMALL': 'A newly added disk is smaller than what its slot requires.',
 };
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Deterministic fallback ID for a device with no real udev-visible serial
  * (common for virtio test disks, and any real disk without `serial=` set).
@@ -570,9 +574,34 @@ export class RealNmdClient implements NmdClient {
     }
   }
 
+  /**
+   * #15 (see the driver-fork-removal handoff): the kernel driver refuses to stop while
+   * mddev->active (a shared open-refcount across every nmdN device node) is nonzero - confirmed
+   * against the driver source this session, stop_array() returns -EBUSY outright with no retry of
+   * its own. That count can lag a LUKS-backed disk's own `cryptsetup close` (or any other just-
+   * finished unmount) by a fraction of a second - real, but not distinguishable from any other
+   * stop failure via nmdctl's own text output (run_nmd_command()/stop_array() in tools/nmdctl both
+   * print the same generic "Error: Failed to..." either way, confirmed against that source too -
+   * there's no EBUSY-specific message to match on). Retrying the *whole* `nmdctl stop` command
+   * (not just the raw /proc/nmdcmd write the dropped fork commit retried directly) is safe to do
+   * unconditionally: nmdctl's own stop_array() no-ops immediately if the array isn't STARTED, and
+   * re-checks for still-mounted filesystems fresh each call - so retrying can't make a genuinely
+   * different failure (e.g. still-mounted filesystems in unattended mode) any worse, only add a
+   * bounded ~1s of latency before surfacing the same error. `udevadm settle` between attempts
+   * mirrors the dropped commit exactly, giving any in-flight device-node churn a chance to clear
+   * before the next write.
+   */
   async stopArray(): Promise<NmdCommandResult> {
-    const { stdout } = await this.run(['stop']);
-    return { ok: true, message: stdout.trim() };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const { stdout } = await this.run(['stop']);
+        return { ok: true, message: stdout.trim() };
+      } catch (err) {
+        if (attempt >= 4) throw err;
+        await this.runSystem('udevadm', ['settle', '--timeout=5']).catch(() => {});
+        await sleep(200);
+      }
+    }
   }
 
   async unmountDisks(): Promise<NmdCommandResult> {
