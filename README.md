@@ -17,12 +17,12 @@
 - **This webui was AI coded.** There's no way I would have had the time to code this by hand.
 - The backbone nonraid kernel driver from [qvr/nonraid](https://github.com/qvr/nonraid) is based on the unraid kernel driver, not AI coded.
 - The nonraid tool (nmdctl) was written by [qvr](https://github.com/qvr/nonraid)
-- I am using my own [fork](https://github.com/domgregori/nonraid) of nonraid that has fixes to the nmdctl tool, the service files, and to the driver.
+- Builds and installs the driver from bare upstream [qvr/nonraid](https://github.com/qvr/nonraid) - no fork needed anymore.
 - Logo was designed by me.
 - I have been testing this on a real metal rig at every step.
 
 This is a web dashboard for [NonRAID](https://github.com/qvr/nonraid) - an alternative to Unraid NAS. Surfaces array status, parity protection, per-disk detail, shares, users, Docker
-containers, LXC containers, historical metrics, and array management. It also builds and installs a forked nonraid 
+containers, LXC containers, historical metrics, and array management.
 
 ## Features
 
