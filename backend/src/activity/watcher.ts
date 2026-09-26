@@ -2,7 +2,7 @@ import type { CacheHealth } from '../cache/types.js';
 import type { CacheService } from '../cache/service.js';
 import { config } from '../config.js';
 import type { NmdClient } from '../nmd/index.js';
-import type { DiskStatus, NmdDisk } from '../nmd/types.js';
+import type { DiskStatus, NmdArrayCounters, NmdDisk } from '../nmd/types.js';
 import type { NotificationEventType } from '../settings/notificationCatalog.js';
 import { notifyEvent } from '../settings/notify.js';
 import type { SettingsStore } from '../settings/store.js';
@@ -37,8 +37,21 @@ interface DiskSnapshot {
  * surfacing in the activity feed: a parity check finishing on its own (not
  * via an explicit user action, which routes/parity.ts already logs), a
  * disk's error count climbing or its status turning bad, and a disk's SMART
- * health flipping from passing to failing. Everything here is a *passive*
- * observation - it never issues driver commands, only reads status and logs.
+ * health flipping from passing to failing. Almost everything here is a
+ * *passive* observation - it reads status and logs, nothing more.
+ *
+ * The one deliberate exception is triggerDriverReload() (see its own doc
+ * comment): dropping the `nonraid` driver fork means two of its own fixes
+ * for stale driver-side counters (num_invalid/num_disabled and friends -
+ * see the driver-fork-removal handoff, items #11-14) no longer exist
+ * upstream, and the only remaining way to reset them is the same full
+ * module-reload sequence reloadDriver() already uses for manual recovery.
+ * checkParitySync() and checkDisks() are exactly where this project already
+ * observes the two conditions that leave those counters stale (a
+ * rebuild/check finishing, a disk newly disabled by a write error), so
+ * that's where the automatic reload is triggered from too - always
+ * logged/notified *before* it runs (see triggerDriverReload), never silent,
+ * since it briefly stops the array.
  *
  * Same background-interval shape as SystemStatsService: a self-unref'd
  * timer so it never keeps the process alive on its own.
@@ -70,6 +83,10 @@ export class ActivityWatcher {
   // exists. Cleared the instant a tick reads false again, so only the notify side is debounced,
   // never "back to normal".
   private needsFormatPending = new Map<number, boolean>();
+  // Guards triggerDriverReload() against overlapping calls - a second edge (e.g. a disk disable
+  // landing the same tick a rebuild elsewhere finishes) must never kick off a second concurrent
+  // module reload while one is already running.
+  private reloadInFlight = false;
 
   constructor(
     private nmd: NmdClient,
@@ -92,7 +109,7 @@ export class ActivityWatcher {
     }
 
     this.checkArrayError(status.array.state);
-    this.checkParitySync(status.array.last_sync, status.array.counters.sync_errors);
+    this.checkParitySync(status.array.last_sync, status.array.counters);
     this.checkDisks(status.disks);
     // Only meaningful while the array is started - nmdctl only reports a disk's real filesystem
     // type once it's actually mounted, so every disk looks "unformatted" while stopped regardless
@@ -204,19 +221,36 @@ export class ActivityWatcher {
     notifyEvent(this.settings, 'cacheMirrorDegraded', 'NonRAID: cache mirror degraded', text);
   }
 
-  private checkParitySync(lastSync: { timestamp: number; status: string }, syncErrors: number): void {
+  private checkParitySync(lastSync: { timestamp: number; status: string }, counters: NmdArrayCounters): void {
     const seen = this.lastSyncTimestamp;
     this.lastSyncTimestamp = lastSync.timestamp;
 
     if (seen === null || lastSync.timestamp === seen || lastSync.timestamp === 0) return;
 
     if (lastSync.status === 'errors') {
-      const text = `Parity check finished with ${syncErrors} sync error${syncErrors === 1 ? '' : 's'}`;
+      const text = `Parity check finished with ${counters.sync_errors} sync error${counters.sync_errors === 1 ? '' : 's'}`;
       this.activity.log(text, 'red', 'parityErrors').catch(() => {});
       notifyEvent(this.settings, 'parityErrors', 'NonRAID: parity errors', text);
     } else if (lastSync.status === 'completed') {
       this.activity.log('Parity check finished with no errors', 'green', 'parityCompleted').catch(() => {});
       notifyEvent(this.settings, 'parityCompleted', 'NonRAID: parity check complete', 'Parity check finished with no errors');
+    }
+
+    // #11-14 (driver-fork-removal handoff): this fires on *any* resync completing, whether it was
+    // a plain parity check or a rebuild/reconstruction - the driver reports both through this same
+    // last_sync field (confirmed against the kernel driver source: md_do_recovery()'s single
+    // success path handles either, distinguished only by which action was requested). Only worth
+    // an automatic reload when the driver's own counters actually show the stale-mismatch
+    // signature: num_invalid != num_disabled is the exact condition status_resync() (kernel) uses
+    // to decide whether the array can ever fall through to offering a parity check again - a
+    // mismatch here that a plain resync completion doesn't itself clear (recompute_counters(),
+    // the fork's own fix for this, no longer exists once the fork is dropped) would otherwise
+    // persist across every subsequent stop/start until somebody manually reloads the driver.
+    // Gating on the real counter mismatch (rather than reloading after every single completion)
+    // keeps a routine, healthy scheduled parity check from paying for a brief array interruption
+    // it doesn't need.
+    if (counters.invalid !== counters.disabled) {
+      this.triggerDriverReload('stale disk counters after a rebuild/parity check');
     }
   }
 
@@ -239,8 +273,55 @@ export class ActivityWatcher {
         const text = `Disk ${disk.slot} (${diskLabel(disk)}) status changed to ${disk.status}`;
         this.activity.log(text, 'red', 'diskFailed').catch(() => {});
         notifyEvent(this.settings, 'diskFailed', 'NonRAID: disk failed', text);
+
+        // #11-14: DISK_DSBL specifically (not DISK_DSBL_NEW/WRONG/INVALID/NP_MISSING, the other
+        // members of BAD_DISK_STATUSES) is exactly the status the kernel driver's md_write_error()
+        // sets when it disables a disk after a write error (confirmed against the driver source).
+        // Without the fork's recompute_counters() fix, the num_disabled/num_invalid bump that
+        // disable produces never gets corrected except by a full module reload - and per
+        // md_write_error()'s own logic, a *second* real write-error disk won't even get disabled
+        // (silently masked) once those counters are already sitting at their ceiling from a first,
+        // already-handled failure. Refreshing right after the first one keeps that ceiling
+        // meaningful for whatever comes next.
+        if (disk.status === 'DISK_DSBL') {
+          this.triggerDriverReload(`disk ${disk.slot} (${diskLabel(disk)}) was disabled by a write error`);
+        }
       }
     }
+  }
+
+  /**
+   * The automated counterpart to the "Settings -> reload driver" manual recovery action
+   * (RealNmdClient.reloadDriver()) - see #11-14 in the driver-fork-removal handoff for why this is
+   * needed at all now that the `nonraid` fork (and its own driver-side counter-recompute fix) is
+   * gone. Deliberately NOT silent: reloadDriver() briefly stops the array (a real, user-visible
+   * interruption - shares/connections drop for the few seconds the module is unloaded and
+   * reloaded), so this always logs *before* attempting it, the same way every other
+   * notification-worthy event in this file does, rather than doing it quietly in the background.
+   * `reloadInFlight` guards against two edges landing on the same tick (or adjacent ticks, since
+   * the reload itself takes a few seconds) from kicking off overlapping module reloads.
+   */
+  private triggerDriverReload(reason: string): void {
+    if (this.reloadInFlight) return;
+    this.reloadInFlight = true;
+
+    const startText = `Refreshing array driver status (${reason}) - the array will briefly stop and restart automatically.`;
+    this.activity.log(startText, 'amber', 'driverAutoReload').catch(() => {});
+    notifyEvent(this.settings, 'driverAutoReload', 'NonRAID: array driver refreshing', startText);
+
+    this.nmd
+      .reloadDriver()
+      .then((result) => {
+        this.activity.log(`Array driver refresh finished: ${result.message}`, 'green', 'driverAutoReload').catch(() => {});
+      })
+      .catch((err) => {
+        const text = `Automatic array driver refresh failed: ${(err as Error).message} - a manual reload (Settings) may be needed.`;
+        this.activity.log(text, 'red', 'driverAutoReload').catch(() => {});
+        notifyEvent(this.settings, 'driverAutoReload', 'NonRAID: array driver refresh failed', text);
+      })
+      .finally(() => {
+        this.reloadInFlight = false;
+      });
   }
 
   private async checkSmartHealth(disks: NmdDisk[]): Promise<void> {
