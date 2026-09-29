@@ -195,18 +195,30 @@ async function main() {
   await shares.remountAll({ skipAlreadyMounted: true });
 
   // docker.service/lxc.service are ordered (via a systemd drop-in install-webui.sh installs) to
-  // start only after nonraid.service - which assembles/mounts the array at boot on its own,
-  // independent of this app - so they no longer race an unmounted array disk. That's ordering
-  // only, not a guarantee the array actually came up: nonraid.service's own ExecStart lines are
-  // all best-effort and never fail the unit even if nmdctl did. This backend is ordered the same
-  // way (After=nonraid.service), so by the time this runs, the array has already had its one shot
-  // at starting - if either service's storage is configured on it and it still isn't up, surface
-  // that now rather than leaving an admin to notice missing containers on their own. One-time
-  // check, not a recurring watcher - covers the boot-time gap this exists for, not "is storage
-  // reachable right now" as an ongoing health check.
+  // start only after nonraid.service - which assembles the array at boot on its own, independent
+  // of this app. That's ordering only, not a guarantee it worked: nonraid.service's ExecStart is
+  // best-effort and never fails the unit even if nmdctl did, so below gives startArray() its own
+  // shot at recovering before falling back to just notifying. One-time check, not a recurring
+  // watcher - covers the boot-time gap this exists for, not ongoing health monitoring.
   try {
     const [dockerStorage, arrayStatus] = await Promise.all([getConfiguredDockerStorage().catch(() => null), nmd.getStatus().catch(() => null)]);
-    const arrayStarted = arrayStatus?.array.state === 'STARTED';
+    let arrayStarted = arrayStatus?.array.state === 'STARTED';
+
+    // nonraid.service's ExecStart lines are best-effort and never fail the unit even if nmdctl did
+    // - on bare upstream qvr/nonraid, a whole-disk member (every disk this app provisions) reliably
+    // fails nmdctl's own rescan on every boot (see #10 in the driver-fork-removal handoff), and
+    // startArray()'s own recovery for that never got a chance to run since nothing called it here.
+    if (arrayStatus && !arrayStarted) {
+      try {
+        await nmd.startArray();
+        arrayStarted = true;
+        activity.log('Array did not start automatically at boot - recovered it now.', 'amber', 'arrayStarted').catch(() => {});
+      } catch {
+        // Not the whole-disk gap startArray() already covers, or recovery itself failed - the
+        // existing Docker/LXC-unavailable notice below (or a human) is the fallback, not a retry loop.
+      }
+    }
+
     if (!arrayStarted) {
       const affected = [dockerStorage?.mode === 'array' ? 'Docker' : null, persistedSettings.lxcStorage.mode === 'array' ? 'LXC' : null].filter(
         (s): s is string => s !== null,
