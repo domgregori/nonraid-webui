@@ -784,8 +784,16 @@ export class RealNmdClient implements NmdClient {
   }
 
   async listAvailableDevices(): Promise<AvailableDevice[]> {
-    const status = await this.getStatus();
-    const claimedIds = status.disks.map((d) => d.disk_id).filter((id): id is string => !!id && id !== 'none');
+    // A genuinely blank array (no superblock has ever existed) has nothing claimed yet either -
+    // same bootstrap case addDisk()/commitNewDisk() handle, see their own doc comments.
+    let status: NmdStatusResponse | null;
+    try {
+      status = await this.getStatus();
+    } catch (err) {
+      if (!(err instanceof ArrayNotConfiguredError)) throw err;
+      status = null;
+    }
+    const claimedIds = (status?.disks ?? []).map((d) => d.disk_id).filter((id): id is string => !!id && id !== 'none');
 
     // A disk actively serving as an array member is claimed by the driver and
     // re-exposed as its own block device (e.g. /dev/nmd5p1) - the *raw*
@@ -800,7 +808,7 @@ export class RealNmdClient implements NmdClient {
     // against the array's own live device list closes it independently of
     // both existing checks.
     const claimedDeviceNames = new Set(
-      status.disks.map((d) => d.device).filter((dev): dev is string => !!dev && dev !== 'none'),
+      (status?.disks ?? []).map((d) => d.device).filter((dev): dev is string => !!dev && dev !== 'none'),
     );
 
     const devicePaths = await this.enumerateDevicePaths();
