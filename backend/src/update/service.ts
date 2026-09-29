@@ -128,9 +128,8 @@ async function latestTag(repoUrl: string): Promise<string | null> {
   return tags[0] ?? null;
 }
 
-/** The current tip commit SHA of `branch` on `repoUrl` - no clone, just a ref listing. Throws
- *  the same way latestTag does on a real failure; a missing branch is treated as "unreachable"
- *  too, since qvr/nonraid always has a main. */
+/** The current tip commit SHA of `branch` on `repoUrl`, or null if that branch doesn't exist -
+ *  no clone, just a ref listing. Throws the same way latestTag does on a real failure. */
 async function latestCommit(repoUrl: string, branch = 'main'): Promise<string | null> {
   let stdout: string;
   try {

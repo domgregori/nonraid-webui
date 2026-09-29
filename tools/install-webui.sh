@@ -530,6 +530,9 @@ ensure_node() {
 fetch_nonraid_source() {
   log "Fetching NonRAID from $NONRAID_REPO_URL (main branch tip)"
   if [ -d "$NONRAID_SRC_DIR/.git" ]; then
+    # An existing checkout upgrading from an older install-webui.sh may still have `origin`
+    # pointed at the old domgregori/nonraid fork - always resync it so this actually switches.
+    git -C "$NONRAID_SRC_DIR" remote set-url origin "$NONRAID_REPO_URL"
     # A failed fetch isn't fatal here (unlike the fresh-clone branch below): warn and keep building
     # from whatever's already checked out rather than aborting the whole install.
     if git -C "$NONRAID_SRC_DIR" fetch origin main; then

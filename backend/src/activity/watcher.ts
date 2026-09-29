@@ -264,10 +264,8 @@ export class ActivityWatcher {
         const text = `Disk ${disk.slot} (${diskLabel(disk)}) reported new errors - total now ${disk.errors}`;
         this.activity.log(text, 'red', 'diskErrors').catch(() => {});
         notifyEvent(this.settings, 'diskErrors', 'NonRAID: disk errors', text);
-        // Deliberately no `continue` here - a real write-error disable (see #11-14 below) reports
-        // its error-count jump and its DISK_DSBL transition on the very same tick, confirmed live
-        // on the rig: an early exit here silently skipped the status check below every time,
-        // recording DISK_DSBL into diskSnapshots as "already seen" without ever acting on it.
+        // Deliberately no `continue` here - a real write-error disable reports its error jump and
+        // its DISK_DSBL transition on the same tick, confirmed live; an early exit here used to skip the check below and lose it.
       }
 
       const wasBad = BAD_DISK_STATUSES.has(prev.status);

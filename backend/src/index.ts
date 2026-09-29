@@ -194,28 +194,23 @@ async function main() {
   // never block startup on one share's mount failing.
   await shares.remountAll({ skipAlreadyMounted: true });
 
-  // docker.service/lxc.service are ordered (via a systemd drop-in install-webui.sh installs) to
-  // start only after nonraid.service - which assembles the array at boot on its own, independent
-  // of this app. That's ordering only, not a guarantee it worked: nonraid.service's ExecStart is
-  // best-effort and never fails the unit even if nmdctl did, so below gives startArray() its own
-  // shot at recovering before falling back to just notifying. One-time check, not a recurring
-  // watcher - covers the boot-time gap this exists for, not ongoing health monitoring.
+  // docker.service/lxc.service start only after nonraid.service, which assembles the array at
+  // boot on its own - ordering only, not a guarantee it worked. One-time check, not a watcher.
   try {
     const [dockerStorage, arrayStatus] = await Promise.all([getConfiguredDockerStorage().catch(() => null), nmd.getStatus().catch(() => null)]);
     let arrayStarted = arrayStatus?.array.state === 'STARTED';
 
-    // nonraid.service's ExecStart lines are best-effort and never fail the unit even if nmdctl did
-    // - on bare upstream qvr/nonraid, a whole-disk member (every disk this app provisions) reliably
-    // fails nmdctl's own rescan on every boot (see #10 in the driver-fork-removal handoff), and
-    // startArray()'s own recovery for that never got a chance to run since nothing called it here.
+    // nonraid.service never fails its unit even if nmdctl did (#10) - give startArray()'s own
+    // recovery a chance here, since nothing else calls it at boot.
     if (arrayStatus && !arrayStarted) {
       try {
         await nmd.startArray();
         arrayStarted = true;
-        activity.log('Array did not start automatically at boot - recovered it now.', 'amber', 'arrayStarted').catch(() => {});
+        const msg = 'Array did not start automatically at boot - recovered it now.';
+        activity.log(msg, 'amber', 'arrayStarted').catch(() => {});
+        notifyEvent(settingsStore, 'arrayStarted', 'NonRAID: array recovered at boot', msg);
       } catch {
-        // Not the whole-disk gap startArray() already covers, or recovery itself failed - the
-        // existing Docker/LXC-unavailable notice below (or a human) is the fallback, not a retry loop.
+        // Falls through to the Docker/LXC notice below - a real failure here needs a human.
       }
     }
 
