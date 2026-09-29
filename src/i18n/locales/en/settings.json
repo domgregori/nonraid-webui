@@ -354,7 +354,7 @@
   },
   "CloudflaredSection": {
     "loading": "Loading…",
-    "title": "Internet Access (Cloudflare Tunnel)",
+    "title": "Public Links (Cloudflare Tunnel)",
     "notInstalled1": "The",
     "notInstalled2": "package isn't installed on this host. Re-run",
     "notInstalled3": "(or install it manually) to enable this section.",

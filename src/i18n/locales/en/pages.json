@@ -244,7 +244,7 @@
       "services": "Services",
       "logs": "System Logs",
       "tailscale": "Tailscale",
-      "cloudflared": "Internet Access",
+      "cloudflared": "Public Links",
       "update": "Update"
     },
     "about": {
@@ -450,7 +450,7 @@
       "title": "Tailscale"
     },
     "cloudflared": {
-      "title": "Internet Access"
+      "title": "Public Links"
     },
     "update": {
       "title": "Update"

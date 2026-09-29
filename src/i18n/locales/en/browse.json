@@ -34,7 +34,7 @@
     "confirmUnshare": "Confirm unshare",
     "copy": "Copy",
     "copied": "Copied!",
-    "noPublicUrlHint": "No public URL is configured yet - set one in Settings > Internet Access so this link shows the real shareable address.",
+    "noPublicUrlHint": "No public URL is configured yet - set one in Settings > Public Links so this link shows the real shareable address.",
     "done": "Done"
   },
   "BulkActionBar": {
