@@ -6,19 +6,17 @@ import { BUILD_TAG } from '../buildInfo.generated.js';
 
 const execFileAsync = promisify(execFile);
 
-// Versioning convention for both repos, decided explicitly (not the "track main's tip" scheme
-// this originally shipped with): a manually-pushed, semver git tag (v0.1.0, v0.2.0, ...) marks a
-// real release. Nothing else counts - not PACKAGE_VERSION (doesn't reliably bump on every fix,
-// see tools/install-webui.sh's build_nonraid_driver comment), not a bare commit hash.
-const NONRAID_REPO_URL = 'https://github.com/domgregori/nonraid.git';
+// Versioning convention differs per repo now. nonraidWebui: a manually-pushed semver git tag
+// (v0.1.0, v0.2.0, ...) marks a real release - nothing else counts. nonraid: bare upstream
+// qvr/nonraid has no tags at all, so it's tracked by main's tip commit SHA instead.
+const NONRAID_REPO_URL = 'https://github.com/qvr/nonraid.git';
 const NONRAID_WEBUI_REPO_URL = 'https://github.com/domgregori/nonraid-webui.git';
 
 const SEMVER_TAG_RE = /^v\d+\.\d+\.\d+$/;
 
 // Written by tools/install-webui.sh's build_nonraid_driver(), only after a `dkms install` actually
-// succeeds against a checkout that was itself exactly at a tag (fetch_nonraid_source() refuses to
-// build from anything else - see its own comment) - so this file existing at all means "installed
-// from a real release," never a mid-build or untagged-commit false positive.
+// succeeds - holds the exact commit SHA of qvr/nonraid main that was built, so this file existing
+// at all means "installed from a real build," never a mid-build false positive.
 const NONRAID_DRIVER_VERSION_FILE = '/etc/nonraid/driver-version';
 
 // The kernel module carries no embedded version string of its own (confirmed live - `modinfo
@@ -32,14 +30,11 @@ const DRIVER_MODULE_SYSFS_PATH = '/sys/module/md_nonraid';
 const LS_REMOTE_TIMEOUT_MS = 10_000;
 
 export interface ComponentUpdateStatus {
-  /** The release tag this component was actually built/installed from (e.g. "v0.2.0"), or null
-   *  when it wasn't built from a tagged release at all - true for every install today, since
-   *  neither repo has pushed a first tag yet, and also true for an ordinary dev checkout that's
-   *  ahead of (or just never at) any tag. */
+  /** What this component was actually built/installed from: a release tag (nonraidWebui) or a
+   *  commit SHA (nonraid) - or null when nothing's been installed/stamped yet. */
   installed: string | null;
-  /** The newest semver tag currently pushed to the repo, or null when there are no tags at all
-   *  (true for both repos today) or the last check attempt failed (see checkError) - either way,
-   *  null here means "nothing to update to," not an error on its own. */
+  /** The newest tag or commit SHA available upstream, matching `installed`'s own kind - or null
+   *  when there's nothing to compare against yet or the last check attempt failed (checkError). */
   latest: string | null;
   /** null (not false) when installed or latest couldn't be determined - "unknown", not "no". */
   upToDate: boolean | null;
@@ -65,7 +60,7 @@ export interface UpdateStatus {
   checkedAt: number | null;
 }
 
-async function readInstalledDriverTag(): Promise<string | null> {
+async function readInstalledDriverVersion(): Promise<string | null> {
   try {
     return (await readFile(NONRAID_DRIVER_VERSION_FILE, 'utf8')).trim() || null;
   } catch {
@@ -133,6 +128,20 @@ async function latestTag(repoUrl: string): Promise<string | null> {
   return tags[0] ?? null;
 }
 
+/** The current tip commit SHA of `branch` on `repoUrl`, or null if that branch doesn't exist -
+ *  no clone, just a ref listing. Throws the same way latestTag does on a real failure. */
+async function latestCommit(repoUrl: string, branch = 'main'): Promise<string | null> {
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync('git', ['ls-remote', repoUrl, `refs/heads/${branch}`], {
+      timeout: LS_REMOTE_TIMEOUT_MS,
+    }));
+  } catch (err) {
+    throw new Error(`could not reach ${repoUrl}: ${(err as Error).message}`);
+  }
+  return stdout.split('\t')[0]?.trim() || null;
+}
+
 export type UpdateComponentKey = 'nonraid' | 'nonraidWebui';
 
 /** Keeps NONRAID_REPO_URL/NONRAID_WEBUI_REPO_URL themselves private to this module (every other
@@ -145,10 +154,9 @@ export function repoUrlForComponent(component: UpdateComponentKey): string {
 const GITHUB_API_TIMEOUT_MS = 10_000;
 
 /** The rendered Markdown body of the GitHub Release for `tag` on `repoUrl`, or null when that tag
- *  has no associated Release object (e.g. a plain pushed tag with nothing published through
- *  GitHub's own Releases UI/API) - "nothing to show," not an error. Only ever called on demand
- *  (Settings > Update's "Changelog" link), not part of checkForUpdates' own cached/polled check -
- *  release notes are opt-in reading, not something worth a live GitHub call on every status poll. */
+ *  has no associated Release object - "nothing to show," not an error. Always null for nonraid
+ *  now (a commit SHA is never a real tag), which is correct: it has no releases to show.
+ *  Only called on demand (Settings > Update's "Changelog" link), never part of checkForUpdates. */
 export async function fetchReleaseNotes(repoUrl: string, tag: string): Promise<string | null> {
   const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/);
   if (!match) throw new Error(`Not a github.com repo URL: ${repoUrl}`);
@@ -190,12 +198,17 @@ export function hasUpdateAvailable(component: ComponentUpdateStatus): boolean {
   return component.upToDate === null && component.installed === null && component.latest !== null;
 }
 
-async function checkComponent(installed: string | null, repoUrl: string, runningMatchesInstalled: boolean | null = null): Promise<ComponentUpdateStatus> {
+async function checkComponent(
+  installed: string | null,
+  repoUrl: string,
+  mode: 'tag' | 'commit',
+  runningMatchesInstalled: boolean | null = null,
+): Promise<ComponentUpdateStatus> {
   try {
-    const latest = await latestTag(repoUrl);
-    // Exact match, not a prefix/fuzzy comparison - both sides are real tag names now, not commit
-    // hashes, so "the same tag" is the only thing "up to date" can mean. null on either side means
-    // "can't tell" (no release installed from / no release published yet), not "no".
+    const latest = mode === 'tag' ? await latestTag(repoUrl) : await latestCommit(repoUrl);
+    // Exact string match either way - both sides are the same kind of identifier (tag or SHA), so
+    // "the same one" is the only thing "up to date" can mean. null on either side means "can't
+    // tell", not "no".
     const upToDate = installed && latest ? installed === latest : null;
     return { installed, latest, upToDate, checkError: null, runningMatchesInstalled };
   } catch (err) {
@@ -212,13 +225,13 @@ let cached: UpdateStatus | null = null;
 export async function checkForUpdates(force: boolean): Promise<UpdateStatus> {
   if (cached && !force) return cached;
 
-  const [installedDriverTag, driverLoadedCurrent] = await Promise.all([readInstalledDriverTag(), isDriverLoadedCurrent()]);
+  const [installedDriverVersion, driverLoadedCurrent] = await Promise.all([readInstalledDriverVersion(), isDriverLoadedCurrent()]);
   const [nonraid, nonraidWebui, cliTool] = await Promise.all([
-    checkComponent(installedDriverTag, NONRAID_REPO_URL, driverLoadedCurrent),
+    checkComponent(installedDriverVersion, NONRAID_REPO_URL, 'commit', driverLoadedCurrent),
     // null (not a computed value) - nonraidWebui restarts itself in place on update (see
     // routes/update.ts), so "installed" vs "running" isn't a real question for it the way it is
     // for the driver (see ComponentUpdateStatus.runningMatchesInstalled's own doc comment).
-    checkComponent(BUILD_TAG, NONRAID_WEBUI_REPO_URL),
+    checkComponent(BUILD_TAG, NONRAID_WEBUI_REPO_URL, 'tag'),
     readCliToolVersion(),
   ]);
 

@@ -299,16 +299,16 @@ bytes (gzip magic vs. not) instead.
 
 ## Update
 
-Versioning convention: only a real pushed git tag (`v0.1.0`, `v0.2.0`, ...) on the relevant
-GitHub repo counts as "a version" for either component - never a bare commit hash. `installed`
-comes back `null` (not an error) for any build that isn't exactly at a tag - a manual/dev build,
-or a fresh install from before this app tracked its own version.
+Versioning convention differs per component. `nonraidWebui`: only a real pushed git tag
+(`v0.1.0`, `v0.2.0`, ...) counts as "a version" - never a bare commit hash. `nonraid`: bare
+upstream `qvr/nonraid` has no tags, so it's tracked by its `main` branch tip commit SHA instead.
+Either way, `installed` comes back `null` (not an error) when nothing's been built/stamped yet.
 
 | Method | Path | Body/Params | Response / Notes |
 |---|---|---|---|
 | GET | `/update/status` | - | Cached result of the last check (`UpdateStatus`) - never hits the network, safe to poll. All-null/unknown shape before the first check has ever run. |
-| POST | `/update/check` | - | Live check against GitHub (`git ls-remote --tags`) for both components. `UpdateStatus`: `{ nonraid, nonraidWebui, cliTool, checkedAt }`, each component `{ installed, latest, upToDate, checkError, runningMatchesInstalled }` - `upToDate`/`runningMatchesInstalled` are `null` (not `false`) when it can't be determined, not just "no". An update is available whenever `upToDate === false`, *or* `installed === null` with a real `latest` (not built from a tagged release at all, but a release still exists to move to) - see `hasUpdateAvailable()` in `backend/src/update/service.ts`. |
-| GET | `/update/changelog` | `?component=nonraid\|nonraidWebui&tag=` | `{ tag, body }` - the GitHub Release body for `tag` on that component's repo, `body: null` when that tag has no Release object (a plain pushed tag with nothing published). |
+| POST | `/update/check` | - | Live check against GitHub: tags for `nonraidWebui`, `main`'s tip commit for `nonraid`. `UpdateStatus`: `{ nonraid, nonraidWebui, cliTool, checkedAt }`, each component `{ installed, latest, upToDate, checkError, runningMatchesInstalled }` - `upToDate`/`runningMatchesInstalled` are `null` (not `false`) when it can't be determined, not just "no". An update is available whenever `upToDate === false`, *or* `installed === null` with a real `latest` (nothing built/stamped yet, but something to move to) - see `hasUpdateAvailable()` in `backend/src/update/service.ts`. |
+| GET | `/update/changelog` | `?component=nonraid\|nonraidWebui&tag=` | `{ tag, body }` - the GitHub Release body for `tag` on that component's repo, `body: null` when that tag has no Release object. Always `null` for `nonraid` now - a commit SHA is never a real tag, so it has no releases to show. |
 | POST | `/update/apply` | `{ component: 'nonraid'\|'nonraidWebui' }` | Re-checks live first; `409` if no update is available (same `hasUpdateAvailable()` gate as above). Runs `install-webui.sh` on the host. `nonraid`: rebuilds/reinstalls the kernel module via DKMS only - never touches the *live* loaded module (reload that separately via Settings > Services). `nonraidWebui`: builds + stages only, then this backend restarts itself in place on success (response still returns first: `{ ok, message: "...restarting now...", output }` - the client reconnects automatically). `ApplyResult`: `{ ok, message, output }` - `output` is the last 200 lines of the install script's combined stdout+stderr. |
 
 ## SSH

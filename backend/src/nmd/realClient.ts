@@ -28,6 +28,10 @@ const ARRAY_ERROR_DESCRIPTIONS: Record<string, string> = {
   'ERROR:NEW_DISK_TOO_SMALL': 'A newly added disk is smaller than what its slot requires.',
 };
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Deterministic fallback ID for a device with no real udev-visible serial
  * (common for virtio test disks, and any real disk without `serial=` set).
@@ -274,16 +278,21 @@ export class RealNmdClient implements NmdClient {
    * actual device path is re-located fresh via disk_id, the same approach
    * restoreUnassignedDisk() uses.
    */
-  async reloadDriver(): Promise<NmdCommandResult> {
-    const before = await this.getStatus();
-    // Validated, not before.array.superblock directly - see resolveSuperblockPath's doc comment.
-    const superblockPath = this.resolveSuperblockPath(before.array.superblock);
-
-    const known = before.disks.filter((d) => d.disk_id && d.disk_id !== 'none');
-    if (known.length === 0) {
-      throw new Error('No disks with a known identity to re-import - nothing to safely recover.');
-    }
-
+  /**
+   * Resolves each given slot's *current* physical device by its recorded disk_id
+   * (findDeviceByDiskId(), which already falls back to the whole disk when there's no partition -
+   * see that method's doc comment) and re-imports it with a direct `import` write to
+   * /proc/nmdcmd - the same explicit-import primitive reloadDriver() has always used, now shared
+   * with startArray()'s narrower recovery (see #10 in the driver-fork-removal handoff: dropping
+   * the `nonraid` fork means nmdctl's own import_disks() rescan can no longer fall back to a raw,
+   * unpartitioned whole disk on its own - every disk this app ever provisions - so this app has to
+   * do that fallback itself). Throws if any given disk's current device can't be located -
+   * deliberately not skipped, since an incomplete re-import is worse than a clear failure for
+   * every current caller (reloadDriver() already required this; startArray() only ever calls this
+   * for slots it just confirmed are missing *because of* the whole-disk gap, so a location failure
+   * there is a genuinely new problem worth surfacing, not something to silently paper over).
+   */
+  private async reimportKnownDisks(known: { slot: number; disk_id: string; size_kb: number }[]): Promise<{ slot: number; device: string }[]> {
     const located: { slot: number; device: string; diskId: string; sizeKb: number }[] = [];
     for (const d of known) {
       const found = await this.findDeviceByDiskId(d.disk_id);
@@ -293,6 +302,21 @@ export class RealNmdClient implements NmdClient {
         );
       }
       located.push({ slot: d.slot, device: found.partition ?? found.device, diskId: d.disk_id, sizeKb: d.size_kb });
+    }
+    for (const d of located) {
+      await this.writeNmdCmd(`import ${d.slot} ${basename(d.device)} 0 ${d.sizeKb} 0 ${d.diskId}`);
+    }
+    return located.map((d) => ({ slot: d.slot, device: d.device }));
+  }
+
+  async reloadDriver(): Promise<NmdCommandResult> {
+    const before = await this.getStatus();
+    // Validated, not before.array.superblock directly - see resolveSuperblockPath's doc comment.
+    const superblockPath = this.resolveSuperblockPath(before.array.superblock);
+
+    const known = before.disks.filter((d) => d.disk_id && d.disk_id !== 'none');
+    if (known.length === 0) {
+      throw new Error('No disks with a known identity to re-import - nothing to safely recover.');
     }
 
     await this.run(['stop']);
@@ -313,9 +337,7 @@ export class RealNmdClient implements NmdClient {
       );
     }
 
-    for (const d of located) {
-      await this.writeNmdCmd(`import ${d.slot} ${basename(d.device)} 0 ${d.sizeKb} 0 ${d.diskId}`);
-    }
+    const located = await this.reimportKnownDisks(known);
 
     await this.startArray();
     return {
@@ -490,12 +512,36 @@ export class RealNmdClient implements NmdClient {
    * activity feed or a dialog. Falls back to that raw text for anything not
    * in the table, since it's still the best information available then.
    */
+  /**
+   * #10 (see the driver-fork-removal handoff): a slot with a recorded identity (disk_id set) but
+   * no live device (device missing/"none") that ISN'T one of the two intentional-unassign
+   * statuses (DISK_NP_MISSING - uncommitted, DISK_NP_DSBL - committed; both legitimately read
+   * "none" by design, see unassignDisk()/restoreUnassignedDisk()) is exactly the signature
+   * nmdctl's own import_disks() rescan leaves behind for a raw, unpartitioned whole-disk array
+   * member - every disk this app ever provisions (commitNewDisk()/addDisk()/shrinkArray() never
+   * create a partition table). Confirmed directly against tools/nmdctl and the kernel driver this
+   * session: import_disks()'s find_partition() call has no fallback for "no partition table, but
+   * the whole device itself is the intended slot content" once the fork's own fix for this
+   * (commit 7148a18) is gone, so it just fails to re-find the disk and skips the slot - and
+   * import_slot() (the C side) refuses outright once the array is actually started, so this only
+   * ever matters here, before that point. The same two statuses are exactly what nmdctl's own
+   * import_disks() itself already skips for the same reason (unassigned-on-purpose), matched here
+   * verbatim rather than re-derived.
+   */
+  private staleWholeDiskSlots(status: NmdStatusResponse): { slot: number; disk_id: string; size_kb: number }[] {
+    return status.disks
+      .filter((d) => d.disk_id && d.disk_id !== 'none')
+      .filter((d) => !d.device || d.device === 'none')
+      .filter((d) => d.status !== 'DISK_NP_MISSING' && d.status !== 'DISK_NP_DSBL')
+      .map((d) => ({ slot: d.slot, disk_id: d.disk_id, size_kb: d.size_kb }));
+  }
+
   async startArray(): Promise<NmdCommandResult> {
     try {
       const { stdout } = await this.run(['start']);
       return { ok: true, message: stdout.trim() };
     } catch (err) {
-      const status = await this.getStatus();
+      let status = await this.getStatus();
       if (status.array.state === 'STARTED') {
         throw err;
       }
@@ -503,14 +549,59 @@ export class RealNmdClient implements NmdClient {
         const known = ARRAY_ERROR_DESCRIPTIONS[status.array.state];
         throw known ? new Error(`${known} (${status.array.state})`) : err;
       }
+
+      // #10: `start` failed and the array isn't in a recognized ERROR:* state - check for the
+      // raw-whole-disk re-import gap before falling back to the generic explicit-state retry
+      // below (which alone can't fix this: nmdctl would just fail import_disks() the same way on
+      // a second attempt). Explicitly re-import exactly the affected slots, using the same by-ID
+      // lookup reloadDriver() relies on, then retry `start` once - importing a slot only updates
+      // its recorded device, it doesn't itself start the array (confirmed against the kernel
+      // driver's import_slot()/start_array() split), so a fresh `start` call is genuinely required
+      // afterward, not just a courtesy re-check.
+      const stale = this.staleWholeDiskSlots(status);
+      if (stale.length > 0) {
+        await this.reimportKnownDisks(stale);
+        try {
+          const { stdout } = await this.run(['start']);
+          return { ok: true, message: stdout.trim() };
+        } catch {
+          status = await this.getStatus(); // refresh - state may have changed since the repair
+        }
+      }
+
       const { stdout } = await this.run(['start', status.array.state]);
       return { ok: true, message: stdout.trim() };
     }
   }
 
+  /**
+   * #15 (see the driver-fork-removal handoff): the kernel driver refuses to stop while
+   * mddev->active (a shared open-refcount across every nmdN device node) is nonzero - confirmed
+   * against the driver source this session, stop_array() returns -EBUSY outright with no retry of
+   * its own. That count can lag a LUKS-backed disk's own `cryptsetup close` (or any other just-
+   * finished unmount) by a fraction of a second - real, but not distinguishable from any other
+   * stop failure via nmdctl's own text output (run_nmd_command()/stop_array() in tools/nmdctl both
+   * print the same generic "Error: Failed to..." either way, confirmed against that source too -
+   * there's no EBUSY-specific message to match on). Retrying the *whole* `nmdctl stop` command
+   * (not just the raw /proc/nmdcmd write the dropped fork commit retried directly) is safe to do
+   * unconditionally: nmdctl's own stop_array() no-ops immediately if the array isn't STARTED, and
+   * re-checks for still-mounted filesystems fresh each call - so retrying can't make a genuinely
+   * different failure (e.g. still-mounted filesystems in unattended mode) any worse, only add a
+   * bounded ~1s of latency before surfacing the same error. `udevadm settle` between attempts
+   * mirrors the dropped commit exactly, giving any in-flight device-node churn a chance to clear
+   * before the next write.
+   */
   async stopArray(): Promise<NmdCommandResult> {
-    const { stdout } = await this.run(['stop']);
-    return { ok: true, message: stdout.trim() };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const { stdout } = await this.run(['stop']);
+        return { ok: true, message: stdout.trim() };
+      } catch (err) {
+        if (attempt >= 4) throw err;
+        await this.runSystem('udevadm', ['settle', '--timeout=5']).catch(() => {});
+        await sleep(200);
+      }
+    }
   }
 
   async unmountDisks(): Promise<NmdCommandResult> {
@@ -693,8 +784,16 @@ export class RealNmdClient implements NmdClient {
   }
 
   async listAvailableDevices(): Promise<AvailableDevice[]> {
-    const status = await this.getStatus();
-    const claimedIds = status.disks.map((d) => d.disk_id).filter((id): id is string => !!id && id !== 'none');
+    // A genuinely blank array (no superblock has ever existed) has nothing claimed yet either -
+    // same bootstrap case addDisk()/commitNewDisk() handle, see their own doc comments.
+    let status: NmdStatusResponse | null;
+    try {
+      status = await this.getStatus();
+    } catch (err) {
+      if (!(err instanceof ArrayNotConfiguredError)) throw err;
+      status = null;
+    }
+    const claimedIds = (status?.disks ?? []).map((d) => d.disk_id).filter((id): id is string => !!id && id !== 'none');
 
     // A disk actively serving as an array member is claimed by the driver and
     // re-exposed as its own block device (e.g. /dev/nmd5p1) - the *raw*
@@ -709,7 +808,7 @@ export class RealNmdClient implements NmdClient {
     // against the array's own live device list closes it independently of
     // both existing checks.
     const claimedDeviceNames = new Set(
-      status.disks.map((d) => d.device).filter((dev): dev is string => !!dev && dev !== 'none'),
+      (status?.disks ?? []).map((d) => d.device).filter((dev): dev is string => !!dev && dev !== 'none'),
     );
 
     const devicePaths = await this.enumerateDevicePaths();
@@ -830,17 +929,25 @@ export class RealNmdClient implements NmdClient {
   }
 
   /**
-   * `add -f slot:device[:id]`, then start the array (naming whatever
-   * abnormal state it reports, since unattended mode refuses to start in
-   * one otherwise), then kick off any pending clear/reconstruction. Shared
-   * tail for both addDisk() (empty slot) and replaceDisk() (occupied slot,
-   * after it's cleared the old identity) - the sequence is identical once
-   * the slot is actually empty, only how it got that way differs.
+   * `add` (or `create` - see `bootstrap`) `-f slot:device[:id]`, then start the array (naming
+   * whatever abnormal state it reports), then kick off any pending clear/reconstruction. Shared
+   * tail for addDisk(), replaceDisk(), and a genuinely blank array's first disk alike.
    */
-  private async commitNewDisk(slot: number, device: string, diskId: string | undefined, lines: string[], autoStart = true): Promise<void> {
+  private async commitNewDisk(
+    slot: number,
+    device: string,
+    diskId: string | undefined,
+    lines: string[],
+    autoStart = true,
+    bootstrap = false,
+  ): Promise<void> {
+    // `create` (bootstrap) instead of `add`: nmdctl's own module-load check only accepts a
+    // not-yet-existing superblock from inside `create`'s call stack, so a genuinely blank array
+    // (no /nonraid.dat has ever existed) can only ever be brought up this way, never via `add`.
+    const cmd = bootstrap ? 'create' : 'add';
     const idSuffix = diskId ? `:${diskId}` : '';
     try {
-      const { stdout } = await this.run(['add', '-f', `${slot}:${device}${idSuffix}`]);
+      const { stdout } = await this.run([cmd, '-f', `${slot}:${device}${idSuffix}`]);
       lines.push(stdout.trim());
     } catch (err) {
       const message = (err as Error).message;
@@ -849,7 +956,7 @@ export class RealNmdClient implements NmdClient {
         // freshly-attached test VM disk with no `serial=` set) - fall back
         // to a synthetic ID rather than failing outright.
         const fallbackId = syntheticDiskId(device);
-        const { stdout } = await this.run(['add', '-f', `${slot}:${device}:${fallbackId}`]);
+        const { stdout } = await this.run([cmd, '-f', `${slot}:${device}:${fallbackId}`]);
         lines.push(stdout.trim());
       } else {
         throw err;
@@ -909,16 +1016,28 @@ export class RealNmdClient implements NmdClient {
    * one currently showing DISK_NP_MISSING, as a "replace", which for parity
    * specifically demands a spare data slot; that's replaceDisk()'s job, not
    * this one). Requires the array already stopped and the slot genuinely
-   * empty; both checked fresh here.
+   * empty; both checked fresh here - except on a genuinely blank array (no
+   * superblock has ever existed), where there's no status to check yet and
+   * this is instead the call that bootstraps one (see commitNewDisk's
+   * `bootstrap` param).
    */
   async addDisk(slot: number, device: string, diskId?: string, options?: { autoStart?: boolean }): Promise<AddDiskResult> {
-    const status = await this.getStatus();
-    if (status.array.state === 'STARTED') {
-      throw new Error('Stop the array before adding a disk.');
+    let status: NmdStatusResponse | null;
+    try {
+      status = await this.getStatus();
+    } catch (err) {
+      if (!(err instanceof ArrayNotConfiguredError)) throw err;
+      status = null;
     }
-    const existing = status.disks.find((d) => d.slot === slot);
-    if (existing && existing.disk_id && existing.disk_id !== 'none') {
-      throw new Error(`Slot ${slot} already has a disk assigned - unassign it first, or use Replace Disk.`);
+
+    if (status) {
+      if (status.array.state === 'STARTED') {
+        throw new Error('Stop the array before adding a disk.');
+      }
+      const existing = status.disks.find((d) => d.slot === slot);
+      if (existing && existing.disk_id && existing.disk_id !== 'none') {
+        throw new Error(`Slot ${slot} already has a disk assigned - unassign it first, or use Replace Disk.`);
+      }
     }
 
     // Hard backstop independent of whatever the caller scanned: refuse to
@@ -933,7 +1052,7 @@ export class RealNmdClient implements NmdClient {
     }
 
     const lines: string[] = [];
-    await this.commitNewDisk(slot, device, diskId, lines, options?.autoStart ?? true);
+    await this.commitNewDisk(slot, device, diskId, lines, options?.autoStart ?? true, status === null);
     return { slot, message: `Disk assignment to slot ${slot} started.`, output: lines.join('\n\n') };
   }
 

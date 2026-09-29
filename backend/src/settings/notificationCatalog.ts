@@ -22,7 +22,8 @@ export type NotificationEventType =
   | 'dockerUpdateAvailable'
   | 'backupSkipped'
   | 'remoteBackupRetentionFailed'
-  | 'dockerLxcStorageUnavailable';
+  | 'dockerLxcStorageUnavailable'
+  | 'driverAutoReload';
 
 export type NotificationSeverity = 'high' | 'medium' | 'low';
 
@@ -61,6 +62,12 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { id: 'backupSkipped', label: 'Backup skipped (misconfigured)', severity: 'high', defaultEnabled: true },
   { id: 'dockerLxcStorageUnavailable', label: "Docker/LXC storage on the array isn't available", severity: 'high', defaultEnabled: true },
   { id: 'cacheMirrorDegraded', label: 'Cache mirror degraded', severity: 'high', defaultEnabled: true },
+  {
+    id: 'driverAutoReload',
+    label: 'Array driver refreshed automatically (briefly stops the array)',
+    severity: 'high',
+    defaultEnabled: true,
+  },
   { id: 'cacheMoverFailed', label: 'Cache mover failed', severity: 'high', defaultEnabled: true },
   { id: 'tempAlertCpu', label: 'CPU temperature alert', severity: 'medium', defaultEnabled: true, group: 'Temperature' },
   { id: 'tempAlertDisk', label: 'Disk temperature alert', severity: 'medium', defaultEnabled: true, group: 'Temperature' },

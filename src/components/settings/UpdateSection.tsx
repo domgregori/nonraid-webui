@@ -35,6 +35,12 @@ function hasUpdateAvailable(component: ComponentUpdateStatus): boolean {
   return component.upToDate === null && component.installed === null && component.latest !== null;
 }
 
+// nonraid's installed/latest are full commit SHAs now, not short tags - truncate for display the
+// way git itself does (`git log --oneline`); leave anything else (a real tag) untouched.
+function shortVersion(value: string): string {
+  return /^[0-9a-f]{40}$/i.test(value) ? value.slice(0, 7) : value;
+}
+
 function StatusBadge({ component }: { component: ComponentUpdateStatus }) {
   const { t } = useTranslation('settings');
   if (component.checkError) {
@@ -167,7 +173,9 @@ export function UpdateSection() {
               <div className="settings-info-row">
                 <span className="settings-info-row__label">{t('UpdateSection.installed')}</span>
                 <span className="settings-info-row__value settings-info-row__value--mono">
-                  {component.installed ?? t('UpdateSection.notTaggedRelease')}
+                  {component.installed
+                    ? shortVersion(component.installed)
+                    : t(key === 'nonraid' ? 'UpdateSection.notBuiltYet' : 'UpdateSection.notTaggedRelease')}
                 </span>
               </div>
               {key === 'nonraid' && (
@@ -175,7 +183,7 @@ export function UpdateSection() {
                   <span className="settings-info-row__label">{t('UpdateSection.running')}</span>
                   <span className="settings-info-row__value settings-info-row__value--mono">
                     {component.runningMatchesInstalled === true
-                      ? (component.installed ?? t('UpdateSection.notTaggedRelease'))
+                      ? (component.installed ? shortVersion(component.installed) : t('UpdateSection.notBuiltYet'))
                       : component.runningMatchesInstalled === false
                         ? t('UpdateSection.olderBuild')
                         : t('UpdateSection.unknown')}
@@ -191,8 +199,11 @@ export function UpdateSection() {
               <div className="settings-info-row">
                 <span className="settings-info-row__label">{t('UpdateSection.latest')}</span>
                 <span className="settings-info-row__value settings-info-row__value--mono">
-                  {component.latest ?? t('UpdateSection.noReleasesPublished')}
-                  {component.latest && (
+                  {component.latest
+                    ? shortVersion(component.latest)
+                    : t(key === 'nonraid' ? 'UpdateSection.couldNotCheckUpstream' : 'UpdateSection.noReleasesPublished')}
+                  {/* nonraid has no GitHub Releases to show - a commit SHA is never a tag */}
+                  {component.latest && key !== 'nonraid' && (
                     <button type="button" className="settings-info-row__link" onClick={() => setViewingChangelog(key)}>
                       {t('UpdateSection.changelog')}
                     </button>

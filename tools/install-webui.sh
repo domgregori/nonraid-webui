@@ -3,11 +3,11 @@
 # package dependencies, the NonRAID kernel driver + nmdctl (built from source, see
 # NONRAID_REPO_URL below), nonraid-webui itself, and starts every service involved. Safe to
 # re-run for updates afterward: apt-get install skips already-installed packages, the driver step
-# always re-pulls and rebuilds from the latest commit on that repo's main branch (a personal fork
-# with fixes landing ahead of any version bump — see its own comment below for why this can't
-# just skip-if-already-built like mergerfs/Node below do), this checkout's own node_modules is
-# never touched (a staged copy in /opt is pruned instead), and it always ends with `systemctl
-# restart` so first-install and every later update take the same code path.
+# always re-pulls and rebuilds from bare upstream's main branch tip (no version tags exist there -
+# see its own comment below for why this can't just skip-if-already-built like mergerfs/Node below
+# do), this checkout's own node_modules is never touched (a staged copy in /opt is pruned instead),
+# and it always ends with `systemctl restart` so first-install and every later update take the same
+# code path.
 #
 # Run from inside a nonraid-webui checkout, as root:
 #   sudo tools/install-webui.sh
@@ -35,7 +35,7 @@ MERGERFS_MIN="2.42.0"
 # change - via Settings -> Update's "NonRAID WebUI" component, which re-runs pin_kernel_minor as
 # part of applying that update (see backend/src/update/apply.ts's applyWebuiUpdate).
 KERNEL_TARGET_MINOR="6.12"
-NONRAID_REPO_URL="https://github.com/domgregori/nonraid.git"
+NONRAID_REPO_URL="https://github.com/qvr/nonraid.git"
 NONRAID_SRC_DIR=/usr/src/nonraid
 ARRAY_DATA_GROUP=users
 ARRAY_DATA_GID=100
@@ -69,9 +69,8 @@ LOG_FILE="$LOG_DIR/install-$(date +%Y%m%d-%H%M%S).log"
 # --step-level flag since every other tunable here is a top-of-file constant too.
 NONRAID_SNAPSHOT_KEEP="${NONRAID_SNAPSHOT_KEEP:-0}"
 NONRAID_SNAPSHOT_TOPVOL_MNT=/mnt/nonraid-topvol
-# The exact release tag (e.g. "v0.2.0") build_nonraid_driver() last successfully installed - see
-# backend/src/update/service.ts's own comment on the matching NONRAID_DRIVER_VERSION_FILE constant
-# for why a tag, not PACKAGE_VERSION or a raw commit hash.
+# The exact commit SHA of qvr/nonraid main that build_nonraid_driver() last successfully installed
+# - see backend/src/update/service.ts's matching NONRAID_DRIVER_VERSION_FILE comment.
 NONRAID_DRIVER_VERSION_FILE=/etc/nonraid/driver-version
 
 log() { echo "==> $*"; }
@@ -525,40 +524,27 @@ ensure_node() {
   log "Node.js v$node_version OK"
 }
 
-# Versioning convention (see backend/src/update/service.ts's own top comment for the full
-# rationale): a manually-pushed semver tag (v0.1.0, v0.2.0, ...) marks a real release - nothing
-# else counts, and this deliberately never falls back to "just track main" the way it used to.
-# Finds the newest such tag on $NONRAID_SRC_DIR's own already-fetched refs and echoes it, or
-# nothing if there isn't one yet.
-latest_semver_tag() {
-  git -C "$NONRAID_SRC_DIR" tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1
-}
-
+# Versioning convention for this component: qvr/nonraid is bare upstream with no version tags at
+# all, so track main's tip commit directly instead (nonraid-webui itself keeps the tag convention -
+# see backend/src/update/service.ts's top comment).
 fetch_nonraid_source() {
-  log "Fetching NonRAID from $NONRAID_REPO_URL (tagged releases only)"
-  local latest_tag
+  log "Fetching NonRAID from $NONRAID_REPO_URL (main branch tip)"
   if [ -d "$NONRAID_SRC_DIR/.git" ]; then
-    # An existing checkout only shows up here on a re-run/update, or when one was pre-seeded onto
-    # an install image (see nonraid-os's build/build-image.sh) so the install still has something
-    # to build against with no network at all. A failed fetch isn't fatal the way it is below when
-    # there's nothing to fall back on: warn and keep building from whatever tag is already checked
-    # out rather than aborting the whole install.
-    if git -C "$NONRAID_SRC_DIR" fetch --tags origin; then
-      latest_tag="$(latest_semver_tag)"
-      [ -n "$latest_tag" ] || fail "No tagged NonRAID release exists at $NONRAID_REPO_URL yet - push one (e.g. \`git tag v0.1.0 <commit> && git push origin v0.1.0\`) before installing/updating."
-      log "Checking out $latest_tag"
-      git -C "$NONRAID_SRC_DIR" checkout --detach "$latest_tag"
+    # An existing checkout upgrading from an older install-webui.sh may still have `origin`
+    # pointed at the old domgregori/nonraid fork - always resync it so this actually switches.
+    git -C "$NONRAID_SRC_DIR" remote set-url origin "$NONRAID_REPO_URL"
+    # A failed fetch isn't fatal here (unlike the fresh-clone branch below): warn and keep building
+    # from whatever's already checked out rather than aborting the whole install.
+    if git -C "$NONRAID_SRC_DIR" fetch origin main; then
+      log "Checking out origin/main"
+      git -C "$NONRAID_SRC_DIR" checkout --detach FETCH_HEAD
       chown -R root:root "$NONRAID_SRC_DIR"
     else
       log "Could not reach $NONRAID_REPO_URL (offline?) — building from the existing checkout at $NONRAID_SRC_DIR as-is"
     fi
   else
     rm -rf "$NONRAID_SRC_DIR"
-    git clone --no-checkout "$NONRAID_REPO_URL" "$NONRAID_SRC_DIR"
-    latest_tag="$(latest_semver_tag)"
-    [ -n "$latest_tag" ] || fail "No tagged NonRAID release exists at $NONRAID_REPO_URL yet - push one (e.g. \`git tag v0.1.0 <commit> && git push origin v0.1.0\`) before installing/updating."
-    log "Checking out $latest_tag"
-    git -C "$NONRAID_SRC_DIR" checkout --detach "$latest_tag"
+    git clone --branch main "$NONRAID_REPO_URL" "$NONRAID_SRC_DIR"
     chown -R root:root "$NONRAID_SRC_DIR"
   fi
 }
@@ -583,18 +569,12 @@ build_nonraid_driver() {
   cp -r "$NONRAID_SRC_DIR/md_nonraid" "$NONRAID_SRC_DIR/raid6" "$NONRAID_SRC_DIR/dkms.conf" "$NONRAID_SRC_DIR/Makefile" "$dkms_src_dir/"
   dkms install "nonraid-dkms/$nonraid_version" -k "$kversion"
 
-  # PACKAGE_VERSION above doesn't reliably bump on every real fix landing in this fork (see this
-  # function's own top comment), so it's not a usable "what's actually installed" indicator - the
-  # exact release tag fetch_nonraid_source() checked out is. --exact-match fails loudly (via `fail`
-  # below, not silently) if that checkout somehow isn't exactly at a tag - it always should be,
-  # since fetch_nonraid_source() never leaves it anywhere else. Stamped only now, after `dkms
-  # install` has actually succeeded, so nonraid-webui's update-check UI never claims a release is
-  # installed when the build that would have installed it actually failed partway through.
-  local installed_tag
-  installed_tag="$(git -C "$NONRAID_SRC_DIR" describe --tags --exact-match 2>/dev/null)" \
-    || fail "$NONRAID_SRC_DIR isn't checked out exactly at a release tag - can't stamp $NONRAID_DRIVER_VERSION_FILE. This shouldn't happen; re-run fetch_nonraid_source."
+  # Stamped only now, after `dkms install` has actually succeeded, so nonraid-webui's update-check
+  # UI never claims a commit is installed when the build that would install it failed partway.
+  local installed_commit
+  installed_commit="$(git -C "$NONRAID_SRC_DIR" rev-parse HEAD)"
   mkdir -p "$(dirname "$NONRAID_DRIVER_VERSION_FILE")"
-  echo "$installed_tag" > "$NONRAID_DRIVER_VERSION_FILE"
+  echo "$installed_commit" > "$NONRAID_DRIVER_VERSION_FILE"
 }
 
 # Kept as its own canonical step (unchanged name/position) for a full install - just a thin wrapper
