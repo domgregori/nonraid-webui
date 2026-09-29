@@ -921,17 +921,25 @@ export class RealNmdClient implements NmdClient {
   }
 
   /**
-   * `add -f slot:device[:id]`, then start the array (naming whatever
-   * abnormal state it reports, since unattended mode refuses to start in
-   * one otherwise), then kick off any pending clear/reconstruction. Shared
-   * tail for both addDisk() (empty slot) and replaceDisk() (occupied slot,
-   * after it's cleared the old identity) - the sequence is identical once
-   * the slot is actually empty, only how it got that way differs.
+   * `add` (or `create` - see `bootstrap`) `-f slot:device[:id]`, then start the array (naming
+   * whatever abnormal state it reports), then kick off any pending clear/reconstruction. Shared
+   * tail for addDisk(), replaceDisk(), and a genuinely blank array's first disk alike.
    */
-  private async commitNewDisk(slot: number, device: string, diskId: string | undefined, lines: string[], autoStart = true): Promise<void> {
+  private async commitNewDisk(
+    slot: number,
+    device: string,
+    diskId: string | undefined,
+    lines: string[],
+    autoStart = true,
+    bootstrap = false,
+  ): Promise<void> {
+    // `create` (bootstrap) instead of `add`: nmdctl's own module-load check only accepts a
+    // not-yet-existing superblock from inside `create`'s call stack, so a genuinely blank array
+    // (no /nonraid.dat has ever existed) can only ever be brought up this way, never via `add`.
+    const cmd = bootstrap ? 'create' : 'add';
     const idSuffix = diskId ? `:${diskId}` : '';
     try {
-      const { stdout } = await this.run(['add', '-f', `${slot}:${device}${idSuffix}`]);
+      const { stdout } = await this.run([cmd, '-f', `${slot}:${device}${idSuffix}`]);
       lines.push(stdout.trim());
     } catch (err) {
       const message = (err as Error).message;
@@ -940,7 +948,7 @@ export class RealNmdClient implements NmdClient {
         // freshly-attached test VM disk with no `serial=` set) - fall back
         // to a synthetic ID rather than failing outright.
         const fallbackId = syntheticDiskId(device);
-        const { stdout } = await this.run(['add', '-f', `${slot}:${device}:${fallbackId}`]);
+        const { stdout } = await this.run([cmd, '-f', `${slot}:${device}:${fallbackId}`]);
         lines.push(stdout.trim());
       } else {
         throw err;
@@ -1000,16 +1008,28 @@ export class RealNmdClient implements NmdClient {
    * one currently showing DISK_NP_MISSING, as a "replace", which for parity
    * specifically demands a spare data slot; that's replaceDisk()'s job, not
    * this one). Requires the array already stopped and the slot genuinely
-   * empty; both checked fresh here.
+   * empty; both checked fresh here - except on a genuinely blank array (no
+   * superblock has ever existed), where there's no status to check yet and
+   * this is instead the call that bootstraps one (see commitNewDisk's
+   * `bootstrap` param).
    */
   async addDisk(slot: number, device: string, diskId?: string, options?: { autoStart?: boolean }): Promise<AddDiskResult> {
-    const status = await this.getStatus();
-    if (status.array.state === 'STARTED') {
-      throw new Error('Stop the array before adding a disk.');
+    let status: NmdStatusResponse | null;
+    try {
+      status = await this.getStatus();
+    } catch (err) {
+      if (!(err instanceof ArrayNotConfiguredError)) throw err;
+      status = null;
     }
-    const existing = status.disks.find((d) => d.slot === slot);
-    if (existing && existing.disk_id && existing.disk_id !== 'none') {
-      throw new Error(`Slot ${slot} already has a disk assigned - unassign it first, or use Replace Disk.`);
+
+    if (status) {
+      if (status.array.state === 'STARTED') {
+        throw new Error('Stop the array before adding a disk.');
+      }
+      const existing = status.disks.find((d) => d.slot === slot);
+      if (existing && existing.disk_id && existing.disk_id !== 'none') {
+        throw new Error(`Slot ${slot} already has a disk assigned - unassign it first, or use Replace Disk.`);
+      }
     }
 
     // Hard backstop independent of whatever the caller scanned: refuse to
@@ -1024,7 +1044,7 @@ export class RealNmdClient implements NmdClient {
     }
 
     const lines: string[] = [];
-    await this.commitNewDisk(slot, device, diskId, lines, options?.autoStart ?? true);
+    await this.commitNewDisk(slot, device, diskId, lines, options?.autoStart ?? true, status === null);
     return { slot, message: `Disk assignment to slot ${slot} started.`, output: lines.join('\n\n') };
   }
 
