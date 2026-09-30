@@ -17,7 +17,6 @@
 - **This webui was AI coded.** There's no way I would have had the time to code this by hand.
 - The backbone nonraid kernel driver from [qvr/nonraid](https://github.com/qvr/nonraid) is based on the unraid kernel driver, not AI coded.
 - The nonraid tool (nmdctl) was written by [qvr](https://github.com/qvr/nonraid)
-- Builds and installs the driver from bare upstream [qvr/nonraid](https://github.com/qvr/nonraid) - no fork needed anymore.
 - Logo was designed by me.
 - I have been testing this on a real metal rig at every step.
 
